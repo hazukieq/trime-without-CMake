@@ -11,7 +11,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import cat.ereza.customactivityoncrash.CustomActivityOnCrash
-import com.osfans.trime.BuildConfig
 import com.osfans.trime.R
 import com.osfans.trime.TrimeApplication
 import com.osfans.trime.databinding.ActivityLogBinding
@@ -25,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import java.io.OutputStreamWriter
+import com.osfans.trime.BuildConfig
 
 class LogActivity : AppCompatActivity() {
 

@@ -21,7 +21,7 @@ class LooksFragment : PreferenceFragmentCompat() {
         super.onPrepareOptionsMenu(menu)
     }
 
-    override fun onPreferenceTreeClick(preference: Preference?): Boolean {
+    override fun onPreferenceTreeClick(preference: Preference): Boolean {
         return when (preference?.key) {
             "looks__selected_theme" -> {
                 ThemePickerDialog(requireContext()).show()

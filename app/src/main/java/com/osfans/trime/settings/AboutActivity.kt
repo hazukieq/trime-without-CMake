@@ -12,11 +12,11 @@ import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.Fragment
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
-import com.osfans.trime.BuildConfig
 import com.osfans.trime.R
 import com.osfans.trime.core.Rime
 import com.osfans.trime.databinding.AboutActivityBinding
 import com.osfans.trime.util.AppVersionUtils.writeLibraryVersionToSummary
+import com.osfans.trime.BuildConfig
 
 class AboutActivity : AppCompatActivity() {
     lateinit var binding: AboutActivityBinding
@@ -90,8 +90,8 @@ class AboutActivity : AppCompatActivity() {
                 ?.hidden()
         }
 
-        override fun onPreferenceTreeClick(preference: Preference?): Boolean {
-            return when (preference?.key) {
+        override fun onPreferenceTreeClick(preference: Preference): Boolean {
+            return when (preference.key) {
                 "about__licensing" -> {
                     val webView = WebView(requireContext())
                     webView.loadUrl("file:///android_asset/license/open_source_license.html")
@@ -126,7 +126,7 @@ class AboutActivity : AppCompatActivity() {
 }
 
 private fun Preference.hidden() {
-    if (this.summary.isBlank() || this.intent.data.toString().isBlank()) {
+    if (this.summary?.isBlank() ?:  this.intent?.data.toString().isBlank()) {
         this.setVisible(false)
     }
 }

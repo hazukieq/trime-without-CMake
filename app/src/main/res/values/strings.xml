@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
+<?xml version="1.0" encoding="utf-8"?><!--
 /**
  * Copyright (C) 2015-present, osfans
  * waxaca@163.com https://github.com/osfans
@@ -20,7 +19,7 @@
 -->
 <resources xmlns:xliff="urn:oasis:names:en:xliff:document:1.2">
     <!-- Input Method Platform Tittle  -->
-    <string name="trime_app_name">Trime·Trime</string>
+    <string name="trime_app_name">Hktrime</string>
     <!-- Preference settings -->
     <string name="settings__help_title">Help</string>
     <string name="pref_wiki">Wiki</string>
@@ -78,7 +77,7 @@
         <item>Input</item>
         <item>None</item>
     </string-array>
-    <string-array name="other__ui_mode_entries" >
+    <string-array name="other__ui_mode_entries">
         <item name="auto">System Default</item>
         <item name="light">Light</item>
         <item name="dark">Dark</item>
@@ -122,7 +121,7 @@
     <string name="other__clipboard_compare_title">Clipboard Compare Rules</string>
     <string name="other__clipboard_output_title">Clipboard Output Rules</string>
     <string name="other__clipboard_manager_summary">Number of clipboard saved items</string>
-    <string-array name="other__clipboard_manager_entries" >
+    <string-array name="other__clipboard_manager_entries">
         <item name="0">Disable</item>
         <item name="20">20</item>
         <item name="50">50</item>
@@ -193,13 +192,13 @@
     <string name="pref_keyboard__hook_summary">Not handled by the App being edited or librime</string>
     <string name="keyboard__hook_candidate_on">Commit directly</string>
     <string name="keyboard__hook_candidate_off">Send number key to librime</string>
-<string name="keyboard__key_swipe_travel_hi_title">The distance to trigger the swipe gesture</string>
-     <string name="keyboard__key_swipe_time_hi_title">Determine the time interval for consecutive keystrokes</string>
-     <string name="keyboard__hook_fast_input">Time interval as fast input </string>
-     <string name="keyboard__hook_fast_input_summary">Merge multiple key inputs into one, thereby reducing the time for candidates, but the interactive feedback will become worse (It will be comming soon)</string>
-     <string name="keyboard__swipe_enabled">Allow swipe gestures to trigger keys</string>
-     <string name="keyboard__key_swipe_velocity">The speed of triggering the button swipe gesture (the distance/velocity is sufficient)</string>
-     <string name="keyboard__key_swipe_velocity_hi">The velocity of the swipe gesture on consecutive keystrokes</string>
+    <string name="keyboard__key_swipe_travel_hi_title">The distance to trigger the swipe gesture</string>
+    <string name="keyboard__key_swipe_time_hi_title">Determine the time interval for consecutive keystrokes</string>
+    <string name="keyboard__hook_fast_input">Time interval as fast input </string>
+    <string name="keyboard__hook_fast_input_summary">Merge multiple key inputs into one, thereby reducing the time for candidates, but the interactive feedback will become worse (It will be comming soon)</string>
+    <string name="keyboard__swipe_enabled">Allow swipe gestures to trigger keys</string>
+    <string name="keyboard__key_swipe_velocity">The speed of triggering the button swipe gesture (the distance/velocity is sufficient)</string>
+    <string name="keyboard__key_swipe_velocity_hi">The velocity of the swipe gesture on consecutive keystrokes</string>
     <string name="about__buildinfo">Build info</string>
     <string name="keyboard__use_mini_keyboard_title">Show mini keyboard with real keyboard attached</string>
     <string name="pref_trime_custom_qq">Custom QQ Group</string>
@@ -208,7 +207,7 @@
     <string name="pref_keyboard__candidate">Candidate</string>
     <string name="keyboard__candidate_page_size">Candidate item count for each page</string>
     <string name="copy_done">Copied to clipboard!</string>
-    <string-array name="keyboard__candidate_page_size_entries" >
+    <string-array name="keyboard__candidate_page_size_entries">
         <item name="10000">Less than candidate</item>
         <item name="10001">close to candidate</item>
         <item name="10002">More than candidate</item>

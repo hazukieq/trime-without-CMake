@@ -95,6 +95,8 @@ import com.osfans.trime.util.StringUtils;
 import com.osfans.trime.util.ViewUtils;
 import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.zip.Inflater;
+
 import kotlin.jvm.Synchronized;
 import timber.log.Timber;
 
@@ -141,7 +143,7 @@ public class Trime extends LifecycleInputMethodService {
 
   private final int dialogType =
       VERSION.SDK_INT >= VERSION_CODES.P
-          ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+          ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY//TYPE_APPLICATION_OVERLAY
           : WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
 
   private boolean isPopupWindowEnabled = true; // 顯示懸浮窗口
@@ -154,7 +156,7 @@ public class Trime extends LifecycleInputMethodService {
   private int minPopupCheckSize; // 第一屏候选词数量少于设定值，则候选词上悬浮窗。（也就是说，第一屏存在长词）此选项大于1时，min_length等参数失效
   private PositionType popupWindowPos; // 悬浮窗口彈出位置
   private PopupWindow mPopupWindow;
-  private RectF mPopupRectF = new RectF();
+  private final RectF mPopupRectF = new RectF();
   private final Handler mPopupHandler = new Handler(Looper.getMainLooper());
   private final Runnable mPopupTimer =
       new Runnable() {
@@ -292,7 +294,7 @@ public class Trime extends LifecycleInputMethodService {
         "\t<TrimeInit>\t" + Thread.currentThread().getStackTrace()[2].getMethodName() + "\t";
     Timber.d(methodName);
     super.onWindowHidden();
-    Timber.d(methodName + "super finish");
+    Timber.d("%ssuper finish", methodName);
     if (!isWindowShown) {
       Timber.i("Ignoring (is already hidden)");
       return;
@@ -307,7 +309,7 @@ public class Trime extends LifecycleInputMethodService {
       syncBackgroundHandler.sendMessageDelayed(msg, 5000); // 输入面板隐藏5秒后，开始后台同步
     }
 
-    Timber.d(methodName + "eventListeners");
+    Timber.d("%seventListeners", methodName);
     for (EventListener listener : eventListeners) {
       if (listener != null) listener.onWindowHidden();
     }
@@ -379,14 +381,14 @@ public class Trime extends LifecycleInputMethodService {
 
         activeEditorInstance = new EditorInstance(this);
         imeManager = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-        Timber.d(methodName + "InputFeedbackManager");
+        Timber.d("%sInputFeedbackManager", methodName);
         inputFeedbackManager = new InputFeedbackManager(this);
 
-        Timber.d(methodName + "keyboardSwitcher");
+        Timber.d("%skeyboardSwitcher", methodName);
 
         keyboardSwitcher = new KeyboardSwitcher();
 
-        Timber.d(methodName + "liquidKeyboard");
+        Timber.d("%sliquidKeyboard", methodName);
         liquidKeyboard =
             new LiquidKeyboard(
                 this, getImeConfig().getClipboardLimit(), getImeConfig().getDraftLimit());
@@ -397,16 +399,16 @@ public class Trime extends LifecycleInputMethodService {
         super.onCreate();
         return;
       }
-      Timber.d(methodName + "super.onCreate()");
+      Timber.d("%ssuper.onCreate()", methodName);
       super.onCreate();
-      Timber.d(methodName + "create listener");
+      Timber.d("%screate listener", methodName);
       for (EventListener listener : eventListeners) {
         if (listener != null) listener.onCreate();
       }
     } catch (Exception e) {
       e.fillInStackTrace();
     }
-    Timber.d(methodName + "finish");
+    Timber.d("%sfinish", methodName);
   }
 
   /**
@@ -417,7 +419,7 @@ public class Trime extends LifecycleInputMethodService {
    */
   public boolean setDarkMode(boolean darkMode) {
     if (darkMode != this.darkMode) {
-      Timber.i("setDarkMode " + darkMode);
+      Timber.i("setDarkMode %s", darkMode);
       this.darkMode = darkMode;
       return true;
     }
@@ -733,7 +735,17 @@ public class Trime extends LifecycleInputMethodService {
     Timber.e("onCreateInputView()");
     // 初始化键盘布局
     super.onCreateInputView();
-    inputRootBinding = InputRootBinding.inflate(LayoutInflater.from(this));
+
+    //适配android12以后的悬浮窗
+    Context mwcontext;
+    if (VERSION.SDK_INT >= VERSION_CODES.S) {
+      mwcontext=createWindowContext(getDisplay(), WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null);
+      //final PopupWindow overlayView = LayoutInflater.from(mwcontext).inflate(someLayoutXml, null);
+    }else{
+      mwcontext=this;
+    }
+
+    inputRootBinding = InputRootBinding.inflate(LayoutInflater.from(mwcontext));
     mainKeyboardView = inputRootBinding.main.mainKeyboardView;
 
     // 初始化候选栏
@@ -741,8 +753,10 @@ public class Trime extends LifecycleInputMethodService {
     mCandidate = inputRootBinding.main.candidateView.candidates;
 
     // 候选词悬浮窗的容器
-    compositionRootBinding = CompositionRootBinding.inflate(LayoutInflater.from(this));
+    compositionRootBinding = CompositionRootBinding.inflate(LayoutInflater.from(mwcontext));
     mComposition = compositionRootBinding.compositions;
+
+
     mPopupWindow = new PopupWindow(compositionRootBinding.compositionRoot);
     mPopupWindow.setClippingEnabled(false);
     mPopupWindow.setInputMethodMode(PopupWindow.INPUT_METHOD_NOT_NEEDED);
@@ -1475,10 +1489,11 @@ public class Trime extends LifecycleInputMethodService {
         });
   }
 
-  private String draftString = "", draftCache = "";
+  //private String draftString = "", draftCache = "";
+  private String draftString = "";
 
   private void addDraft() {
-    draftCache = activeEditorInstance.getDraftCache();
+    String draftCache = activeEditorInstance.getDraftCache();
     if (draftCache.isEmpty() || draftCache.trim().equals(draftString)) return;
 
     if (getImeConfig().getDraftLimit() != 0) {

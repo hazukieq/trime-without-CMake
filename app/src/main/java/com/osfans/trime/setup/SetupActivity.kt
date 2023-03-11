@@ -1,5 +1,6 @@
 package com.osfans.trime.setup
 
+
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Bundle
@@ -17,11 +18,12 @@ import com.osfans.trime.R
 import com.osfans.trime.databinding.ActivitySetupBinding
 import com.osfans.trime.setup.SetupPage.Companion.firstUndonePage
 import com.osfans.trime.setup.SetupPage.Companion.isLastPage
+import com.osfans.trime.util.SpvalueStorage
 
 class SetupActivity : FragmentActivity() {
     private lateinit var viewPager: ViewPager2
     private val viewModel: SetupViewModel by viewModels()
-
+    private var permission_isAll:Boolean=false
     companion object {
         private var binaryCount = false
         private const val NOTIFY_ID = 87463
@@ -33,29 +35,47 @@ class SetupActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         val binding = ActivitySetupBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        val sp=SpvalueStorage.getInstance(this@SetupActivity)
+        permission_isAll= sp?.getBooleanValue("isAll",false) == true
+
+
         val prevButton = binding.prevButton.apply {
             text = getString(R.string.setup__prev)
             setOnClickListener { viewPager.currentItem = viewPager.currentItem - 1 }
         }
+
         binding.skipButton.apply {
             text = getString(R.string.setup__skip)
             setOnClickListener {
                 AlertDialog.Builder(this@SetupActivity)
                     .setMessage(R.string.setup__skip_hint)
                     .setPositiveButton(R.string.setup__skip_hint_yes) { _, _ ->
-                        finish()
+                        if(!permission_isAll){
+                            //startActivity(Intent(this@SetupActivity,LauchAct::class.java))
+                            finish()
+                        }else finish()
                     }
                     .setNegativeButton(R.string.setup__skip_hint_no, null)
                     .show()
             }
         }
+
         val nextButton = binding.nextButton.apply {
             setOnClickListener {
                 if (viewPager.currentItem != SetupPage.values().size - 1) {
                     viewPager.currentItem = viewPager.currentItem + 1
-                } else finish()
+                }else finish()
+            /*else {
+                    if(!permission_isAll){
+                        startActivity(Intent(this@SetupActivity,LauchAct::class.java))
+                        finish()
+                    }else finish()
+
+                }//finish()*/
             }
         }
+
         viewPager = binding.viewpager
         viewPager.adapter = Adapter()
         viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
@@ -72,6 +92,7 @@ class SetupActivity : FragmentActivity() {
                     )
             }
         })
+
         viewModel.isAllDone.observe(this) { allDone ->
             nextButton.apply {
                 // Hide next button for the last page when allDone == false
@@ -80,6 +101,7 @@ class SetupActivity : FragmentActivity() {
                 }
             }
         }
+
         // Skip to undone page
         firstUndonePage()?.let { viewPager.currentItem = it.ordinal }
         binaryCount = true

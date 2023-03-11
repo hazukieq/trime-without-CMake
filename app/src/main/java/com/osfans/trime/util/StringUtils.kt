@@ -1,8 +1,6 @@
 package com.osfans.trime.util
 
 import android.view.KeyEvent
-import kotlin.math.max
-import kotlin.math.min
 
 object StringUtils {
     private const val SECTION_DIVIDER = ",.?!~:，。：～？！…\t\r\n\\/"

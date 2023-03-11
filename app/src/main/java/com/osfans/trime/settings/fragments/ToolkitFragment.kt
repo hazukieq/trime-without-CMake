@@ -28,6 +28,7 @@ class ToolkitFragment : PreferenceFragmentCompat() {
         setHasOptionsMenu(true)
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onPrepareOptionsMenu(menu: Menu) {
         menu.forEach { item -> item.isVisible = false }
         super.onPrepareOptionsMenu(menu)

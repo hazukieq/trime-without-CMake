@@ -112,7 +112,7 @@ public class Rime {
     }
 
     public RimeCandidate[] getCandidates() {
-      Timber.d("setWindow getCandidates() size()=" + size());
+      Timber.d("setWindow getCandidates() size()=%s", size());
       return size() == 0 ? null : menu.candidates;
     }
   }

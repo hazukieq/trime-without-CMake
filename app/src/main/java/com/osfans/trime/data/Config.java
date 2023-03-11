@@ -18,6 +18,7 @@
 
 package com.osfans.trime.data;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
@@ -104,25 +105,25 @@ public class Config {
     themeName = appPrefs.getLooks().getSelectedTheme();
     soundPackageName = appPrefs.getKeyboard().getSoundPackage();
 
-    Timber.d(methodName + "prepareRime");
+    Timber.d("%sprepareRime", methodName);
     prepareRime(context);
 
     //    正常逻辑不应该部署全部主题，init()方法已经做过当前主题的部署
     //    Timber.d(methodName + "deployTheme");
     //    deployTheme();
 
-    Timber.d(methodName + "init");
+    Timber.d("%sinit", methodName);
     init(true);
 
-    Timber.d(methodName + "setSoundFromColor");
+    Timber.d("%ssetSoundFromColor", methodName);
     setSoundFromColor();
 
-    Timber.d(methodName + "setClipboard&draft");
+    Timber.d("%ssetClipboard&draft", methodName);
     clipBoardCompare = appPrefs.getOther().getClipboardCompareRules().trim().split("\n");
     clipBoardOutput = appPrefs.getOther().getClipboardOutputRules().trim().split("\n");
     draftOutput = appPrefs.getOther().getDraftOutputRules().trim().split("\n");
 
-    Timber.d(methodName + "finish");
+    Timber.d("%sfinish", methodName);
   }
 
   public String[] getClipBoardCompare() {
@@ -181,7 +182,7 @@ public class Config {
     boolean isExist = new File(sharedDataDir).exists();
     boolean isOverwrite = AppVersionUtils.INSTANCE.isDifferentVersion(appPrefs);
     String defaultFile = "trime.yaml";
-    Timber.d(methodName + "copy");
+    Timber.d("%scopy", methodName);
     if (isOverwrite) {
       copyFileOrDir("", true);
     } else if (isExist) {
@@ -190,13 +191,13 @@ public class Config {
     } else {
       copyFileOrDir("", false);
     }
-    Timber.d(methodName + "copy2");
+    Timber.d("%scopy2", methodName);
     while (!new File(sharedDataDir, defaultFile).exists()) {
       SystemClock.sleep(100);
       copyFileOrDir("", isOverwrite);
     }
     // 缺失导致获取方案列表为空
-    Timber.d(methodName + "copy default.custom.yaml");
+    Timber.d("%scopy default.custom.yaml", methodName);
     final String defaultCustom = "default.custom.yaml";
     if (!new File(sharedDataDir, defaultCustom).exists()) {
       try {
@@ -205,9 +206,9 @@ public class Config {
         e.printStackTrace();
       }
     }
-    Timber.d(methodName + "Rime.get");
+    Timber.d("%sRime.get", methodName);
     Rime.get(context, !isExist); // 覆蓋時不強制部署
-    Timber.d(methodName + "finish");
+    Timber.d("%sfinish", methodName);
   }
 
   public static String[] getThemeKeys(boolean isUser) {
@@ -238,6 +239,7 @@ public class Config {
     return names;
   }
 
+  @SuppressLint("SuspiciousIndentation")
   public boolean copyFileOrDir(String path, boolean overwrite) {
     try {
       final String assetPath = new File(RIME, path).getPath();
@@ -248,8 +250,8 @@ public class Config {
       } else {
         // Dirs
         final File dir = new File(sharedDataDir, path);
-        if (!dir.exists()) // noinspection ResultOfMethodCallIgnored
-        dir.mkdir();
+
+        if (!dir.exists())  dir.mkdir();
         for (String asset : assets) {
           final String subPath = new File(path, asset).getPath();
           copyFileOrDir(subPath, overwrite);
@@ -320,7 +322,7 @@ public class Config {
       }
       in.close();
       out.close();
-      Timber.i("applySoundPackage = " + name);
+      Timber.i("applySoundPackage = %s", name);
     } catch (Exception e) {
       e.printStackTrace();
     }

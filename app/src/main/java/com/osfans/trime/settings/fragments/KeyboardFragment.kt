@@ -21,6 +21,7 @@ class KeyboardFragment :
         setHasOptionsMenu(true)
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onPrepareOptionsMenu(menu: Menu) {
         menu.forEach { item -> item.isVisible = false }
         super.onPrepareOptionsMenu(menu)
@@ -50,7 +51,7 @@ class KeyboardFragment :
             }
         }
     }
-    override fun onPreferenceTreeClick(preference: Preference?): Boolean {
+    override fun onPreferenceTreeClick(preference: Preference): Boolean {
         return when (preference?.key) {
             "keyboard__key_sound_package" -> {
                 SoundPickerDialog(requireContext()).show()
@@ -61,11 +62,11 @@ class KeyboardFragment :
     }
     override fun onResume() {
         super.onResume()
-        preferenceScreen.sharedPreferences.registerOnSharedPreferenceChangeListener(this)
+        preferenceScreen.sharedPreferences!!.registerOnSharedPreferenceChangeListener(this)
     }
 
     override fun onPause() {
         super.onPause()
-        preferenceScreen.sharedPreferences.unregisterOnSharedPreferenceChangeListener(this)
+        preferenceScreen.sharedPreferences!!.unregisterOnSharedPreferenceChangeListener(this)
     }
 }

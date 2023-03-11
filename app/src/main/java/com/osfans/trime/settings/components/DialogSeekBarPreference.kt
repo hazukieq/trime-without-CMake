@@ -36,7 +36,7 @@ class DialogSeekBarPreference : Preference {
     private var unit: String = ""
 
     private val currentValue: Int
-        get() = sharedPreferences.getInt(key, defaultValue)
+        get() = sharedPreferences!!.getInt(key, defaultValue)
 
     @Suppress("unused")
     constructor(context: Context) : this(context, null)
@@ -61,7 +61,7 @@ class DialogSeekBarPreference : Preference {
         showSeekBarDialog()
     }
 
-    override fun onAttachedToHierarchy(preferenceManager: PreferenceManager?) {
+    override fun onAttachedToHierarchy(preferenceManager: PreferenceManager) {
         super.onAttachedToHierarchy(preferenceManager)
         summary = getTextForValue(currentValue)
     }
@@ -103,12 +103,12 @@ class DialogSeekBarPreference : Preference {
             setPositiveButton(android.R.string.ok) { _, _ ->
                 val actualValue = seekBarProgressToActualValue(dialogView.seekBar.progress)
                 if (callChangeListener(actualValue)) {
-                    sharedPreferences.edit().putInt(key, actualValue).apply()
+                    sharedPreferences?.edit()?.putInt(key, actualValue)?.apply()
                     summary = getTextForValue(currentValue)
                 }
             }
             setNeutralButton(R.string.pref__default) { _, _ ->
-                sharedPreferences.edit().putInt(key, defaultValue).apply()
+                sharedPreferences?.edit()?.putInt(key, defaultValue)?.apply()
                 summary = getTextForValue(currentValue)
             }
             setNegativeButton(android.R.string.cancel, null)

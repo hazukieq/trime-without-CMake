@@ -18,6 +18,11 @@
 
         <item name="android:windowBackground">@color/windowBackground</item>
         <item name="android:colorBackground">@color/windowBackground</item>
-
     </style>
+
+    <!--style name="Theme.Launcher" parent="Theme.MaterialComponents.DayNight.Bridge">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowBackground">@drawable/launchbg</item>
+    </style-->
+
 </resources>

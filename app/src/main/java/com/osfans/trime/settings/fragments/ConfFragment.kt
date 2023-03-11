@@ -28,13 +28,14 @@ class ConfFragment : PreferenceFragmentCompat(), CoroutineScope by MainScope() {
         setHasOptionsMenu(true)
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onPrepareOptionsMenu(menu: Menu) {
         menu.forEach { item -> item.isVisible = false }
         super.onPrepareOptionsMenu(menu)
     }
 
-    override fun onPreferenceTreeClick(preference: Preference?): Boolean {
-        return when (preference?.key) {
+    override fun onPreferenceTreeClick(preference: Preference): Boolean {
+        return when (preference.key) {
             "conf__synchronize" -> {
                 val progressDialog = createLoadingDialog(requireContext(), R.string.sync_progress)
                 launch {

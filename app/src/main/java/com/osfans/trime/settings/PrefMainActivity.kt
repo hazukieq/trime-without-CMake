@@ -2,20 +2,15 @@ package com.osfans.trime.settings
 
 import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build.VERSION
 import android.os.Build.VERSION_CODES
 import android.os.Bundle
-import android.provider.Settings
 import android.view.Menu
 import android.view.MenuItem
 import android.view.inputmethod.InputMethodManager
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.Toolbar
-import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
@@ -26,22 +21,23 @@ import com.osfans.trime.data.AppPrefs
 import com.osfans.trime.databinding.PrefActivityBinding
 import com.osfans.trime.ime.core.Trime
 import com.osfans.trime.settings.fragments.PrefFragment
+import com.osfans.trime.setup.LauchAct
 import com.osfans.trime.setup.SetupActivity
 import com.osfans.trime.util.RimeUtils
 import com.osfans.trime.util.createLoadingDialog
+import com.permissionx.guolindev.PermissionX
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
 internal const val FRAGMENT_TAG = "FRAGMENT_TAG"
-const val PERMISSION_REQUEST_EXTERNAL_STORAGE = 0
+//const val PERMISSION_REQUEST_EXTERNAL_STORAGE = 0
 
 class PrefMainActivity :
     AppCompatActivity(),
     PreferenceFragmentCompat.OnPreferenceStartFragmentCallback,
-    ActivityCompat.OnRequestPermissionsResultCallback,
+    //ActivityCompat.OnRequestPermissionsResultCallback,
     CoroutineScope by MainScope() {
     private val prefs get() = AppPrefs.defaultInstance()
 
@@ -90,11 +86,17 @@ class PrefMainActivity :
         }
 
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        if (SetupActivity.shouldSetup()) {
+        /*if (SetupActivity.shouldSetup()) {
             startActivity(Intent(this, SetupActivity::class.java))
+        }*/
+
+        if (!LauchAct.shouldSetup(this)) {
+            startActivity(Intent(this, LauchAct::class.java))
         }
-        requestExternalStoragePermission()
-        requestAlertWindowPermission()
+
+        //requestPermission()
+        //requestExternalStoragePermission()
+        //requestAlertWindowPermission()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -115,19 +117,23 @@ class PrefMainActivity :
     ): Boolean {
         // Instantiate the new Fragment
         val args = pref.extras
-        val fragment = supportFragmentManager.fragmentFactory.instantiate(
-            classLoader,
-            pref.fragment
-        ).apply {
-            arguments = args
-            @Suppress("DEPRECATION")
-            setTargetFragment(caller, 0)
+        val fragment = pref.fragment?.let {
+            supportFragmentManager.fragmentFactory.instantiate(
+                classLoader,
+                it
+            ).apply {
+                arguments = args
+                @Suppress("DEPRECATION")
+                setTargetFragment(caller, 0)
+            }
         }
         // Replace the existing Fragment with the new Fragment
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.preference, fragment)
-            .addToBackStack(null)
-            .commit()
+        if (fragment != null) {
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.preference, fragment)
+                .addToBackStack(null)
+                .commit()
+        }
         title = pref.title
         return true
     }
@@ -139,7 +145,7 @@ class PrefMainActivity :
             .commit()
     }
 
-    override fun onRequestPermissionsResult(
+    /*override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
         grantResults: IntArray
@@ -158,7 +164,7 @@ class PrefMainActivity :
             }
         }
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-    }
+    }*/
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.preference_main_menu, menu)
@@ -194,7 +200,7 @@ class PrefMainActivity :
         }
     }
 
-    private fun requestExternalStoragePermission() {
+    /*private fun requestExternalStoragePermission() {
         if (VERSION.SDK_INT >= VERSION_CODES.M) {
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
                 PackageManager.PERMISSION_GRANTED
@@ -232,9 +238,9 @@ class PrefMainActivity :
                 }
             }
         }
-    }
+    }*/
 
-    private fun requestAlertWindowPermission() {
+    /*private fun requestAlertWindowPermission() {
         if (VERSION.SDK_INT >= VERSION_CODES.P) { // 僅Android P需要此權限在最上層顯示懸浮窗、對話框
             if (!Settings.canDrawOverlays(this)) { // 事先说明需要权限的理由
                 AlertDialog.Builder(this)
@@ -250,6 +256,36 @@ class PrefMainActivity :
                     .setNegativeButton(android.R.string.cancel, null)
                     .show()
             }
+        }
+    }*/
+
+    fun requestPermission(){
+        val requestList=ArrayList<String>()
+        if(VERSION.SDK_INT >= VERSION_CODES.M&&VERSION.SDK_INT<=VERSION_CODES.Q){
+            requestList.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            requestList.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            requestList.add(Manifest.permission.SYSTEM_ALERT_WINDOW)
+        }else if(VERSION.SDK_INT>VERSION_CODES.Q){
+            //requestList.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            //requestList.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            requestList.add(Manifest.permission.MANAGE_EXTERNAL_STORAGE)
+            requestList.add(Manifest.permission.SYSTEM_ALERT_WINDOW)
+        }
+        if(!requestList.isEmpty()){
+            PermissionX.init(this)
+                .permissions(requestList)
+                .onExplainRequestReason{scope,deniedList->
+                    val msg=getString(R.string.external_storage_access_required)+"\n\n"+getString(R.string.alert_window_access_required)
+                    scope.showRequestReasonDialog(deniedList,msg,"同意","拒绝")
+                }
+                .request { allGranted, _, _ ->
+                    if (allGranted) {
+                        ToastUtils.showShort(R.string.external_storage_permission_granted)
+                    } else {
+                        ToastUtils.showShort(R.string.external_storage_permission_not_available)
+                        requestPermission()
+                    }
+                }
         }
     }
 }

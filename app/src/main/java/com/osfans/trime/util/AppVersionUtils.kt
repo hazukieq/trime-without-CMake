@@ -2,9 +2,8 @@ package com.osfans.trime.util
 
 import android.net.Uri
 import androidx.preference.Preference
-import com.osfans.trime.BuildConfig
 import com.osfans.trime.data.AppPrefs
-
+import com.osfans.trime.BuildConfig
 object AppVersionUtils {
     /**
      * Compare the application's version name

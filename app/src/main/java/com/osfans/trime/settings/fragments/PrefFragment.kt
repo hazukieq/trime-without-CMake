@@ -27,8 +27,8 @@ class PrefFragment : PreferenceFragmentCompat() {
         )
     }
 
-    override fun onPreferenceTreeClick(preference: Preference?): Boolean {
-        return when (preference?.key) {
+    override fun onPreferenceTreeClick(preference: Preference): Boolean {
+        return when (preference.key) {
             "pref_schemas" -> {
                 SchemaPickerDialog(requireContext()).show()
                 true
