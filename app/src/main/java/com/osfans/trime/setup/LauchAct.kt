@@ -1,7 +1,9 @@
 package com.osfans.trime.setup
 
 import android.Manifest
+import android.app.AlertDialog
 import android.content.Context
+import android.content.DialogInterface
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build
@@ -10,9 +12,14 @@ import android.os.Bundle
 import android.os.Environment
 import android.util.Log
 import com.blankj.utilcode.util.ToastUtils
+import com.blankj.utilcode.util.Utils
 import com.osfans.trime.R
 import com.osfans.trime.util.SpvalueStorage
 import com.permissionx.guolindev.PermissionX
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import timber.log.Timber
 import java.io.File
 import java.util.zip.ZipInputStream
@@ -31,6 +38,7 @@ class LauchAct : AppCompatActivity() {
     }
 
     companion object {
+        var isCheck=false
         fun shouldSetup(context:Context):Boolean{
             var isAll=false
             val sputil=SpvalueStorage.getInstance(context)
@@ -74,12 +82,19 @@ class LauchAct : AppCompatActivity() {
                     if (allGranted) {
                         setup(this,"isAll",true)
 
+/*                        runBlocking{
+                            val check=async(Dispatchers.IO){
+                                return@async Hks2local()
+                            }
+
+                            isCheck=check.await()
+                        }*/
+
                         if(Hks2local()) {
                             ToastUtils.showShort(R.string.external_storage_permission_granted)
                             startActivity(Intent(this,SetupActivity::class.java))
                             finish()
-                        }
-                        else  finish()
+                        } else  finish()
                     } else {
                         ToastUtils.showShort(R.string.external_storage_permission_not_available)
                         ToastUtils.showShort(" $deniedList")
@@ -97,9 +112,9 @@ class LauchAct : AppCompatActivity() {
 
         while (entry!=null){
             val current=File("$dest/${entry.name}")
-            if(entry.isDirectory) continue//current.mkdirs()
+            if(entry.isDirectory) current.mkdirs()
             else{
-                //current.parentFile?.mkdirs()
+                current.parentFile?.mkdirs()
                 Timber.tag("hs").i(entry.name)
                 zip.buffered().copyTo(current.outputStream())
             }
@@ -109,7 +124,7 @@ class LauchAct : AppCompatActivity() {
         hks.close()
     }
 
-    fun extractFiles(dest:File,file:String,nonexistedList:List<String>){
+    /*fun extractFiles(dest:File,file:String,nonexistedList:List<String>){
         val hks=assets.open(file)
         val zip=ZipInputStream(hks.buffered())
         var entry=zip.nextEntry
@@ -127,7 +142,8 @@ class LauchAct : AppCompatActivity() {
 
         zip.closeEntry()
         hks.close()
-    }
+    }*/
+
     fun Hks2local():Boolean{
         var isDone=false
         val rootpath=Environment.getExternalStorageDirectory().toString()+"/rime"
@@ -137,32 +153,24 @@ class LauchAct : AppCompatActivity() {
                 destFile.mkdir()
                 unzipFile(destFile,"hks/rime.zip")
             }else{
-                val assetsFiles= mutableListOf(
-                    "default.custom.yaml","default.yaml",
-                    "essay.txt",
-                    "hakka.dict.yaml","hakka_giugiung.schema.yaml","hakka_mobilewords.dict.yaml",
-                    "hakka_oftenwords.dict.yaml","hakka_places.dict.yaml","hakka_poems.dict.yaml",
-                    "hakka_sougou_words.dict.yaml","hakka_tong.trime.yaml","hakka_tung.dict.yaml",
-                    "hakka_tung.schema.yaml","hakka_tung_q.schema.yaml","hakka_zon.dict.yaml",
-                    "ipa_yunlong.dict.yaml","ipa_yunlong.schema.yaml",
-                    "luna_pinyin.dict.yaml","luna_pinyin.schema.yaml","luna_pinyin_simp.schema.yaml",
-                    "symbols.yaml"
-                )
+                //destFile.deleteOnExit()
+                //destFile.mkdir()
+                unzipFile(destFile,"hks/rime.zip")
+/*                val dialog=AlertDialog.Builder(this)
+                dialog
+                    .setTitle("警告")
+                    .setMessage("发现您手机内存在RIME文件夹，请问是否进行覆盖？\n注意：该操作将会导致您原来数据的丢失！！")
+                    .setPositiveButton("确认"){
+                            _:DialogInterface, _:Int->
+                        unzipFile(destFile,"hks/rime.zip")
+                    }
+                    .setNegativeButton("取消"){ _:DialogInterface, _:Int->
+                        ToastUtils.showShort("您已取消该操作！")
+                    }
 
-                val existedfileNames:MutableList<String> = mutableListOf()
-                val fileTree:FileTreeWalk=destFile.walk()
-                fileTree.maxDepth(1)
-                    .filter { it.isFile }
-                    .filter { it.extension in listOf("yaml","txt") }
-                    .forEach { existedfileNames.add(it.name) }
-                existedfileNames.forEach(::println)
-
-
-                val nonexistedFiles=existedfileNames.filter {
-                    it !in assetsFiles
-                }
-
-                extractFiles(destFile,"hks/rime.zip",nonexistedFiles)
+                    .setCancelable(false)
+                    .create()
+                    .show()*/
             }
             isDone=true
         }catch (e:Exception){
