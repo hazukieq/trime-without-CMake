@@ -17,10 +17,10 @@ env:
   APP_NAME: Trime·Trime
   APP_NAME_CN: 同文输入法・Trime
   APP_NAME_TW: 同文輸入法・Trime
-  APP_NAME_NEW: TrimePro
-  APP_NAME_NEW_CN: 同文输入法Pro
-  APP_NAME_NEW_TW: 同文輸入法Pro
-  CUSTOM_QQ: "811142286"
+  APP_NAME_NEW: Hktrime
+  APP_NAME_NEW_CN: 客语同文输入法
+  APP_NAME_NEW_TW: 客语同文輸入法
+  CUSTOM_QQ: "77608640"
   CUSTOM_QQ_LINK: mqqopensdkapi://bizAgent/qm/qr?url=http%3A%2F%2Fqm.qq.com%2Fcgi-bin%2Fqm%2Fqr%3Ffrom%3Dapp%26p%3Dandroid%26k%3DzifdI0iaEYjATwYkvVzP1cjsUEWSa9Ha
 #  FEEDS_CONF: feeds.conf.default
 #  CONFIG_FILE: .config
