@@ -17,6 +17,7 @@ android {
         buildConfigField 'String', 'BUILD_VERSION' , '"' + "$versionName" + '-g'+ getGitVersion()+ '-' + getBuildDate()  +  '"'
 
         ndk {
+            //noinspection ChromeOsAbiSupport
             abiFilters "arm64-v8a" // ,"armeabi-v7a"
         }
     }
@@ -29,12 +30,17 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            //proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-android.txt'
+            debuggable false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-android.txt'
             signingConfig signingConfigs.release
+        }
+        debug{
+            minifyEnabled false
+            debuggable true
         }
     }
 
-    def propsFile = rootProject.file('gradle.properties') //store release config in gradle.properties
+    def propsFile = rootProject.file('release.properties') //store release config in gradle.properties
     def configName = 'release'
 
     if (propsFile.exists() && android.signingConfigs.hasProperty(configName)) {
@@ -65,18 +71,18 @@ dependencies {
     implementation "com.jakewharton.timber:timber:5.0.1"
     implementation "cat.ereza:customactivityoncrash:2.4.0"
     implementation "androidx.core:core-ktx:1.9.0"
-    implementation "androidx.appcompat:appcompat:1.5.1"
+    implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation "androidx.preference:preference-ktx:1.2.0"
     implementation "androidx.constraintlayout:constraintlayout:2.1.4"
     implementation "androidx.viewpager2:viewpager2:1.0.0"
-    implementation "androidx.fragment:fragment-ktx:1.5.4"
+    implementation 'androidx.fragment:fragment-ktx:1.5.6'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlin_coroutines_version"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$kotlin_coroutines_version"
     implementation "com.google.android.flexbox:flexbox:3.0.0"
     //PermissionX
     implementation 'com.guolindev.permissionx:permissionx:1.7.1'
-    implementation 'com.google.android.material:material:1.4.+'
+    implementation 'com.google.android.material:material:1.8.0'
 
     // 吐司框架：https://github.com/getActivity/Toaster
     //implementation 'com.github.getActivity:Toaster:12.0'
@@ -91,32 +97,32 @@ def getBuildInfo(){
     return info
 }
 
-def getBuildDate() {
+static def getBuildDate() {
     return new Date().format("yyyyMMdd", TimeZone.getTimeZone("UTC"))
 }
 
-def getBuildTime() {
+static def getBuildTime() {
     return new Date().format("yyyy-MM-dd HH:mm", TimeZone.getTimeZone("UTC"))
 }
 
-def getCommitInfo(){
+static def getCommitInfo(){
     def text = ' git show --pretty=format:"%ci"'.execute().text.trim()
     text =  (text =~ /${"(\\n.*|\")"}/).replaceAll("").trim()
     return ' git describe'.execute().text.trim() +  ", " + text
 }
 
-def getGitBranch(){
+static def getGitBranch(){
     def text = 'git symbolic-ref --short -q HEAD'.execute().text.trim()
     if(text.length()<1)
         return System.getenv("CI_BRANCH")
     return text
 }
 
-def getGitVersion() {
+static def getGitVersion() {
     return 'git rev-parse --short HEAD'.execute().text.trim()
 }
 
-def gitGitVersionCode() {
+static def gitGitVersionCode() {
     try {
         return 'git rev-list HEAD --first-parent --count'.execute().text.trim().toInteger()
     }
@@ -125,13 +131,13 @@ def gitGitVersionCode() {
     }
 }
 
-def getGitUser() {
+static def getGitUser() {
     def name = 'git config user.name'.execute().text.trim()
     if(name.length()<1)
         return System.getenv("CI_NAME")
     return name
 }
 
-def getGitUrl() {
+static def getGitUrl() {
     return 'git remote get-url  origin'.execute().text.trim().replaceFirst("\\.git\$","")
 }

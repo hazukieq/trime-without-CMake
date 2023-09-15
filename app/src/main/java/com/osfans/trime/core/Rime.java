@@ -235,7 +235,7 @@ public class Rime {
   private static boolean mOnMessage;
 
   static {
-    System.loadLibrary("rime_jni");
+    System.loadLibrary("rime_jni_1_5");
   }
 
   /*

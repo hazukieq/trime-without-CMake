@@ -28,7 +28,7 @@ enum class SetupPage {
         }
     )
 
-    fun getButtonAction(context: Context) = when (this) {
+    fun getButtonAction(context: Context) : Any = when (this) {
         Enable -> InputMethodUtils.showImeEnablerActivity(context)
         Select -> InputMethodUtils.showImePicker(context)
     }

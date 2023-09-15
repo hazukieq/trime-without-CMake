@@ -21,7 +21,9 @@
         android:label="@string/trime_app_name"
         android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/ic_app_icon_round"
-        android:theme="@style/PreferenceTheme">
+        android:theme="@style/PreferenceTheme"
+        android:enableOnBackInvokedCallback="false"
+        tools:targetApi="tiramisu">
         <activity
             android:name=".setup.LauchAct">
         </activity>

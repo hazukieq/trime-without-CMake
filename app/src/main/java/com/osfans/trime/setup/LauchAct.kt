@@ -25,11 +25,9 @@ import java.io.File
 import java.util.zip.ZipInputStream
 
 class LauchAct : AppCompatActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_lauch)
-
 
         if(!shouldSetup(this)){
              requestPermission()
@@ -64,8 +62,6 @@ class LauchAct : AppCompatActivity() {
             requestList.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
             requestList.add(Manifest.permission.SYSTEM_ALERT_WINDOW)
         }else if(Build.VERSION.SDK_INT> Build.VERSION_CODES.Q){
-            //requestList.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-            //requestList.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
             requestList.add(Manifest.permission.MANAGE_EXTERNAL_STORAGE)
             requestList.add(Manifest.permission.SYSTEM_ALERT_WINDOW)
         }
@@ -73,28 +69,15 @@ class LauchAct : AppCompatActivity() {
             PermissionX.init(this)
                 .permissions(requestList)
                 .onExplainRequestReason{scope,deniedList->
-                    //val msg=getString(R.string.external_storage_access_required)+"\n"+getString(R.string.alert_window_access_required)
                     val msg= "即将申请的权限是程序运行必须依赖权限。\n同文输入法 需访问手机存储、用于为您提供文字、符号、表情、语音等内容输入服务。悬浮窗权限用于显示输入法键盘。"
-
                     scope.showRequestReasonDialog(deniedList,msg,"同意","拒绝")
                 }
                 .request { allGranted, grantedList, deniedList ->
                     if (allGranted) {
                         setup(this,"isAll",true)
-
-/*                        runBlocking{
-                            val check=async(Dispatchers.IO){
-                                return@async Hks2local()
-                            }
-
-                            isCheck=check.await()
-                        }*/
-
-                        if(Hks2local()) {
-                            ToastUtils.showShort(R.string.external_storage_permission_granted)
-                            startActivity(Intent(this,SetupActivity::class.java))
-                            finish()
-                        } else  finish()
+                        ToastUtils.showShort(R.string.external_storage_permission_granted)
+                        startActivity(Intent(this,SetupActivity::class.java))
+                        finish()
                     } else {
                         ToastUtils.showShort(R.string.external_storage_permission_not_available)
                         ToastUtils.showShort(" $deniedList")
@@ -124,28 +107,8 @@ class LauchAct : AppCompatActivity() {
         hks.close()
     }
 
-    /*fun extractFiles(dest:File,file:String,nonexistedList:List<String>){
-        val hks=assets.open(file)
-        val zip=ZipInputStream(hks.buffered())
-        var entry=zip.nextEntry
-
-        while (entry!=null){
-            val current = File("$dest/${entry.name}")
-            if(entry.name in nonexistedList) {
-                if (entry.isDirectory) continue//current.mkdirs()
-                else {
-                    zip.buffered().copyTo(current.outputStream())
-                }
-            }
-            entry = zip.nextEntry
-        }
-
-        zip.closeEntry()
-        hks.close()
-    }*/
-
-    fun Hks2local():Boolean{
-        var isDone=false
+    /*fun Hks2local():Boolean{
+        var isDone: Boolean
         val rootpath=Environment.getExternalStorageDirectory().toString()+"/rime"
         val destFile=File(rootpath)
         try {
@@ -153,24 +116,7 @@ class LauchAct : AppCompatActivity() {
                 destFile.mkdir()
                 unzipFile(destFile,"hks/rime.zip")
             }else{
-                //destFile.deleteOnExit()
-                //destFile.mkdir()
                 unzipFile(destFile,"hks/rime.zip")
-/*                val dialog=AlertDialog.Builder(this)
-                dialog
-                    .setTitle("警告")
-                    .setMessage("发现您手机内存在RIME文件夹，请问是否进行覆盖？\n注意：该操作将会导致您原来数据的丢失！！")
-                    .setPositiveButton("确认"){
-                            _:DialogInterface, _:Int->
-                        unzipFile(destFile,"hks/rime.zip")
-                    }
-                    .setNegativeButton("取消"){ _:DialogInterface, _:Int->
-                        ToastUtils.showShort("您已取消该操作！")
-                    }
-
-                    .setCancelable(false)
-                    .create()
-                    .show()*/
             }
             isDone=true
         }catch (e:Exception){
@@ -178,5 +124,5 @@ class LauchAct : AppCompatActivity() {
             isDone=false
         }
         return isDone
-    }
+    }*/
 }
