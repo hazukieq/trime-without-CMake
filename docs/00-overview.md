@@ -1,6 +1,7 @@
 # 00 · 项目总览
 
-> 基线：`dev` 分支 HEAD `68f876f`（2026-11-08，`docs: add hkrime developer documentation set`）。
+> 基线：文档事实快照提交 `68f876f`（2026-11-08，`docs: add hkrime developer documentation set`）；
+> 当前 `dev` HEAD 以 `git log -1` 为准（其后 `b1d9b57` 仅回填分支迁移记录）。
 > 所有行号以该提交为准；若工作树有未提交改动，行号可能偏移，以内容为准。
 
 ## 目录

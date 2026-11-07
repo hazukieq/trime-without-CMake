@@ -37,7 +37,7 @@ f5638bb  chore(gradle): get git branch info from ci     ← merge-base（develop
         │
         ├─ 922a2ba  2026-11-08  refactor: rename package to com.hazukieq.hkrime
         ├─ 7436b6d  2026-11-08  build(jni): rebuild librime_jni.so
-        └─ 68f876f  2026-11-08  docs: add hkrime developer documentation set ← 当前 HEAD（dev）
+        └─ 68f876f  2026-11-08  docs: add hkrime developer documentation set ← 文档事实基线（dev；其后 b1d9b57 回填分支迁移）
 ```
 
 `git merge-base origin/main dev` = `f5638bb`；main 另有 1 个 dev 未含的提交 `14d365e "Update build-my-trime.yml"`

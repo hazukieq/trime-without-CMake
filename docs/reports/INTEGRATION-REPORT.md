@@ -88,7 +88,7 @@ $ git grep -n 'rime_jni_1_5' -- ':!docs' ':!README.md'
 
 其它说明：
 - `app/build.gradle`（`jniLibs.srcDirs = ['libs']`、abiFilters `arm64-v8a`）**未改**，无需为单库调整。
-- `app/libs_backup/**` **未动**（见 §7）。
+- `libs_backup/**` **未动**（见 §7）。
 - `git status` 中另有 `README.md`、`docs/**` 等改动，非本任务产物（Lead/文档 owner 的工作）。
 
 ## 4. 构建记录
@@ -216,7 +216,7 @@ release 的 `.so` 条目经 R8/资源处理未变（13,587,824 B、CRC 与 debug
 
 > APK 体积下降以「去掉 85MB 废库被 strip 后的 13.9MB + 去掉重复 1_5 库 13.5MB + 换入单个 13.5MB 新库」为主；`.so` 压缩率 ~69% 是本次 APK 的最大占用项（debug APK 中占 37%）。
 
-## 7. `app/libs_backup/**` 说明（未动，按 Lead 指示）
+## 7. `libs_backup/**` 说明（未动，按 Lead 指示）
 
 | 文件 | 大小 | sha256 | 状态 |
 |---|---|---|---|

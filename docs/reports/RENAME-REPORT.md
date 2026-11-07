@@ -86,6 +86,8 @@ sed -i \
 
 改动文件按类型：`60 kt` + `27 java` + `10 xml` + `2 yaml` + `2 gradle` + `2 properties` = 103。
 
+> 口径注（2026-11-08 独立验收 DEV-3）：`gh api repos/hazukieq/trime-without-CMake/commits/922a2bae` 显示 **104 个条目、+394/−393**——比本表的 103 files/+393/−392 多 1 个条目与 1 行。差异来自同一提交还删除了二进制 `app/libs/arm64-v8a/librime_jni_1_5.so`（0/0 行，故不入 diffstat 文本口径）以及 Rime.java `loadLibrary` 一行替换的行统计口径差；两份数字均保留，以 gh 条目数 104 = 103 文本文件 + 1 二进制删除为准。
+
 ### 3.3 覆盖点逐项核对
 
 | 位置 | 改动 | 证据 |

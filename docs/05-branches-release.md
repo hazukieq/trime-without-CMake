@@ -1,7 +1,7 @@
 # 05 · 分支模型与发布
 
 > 覆盖：分支职责、**为什么改名与换 `.so` 必须同批**、改名影响面全清单、发布流程、签名与密钥安全、旧数据迁移。
-> 基线 HEAD `68f876f`（分支 `dev`）。
+> 基线提交 `68f876f`（分支 `dev`）；当前 HEAD 以 `git log -1` 为准。
 
 ## 目录
 
@@ -32,7 +32,7 @@ main   ──●──●──●  (without-CMake 稳定主线，com.tumuyan.tr
 dev       ●──●──●  (hkrime：com.hazukieq.hkrime + 新 .so)
 ```
 
-> **现状（2026-11-08 已执行）**：远端只剩 `main`（=`14d365e`，默认分支）与 `dev`（=`68f876f`）；
+> **现状（2026-11-08 已执行）**：远端只剩 `main`（=`14d365e`，默认分支）与 `dev`（迁移时 tip `68f876f`，其后新增 `b1d9b57` 文档提交）；
 > 旧 `develop`/`hakka` 已删除。迁移前快照：`develop=14d365ec`、`hakka=0c1e58ac`。
 > 回滚：`git push origin 14d365ec:refs/heads/develop 0c1e58ac:refs/heads/hakka`，并把默认分支改回 `develop`。
 
