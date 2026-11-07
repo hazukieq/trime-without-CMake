@@ -129,6 +129,7 @@
     showHint: true,
     showPreview: true,
     showCandidates: true,
+    showCandStruct: true,
     schemaName: '客语12键',
     composition: 'ngin',
     candidates: [],
@@ -146,7 +147,8 @@
     selScheme: $('selScheme'), selKeyboard: $('selKeyboard'),
     selOrientation: $('selOrientation'), inpWidth: $('inpWidth'), inpZoom: $('inpZoom'),
     chkAscii: $('chkAscii'), chkDark: $('chkDark'), chkSymbol: $('chkSymbol'),
-    chkHint: $('chkHint'), chkPreview: $('chkPreview'), chkCandidates: $('chkCandidates'),
+    chkHint: $('chkHint'), chkPreview: $('chkPreview'), chkCandidates: $('chkCandidates'), chkCandStruct: $('chkCandStruct'),
+    candLegend: $('candLegend'),
     inpSchema: $('inpSchema'), inpComposition: $('inpComposition'), inpCandidates: $('inpCandidates'),
     device: $('device'), composeBar: $('composeBar'), candidateBar: $('candidateBar'),
     keyboard: $('keyboard'), stageHint: $('stageHint'), patchMode: $('patchMode'),
@@ -394,9 +396,19 @@
     return labels.default || 'Enter';
   }
 
+  // `{Left}`、`[]{Left}`、`{}{Left}` 这类「花括号 send/text 串」不显示内部内容，
+  // 统一缩成 `{}`（用户要求：这类提示不需要，占位即可）
+  function hasBraceToken(s) {
+    return typeof s === 'string' && /\{[^}]*\}/.test(s);
+  }
+  function bracePlaceholder(s) {
+    return hasBraceToken(s) ? '{}' : s;
+  }
+
   function displayLabel(token) {
     if (token === null || token === undefined) return '';
     const s = String(token);
+    if (hasBraceToken(s)) return '{}';
     if (s === 'space' || s === 'Space') return S.schemaName || '空格';
     if (s.length === 1) return s;
     return KEYCODE_LABELS[s] || s;
@@ -411,7 +423,7 @@
     const token = entry.click;
     if (token === undefined || token === null || token === '') return '';
     let t = String(token);
-    if (t.startsWith('{') && t.endsWith('}')) return applyTransform(t.slice(1, -1), kb);
+    if (hasBraceToken(t)) return '{}';
     const p = presetKey(t);
     let lab = null;
     if (p) {
@@ -727,6 +739,7 @@
         for (const slot of EVENTS) {
           const token = entry[slot];
           if (typeof token !== 'string' || !token || token.startsWith('{')) continue;
+          if (hasBraceToken(token)) continue;
           if (presets[token] || token.length === 1 || KEYCODE_LABELS[token] || KNOWN_KEYCODES.has(token) || token === 'space') continue;
           const key = kbName + ' → ' + token;
           if (!unknown.has(token)) unknown.set(token, new Set());
@@ -828,6 +841,56 @@
       }
       bar.appendChild(d);
     });
+
+    // ---- 候选区结构标注：虚线外框 + 注释带 + 高度徽标 + 图例 ----
+    bar.classList.toggle('annotate', !!S.showCandStruct);
+    if (S.showCandStruct) {
+      const g = document.createElement('div');
+      g.className = 'cand-guide';
+      if (hasComment) {
+        const band = document.createElement('div');
+        band.className = 'cand-comment-band';
+        band.style.height = commentSize + 'px';
+        if (commentOnTop) band.style.top = '0px';
+        else band.style.bottom = '0px';
+        band.title = 'comment 区（' + commentSize + 'px，' + (commentOnTop ? '在上方' : '在下方') + '）';
+        g.appendChild(band);
+      }
+      bar.appendChild(g);
+      renderCandLegend({
+        barH, cfgH: h, fontSize, commentSize, padding, spacing, commentOnTop, hasComment,
+        candCount: cands.length,
+      });
+    } else if (el.candLegend) {
+      el.candLegend.hidden = true;
+    }
+  }
+
+  function renderCandLegend(info) {
+    const L = el.candLegend;
+    if (!L) return;
+    L.hidden = false;
+    const chip = (label, key) => {
+      const r = resolveColor(key);
+      const sw = r.css ? '<span class="sw" style="background:' + esc(r.css) + '"></span>'
+                       : '<span class="sw" style="background:repeating-linear-gradient(45deg,#333,#333 2px,#222 2px,#222 4px)"></span>';
+      return '<span class="chip">' + sw + esc(label) + '</span>';
+    };
+    L.innerHTML =
+      '<span class="title">候选区构成</span>' +
+      chip('背景', 'candidate_background') +
+      chip('高亮底', 'hilited_candidate_back_color') +
+      chip('文字', 'candidate_text_color') +
+      chip('高亮字', 'hilited_candidate_text_color') +
+      chip('注释字', 'comment_text_color') +
+      chip('分隔线', 'candidate_separator_color') +
+      '<span class="chip"><b>高 ' + info.barH + 'px</b></span>' +
+      '<span class="chip">候选 <b>' + info.fontSize + 'px</b></span>' +
+      '<span class="chip">注释 <b>' + info.commentSize + 'px</b></span>' +
+      '<span class="chip">内边距 <b>' + info.padding + '</b></span>' +
+      '<span class="chip">间距 <b>' + info.spacing + '</b></span>' +
+      '<span class="chip">斜纹 = comment ' + info.commentSize + 'px，<b>' + (info.commentOnTop ? '在上' : '在下') + '</b></span>' +
+      '<span class="chip">共 <b>' + info.candCount + '</b> 个候选</span>';
   }
 
   function renderComposition() {
@@ -971,7 +1034,7 @@
 
   function keySymbolLabelFrom(token) {
     if (typeof token !== 'string' || !token) return '';
-    if (token.startsWith('{') && token.endsWith('}')) return token.slice(1, -1);
+    if (hasBraceToken(token)) return '{}';
     const p = presetKey(token);
     if (p) {
       if (p.label !== undefined && p.label !== null && p.label !== '') return String(p.label);
@@ -1147,11 +1210,9 @@
     el.stageHint.hidden = true;
     el.themeMeta.textContent = (S.theme.name || '未命名') + ' · v' + (S.theme.config_version || '?') +
       (S.fileName ? ' · ' + S.fileName : '');
-    // 手机屏幕比例（宽 × 2），键盘贴底，上方留出 App 内容区 —— 更接近真机观感
+    // 只展示键盘本体（不要 App 内容区）
     el.device.style.width = S.width + 'px';
-    el.device.style.height = Math.round(S.width * 2) + 'px';
-    const rootBg = color('root_background') || color('back_color');
-    if (rootBg) el.device.style.background = rootBg;
+    el.device.style.height = 'auto';
     S.candidates = parseCandidates();
     renderComposition();
     renderCandidates();
@@ -1312,6 +1373,7 @@
     el.chkHint.addEventListener('change', () => { S.showHint = el.chkHint.checked; renderKeyboard(); });
     el.chkPreview.addEventListener('change', () => { S.showPreview = el.chkPreview.checked; hideKeyPreview(); });
     el.chkCandidates.addEventListener('change', () => { S.showCandidates = el.chkCandidates.checked; renderComposition(); renderCandidates(); });
+    el.chkCandStruct.addEventListener('change', () => { S.showCandStruct = el.chkCandStruct.checked; renderCandidates(); });
     el.inpSchema.addEventListener('input', () => { S.schemaName = el.inpSchema.value; renderKeyboard(); });
     el.inpComposition.addEventListener('input', renderComposition);
     el.inpCandidates.addEventListener('input', () => { S.candidates = parseCandidates(); renderCandidates(); });
