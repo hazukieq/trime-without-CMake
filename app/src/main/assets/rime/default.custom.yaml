@@ -1,0 +1,12 @@
+customization:
+  distribution_code_name: ""
+  distribution_version: ""
+  generator: "Rime::SwitcherSettings"
+  modified_time: "Fri Jun 12 21:39:41 2026"
+  rime_version: 1.7.3
+patch:
+  "menu/page_size": 5
+  schema_list:
+    - {schema: hakka_jiugong}
+    - {schema: hakka_qwerty}
+    - {schema: ipa_yunlong}

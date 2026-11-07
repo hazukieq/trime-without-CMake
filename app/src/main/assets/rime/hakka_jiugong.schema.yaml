@@ -1,0 +1,175 @@
+
+# Rime schema
+# encoding: utf-8
+
+schema:
+  schema_id: hakka_jiugong
+  name: 客语12键
+  author:
+    - 佛振 <chen.sst@gmail.com>
+    - Uncle光 <467896722@qq.com>
+  description: |
+    「漢語拼音」，以符號按鍵 - / < \ 輸入四聲
+    拼音碼表根據 CC-CEDICT 改編
+  dependencies:
+    - luna_pinyin
+
+switches:
+  - name: simplification
+    reset: 0
+    states: ["简","繁"]
+  - name: ywz
+    reset: 0    #0为默认关闭，1为默认开启，推荐默认关闭
+    states: [ 关, 情 ]    #控制开关，可自定义括号内，开关显示内容
+  - name: lenth
+    reset: 0    #0为默认关闭，1为默认开启，推荐默认关闭
+    states: [ 关, 联 ]    #控制开关
+  
+  #- name: full_shape
+   # states: [ "全","半" ]
+
+  - options: [ _key_Hide ]
+    states: ["          	                     ▽"] #▼"]
+
+
+engine:
+  processors:
+    - ascii_composer
+    - recognizer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+  segmentors:
+    - ascii_segmentor
+    - matcher
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
+  translators:
+    - punct_translator
+    - table_translator@custom_phrase
+    - reverse_lookup_translator
+    - script_translator
+  filters:
+    - simplifier
+    - uniquifier
+    - simplifier@ywz
+    - simplifier@lenth
+
+speller:
+  alphabet: zwxyvutsrqponmlkjihgfedcba1234567890;
+  initials: zxywvutsrqponmlkihgfedcba1234567890;
+  delimiter: " '"
+  algebra:
+    #- abbrev/^([bcdfghjklmnpqstvz]).+$/$1$2/
+    - abbrev/^(th).+$/$1/
+    - abbrev/^(nz).+$/$1/
+    - abbrev/^(ng).+$/$1/
+    - derive/ap$/at/
+    - derive/ep$/et/
+    - derive/up$/ut/
+    - derive/w$/u/
+    - derive/iam$/ian/
+    - derive/am$/an/
+    - derive/om$/on/
+    - derive/im$/in/
+    - derive/em$/en/
+    - xform/^nz/y/
+    - xform/^th/w/
+    - xform/^ng/1/
+    - xform/(\w)o/$1M/
+    - xform/M/4/
+    - xform/(\w)u/$1V/
+    - xform/V/3/
+    - xlit/abcdefghiklmnpsvrzjqt/aaaeeeiii554477338899/
+    #- derive/[+_*^0]//
+    #- derive/([+_*^0])$//
+    #- derive/^(.*)$/\U$1/
+ 
+
+translator:
+  dictionary: hakka
+  prism: hakka
+  enable_user_dict: true
+  enable_sentence: true
+
+  #spelling_hints: 5 # ～字以內候選標註完整帶調拼音
+  preedit_format:
+    - xform/(\w)a4/$1an/
+    - xform/(\w)ani/$1ang/
+    - xform/(\w)a9/$1at/
+    - xform/(\w)a7/$1ap/
+    - xform/(\w)a5/$1ak/
+    - xform/(\w)i4/$1in/
+    - xform/(\w)in5/$1iok/
+    - xform/(\w)i9/$1it/
+    - xform/(\w)i7/$1ip/
+    - xform/(\w)i34/$1iun/
+    - xform/(\w)iuni/$1iung/
+    - xform/(\w)34/$1un/
+    - xform/(\w)uni/$1ung/
+    - xform/(\w)39/$1ut/
+    - xform/(\w)37/$1up/
+    - xform/(\w)35/$1uk/
+    - xform/(\w)e4/$1en/
+    - xform/(\w)e9/$1et/
+    - xform/(\w)e7/$1ep/
+    - xform/(\w)e5/$1ek/
+    - xform/(\w)44/$1on/
+    - xform/(\w)oni/$1ong/
+    - xform/(\w)in9/$1iot/
+    - xform/(\w)in4/$1ion/
+    - xform/(\w)ioni/$1iong/
+    - xform/(\w)49/$1ot/
+    - xform/(\w)45/$1ok/
+    - xform/3/u/
+    - xform/4/o/
+    - xform/y/$1nz/
+    - xform/1/$1ng/
+    - xform/w/$1th/
+
+ywz:
+  opencc_config: ywz.json
+  option_name: ywz
+  tips: all    #none无注释, char单字注释, all全部注释
+  
+lenth:
+  opencc_config: lenth.json
+  option_name: lenth
+  tips: none    #none无注释, char单字注释, all全部注释
+  
+
+custom_phrase:
+  dictionary: ""
+  user_dict: custom_phrase
+  db_class: tabledb
+  enable_completion: true
+  enable_sentence: true
+  enable_encoder: true
+  encode_commit_history: true
+  initial_quality: "1000"
+
+reverse_lookup:
+  dictionary: luna_pinyin
+  prefix: "`"
+  suffix: "'"
+  tips: 〔普通话拼音〕
+  preedit_format:
+    - xform/([nl])v/$1ü/
+    - xform/([nl])ue/$1üe/
+    - xform/([jqxy])v/$1u/
+
+punctuator:
+  import_preset: symbols
+
+key_binder:
+  import_preset: default
+
+recognizer:
+  import_preset: default
+  patterns:
+    punct: "^/([0-9]0?|[a-z]+)$"
+    reverse_lookup: "`[a-z]*'?$"
