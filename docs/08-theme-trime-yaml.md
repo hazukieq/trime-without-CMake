@@ -620,7 +620,8 @@ python3 -m http.server 8765           # 或 ./tools/theme-previewer/serve.sh
 
 - 字体：真机用 `assets/rime/fonts/*.ttf`，预览器用系统 sans-serif（字体缺失时真机也会回退）。
 - 图片背景（`.9.png` 九宫格、皮肤三层）不做合成。
-- 候选栏按 `candidate_view_height` 固定高度，文字溢出会像真机一样被裁切。
+- 候选栏：无注释时按 `candidate_view_height` 固定高度；有注释时会按需撑高（真机是硬裁），这是为可读性做的唯一刻意偏离。
+- 按键预览：按 `preview_text_size` / `preview_height` 计算气泡尺寸，宽度按文本实测并夹在屏幕内，上方放不下时落到键下方（真机固定画在键上方）。
 - 滑动/长按的交互不做，仅在「按键」tab 里列出所有事件槽位。
 - 悬浮键盘（liquid_keyboard）不渲染，只展示配置。
 

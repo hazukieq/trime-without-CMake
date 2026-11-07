@@ -99,9 +99,14 @@ main {
 
 .stage { flex: 1; min-height: 0; display: flex; align-items: flex-start; justify-content: center; overflow: auto; padding: 10px 12px 16px; }
 .device {
-  transform-origin: top center; border-radius: 14px; overflow: hidden;
+  transform-origin: top center; border-radius: 18px; overflow: hidden;
   box-shadow: 0 18px 50px rgba(0,0,0,.55), 0 0 0 1px #2a3346;
   background: #000; flex: none; position: relative;
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.app-area {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: rgba(128,128,128,.55); letter-spacing: .1em; user-select: none;
 }
 .stage-hint { position: absolute; color: var(--fg-faint); font-size: 12px; }
 .compose-bar {
@@ -133,7 +138,8 @@ main {
 .key.sel { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 3; }
 .key-pop {
   position: absolute; z-index: 40; display: flex; align-items: center; justify-content: center;
-  border-radius: 8px; pointer-events: none; box-shadow: 0 6px 18px rgba(0,0,0,.45);
+  border-radius: 8px; pointer-events: none; box-shadow: 0 8px 22px rgba(0,0,0,.5);
+  white-space: nowrap; overflow: hidden; line-height: 1.1;
 }
 .sample-row { display: flex; gap: 10px; padding: 0 12px 10px; flex: none; }
 .sample-row .field input { width: 100%; }
