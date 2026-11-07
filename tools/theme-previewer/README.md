@@ -24,6 +24,8 @@
   （含 `keyboard_height` 高度锁定、右侧填满、空位占位），候选栏/编码区按 `Candidate`/`Composition` 的样式渲染。
 - **候选区结构**（默认开）：候选栏虚线外框、每个候选独立框、comment 区斜纹带，下方图例给出
   实际用到的颜色（背景/高亮底/文字/高亮字/注释字/分隔线）与高度/字号/内边距/间距/注释位置。
+- **按键三段文字**：主标签居中、长按角标（`label_symbol` / `long_click` 的标签）顶部居中、`hint` 底部居中，
+  与 `KeyboardView#onBufferDraw` 一致（旧版本把角标画在左下角，已修正）。
 - **候选区点击探查**：点候选字 / 注释（拼音）/ 分隔线 / 候选栏空白，右侧「候选区」tab 显示该部分的
   几何与颜色计算（外框 left/width、measureText、文字与注释中心 X、颜色命中键、高度公式）。
   候选栏几何与 `Candidate.updateCandidateWidth()` / `onDraw()` 逐项对齐：`comment_on_top` 时高度为

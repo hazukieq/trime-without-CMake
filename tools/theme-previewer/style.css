@@ -134,7 +134,10 @@ main {
 }
 .key .lbl { pointer-events: none; white-space: nowrap; }
 .key .sym {
-  position: absolute; left: 6px; bottom: 1px; pointer-events: none; white-space: nowrap;
+  /* KeyboardView.drawKeySymbol：baseline = padding.top - fontMetrics.top，文字对齐 CENTER
+     → 符号画在键的「顶部居中」，不是左下角 */
+  position: absolute; left: 50%; top: 0; transform: translateX(-50%);
+  pointer-events: none; white-space: nowrap; line-height: 1.1;
 }
 .key .hint {
   position: absolute; left: 50%; transform: translateX(-50%); bottom: 0; pointer-events: none; white-space: nowrap;

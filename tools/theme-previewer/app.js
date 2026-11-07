@@ -1111,8 +1111,11 @@
         sym.style.fontFamily = symbolFont;
         const sx = num(entry.key_symbol_offset_x, num(style.key_symbol_offset_x, 0));
         const sy = num(entry.key_symbol_offset_y, num(style.key_symbol_offset_y, 0));
-        sym.style.left = (6 + sx) + 'px';
-        sym.style.bottom = (1 - sy) + 'px';
+        // 顶部居中：baseline ≈ padding.top + ascent，这里用 top=padding.top 近似；
+        // key_symbol_offset_x 让符号整体左右偏，_y 让它上下偏（正值往下，和 Java 的 baseline+offset 一致）
+        const padTop = num(style.keyboard_padding_top, 0);
+        sym.style.top = (padTop + sy) + 'px';
+        sym.style.transform = 'translateX(calc(-50% + ' + sx + 'px))';
         d.appendChild(sym);
       }
       if (S.showHint && entry.hint !== undefined && entry.hint !== '') {

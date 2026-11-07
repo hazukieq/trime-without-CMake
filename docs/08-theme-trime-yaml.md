@@ -481,6 +481,21 @@ w -= horizontal_gap                  // 键宽扣掉间距
 
 这就是「换键盘时键盘高度不跳」的机制：所有键盘被强制压到同一个总高。
 
+### 8.3.1 按键内部的三段文字位置（`KeyboardView#onBufferDraw`）
+
+一个键里最多画三段文字，**位置完全不同**，这是主题排查时最容易看错的地方：
+
+| 文字 | 来源 | 水平 | 垂直 | 字号 |
+| --- | --- | --- | --- | --- |
+| 主标签 `label` | `Key.getLabel()`（键自身 `label`，或 preset/事件标签，`enter_labels` 会替换） | 居中：`键宽/2 + key_text_offset_x`（Paint 为 `CENTER` 对齐） | `(h - padT - padB)/2 + (textSize - descent)/2 + padT + key_text_offset_y` | `key_text_size`；否则 `label.length() > 1 ? key_long_text_size : key_text_size` |
+| 角标 `symbol` | `Key.getSymbolLabel()`：`label_symbol`，否则 `long_click` 的标签 | 居中：`键宽/2 + key_symbol_offset_x` | **顶部**：baseline = `padding.top - fontMetrics.top + key_symbol_offset_y` | `symbol_text_size`（键级优先，否则 `style/symbol_text_size`，默认 10） |
+| 提示 `hint` | 键的 `hint` 字段 | 居中：`键宽/2 + key_hint_offset_x` | **底部**：baseline = `键高 - padding.bottom - fontMetrics.bottom + key_hint_offset_y` | 同 `symbol_text_size`（复用 symbol Paint） |
+
+> 记忆口诀：**主标签居中，长按角标在顶，hint 在底**。
+> 所以 `long_click: Keyboard_edit` 的「编辑」小字是画在键的**顶部居中**（不是左下角）；
+> 想挪位置用 `key_symbol_offset_x / key_symbol_offset_y`（正值向右/向下），
+> 想换角标文字用 `label_symbol`（优先级高于 `long_click` 的标签）。
+
 ### 8.4 键盘选择链（`style.keyboards` + `Config.getKeyboardNames`）
 
 `.default` 的解析顺序（上游行为，本 fork 简化）：
