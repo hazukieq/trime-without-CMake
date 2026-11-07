@@ -111,6 +111,8 @@ python3 script/verify-rime-assets.py   # 期望：53 passed, 0 failed
 | [docs/05-branches-release.md](docs/05-branches-release.md) | 分支模型、改名影响面 10 层、发布流程、**签名与密钥安全** |
 | [docs/06-troubleshooting-roadmap.md](docs/06-troubleshooting-roadmap.md) | 四层排障、症状表、诊断命令、技术债与路线图 |
 | [docs/07-opencc-and-rime-data.md](docs/07-opencc-and-rime-data.md) | OpenCC 三种文件关系、部署管线、客家话数据、**扩充指引** |
+| [docs/08-theme-trime-yaml.md](docs/08-theme-trime-yaml.md) | **trime.yaml 主题全解**（style / 配色 / 按键 / 键盘 / 悬浮键盘 / 15 个坑） |
+| [tools/theme-previewer/](tools/theme-previewer/README.md) | **主题实时预览器**：浏览器里渲染真实布局与配色，改主题不用装机 |
 | [docs/reports/](docs/reports/README.md) | 构建 / 改名 / 集成 / 真机测试报告（证据存档） |
 
 ### 安全提示

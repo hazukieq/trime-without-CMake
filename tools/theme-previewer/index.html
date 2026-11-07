@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trime 主题预览器 · trime.yaml</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="topbar">
+  <div class="brand">
+    <span class="dot"></span>
+    <h1>Trime 主题预览器</h1>
+    <span class="sub">trime.yaml · 实时渲染</span>
+  </div>
+  <div class="actions">
+    <button id="btnOpen" class="btn">打开 YAML…</button>
+    <input id="fileInput" type="file" accept=".yaml,.yml,.txt" hidden>
+    <span class="sep"></span>
+    <button class="btn ghost preset" data-preset="trime.yaml">默认主题</button>
+    <button class="btn ghost preset" data-preset="hakka_theme.trime.yaml">客家主题</button>
+    <button class="btn ghost preset" data-preset="tongwenfeng.trime.yaml">同文风主题</button>
+    <span class="sep"></span>
+    <label class="chk" title="把编辑器内容当作 trime.custom.yaml 的 patch 叠加到默认主题上"><input type="checkbox" id="patchMode"> patch 叠加</label>
+    <span id="status" class="status">初始化…</span>
+  </div>
+</header>
+
+<main>
+  <!-- 左：源码 -->
+  <section class="pane editor-pane">
+    <div class="pane-head">
+      <div class="tabs">
+        <button class="tab active" data-tab="yaml">主题源码</button>
+      </div>
+      <div class="pane-meta">
+        <span id="themeMeta">—</span>
+        <button id="btnReset" class="btn tiny ghost" title="把编辑器恢复为磁盘上的原始文件">还原</button>
+      </div>
+    </div>
+    <textarea id="editor" spellcheck="false" autocomplete="off" placeholder="在此粘贴 trime.yaml 内容，或点上方「打开 YAML…」…"></textarea>
+    <div class="pane-foot">
+      <span id="cursorInfo">行 1，列 1</span>
+      <span>编辑后自动重新渲染（约 250ms 防抖）</span>
+    </div>
+  </section>
+
+  <!-- 中：预览 -->
+  <section class="pane preview-pane">
+    <div class="toolbar">
+      <label class="field"><span>配色方案</span><select id="selScheme"></select></label>
+      <label class="field"><span>键盘</span><select id="selKeyboard"></select></label>
+      <label class="field"><span>方向</span>
+        <select id="selOrientation">
+          <option value="portrait">竖屏</option>
+          <option value="landscape">横屏</option>
+        </select>
+      </label>
+      <label class="field"><span>屏宽(dp)</span><input id="inpWidth" type="number" min="240" max="1200" step="1" value="360"></label>
+      <label class="field"><span>缩放</span><input id="inpZoom" type="range" min="50" max="140" value="100"></label>
+    </div>
+    <div class="toolbar second">
+      <label class="chk"><input type="checkbox" id="chkAscii"> 西文模式</label>
+      <label class="chk"><input type="checkbox" id="chkDark"> 深色外观</label>
+      <label class="chk"><input type="checkbox" id="chkSymbol" checked> 显示符号(symbol)</label>
+      <label class="chk"><input type="checkbox" id="chkHint" checked> 显示提示(hint)</label>
+      <label class="chk"><input type="checkbox" id="chkPreview" checked> 按键弹窗预览</label>
+      <label class="chk"><input type="checkbox" id="chkCandidates" checked> 候选栏</label>
+      <label class="field inline"><span>方案名</span><input id="inpSchema" type="text" value="客语12键" title="空格键的标签取自当前方案名"></label>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="device" id="device">
+        <div class="compose-bar" id="composeBar" hidden></div>
+        <div class="candidate-bar" id="candidateBar"></div>
+        <div class="keyboard" id="keyboard"></div>
+      </div>
+      <div class="stage-hint" id="stageHint">正在载入默认主题…</div>
+    </div>
+
+    <div class="sample-row">
+      <label class="field grow"><span>示例编码/预编辑</span><input id="inpComposition" type="text" value="ngin"></label>
+      <label class="field grow"><span>示例候选（每行一个，用竖线分隔注释）</span><input id="inpCandidates" type="text" value="人|ren, 你|ni, 尼|ni, 泥|ni, 呢|ne, 逆|ni, 拟|ni, 腻|ni"></label>
+    </div>
+  </section>
+
+  <!-- 右：检查器 -->
+  <aside class="pane side-pane">
+    <div class="tabs side-tabs">
+      <button class="tab active" data-stab="issues">问题 <b id="badgeIssues" class="badge">0</b></button>
+      <button class="tab" data-stab="colors">颜色</button>
+      <button class="tab" data-stab="keyboards">键盘</button>
+      <button class="tab" data-stab="key">按键</button>
+      <button class="tab" data-stab="style">style</button>
+    </div>
+
+    <div class="side-body">
+      <div class="side-tab active" data-panel="issues">
+        <div id="issuesEmpty" class="empty">没有发现问题。</div>
+        <ul id="issueList" class="issue-list"></ul>
+      </div>
+
+      <div class="side-tab" data-panel="colors">
+        <div class="side-note">当前方案：<code id="curScheme">—</code>。下表是渲染时用到的颜色键，按 <code>fallback_colors</code> 链解析；「来源」列为实际命中的键。</div>
+        <table class="tbl" id="colorTable"><thead><tr><th></th><th>键</th><th>解析值</th><th>来源</th></tr></thead><tbody></tbody></table>
+      </div>
+
+      <div class="side-tab" data-panel="keyboards">
+        <div class="side-note">点击一行切换预览。行数/高度由预览器按 <code>Keyboard.java</code> 的算法实时计算。</div>
+        <table class="tbl" id="kbTable"><thead><tr><th>键盘</th><th>键数</th><th>行</th><th>高度</th></tr></thead><tbody></tbody></table>
+      </div>
+
+      <div class="side-tab" data-panel="key">
+        <div id="keyDetail" class="key-detail">
+          <div class="empty">点击预览里的任意按键查看它的事件解析与原始 YAML。</div>
+        </div>
+      </div>
+
+      <div class="side-tab" data-panel="style">
+        <div class="side-note">当前生效的 <code>style</code> 值（含预览器内置默认值）。</div>
+        <table class="tbl" id="styleTable"><thead><tr><th>键</th><th>值</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<script src="vendor/js-yaml.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
