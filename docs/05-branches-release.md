@@ -1,7 +1,7 @@
 # 05 · 分支模型与发布
 
 > 覆盖：分支职责、**为什么改名与换 `.so` 必须同批**、改名影响面全清单、发布流程、签名与密钥安全、旧数据迁移。
-> 基线 HEAD `7436b6d`（分支 `hakka`）。
+> 基线 HEAD `68f876f`（分支 `dev`）。
 
 ## 目录
 
@@ -32,10 +32,11 @@ main   ──●──●──●  (without-CMake 稳定主线，com.tumuyan.tr
 dev       ●──●──●  (hkrime：com.hazukieq.hkrime + 新 .so)
 ```
 
-> 现状（写文档时）：远端仍是 `origin/develop`、`origin/hakka`，默认分支 `origin/HEAD -> develop`；
-> **重命名尚未执行**。执行后 `develop`→`main`、`hakka`→`dev`，并改默认分支为 `main`。
+> **现状（2026-11-08 已执行）**：远端只剩 `main`（=`14d365e`，默认分支）与 `dev`（=`68f876f`）；
+> 旧 `develop`/`hakka` 已删除。迁移前快照：`develop=14d365ec`、`hakka=0c1e58ac`。
+> 回滚：`git push origin 14d365ec:refs/heads/develop 0c1e58ac:refs/heads/hakka`，并把默认分支改回 `develop`。
 
-### 迁移命令（维护者执行）
+### 迁移命令（2026-11-08 已执行；以下为可复现步骤）
 
 ```bash
 # 1) 本地改名
@@ -49,6 +50,17 @@ git push -u origin dev
 # 3) GitHub 上把默认分支切到 main（Settings → Branches）
 # 4) 确认无误后删除旧远端分支
 git push origin --delete develop hakka
+```
+
+实际执行记录（GitHub 没有「分支改名」API，实际用「建新 ref → 改默认分支 → 删旧 ref」）：
+
+```bash
+# 用本地分支/sha 直接建远端分支
+git push -u origin hakka:dev
+git push origin origin/develop:refs/heads/main
+git push origin --delete develop hakka            # 或 gh api -X DELETE .../git/refs/heads/develop
+gh api -X PATCH repos/hazukieq/trime-without-CMake -f default_branch=main
+# 本地：git branch -m hakka dev; git branch --track main origin/main; git fetch --prune
 ```
 
 注意事项：

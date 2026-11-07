@@ -11,7 +11,7 @@
   v3.3.x 起 Kotlin 化重构、JNI 接口全变，**不能直接合并**。
 - **继承自 without-CMake**：不在 Gradle 里编译 C++，而是直接提交预编译的 `librime_jni.so`；
   代价是 `.so` 与 Java 的一致性没有编译期保障，因此本仓库另配了构建/校验脚本。
-- **分支**：`hakka` → 计划改名 `dev`（hkrime 开发线）；`develop` → `main`（稳定的 without-CMake 主线，保持旧包名）。
+- **分支**：`dev`（原 `hakka`，hkrime 开发线）；`main`（原 `develop`，稳定的 without-CMake 主线，保持旧包名）。
   两条线内容不同，**不要互相 merge**。
 
 ### 当前状态

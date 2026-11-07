@@ -4,7 +4,7 @@
 基于 [`tumuyan/trime-without-CMake`](https://github.com/tumuyan/trime-without-CMake)，
 包名 `com.hazukieq.hkrime`，源码基准钉死上游 **v3.2.7**。
 
-> 文档基线：`hakka` 分支 HEAD **`7436b6d`**（2026-11-08）。
+> 文档基线：`dev` 分支 HEAD **`68f876f`**（2026-11-08）。
 > 行号以该提交为准；工作树若有改动会偏移，**以内容为准**。
 
 ## 当前状态一览

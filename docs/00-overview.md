@@ -1,6 +1,6 @@
 # 00 · 项目总览
 
-> 基线：`hakka` 分支 HEAD `7436b6d`（2026-11-08，`build(jni): rebuild librime_jni.so for com.hazukieq.hkrime`）。
+> 基线：`dev` 分支 HEAD `68f876f`（2026-11-08，`docs: add hkrime developer documentation set`）。
 > 所有行号以该提交为准；若工作树有未提交改动，行号可能偏移，以内容为准。
 
 ## 目录
@@ -51,8 +51,8 @@ osfans/trime                     上游 RIME 安卓前端，默认分支 develop
 tumuyan/trime-without-CMake      去掉 CMake 的 fork（直接提交预编译 .so），默认分支 develop
         │
 hazukieq/trime-without-CMake     本仓库
-        ├─ develop  →  计划改名 main ：稳定主线（= without-CMake 原内容，不含客家话定制）
-        └─ hakka    →  计划改名 dev  ：hkrime 开发线（本次全部成果所在）
+        ├─ main      （原 develop）：稳定主线（= without-CMake 原内容，不含客家话定制）
+        └─ dev       （原 hakka）  ：hkrime 开发线（本次全部成果所在）
 ```
 
 **为什么钉死 v3.2.7**：JNI 是**符号名静态绑定**（无 `RegisterNatives`），

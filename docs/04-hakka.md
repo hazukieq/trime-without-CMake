@@ -36,11 +36,12 @@ f5638bb  chore(gradle): get git branch info from ci     ← merge-base（develop
    └─ 0c1e58a  2023-09-15  rm key,workflow               ← 删 5 个 CI workflow，放开 jks 忽略
         │
         ├─ 922a2ba  2026-11-08  refactor: rename package to com.hazukieq.hkrime
-        └─ 7436b6d  2026-11-08  build(jni): rebuild librime_jni.so  ← 当前 HEAD
+        ├─ 7436b6d  2026-11-08  build(jni): rebuild librime_jni.so
+        └─ 68f876f  2026-11-08  docs: add hkrime developer documentation set ← 当前 HEAD（dev）
 ```
 
-`git merge-base origin/develop hakka` = `f5638bb`；develop 另有 1 个 hakka 未含的提交 `14d365e "Update build-my-trime.yml"`
-（即 develop 只比 merge-base 多一个 CI 文件改动）。
+`git merge-base origin/main dev` = `f5638bb`；main 另有 1 个 dev 未含的提交 `14d365e "Update build-my-trime.yml"`
+（即 main 只比 merge-base 多一个 CI 文件改动）。
 
 ## 3. 逐提交拆解
 
