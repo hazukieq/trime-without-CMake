@@ -344,6 +344,9 @@ if [ "$CLEAN" = 1 ]; then
 fi
 
 step "cmake configure（NDK toolchain，绕过 gradle）"
+# 16 KB page 兼容（Android 15+ 的 16KB page 设备要求 LOAD 段按 0x4000 对齐）：
+# 通过 CMAKE_SHARED_LINKER_FLAGS 给 librime_jni.so 加 -Wl,-z,max-page-size=16384。
+# 若不加，Android 15+/16 会弹「此应用不符合 16 KB 对齐要求」，部分设备/场景 dlopen 失败。
 info "build dir: $BUILD_DIR"
 # -UBOOST_EXCLUDE_LIBRARIES 是必须的坑规避：
 #   app/src/main/jni/cmake/FindBoost.cmake 第 4 行做
@@ -360,6 +363,7 @@ info "build dir: $BUILD_DIR"
   -DANDROID_PLATFORM="$ANDROID_PLATFORM" \
   -DANDROID_STL=c++_static \
   -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+  -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-z,max-page-size=16384" \
   -UBOOST_EXCLUDE_LIBRARIES
 
 step "构建 rime_jni（ninja -j $JOBS）"
