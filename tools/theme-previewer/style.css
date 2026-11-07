@@ -131,8 +131,9 @@ main {
 .key {
   position: absolute; display: flex; align-items: center; justify-content: center;
   cursor: pointer; overflow: visible; user-select: none;
+  background: var(--k-bg, transparent); color: var(--k-fg, inherit);
 }
-.key .lbl { pointer-events: none; white-space: nowrap; }
+.key .lbl { pointer-events: none; white-space: nowrap; color: var(--k-fg, inherit); }
 .key .sym {
   /* KeyboardView.drawKeySymbol：baseline = padding.top - fontMetrics.top，文字对齐 CENTER
      → 符号画在键的「顶部居中」，不是左下角 */
@@ -142,7 +143,12 @@ main {
 .key .hint {
   position: absolute; left: 50%; transform: translateX(-50%); bottom: 0; pointer-events: none; white-space: nowrap;
 }
-.key:hover { outline: 1px solid rgba(120,170,255,.55); outline-offset: -1px; }
+.key:hover {
+  background: var(--k-hbg, var(--k-bg, transparent));
+  outline: 1px solid rgba(120,170,255,.55); outline-offset: -1px;
+}
+.key:hover .lbl { color: var(--k-hfg, var(--k-fg, inherit)); }
+.key:hover .sym { color: var(--k-hsym, var(--k-sym, inherit)); }
 .key.sel { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 3; }
 /* 候选区结构标注 */
 .candidate-bar.annotate { outline: 1px dashed rgba(140, 200, 255, .75); outline-offset: -1px; }

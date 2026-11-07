@@ -1022,17 +1022,33 @@
   }
 
   /* ------------------------------ 渲染：键盘 ------------------------------ */
+  // 键上写的颜色可能是：0xRRGGBB / #hex / CSS 颜色名 / **方案里的具名颜色**（bkg、bbs、bh1…）
+  // 真机 Key.java 走 Config.getColor(context, mk, key) → parseColor 失败时 getCurrentColor(name) 回查方案。
+  function entryColor(v) {
+    if (v === undefined || v === null || v === '') return null;
+    const direct = parseColor(v);
+    if (direct && direct.css) return direct.css;
+    const scheme = S.schemeObj || {};
+    const raw = scheme[String(v)];
+    if (raw !== undefined && raw !== null && raw !== '') {
+      const c = parseColor(raw);
+      if (c && c.css) return c.css;
+    }
+    const r = resolveColor(String(v));
+    return r && r.css ? r.css : null;
+  }
+
   function keyColorsForState(entry, hovered, on) {
     const base = {
-      bg: entry.key_back_color !== undefined ? (parseColor(entry.key_back_color) || {}).css : null,
-      fg: entry.key_text_color !== undefined ? (parseColor(entry.key_text_color) || {}).css : null,
-      sym: entry.key_symbol_color !== undefined ? (parseColor(entry.key_symbol_color) || {}).css : null,
+      bg: entryColor(entry.key_back_color),
+      fg: entryColor(entry.key_text_color),
+      sym: entryColor(entry.key_symbol_color),
     };
     if (hovered) {
       return {
-        bg: (entry.hilited_key_back_color !== undefined && (parseColor(entry.hilited_key_back_color) || {}).css) || color('hilited_key_back_color') || base.bg,
-        fg: (entry.hilited_key_text_color !== undefined && (parseColor(entry.hilited_key_text_color) || {}).css) || color('hilited_key_text_color') || base.fg,
-        sym: (entry.hilited_key_symbol_color !== undefined && (parseColor(entry.hilited_key_symbol_color) || {}).css) || color('hilited_key_symbol_color') || base.sym,
+        bg: entryColor(entry.hilited_key_back_color) || color('hilited_key_back_color') || base.bg,
+        fg: entryColor(entry.hilited_key_text_color) || color('hilited_key_text_color') || base.fg,
+        sym: entryColor(entry.hilited_key_symbol_color) || color('hilited_key_symbol_color') || base.sym,
       };
     }
     if (on) {
@@ -1081,7 +1097,14 @@
       d.style.height = Math.max(1, k.height) + 'px';
       d.style.borderRadius = Math.max(0, round) + 'px';
       const cols = keyColorsForState(entry, false, false);
-      d.style.background = cols.bg || 'transparent';
+      const hov = keyColorsForState(entry, true, false);
+      // 悬停态交给 CSS :hover，JS 不再改 background/color —— 这样即使 mouseleave 丢失也不会「卡色」
+      d.style.setProperty('--k-bg', cols.bg || 'transparent');
+      d.style.setProperty('--k-fg', cols.fg || 'inherit');
+      d.style.setProperty('--k-sym', cols.sym || 'inherit');
+      d.style.setProperty('--k-hbg', hov.bg || cols.bg || 'transparent');
+      d.style.setProperty('--k-hfg', hov.fg || cols.fg || 'inherit');
+      d.style.setProperty('--k-hsym', hov.sym || cols.sym || 'inherit');
 
       const label = keyLabel(entry);
       const lbl = document.createElement('span');
@@ -1089,7 +1112,7 @@
       lbl.textContent = label;
       const lsize = entry.key_text_size !== undefined && entry.key_text_size > 0 ? Number(entry.key_text_size) : (label.length > 1 ? keyLongSize : keyTextSize);
       lbl.style.fontSize = lsize + 'px';
-      lbl.style.color = cols.fg || '#fff';
+      lbl.style.color = 'var(--k-fg)';
       lbl.style.fontFamily = keyFont;
       if (shadowRadius > 0) lbl.style.textShadow = '0 0 ' + shadowRadius + 'px ' + shadowColor;
       const offX = num(entry.key_text_offset_x, num(style.key_text_offset_x, 0));
@@ -1107,7 +1130,7 @@
         sym.textContent = symLabel;
         const ssize = entry.symbol_text_size !== undefined && entry.symbol_text_size > 0 ? Number(entry.symbol_text_size) : symbolSize;
         sym.style.fontSize = ssize + 'px';
-        sym.style.color = cols.sym || '#aaa';
+        sym.style.color = 'var(--k-sym)';
         sym.style.fontFamily = symbolFont;
         const sx = num(entry.key_symbol_offset_x, num(style.key_symbol_offset_x, 0));
         const sy = num(entry.key_symbol_offset_y, num(style.key_symbol_offset_y, 0));
@@ -1123,7 +1146,7 @@
         hint.className = 'hint';
         hint.textContent = String(entry.hint);
         hint.style.fontSize = symbolSize + 'px';
-        hint.style.color = cols.sym || '#aaa';
+        hint.style.color = 'var(--k-sym)';
         hint.style.fontFamily = symbolFont;
         const hx = num(entry.key_hint_offset_x, num(style.key_hint_offset_x, 0));
         const hy = num(entry.key_hint_offset_y, num(style.key_hint_offset_y, 0));
@@ -1134,17 +1157,9 @@
       if (S.selectedKey === idx) d.classList.add('sel');
 
       d.addEventListener('mouseenter', () => {
-        const hoverCols = keyColorsForState(entry, true, false);
-        d.style.background = hoverCols.bg || 'transparent';
-        lbl.style.color = hoverCols.fg || '#fff';
         if (S.showPreview) showKeyPreview(k, label);
       });
-      d.addEventListener('mouseleave', () => {
-        const normal = keyColorsForState(entry, false, false);
-        d.style.background = normal.bg || 'transparent';
-        lbl.style.color = normal.fg || '#fff';
-        hideKeyPreview();
-      });
+      d.addEventListener('mouseleave', () => hideKeyPreview());
       d.addEventListener('click', () => selectKey(idx));
       kbEl.appendChild(d);
     });
@@ -1499,6 +1514,9 @@
     document.querySelectorAll('.side-tabs .tab').forEach((t) => t.addEventListener('click', () => switchSideTab(t.dataset.stab)));
 
     // 拖拽 YAML 到页面
+    // 鼠标离开窗口 / 窗口失焦时，收掉按键放大预览（避免残留在屏幕上）
+    window.addEventListener('blur', () => hideKeyPreview());
+    document.addEventListener('mouseleave', () => hideKeyPreview());
     document.addEventListener('dragover', (e) => { e.preventDefault(); });
     document.addEventListener('drop', (e) => {
       e.preventDefault();
