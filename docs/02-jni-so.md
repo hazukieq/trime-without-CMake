@@ -1,6 +1,8 @@
 # 02 · JNI 与 `librime_jni.so`（定稿）
 
-> **本篇状态：定稿（v3，2026-11-08 第二轮）**。`.so` 已重建（新包名 + 16 KB 对齐）、`loadLibrary` 已统一、符号契约 73/73 通过、真机仪器测试通过。
+> 事实快照：`ebb18c1`（当前 HEAD 以 `git log -1` 为准）。
+> **本篇状态：定稿（v4，2026-11-08 第三轮）**。`.so` 未再变动（13,587,744 B）；`loadLibrary` 已统一、符号契约 73/73 通过、真机仪器测试通过。
+> 第三轮的 `726a209` 只增加 rime 数据资产（方案/词典/OpenCC 滤镜），不涉及 JNI，故本篇结论不变。
 > 历史故障（85 MB 废库）保留在本篇 §2 作为「为什么会崩」的记录与排障依据。
 
 ## 目录
@@ -55,7 +57,8 @@
 OK: JNI 符号契约一致（73 个声明全部导出，无旧包名残留）
 ```
 
-> 73 = `Rime.java` 的 72 个 `native` + `OpenCCDictManager.kt:15` 的 1 个 `external fun openccDictConv`。
+> 73 = `Rime.java` 的 72 个 `native` + `OpenCCDictManager.kt:71` 的 1 个 `external fun openccDictConv`。
+> （`:15` 是 `System.loadLibrary("rime_jni")`，两者别混。）
 
 ### 历史遗留（已清理）
 
@@ -175,7 +178,7 @@ c96f92b "close log" (2023-09-15)   补入 13.5MB 的 librime_jni_1_5.so + libs_b
 
 ## 5. 怎么重建（脚本化）
 
-**不要手工执行 git clone / sed / cmake**——已固化为 `script/build-jni-so.sh`（415 行，幂等、可重复）。
+**不要手工执行 git clone / sed / cmake**——已固化为 `script/build-jni-so.sh`（419 行，幂等、可重复）。
 
 ```bash
 cd /home/hazukie/Projects/common/trime-workspace/hkrime
@@ -186,7 +189,7 @@ cd /home/hazukie/Projects/common/trime-workspace/hkrime
 
 # 常用变体
 ./script/build-jni-so.sh --clean                    # 清掉源码树与构建目录后从头来（幂等）
-./script/build-jni-so.sh --build-type Release       # -O2 优化版（约 6 MB，见 §7）
+./script/build-jni-so.sh --build-type Release       # -O2 优化版（约 6 MB，见 §8）
 ./script/build-jni-so.sh --src-dir /path/to/trime-v3.2.7   # 复用已 clone 的源码（离线）
 ./script/build-jni-so.sh --out-dir /tmp/out         # 只装到临时目录（不动 app/libs）
 ```
@@ -319,7 +322,7 @@ timeout 300 adb shell am instrument -w -r \
 
 | 现象 | 判定 |
 |---|---|
-| `OK (1 test)` | 通过（部署 + ocd2 生成 + 转换 + 方案列表全部正常） |
+| `OK (1 test)` | 通过（fresh 部署 + 18 个 `ocd2` + 10 个 bin + 3 个方案 + 4 组转换全部正常） |
 | `No implementation found for ... Rime.setup` | `.so` 与 Java 包名不匹配（装错库/没重编） |
 | `UnsatisfiedLinkError: dlopen failed` | 库缺失或 ABI 不符；`libc++_shared.so not found` 表示用了 shared STL（当前库静态链接，不会出现） |
 | 键盘出但候选为空 | 不是 JNI 问题 → 无输入方案，见 06 §4.1 |
@@ -385,4 +388,4 @@ $ANDROID_HOME/build-tools/36.0.0/zipalign -c -P 16 4 $APK   # 退出码 0
 | 路径 | `get_shared_data_dir` `get_user_data_dir` `get_sync_dir` `get_user_id` |
 | 版本 | `get_version` `get_librime_version` `get_trime_version` `get_opencc_version` |
 | 回调 | `set_notification_handler` |
-| OpenCC | `opencc_convert`（Rime）+ `openccDictConv`（`OpenCCDictManager.kt:15`，第 73 个符号） |
+| OpenCC | `opencc_convert`（Rime）+ `openccDictConv`（`OpenCCDictManager.kt:71`，第 73 个符号；`:15` 是 loadLibrary） |

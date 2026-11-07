@@ -158,7 +158,7 @@ flowchart TD
    （`bopomofo_tw`/`luna_pinyin*`）生效，而这些方案在本仓库并不存在，表现为「方案列表为空」。
 
 > 现状：`assets/rime/default.custom.yaml` 已随包提供（12 行，`patch:` + `menu/page_size` + `schema_list`
-> 指向 `hakka_jiugong`/`hakka_qwerty`/`ipa_yunlong`），所以补空文件的兜底通常不会触发；后两项仍缺 schema 文件，见 [07 §8](07-opencc-and-rime-data.md)。
+> 指向 `hakka_jiugong`/`hakka_qwerty`/`ipa_yunlong`），且三项**均有实体方案文件**（`726a209` 补齐，见 [07 §8](07-opencc-and-rime-data.md)）。
 
 ## 6. 数据目录模型
 
@@ -171,6 +171,9 @@ RIME 需要两个目录（`Rime.init` 把它们传给 native，`Rime.java:329-33
 
 - 默认值来自 `AppPrefs.kt:346-353`：`EXTERNAL_PATH_PREFIX = appContext.getExternalFilesDir(null)!!.absolutePath`，
   即 `/sdcard/Android/data/<applicationId>/files/rime`。
+- ⚠ 两个 getter（`:349`、`:352`）默认都返回 `$EXTERNAL_PATH_PREFIX/rime`，即「默认同路径」；
+  但**用户可分别改**。本机真机实测 sharedDataDir = `…/files/rime`、userDataDir = `/storage/emulated/0/rime`，
+  是该机既有偏好所致，**不是默认值**。
 - 实际路径**随 applicationId 变化**：改包名后用户数据目录也会变，旧数据不会自动迁移（见 05 改名影响面）。
 - `DataManager.getDataDir(child)`（`data/DataManager.kt:5-16`）：优先 `sharedDataDir/child`，不存在则回退 `userDataDir/child`。
 - OpenCC 词典目录 = `getDataDir("opencc")`（`OpenCCDictManager.kt:18-20`），放 `*.ocd2` 二进制词典。

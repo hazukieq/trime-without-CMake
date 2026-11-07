@@ -20,13 +20,16 @@
 |---|---|
 | 包名 / namespace | ✅ `com.hazukieq.hkrime`（103 文件 / 391 行改名） |
 | native 库 | ✅ `app/libs/arm64-v8a/librime_jni.so`，13,587,744 B，73 符号，新包名，**16 KB 页对齐** |
-| 输入方案 | ✅ 内置客家话「客语12键」（`hakka_jiugong`）+ 9 张词典 |
-| OpenCC 简繁 | ✅ 29 个词典/配置，部署时生成 15 个 `.ocd2`（实测 s2t/t2s/s2tw/s2twp） |
-| 构建/校验脚本 | ✅ `build-jni-so.sh` + `verify-jni-symbols.sh` + `gen-keystore.sh` |
-| 签名 | ✅ 密钥已移出仓库（`~/.android-keys/` 或 `HKREME_*` 环境变量） |
-| APK | ✅ debug 17,233,842 B / release 11,004,041 B（新 key 签名，zipalign16 通过） |
-| 真机 | ✅ **数据链路仪器测试通过**（`OK (1 test)`）；⬜ 键盘界面人工冒烟未做 |
-| 已知缺口 | ⚠ 缺 `luna_pinyin`（反查用）、`hakka_qwerty`/`ipa_yunlong` 方案文件、`ywz.json`/`lenth.json`；详见 [`docs/04-hakka.md`](docs/04-hakka.md) §6 |
+| 输入方案 | ✅ **3 个**：客语12键（`hakka_jiugong`）/ 客语26键（`hakka_qwerty`）/ 雲龍國際音標（`ipa_yunlong`）+ 朙月拼音（`luna_pinyin`，供反查），共 11 个方案/词典文件 |
+| OpenCC 简繁 | ✅ **34 个**词典/配置（18 txt + 16 json），fresh 部署生成 **18 个 `.ocd2`**（实测 s2t/t2s/s2tw/s2twp） |
+| 数据资产 | ✅ `assets/rime/` 共 **23 项**（22 文件 + `opencc/`）；静态自检 **53 passed, 0 failed** |
+| 构建/校验脚本 | ✅ `build-jni-so.sh` + `verify-jni-symbols.sh` + `verify-rime-assets.py` + `gen-keystore.sh` |
+| 签名 | ✅ 密钥已移出仓库（`~/.android-keys/` 或 `HKREME_*` 环境变量）；无密钥时产出 `-unsigned.apk`（不报错） |
+| APK | ✅ debug **13,437,603 B** / release **11,405,775 B**（新 key 签名，zipalign16 通过） |
+| 真机 | ✅ **数据链路仪器测试通过**（`OK (1 test)`：fresh 部署 / 18 ocd2 / 10 bin / 3 方案）；⬜ 键盘界面人工冒烟未做 |
+| 已知限制 | ⬜ IME 界面未冒烟；不预置 `*.userdb`（设计取舍）；仅 `arm64-v8a`；release lint 被 `-x lintVital*` 绕过；历史密钥仍在 git 历史 → 详见 [`docs/06`](docs/06-troubleshooting-roadmap.md) §5 |
+
+> 事实快照：`ebb18c1`（当前 HEAD 以 `git log -1` 为准）。完整文档见 [`docs/`](docs/README.md)。
 
 ### 快速开始
 
@@ -44,6 +47,8 @@ adb install -r app/build/outputs/apk/debug/trime-3.2.7-debug.apk
 adb shell appops set com.hazukieq.hkrime MANAGE_EXTERNAL_STORAGE allow
 # 6) 正式包（本机 lint 需绕过，详见 docs/03-build.md）
 ./gradlew :app:assembleRelease -x lintVitalAnalyzeRelease -x lintVitalRelease
+#    有密钥 → app/build/outputs/apk/release/trime-3.2.7-release.apk
+#    无密钥 → …/trime-3.2.7-release-unsigned.apk（构建不失败，但需自行 apksigner sign）
 ```
 
 首次启动会走「存储权限 → 启用输入法 → 选择输入法」引导。
@@ -71,6 +76,12 @@ timeout 300 adb shell am instrument -w -r \
 ./script/verify-jni-symbols.sh    # 期望：OK: JNI 符号契约一致（73 个声明全部导出，无旧包名残留）
 ```
 
+改 `assets/rime/` 下的方案/词典/OpenCC 配置后，必须先跑静态自检（无需设备）：
+
+```bash
+python3 script/verify-rime-assets.py   # 期望：53 passed, 0 failed
+```
+
 ### 常用命令
 
 | 目的 | 命令 |
@@ -79,6 +90,7 @@ timeout 300 adb shell am instrument -w -r \
 | 编译仪器测试 APK | `./gradlew :app:assembleDebugAndroidTest` |
 | 重建 native 库 | `./script/build-jni-so.sh`（`--clean` 强制冷构建，约 20 s） |
 | 校验 `.so` 与 Java 契约 | `./script/verify-jni-symbols.sh` |
+| 校验 rime 数据引用 | `python3 script/verify-rime-assets.py`（53 项） |
 | 生成发布密钥 | `./script/gen-keystore.sh`（写入 `~/.android-keys/`，不覆盖已有） |
 | 校验 16 KB 对齐 | `$ANDROID_HOME/build-tools/36.0.0/zipalign -c -P 16 4 <apk>` |
 | 格式检查 / 自动修 | `./gradlew spotlessCheck` / `./gradlew spotlessApply` |
@@ -107,7 +119,8 @@ timeout 300 adb shell am instrument -w -r \
 旧密钥应视为已泄露；彻底清除需改写 Git 历史，见 [`docs/05-branches-release.md`](docs/05-branches-release.md) §6）。
 当前签名走三级查找：① 仓库根 `release.properties`（已 gitignore）② `~/.android-keys/hkrime-release.properties`
 ③ 环境变量 `HKREME_STORE_FILE/HKREME_STORE_PASSWORD/HKREME_KEY_ALIAS/HKREME_KEY_PASSWORD`；
-都没有时 release **不签名**。换签名后旧版本无法覆盖升级，发布前请确认。
+都没有时 release **不签名但不失败**，产物为 `trime-3.2.7-release-unsigned.apk`（`apksigner verify` 会报 `Missing META-INF/MANIFEST.MF`）。
+换签名后旧版本无法覆盖升级，发布前请确认。
 
 ---
 

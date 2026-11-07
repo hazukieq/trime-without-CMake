@@ -1,7 +1,7 @@
 # 05 · 分支模型与发布
 
 > 覆盖：分支职责、**为什么改名与换 `.so` 必须同批**、改名影响面全清单、发布流程、版本号、签名与密钥安全、旧数据迁移、回滚。
-> 基线提交 `bebad9f`（分支 `dev`）；当前 HEAD 以 `git log -1` 为准。
+> 事实快照：`ebb18c1`（当前 HEAD 以 `git log -1` 为准），分支 `dev`。
 
 ## 目录
 
@@ -32,7 +32,7 @@ main   ──●──●──●  (without-CMake 稳定主线，com.tumuyan.tr
 dev       ●──●──●  (hkrime：com.hazukieq.hkrime + 新 .so + 客家话数据)
 ```
 
-> **现状（2026-11-08 已执行）**：远端为 `main`（=`14d365e`，默认分支）与 `dev`（迁移时 tip `68f876f`，其后新增 `b1d9b57`、`feb4310`、`2b50c1f`、`9dc8c32`、`bebad9f`）；
+> **现状（2026-11-08 已执行）**：远端为 `main`（=`14d365e`，默认分支）与 `dev`（迁移时 tip `68f876f`，其后新增 `b1d9b57`、`feb4310`、`2b50c1f`、`9dc8c32`、`bebad9f`、`63fd09e`、`726a209`、`ebb18c1`）；
 > 旧 `develop`/`hakka` 已删除。迁移前快照：`develop=14d365ec`、`hakka=0c1e58ac`。
 > 回滚：`git push origin 14d365ec:refs/heads/develop 0c1e58ac:refs/heads/hakka`，并把默认分支改回 `develop`。
 
@@ -74,6 +74,7 @@ git fetch --prune
 ③ dev 分支上：仓库内 "rime_jni_1_5" 出现次数 == 0
 ④ dev 分支上：libs_backup/ 不存在；仓库根无 skeys.jks / release.properties
 ⑤ main 分支上：上述①-④都应是旧值（com.tumuyan.trime / com_osfans_trime / 旧库 / 旧路径）
+⑥ dev 分支上：python3 script/verify-rime-assets.py 必须 53 passed, 0 failed
 ```
 
 ---
@@ -175,17 +176,27 @@ timeout 300 adb shell am instrument -w -r -e class com.hazukieq.hkrime.RimeDataT
   com.hazukieq.hkrime.test/androidx.test.runner.AndroidJUnitRunner    # OK (1 test)
 ```
 
-### 已产出交付物（2026-11-08 第二轮）
+### 已产出交付物（2026-11-08 第三轮，`ebb18c1`）
 
 | 产物 | 大小 | sha256 | 说明 |
 |---|---|---|---|
-| `artifacts/hkrime-debug.apk` | **17,233,842 B** | `d0e6159c79844e465d22cf2b80834246e47d9c81dd344a0de226dd7b6917aac7` | 可安装（debug key） |
-| `artifacts/hkrime-release.apk` | **11,004,041 B** | `b2e7b748d88b87eeded4aab2dac95724b19a264080196768795ae0f5b4b0426e` | 新 keystore 签名，`apksigner verify` 通过；**未过 lint** |
+| `artifacts/hkrime-debug.apk` | **13,437,603 B** | `fe6ae286697614a52afbe4ef1a8db75e3df8fbf167d404c2d22805ef3597e575` | 可安装（debug key） |
+| `artifacts/hkrime-release.apk` | **11,405,775 B** | `62b63eb2555229a6df9e78bdc7719da857fd4db7cd26973b7e3533d760ddd0a5` | 新 keystore 签名，`apksigner verify` 通过；**未过 lint** |
+| `artifacts/librime_jni.so` | 13,587,744 B | `fd4372553592830cc8af03a7cae10009eb1882f2eada957086513a7fbc60f03f` | Debug(-O0)，16 KB 对齐 |
+| `artifacts/librime_jni-release-opt.so` | 6,065,152 B | `6b6173d10039262a57205efb321d195d72c1e71b568ec8ba0320beaf4696f920` | `-O2` 备选，未装入 app |
 
 两者 package 均为 `com.hazukieq.hkrime`、versionCode `20220701`、versionName `3.2.7`、
 minSdk 21 / targetSdk 33 / native-code `arm64-v8a`，`zipalign -c -P 16 4` 均通过。
 
-> 体积比上轮（11.4 MB / 9.6 MB）增大，是因为 `2b50c1f` 恢复了 29 个 OpenCC 文件并并入 16 个客家话文件（+269,435 行）。
+> **口径**：上表 sha256 是**该次交付物**的指纹，用于校验收到的文件未被改动；
+> **不要承诺「任意 clean build 得到同一 hash」**——APK 是 zip，条目时间戳/顺序会让字节变化。
+> 可承诺的是尺寸稳定：clean 构建 debug ≈13.44 MB、release ≈11.41 MB。
+>
+> **体积变化**：debug 17,233,842 B → 13,437,603 B（**变小 3.8 MB，原因未核实，TODO**）；
+> release 11,004,041 B → 11,405,775 B（+401 KB），来自并入 `luna_pinyin.dict.yaml`（889,946 B）与 3 个新方案/词典（`726a209`），**不是废数据**。
+>
+> `release` 在**没有 keystore** 时也能构建成功（`ebb18c1`），但产物名为 `trime-3.2.7-release-unsigned.apk`，
+> `apksigner verify` 会报 `DOES NOT VERIFY: Missing META-INF/MANIFEST.MF`——发布前必须核验签名，见 03 §2.3。
 
 ---
 
@@ -195,7 +206,7 @@ minSdk 21 / targetSdk 33 / native-code `arm64-v8a`，`zipalign -c -P 16 4` 均�
 |---|---|---|
 | `versionName` | `3.2.7`（沿用上游） | hkrime 自有版本需区分上游：建议 `3.2.7-hkrime.1` 或 `0.1.0`，并在设置页展示 |
 | `versionCode` | `20220701`（上游日期式） | 改为递增整数（如 1,2,3…），避免与上游日期码冲突；**必须 > 20220701** 才能覆盖安装旧版 |
-| `BUILD_INFO` | 构建时由 `app/build.gradle:94-143` 通过 git 命令注入 | 保留，便于定位「哪个提交出的包」 |
+| `BUILD_INFO` | `app/build.gradle:16` buildConfigField，值由 `getBuildInfo()`（`:118`）拼出 Build/Date/Commit/Branch/Repository；其中 Commit 来自 `getCommitInfo()`（`:131`） | `ebb18c1` 起用 `git describe --tags --always`：仓库**无 tag** 时回退为**短 sha**，不再输出空串；格式 `<describe>, <commit date>`。`BUILD_VERSION`（`:17`）为 `"$versionName-g" + 短sha + "-" + 日期`。保留，便于定位「哪个提交出的包」 |
 
 > ⚠ 同包名的旧安装包若 `versionCode` 不增则无法覆盖升级；跨包名（`com.tumuyan.trime` → `com.hazukieq.hkrime`）则是两个独立 app，可共存（同时装两个输入法会互相干扰，建议只留一个）。
 
@@ -294,14 +305,17 @@ adb shell ls /storage/emulated/0/Android/data/com.hazukieq.hkrime/files/rime
 
 ```text
 ✅ app/libs/arm64-v8a/librime_jni.so       13,587,744 B  sha256 fd437255…f03f（16 KB 对齐）
-✅ script/build-jni-so.sh / verify-jni-symbols.sh / gen-keystore.sh
+✅ script/build-jni-so.sh(419) / verify-jni-symbols.sh(237) / gen-keystore.sh(79) / verify-rime-assets.py(183)
 ✅ 符号契约输出 OK（73/73，0 旧包名）
-✅ artifacts/hkrime-debug.apk              17,233,842 B  sha256 d0e6159c…
-✅ artifacts/hkrime-release.apk            11,004,041 B  sha256 b2e7b748…（新 key，verify 通过）
-✅ 真机仪器测试 OK (1 test)（部署/ocd2/四组转换/hakka.table.bin）
-⬜ 真机 IME 界面冒烟（启用/选择/打字/上屏/主题切换/部署按钮）
+✅ rime 资产静态自检 53 passed, 0 failed（schema/词典/OpenCC 引用闭合）
+✅ assets/rime 23 项；opencc 34（18 txt + 16 json）→ fresh 部署生成 18 ocd2 / 10 bin / 3 方案
+✅ artifacts/hkrime-debug.apk              13,437,603 B  sha256 fe6ae286…
+✅ artifacts/hkrime-release.apk            11,405,775 B  sha256 62b63eb2…（新 key，verify 通过）
+✅ 真机仪器测试 OK (1 test)（fresh 部署/18 ocd2/10 bin/3 方案/四组转换/ywz+lenth 可加载）
+⬜ 真机 IME 界面冒烟（启用/选择/打字/上屏/主题切换/部署按钮/多值候选）
 ⬜ release lint 通过（当前用 -x 绕过）
 ⬜ 历史密钥清理（需改写历史，未决策）
+⬜ 用户词库（*.userdb）预置：**设计取舍，不做**
 ```
 
 ### 回滚

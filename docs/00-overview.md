@@ -1,6 +1,7 @@
 # 00 · 项目总览
 
-> 基线：`dev` @ `bebad9f`（2026-11-08 第二轮）。所有行号以该提交为准；工作树有未提交改动时以内容为准。
+> 事实快照：`ebb18c1`（当前 HEAD 以 `git log -1` 为准），`dev` 分支，2026-11-08 第三轮。
+> 所有行号以该提交为准；工作树有未提交改动时以内容为准。
 
 ## 目录
 
@@ -20,7 +21,7 @@
 包名 `com.hazukieq.hkrime`，冻结在上游 **v3.2.7**（3.3.x 起 Kotlin 化、JNI 接口不兼容）。
 
 - 它**不是**一个新输入法引擎：内核仍是 librime（`1.7.3-74-g43023e16`），hkrime 做「打包 + 数据 + 定制 + 改名」。
-- 它**现在有客家话数据了**：内置方案「客语12键」+ 9 张词典 + OpenCC 资料，开箱可用；仍有缺料项，见 [04](04-hakka.md) §6。
+- 它**现在数据完整了**：3 个方案（客语12键 / 客语26键 / 雲龍國際音標）+ 11 个方案/词典文件 + OpenCC 34 个资源，开箱可用；剩余是「界面未冒烟」与少量设计取舍，见 [04](04-hakka.md) §6。
 
 ## 2. 当前状态（定稿）
 
@@ -31,16 +32,16 @@
 | SDK | compileSdk 33 / targetSdk 33 / minSdk 21 |
 | ABI | **仅 `arm64-v8a`** |
 | native 库 | `app/libs/arm64-v8a/librime_jni.so`，**13,587,744 B**，73 符号，stripped，**16 KB 对齐**（LOAD=0x4000） |
-| 数据 | assets/rime 19 项：16 个客家话文件 + 2 个主题 + `opencc/`（29 个：15 txt + 14 json） |
-| 构建 | `:app:assembleDebug` 通过；release 需 `-x lintVitalAnalyzeRelease -x lintVitalRelease` |
+| 数据 | assets/rime **23 项** = 22 个文件（3 方案 + 11 词典/方案文件 + 4 通用配置 + 3 主题 + 1 符号表）+ `opencc/` **34 个**（18 txt + 16 json） |
+| 构建 | `:app:assembleDebug` 通过；release 需 `-x lintVitalAnalyzeRelease -x lintVitalRelease`；无密钥时产出 `-unsigned.apk` |
 | 签名 | 密钥**已移出仓库**，走 `~/.android-keys/` 或环境变量；新证书 SHA-256 `d9d7d91a…93cb` |
-| 交付物 | debug 17,233,842 B；release 11,004,041 B（新 key 签名，verify 通过） |
-| 验证 | 符号契约 73/73；**真机仪器测试 `OK (1 test)`**（部署 + ocd2 + 4 组转换 + hakka 词典编译）；IME 界面人工冒烟未做 |
-| 客家话 | ✅ 方案/词典已内置；⚠ 缺 `luna_pinyin`、`hakka_qwerty`、`ipa_yunlong`、`ywz.json`、`lenth.json` |
+| 交付物 | debug **13,437,603 B**；release **11,405,775 B**（新 key 签名，verify 通过） |
+| 验证 | 符号契约 73/73；**真机仪器测试 `OK (1 test)`**（fresh 部署 + 18 ocd2 + 10 bin + 3 方案 + 4 组转换）；资产静态自检 **53 passed**；IME 界面人工冒烟未做 |
+| 客家话 | ✅ 三方案齐备、词典已编译、反查/情联依赖已备；⬜ 界面效果未冒烟；设计取舍：不预置 `*.userdb` |
 
 ```text
-已完成  ── 改名 ✅  重编 .so ✅  16KB ✅  脚本固化 ✅  OpenCC 恢复 ✅  客家话数据 ✅  真机数据链路 ✅  密钥外置 ✅
-未完成  ── IME 界面冒烟 ⬜  方案缺料 ⬜  release lint ⬜  历史密钥清理 ⬜  CI ⬜
+已完成  ── 改名 ✅  重编 .so ✅  16KB ✅  脚本固化 ✅  OpenCC 恢复+补齐 ✅  客家话数据完整 ✅  真机数据链路 ✅  密钥外置 ✅  资产自检 ✅
+未完成  ── IME 界面冒烟 ⬜  release lint ⬜  历史密钥清理 ⬜  CI ⬜  多值候选界面验证 ⬜
 ```
 
 ## 3. 谱系与版本坐标
@@ -72,13 +73,14 @@ hkrime/
 │       ├── main/
 │       │   ├── AndroidManifest.xml     # Application / IME service / 4 个 activity / alias
 │       │   ├── java/com/hazukieq/hkrime/  # 87 个源文件（Java + Kotlin 混合）
-│       │   ├── assets/rime/            # 19 项：客家话方案/词典/主题/符号 + opencc/ 29 个
+│       │   ├── assets/rime/            # 23 项：3 方案 + 11 词典/方案文件 + 4 通用配置 + 3 主题 + opencc/ 34 个
 │       │   ├── res/xml/method.xml      # IME 子类型与 settingsActivity（改名易漏点）
 │       │   └── jni/                    # ⚠ 不在仓库内（.gitignore:14），只在构建机上由脚本生成
-│       └── androidTest/java/com/hazukieq/hkrime/RimeDataTest.kt  # 真机仪器测试
+│       └── androidTest/java/com/hazukieq/hkrime/RimeDataTest.kt  # 真机仪器测试（147 行）
 ├── script/
-│   ├── build-jni-so.sh                 # 415 行：clone→pin 校验→patch→cmake+ninja→strip→安装（含 16KB 链接参数）
+│   ├── build-jni-so.sh                 # 419 行：clone→pin 校验→patch→cmake+ninja→strip→安装（含 16KB 链接参数）
 │   ├── verify-jni-symbols.sh           # 237 行：73 符号契约校验
+│   ├── verify-rime-assets.py           # 183 行：schema/词典/OpenCC 引用静态自检（53 项）
 │   ├── gen-keystore.sh                 # 79 行：生成仓库外 release 密钥
 │   └── changelog.sh                    # 上游遗留 8 行（含 $curent 拼写 bug）
 ├── docs/                               # 本套文档（+ reports/ 报告存档）
@@ -103,11 +105,12 @@ hkrime/
 | 数据目录 | `getExternalFilesDir(null)/rime`，随 `applicationId` 变 | `data/AppPrefs.kt:346-353` |
 | 部署触发 | 广播 `com.hazukieq.hkrime.deploy` / `.sync` | `ime/broadcast/IntentReceiver.kt:63-64` |
 | 主题 | `trime.yaml`（66 KB）、`tongwenfeng.trime.yaml`（185 KB）、`hakka_theme.trime.yaml`（客家同文风，3,923 行） | `app/src/main/assets/rime/` |
-| 签名 | 仓库外密钥；构建查找顺序：仓库根 → `~/.android-keys/` → `HKREME_*` 环境变量 | `app/build.gradle:45-79` |
-| 仪器测试 | `RimeDataTest.deployAndOpenccWorks()`，必须 `timeout` + `appops` 授权 | `app/src/androidTest/...` |
+| 签名 | 仓库外密钥；`signingConfigs` 在 `:26`，keystore 三级查找与条件赋值在 `:43-75`，**`:67` 才决定是否签名** | `app/build.gradle` |
+| 资产自检 | `python3 script/verify-rime-assets.py` → 53 passed, 0 failed（schema/词典/OpenCC 引用闭合） | `script/verify-rime-assets.py` |
+| 仪器测试 | `RimeDataTest.deployAndOpenccWorks()`（147 行，先清空数据目录强制 fresh 部署）；必须 `timeout` + `appops` 授权 | `app/src/androidTest/...` |
 | CI | **无**（5 个 workflow 已被 `0c1e58a` 删除） | `.github/` |
 
-## 6. 已完成的工作（两轮）
+## 6. 已完成的工作（三轮）
 
 ### 第一轮（2026-11-08 上午）：改名 + 重建 `.so`
 
@@ -124,12 +127,25 @@ hkrime/
 | # | 动作 | 产物 | 证据 |
 |---|---|---|---|
 | 6 | 恢复 OpenCC 资源（29 个） | 简繁/台湾转换可用，ocd2 15 个 | [07](07-opencc-and-rime-data.md) |
-| 7 | 并入客家话数据（16 个文件） | 方案「客语12键」+ 9 张词典 | [04](04-hakka.md) §5 |
+| 7 | 并入用户 rime 数据（17 个文件：`trime.yaml` 保留仓库版 + 11 客家话 + 4 通用 + `user.yaml`） | 方案「客语12键」+ 9 张词典 | [04](04-hakka.md) §5 |
 | 8 | 16 KB 页对齐 | `.so` 13,587,744 B，LOAD=0x4000 | [02](02-jni-so.md) §7 |
 | 9 | 签名密钥外置 + `gen-keystore.sh` | 新证书 `d9d7d91a…93cb` | [05](05-branches-release.md) §6 |
 | 10 | 真机仪器测试 | `OK (1 test)` | [reports/DEVICE-TEST-REPORT.md](reports/DEVICE-TEST-REPORT.md) |
 
 > 提交对照：`2b50c1f`（数据）、`9dc8c32`（16 KB）、`bebad9f`（密钥 + 测试）。
+
+### 第三轮（2026-11-08 下午）：缺口修复 + 构建健壮性
+
+| # | 动作 | 产物 | 证据 |
+|---|---|---|---|
+| 11 | 补齐 `schema_list` 引用的全部方案/词典 | `hakka_qwerty`、`ipa_yunlong`、`luna_pinyin`（含 889,946 B 词典） | `726a209`；[04](04-hakka.md) §3.9 |
+| 12 | 补 `ywz`/`lenth` OpenCC 滤镜并重写为规范格式 | `ywz.{json,txt}`（141 词条）、`lenth.{json,txt}`（31）、`JPVariantsRev.txt` | [07](07-opencc-and-rime-data.md) §3.4 |
+| 13 | 删旧机残留 `user.yaml` | 方案列表不再引用不存在方案 | `726a209` |
+| 14 | 资产静态自检脚本 | `verify-rime-assets.py` → **53 passed, 0 failed** | [03](03-build.md) §7 |
+| 15 | 仪器测试加「强制 fresh 部署」+ 扩展断言 | 18 ocd2 / 10 bin / 3 方案 / ywz+lenth 可加载 | `RimeDataTest.kt:47-48`、`:117-146` |
+| 16 | 无密钥也能编 release；`BUILD_INFO` 带提交 | `trime-3.2.7-release-unsigned.apk`；`git describe --tags --always` 回退短 sha | `ebb18c1`；[05](05-branches-release.md) §5 |
+
+> 结果：assets/rime 19 → **23 项**；opencc 29 → **34 个**（fresh 部署 18 ocd2、10 bin、3 方案）。
 
 ## 7. 文档索引
 
@@ -141,7 +157,7 @@ hkrime/
 | [04-hakka.md](04-hakka.md) | hakka 的提交史、**客家话数据清单**、缺口与下一步 |
 | [05-branches-release.md](05-branches-release.md) | 分支模型、改名影响面、发布流程、**签名与密钥安全**、数据迁移 |
 | [06-troubleshooting-roadmap.md](06-troubleshooting-roadmap.md) | 按症状查表、递归/16KB 详解、技术债与 roadmap |
-| [07-opencc-and-rime-data.md](07-opencc-and-rime-data.md) | OpenCC 三种文件关系、部署管线、客家话数据、缺料清单、扩充指引 |
+| [07-opencc-and-rime-data.md](07-opencc-and-rime-data.md) | OpenCC 三种文件关系、部署管线、客家话数据、**缺口状态与扩充指引** |
 | [reports/](reports/README.md) | 原始构建/改名/集成/真机报告（证据存档；部分数值为历史快照） |
 
 **推荐阅读顺序**：00 → 01 → 03（想动手）→ 07（改数据）→ 02（改 native 时）→ 04 → 05 → 06。

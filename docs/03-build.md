@@ -1,321 +1,396 @@
-# 03 · 构建与测试
+# 03 · 构建与验证
 
-> 覆盖三条链路：**编 APK**（日常）、**编 native `.so`**（改包名/升级 librime/换对齐参数时）、**跑仪器测试**（验证 Rime 数据链路）。
-> 基线 HEAD `bebad9f`（`dev` 分支）。所有命令在仓库根 `trime-workspace/hkrime/` 下执行。
+> 事实快照：`ebb18c1`（当前 HEAD 以 `git log -1` 为准）。
+> 本篇覆盖：**环境版本** → **签名** → **编 APK** → **编 .so** → **仪器测试** → **产物校验** → **报错速查**。
+> without-CMake 的含义：仓库不编译 librime，只提交预编译 `.so`；但本仓库额外提供**从上游源码重建 `.so` 的脚本**。
 
 ## 目录
 
-1. [环境要求](#1-环境要求)
-2. [签名配置（release 必读）](#2-签名配置release-必读)
-3. [编 APK（最常用）](#3-编-apk最常用)
-4. [编 native `.so`](#4-编-native-so)
-5. [仪器测试（真机）](#5-仪器测试真机)
+1. [环境与前置](#1-环境与前置)
+2. [签名与密钥](#2-签名与密钥)
+3. [编 APK](#3-编-apk)
+4. [编 .so（可选，重建 JNI 库）](#4-编-so可选重建-jni-库)
+5. [仪器测试与真机验证](#5-仪器测试与真机验证)
 6. [产物与校验](#6-产物与校验)
-7. [常见报错](#7-常见报错)
-8. [代码风格与格式化](#8-代码风格与格式化)
+7. [工具与脚本速查](#7-工具与脚本速查)
+8. [常见报错](#8-常见报错)
+9. [代码风格（spotless）](#9-代码风格spotless)
 
 ---
 
-## 1. 环境要求
+## 1. 环境与前置
 
 ### 1.1 版本矩阵（本机实测）
 
-| 组件 | 要求 | 本机值 | 说明 |
-|---|---|---|---|
-| JDK | **17** | `$HOME/opt/jdk17/jdk-17.0.9`（`openjdk 17.0.9 / JBR-17.0.9+7`） | **不要用系统默认的 JDK 21**：AGP 7.4.2 + Gradle 7.5 未适配 21 |
-| Gradle | 7.5 | wrapper 自动下载，`~/.gradle/wrapper/dists/gradle-7.5-bin` 已缓存 | `gradle/wrapper/gradle-wrapper.properties:3` |
-| AGP | 7.4.2 | `build.gradle:37` | |
-| Kotlin | 1.8.20 / 插件 1.7.20 | `build.gradle:10,53` | |
-| compileSdk | 33 | `app/build.gradle:5` | |
-| NDK | 24.0.8215888 | `/home/hazukie/Android/Sdk/ndk/24.0.8215888` | `app/build.gradle:6` **硬编码**，版本不存在会直接失败 |
-| CMake | 3.22.1 | `$ANDROID_HOME/cmake/3.22.1/bin/cmake` | 仅编 `.so` 用；Gradle 侧不编 C++ |
-| Ninja | 1.10.2 | 随 SDK cmake 附带 | 同上 |
-| SDK | platform 33 + build-tools **35+** | `/home/hazukie/Android/Sdk`（`local.properties` 的 `sdk.dir`） | build-tools 35+ 才有 `zipalign -P 16`（本机 36.0.0） |
-| 测试设备 | Android 15+（16 KB page）可选 | Xiaomi M2012K11AC / Android 16 / serial `5f08bc20` | 16 KB 对齐问题只在 16 KB page 设备暴露 |
-
-```bash
-export JAVA_HOME="$HOME/opt/jdk17/jdk-17.0.9"
-export PATH="$JAVA_HOME/bin:$PATH"
-java -version    # 期望：openjdk version "17.0.9"
-```
-
-> `local.properties` 不入库（`.gitignore:38`），新机器需自己写 `sdk.dir=/path/to/Android/Sdk`。
-
-### 1.2 三个容易被忽略的前置
-
-| 前置 | 为什么 |
-|---|---|
-| **git 可用且在仓库内** | `app/build.gradle:94-143` 的 `getBuildInfo/getCommitInfo/getGitBranch…` 靠执行 `git …` 取 BUILD_INFO（写进 `BuildConfig`）。纯拷贝目录（无 `.git`）可能取不到信息 |
-| **`release.properties`（可选）** | release 签名配置的**第一优先级**来源；缺失不会再让构建失败，详见 §2 |
-| **`adb` 与设备授权** | 仅跑仪器测试需要；重装 APK 会重置「所有文件访问」授权，必须重新 `appops set` |
-
----
-
-## 2. 签名配置（release 必读）
-
-**历史问题**：早期仓库把 `skeys.jks` + `release.properties`（含明文口令 `263909`）直接提交进版本库。`bebad9f` 已把两者从当前树删除（`git rm --cached` + 删文件），改为「密钥在仓库外 + 三级查找」。
-
-### 2.1 查找顺序（`app/build.gradle:45-79`）
-
-| 优先级 | 来源 | 用途 |
+| 组件 | 版本 / 路径 | 说明 |
 |---|---|---|
-| ① | 仓库根 `release.properties` | 本地临时覆盖（该文件已 gitignore） |
-| ② | `~/.android-keys/hkrime-release.properties` | **推荐**，由 `script/gen-keystore.sh` 生成 |
-| ③ | 环境变量 `HKREME_STORE_FILE` / `HKREME_STORE_PASSWORD` / `HKREME_KEY_ALIAS` / `HKREME_KEY_PASSWORD` | CI/临时构建 |
-| — | 都没有 | **release 不签名**（Gradle 打 `logger.lifecycle` 提示），产物是未签名 APK，不能直接装 |
+| JDK | **17**，`$HOME/opt/jdk17/jdk-17.0.9` | **必须 17**；系统默认 JDK 21 会让 AGP 7.4.2 / lint 出问题 |
+| Gradle | 7.5（`gradle/wrapper/gradle-wrapper.properties`，已缓存于 `~/.gradle/wrapper/dists`） | 由 wrapper 自带，勿升级 |
+| AGP | 7.4.2（`build.gradle:37`） | 与 Gradle 7.5 / JDK 17 匹配 |
+| Kotlin | 1.8.20（`build.gradle:10`），插件 1.7.20（`:53`） | 版本不一致是历史现状，能编 |
+| compileSdk / targetSdk / minSdk | 33 / 33 / 21（`app/build.gradle:5/11/10`） | |
+| NDK | **24.0.8215888**（`app/build.gradle:6`） | 只有「编 .so」才用；编 APK 不需要 |
+| CMake | 3.22.1 | 同上 |
+| Ninja | 1.10.2（NDK 自带） | 同上 |
+| build-tools | **35 及以上** | `zipalign -P 16`（16 KB 校验）需要 |
+| Python 3 + PyYAML | 任意 3.8+ | 跑 `script/verify-rime-assets.py` |
+| Android SDK | `/home/hazukie/Android/Sdk`（`local.properties`） | 换机器需自行改 |
 
-### 2.2 首次生成密钥
-
-```bash
-./script/gen-keystore.sh
-# 产物：~/.android-keys/hkrime-release.jks        （2048-bit RSA，10000 天，600）
-#       ~/.android-keys/hkrime-release.properties （600，目录 700）
-
-# 其他用法
-./script/gen-keystore.sh --alias hkrime --dir ~/.android-keys
-./script/gen-keystore.sh --force    # 覆盖已有密钥——危险：已发布版本无法再升级
-```
-
-脚本 DN：`CN=hkrime, OU=hazukieq, O=hkrime-fork, L=Guiping, ST=Guangxi, C=CN`。
-`release.properties.example`（7 行）是占位模板，说明「复制到 `~/.android-keys/` 或仓库根并改口令」。
-
-**密钥一旦丢失，已发布版本就无法覆盖升级**（签名不同 Android 拒绝安装），务必自行备份 `hkrime-release.jks`。
-
-### 2.3 用环境变量签名（CI 形态）
+### 1.2 三条前置
 
 ```bash
-export HKREME_STORE_FILE="$HOME/.android-keys/hkrime-release.jks"
-export HKREME_STORE_PASSWORD='…'
-export HKREME_KEY_ALIAS=hkrime
-export HKREME_KEY_PASSWORD='…'
-./gradlew :app:assembleRelease -x lintVitalAnalyzeRelease -x lintVitalRelease
+# ① JDK 17（本机路径，按需替换）
+export JAVA_HOME=$HOME/opt/jdk17/jdk-17.0.9
+export PATH=$JAVA_HOME/bin:$PATH
+java -version          # 期望 openjdk 17.0.9
+
+# ② SDK 位置
+cat local.properties   # sdk.dir=/home/hazukie/Android/Sdk
+
+# ③ 首次构建会下载 Gradle 7.5 与依赖（网络）
+./gradlew --version
 ```
 
-> 旧密钥仍留在 git 历史里（`92c7aa5`/`4af2a94` 引入），彻底清除需改写历史 + force push；风险评估见 [05](05-branches-release.md) §6。
+> 所有命令都在**仓库根目录**执行；`./gradlew` 是本仓库 wrapper。
 
 ---
 
-## 3. 编 APK（最常用）
+## 2. 签名与密钥
+
+### 2.1 生成密钥（推荐做法）
 
 ```bash
-cd /home/hazukie/Projects/common/trime-workspace/hkrime
-export JAVA_HOME="$HOME/opt/jdk17/jdk-17.0.9"
-
-# 1) Debug（日常开发；自动用 debug key 签名，可直接装）
-./gradlew :app:assembleDebug
-#    产物：app/build/outputs/apk/debug/trime-3.2.7-debug.apk
-
-# 2) Debug + 测试 APK（跑仪器测试前必须两个都编）
-./gradlew assembleDebug assembleDebugAndroidTest
-#    产物：.../debug/trime-3.2.7-debug.apk
-#          .../androidTest/debug/trime-3.2.7-debug-androidTest.apk
-
-# 3) Release（正式包；注意 lint 绕过，见下）
-./gradlew :app:assembleRelease -x lintVitalAnalyzeRelease -x lintVitalRelease
-#    产物：app/build/outputs/apk/release/trime-3.2.7-release.apk
-
-# 4) 只做静态检查（跑 lint，不打包）
-./gradlew :app:lintDebug
-
-# 5) 清干净重来
-./gradlew clean
+./script/gen-keystore.sh          # 幂等：已存在则拒绝覆盖
+./script/gen-keystore.sh --force  # 覆盖（会破坏旧版本升级路径，慎用）
 ```
 
-### 为什么 release 要 `-x lintVital…`
-
-本环境 `lintVitalAnalyzeRelease` 报错（AGP 7.4.2 + JDK 17 的 lint 环境问题，与本项目代码无关），
-`lintVitalRelease` 依赖它，故一并跳过，否则 `assembleRelease` 直接失败。
-副作用：**release 包未经过 lint 检查**，属已知欠债（见 [06](06-troubleshooting-roadmap.md) §5）。
-
-### APK 名与路径（易错）
-
-| 名称 | 值 |
+| 项 | 值 |
 |---|---|
-| Gradle 产物名 | **`trime-3.2.7-debug.apk`**（`archivesBaseName = "trime-$versionName"`，`app/build.gradle:14`） |
-| 完整路径 | `app/build/outputs/apk/debug/trime-3.2.7-debug.apk` |
-| 测试 APK | `app/build/outputs/apk/androidTest/debug/trime-3.2.7-debug-androidTest.apk` |
-| 对外交付名 | `artifacts/hkrime-debug.apk`（人工改名后的拷贝，仓库外） |
+| 输出目录 | `~/.android-keys/`（`chmod 700`） |
+| 密钥库 | `~/.android-keys/hkrime-release.jks`（2,744 B，`chmod 600`） |
+| 属性文件 | `~/.android-keys/hkrime-release.properties`（147 B，`chmod 600`） |
+| 算法 | RSA 2048，有效期 **10000 天** |
+| alias | `hkrime`（可用 `--alias` 改） |
+| DN | `CN=hkrime, OU=hazukieq, O=hkrime-fork, L=Guiping, ST=Guangxi, C=CN` |
 
-> ⚠ 不是 `app-debug.apk`。文档与脚本里出现 `app-debug.apk` 的地方都是错的。
+脚本参数：`--force` / `--alias <name>` / `--dir <dir>`；共 79 行。
 
-### 为什么不再需要编 C++
+### 2.2 签名配置怎么找到密钥（`app/build.gradle:26-75`）
 
-本仓库是 **without-CMake** fork：native 库以**预编译 `.so` 提交在 `app/libs/arm64-v8a/`**，
-`app/build.gradle:61-65` 用 `sourceSets.main.jniLibs.srcDirs = ['libs']` 直接打包。
-所以 `assembleDebug` **不触发** NDK 编译，NDK 只是 `ndkVersion` 声明（版本仍需存在，否则配置期校验失败）。
+```text
+signingConfigs { release { } }            ← :26 只声明空壳
+   │
+   └─ keystore 查找（:43-75）
+        ① rootProject.file('release.properties')                       ← 仓库根（不入库）
+        ② ~/.android-keys/hkrime-release.properties                    ← 推荐
+        ③ 环境变量 HKREME_STORE_FILE / _STORE_PASSWORD / _KEY_ALIAS / _KEY_PASSWORD
+        │
+        ├─ 找到 → 填 storeFile(:63) / storePassword(:64) / keyAlias(:65，默认 hkrime) / keyPassword(:66)
+        │         → :67 `android.buildTypes.release.signingConfig = android.signingConfigs.release`
+        └─ 没找到 → :73 logger.lifecycle 提示「release 签名未配置」，**不赋值**
+```
+
+要点：
+
+- **`:67` 才是"要不要签名"的开关**——不是靠 buildType 里写死 `signingConfig signingConfigs.release`。
+- 没配签名时 release **不会失败**，而是产出**未签名** APK（见 2.3）。
+- 三级查找的优先级：仓库根 `release.properties` **会覆盖** `~/.android-keys`。
+- 环境变量只补位 `storeFile` 与口令/alias，不替代属性文件（`storeFile` 用 `props.storeFile ?: env`）。
+
+### 2.3 有密钥 / 无密钥的行为对照（`ebb18c1` 后）
+
+| 场景 | `assembleRelease` 结果 | 产物文件名 | 校验 |
+|---|---|---|---|
+| **有** keystore | BUILD SUCCESSFUL | `trime-3.2.7-release.apk` | `apksigner verify` 通过 |
+| **无** keystore | **BUILD SUCCESSFUL**（不报错） | `trime-3.2.7-release-unsigned.apk`（实测 11,316,527 B） | `apksigner verify` 报 `DOES NOT VERIFY: Missing META-INF/MANIFEST.MF` |
+| 无 keystore + 强制检查 | — | — | 用 `apksigner verify` 失败即可判定未签名 |
+
+> `ebb18c1` 之前：无 keystore 会直接报 `SigningConfig "release" is missing required property "storeFile"` 构建失败。
+> 现行为对「只想编个包看看」的场景友好，但**发布前必须核验签名**。
+
+对未签名 APK 后置签名：
+
+```bash
+apksigner sign \
+  --ks ~/.android-keys/hkrime-release.jks \
+  --ks-key-alias hkrime \
+  --out trime-3.2.7-release-signed.apk \
+  trime-3.2.7-release-unsigned.apk
+apksigner verify --print-certs trime-3.2.7-release-signed.apk
+```
+
+### 2.4 为什么密钥不入库
+
+历史教训：`92c7aa5` / `4af2a94` 曾把 `skeys.jks`（2,517 B）与 `release.properties`（74 B，明文口令 `263909`）提交进仓库，`bebad9f` 才移出当前树。
+**但历史提交里仍在**，详见 [05 §6](05-branches-release.md)。当前 `.gitignore` 已忽略 `*.jks`、`release.properties`、`*.keystore`。
 
 ---
 
-## 4. 编 native `.so`
+## 3. 编 APK
 
-只有四种情况需要：**改包名**、**升级/降级 librime**、**改 patch 逻辑**、**改页对齐/优化参数**。
+### 3.1 debug
 
 ```bash
-# 默认流程（clone 上游 v3.2.7 → 校验 pin → patch → cmake+ninja → strip → 安装 → 校验）
-./script/build-jni-so.sh
+export JAVA_HOME=$HOME/opt/jdk17/jdk-17.0.9
+./gradlew assembleDebug
+# 产物：app/build/outputs/apk/debug/trime-3.2.7-debug.apk
+```
 
-# 已 clone 过源码（离线、最快）：复用源码树
+### 3.2 release
+
+```bash
+./gradlew assembleRelease -x lintVitalAnalyzeRelease -x lintVitalRelease
+# 产物：app/build/outputs/apk/release/trime-3.2.7-release.apk（无密钥时为 -unsigned.apk）
+```
+
+**为什么必须 `-x lintVital*`**：AGP 7.4.2 的 lint 在 JDK 17 环境下会崩（与项目代码无关）。
+这是环境绕过，不是质量豁免——正式发版前建议另找 JDK 11 跑一次 lint。**该问题至今未修**（见 06 路线图 P1）。
+
+### 3.3 APK 名与路径
+
+`archivesBaseName "trime-$versionName"`（`app/build.gradle:14`），所以文件名固定为 `trime-3.2.7-<buildType>.apk`：
+
+| 类型 | 路径（仓库内） | 说明 |
+|---|---|---|
+| debug | `app/build/outputs/apk/debug/trime-3.2.7-debug.apk` | |
+| release | `app/build/outputs/apk/release/trime-3.2.7-release.apk` | 无密钥时 `…-release-unsigned.apk` |
+| androidTest | `app/build/outputs/apk/androidTest/debug/trime-3.2.7-debug-androidTest.apk` | 仪器测试用 |
+
+### 3.4 编测试 APK
+
+```bash
+./gradlew assembleDebug assembleDebugAndroidTest
+```
+
+`app/build.gradle:29` 已配 `testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"`；
+依赖 `androidx.test.ext:junit:1.1.5`、`androidx.test:runner:1.5.2`（`:104-105`）。
+
+---
+
+## 4. 编 .so（可选，重建 JNI 库）
+
+**平时不需要**：仓库已提交 `app/libs/arm64-v8a/librime_jni.so`（13,587,744 B）。
+只有「改包名 / 换上游版本 / 改 JNI 补丁」时才需重建。脚本 419 行，自动完成上游 clone、patch、构建、strip、校验。
+
+```bash
+# 最常用：用本机已缓存的子模块源码重建（不联网 clone）
 ./script/build-jni-so.sh --src-dir ../jni-build/trime-v3.2.7
 
-# 强制从头（清源码树与构建目录；实测冷构建 18–21s）
+# 从 GitHub 全新 clone（慢，需网络）
 ./script/build-jni-so.sh --clean
 
-# 出 -O2 优化版（约 6 MB，默认不装入 app）
-./script/build-jni-so.sh --build-type Release --out-dir /tmp/opt
+# 产物
+#   app/libs/arm64-v8a/librime_jni.so  (+ .sha256)
 ```
 
-脚本已固定注入 **16 KB 页对齐**：`-DCMAKE_SHARED_LINKER_FLAGS="-Wl,-z,max-page-size=16384"`（`:348` 注释、`:366` 实参）。
-Android 15/16 的 16 KB page 设备会拒装 4 KB 对齐的 `.so`，详见 [02 §7](02-jni-so.md)。
+| 参数 | 默认 | 说明 |
+|---|---|---|
+| `--pkg` | `com.hazukieq.hkrime` | 新包名（写进 JNI 符号） |
+| `--old-pkg` | `com.osfans.trime` | 旧包名（patch 源） |
+| `--upstream-repo` / `--upstream-ref` | `osfans/trime` / `v3.2.7` | 上游基准 |
+| `--abi` | `arm64-v8a` | |
+| `--ndk` | 自动探测 | 需 24.0.8215888 |
+| `--build-type` | `Debug` | Debug=-O0（带调试串）；Release 更小（见 02 §8） |
+| `--out-dir` | `app/libs/<abi>` | |
+| `--expect-symbols` | 73 | 符号数期望值 |
+| `--clean` | 关 | 重新 clone |
+| `--log` | 自动 | 构建日志 |
 
-完整参数表、内部 7 步流程、`-UBOOST_EXCLUDE_LIBRARIES` 坑，见 [02-jni-so.md](02-jni-so.md) §5。
-构建完成后**必须**跑校验：
+**16 KB 页对齐**（Android 15+ 必需）已固化进脚本：`:348` 注释、`:366` 实参
+`-DCMAKE_SHARED_LINKER_FLAGS="-Wl,-z,max-page-size=16384"`。详见 [02 §7](02-jni-so.md)。
 
-```bash
-./script/verify-jni-symbols.sh
-# OK: JNI 符号契约一致（73 个声明全部导出，无旧包名残留）
-```
-
-> 关键约束：**.so 与 Java 包名必须同批**。改了 `applicationId`/`namespace` 而不重编 `.so`，
-> 运行期必 `UnsatisfiedLinkError`（旧库全部按 `com.osfans.trime` 编）。
+冷构建实测 **18–21 s**（20 核，357 步）；增量约 1.4 s。构建细节与坑见 [02 §5](02-jni-so.md)。
 
 ---
 
-## 5. 仪器测试（真机）
+## 5. 仪器测试与真机验证
 
-用例：`app/src/androidTest/java/com/hazukieq/hkrime/RimeDataTest.kt`（111 行，`@RunWith(AndroidJUnit4::class)`，单用例 `deployAndOpenccWorks()`）。
+### 5.1 测试覆盖什么（`app/src/androidTest/java/com/hazukieq/hkrime/RimeDataTest.kt`，147 行）
 
-### 5.1 它验证什么
+测试**先清空** `sharedDataDir` 与 `userDataDir/build`（`:47-48`）强制 fresh 部署——否则同版本覆盖安装不会重拷 assets。
 
-| # | 断言 |
+| 断言组 | 内容 |
 |---|---|
-| 1 | `Config.get(ctx)` + `Rime.destroy()/Rime.get(ctx,true)` 不崩（JNI/符号/包名全链路） |
-| 2 | sharedDataDir 已部署 `trime.yaml`、`default.custom.yaml`、`hakka_jiugong.schema.yaml`、`hakka.dict.yaml`、`hakka_oftenwords.dict.yaml` |
-| 3 | `opencc/` 下 `.ocd2` ≥15 且存在 `STCharacters.ocd2` |
-| 4 | userDataDir `build/` 有 `.bin` 且含 `hakka.table.bin` |
-| 5 | `Rime.get_opencc_version()` 非空；`s2t/t2s/s2tw/s2twp` 四组转换结果正确 |
-| 6 | `Rime.getSchemaNames()` 非空 |
+| 部署文件 | `trime.yaml`、`default.custom.yaml`、`hakka_jiugong.schema.yaml`、`hakka.dict.yaml`、`hakka_oftenwords.dict.yaml` 存在 |
+| OpenCC 资源 | `opencc/` 存在；`s2t.json`、`STCharacters.txt` 存在；`.ocd2` **≥17**（fresh 实测 18）；`STCharacters.ocd2` 存在 |
+| 编译产物 | `userDataDir/build/*.bin` 非空且含 `hakka.table.bin`；`hakka_qwerty.prism.bin`、`ipa_yunlong.prism.bin`、`luna_pinyin*` bin |
+| 方案列表 | 3 项：客语12键 / 客语26键 / 雲龍國際音標 |
+| 滤镜可加载 | `ywz.ocd2`、`lenth.ocd2` 存在；`openccConvert("不屑","ywz.json")`、`("qq","lenth.json")` 非 null |
+| 转换正确性 | `汉字→漢字(s2t)`、`漢字→汉字(t2s)`、`软件→軟件(s2tw)`、`软件→軟體(s2twp)` |
 
-> 注意第 4 项：`build/` 在 **userDataDir**，不在 sharedDataDir。默认两者都指 `.../files/rime`；但用户若在设置里把 user 数据目录改到 `/sdcard/rime`，`build/` 就在那里。
+> **多值断言为何只测"非 null"**：`ywz`/`lenth` 的候选词全量展开由 librime `simplifier` 的 `Opencc::ConvertWord` 完成，
+> 而 JNI `Rime.openccConvert` 走 `SimpleConverter` 只取首值。细节见 [07 §3.1](07-opencc-and-rime-data.md)。
 
-### 5.2 完整步骤
+### 5.2 完整命令序列
 
 ```bash
-export JAVA_HOME="$HOME/opt/jdk17/jdk-17.0.9"
-
-# 1) 编 app + 测试 APK
+export JAVA_HOME=$HOME/opt/jdk17/jdk-17.0.9
 ./gradlew assembleDebug assembleDebugAndroidTest
 
-# 2) 安装（测试 APK 需要 -t）
 adb install -r app/build/outputs/apk/debug/trime-3.2.7-debug.apk
 adb install -r -t app/build/outputs/apk/androidTest/debug/trime-3.2.7-debug-androidTest.apk
 
-# 3) 授予「所有文件访问」——每次重装都会被重置，必须重设
+# 关键：授「所有文件访问」权限，否则测试会卡在部署
 adb shell appops set com.hazukieq.hkrime MANAGE_EXTERNAL_STORAGE allow
 
-# 4) 跑（必须套 timeout）
+# 关键：必须套 timeout（原因见 5.3）
 timeout 300 adb shell am instrument -w -r \
   -e class com.hazukieq.hkrime.RimeDataTest \
   com.hazukieq.hkrime.test/androidx.test.runner.AndroidJUnitRunner
-# 期望最后一行：OK (1 test)
 ```
 
-**为什么要 `timeout`**：权限被拒时，`Config.setTheme()`（`Config.java:292`）→ `init()`（`:355`）→ 异常分支里又调 `setTheme(defaultName)`（`:395`），形成**无限递归**，`am instrument` 会一直不返回。这不是测试的 bug，是真实应用的缺陷路径（见 06 §4.2）。
+期望输出结尾：`OK (1 test)`。
 
-### 5.3 真机结果（2026-11-08）
+### 5.3 为什么必须用 `timeout` 包住
 
-`OK (1 test)`。实测：sharedDataDir `/storage/emulated/0/Android/data/com.hazukieq.hkrime/files/rime`、userDataDir `/storage/emulated/0/rime`、opencc 44 条目 / 15 个 ocd2、OpenCC `ver.1.1.4`、`s2t 汉字→漢字`、`t2s 漢字→汉字`、`s2tw 软件→軟件`、`s2twp 软件→軟體`、`hakka.table.bin` 生成。详见 [reports/DEVICE-TEST-REPORT.md](reports/DEVICE-TEST-REPORT.md)。
+若 `MANAGE_EXTERNAL_STORAGE` 被拒，`Config` 会进入**无限递归**：
 
-### 5.4 测试前必看：别动用户的 `/sdcard/rime`
+```text
+Config.setTheme(theme)            // data/Config.java:292
+   └─ init(skip_delopy)           // :355
+        └─ catch → setTheme(defaultName)   // :395
+             └─ init(...) → 再抛 → 再 setTheme … （不终止）
+```
 
-若设备上已有真实 RIME 数据（`/sdcard/rime` 含 `*.userdb`、`backup/`），测试会往里写 `build/`。本轮测试前就发现该目录是用户真实数据，先 `mv` 备份、测完恢复。**操作前先 `adb shell ls /sdcard/rime` 确认，必要时备份。**
+表现：`am instrument` 一直不返回、日志刷同一段栈。**这是未修的 bug**（见 [06 §4.2](06-troubleshooting-roadmap.md)）。
+处置：`timeout` + 确认 `appops` 已授权。**每次 `adb install -r` 后授权会重置，必须重设。**
+
+### 5.4 真机结果（第二轮，缺口修复后）
+
+| 项 | 结果 |
+|---|---|
+| 设备 | Xiaomi M2012K11AC / Android 16 / adb serial `5f08bc20` |
+| 测试 | `OK (1 test)` |
+| opencc 生成 | **18 个 `.ocd2`**（运行期目录共 52 条目 = 34 源文件 + 18 ocd2） |
+| build bins | **10 个**（hakka.* / luna_pinyin.* / hakka_qwerty.prism / ipa_yunlong.*） |
+| 方案 | **3 项**：客语12键 / 客语26键 / 雲龍國際音標 |
+| 共享目录 | `/storage/emulated/0/Android/data/com.hazukieq.hkrime/files/rime` |
+| 用户目录 | 该机为 `/storage/emulated/0/rime`（既有偏好所致，非默认值） |
+| OpenCC 版本 | `ver.1.1.4` |
+
+### 5.5 跑测试前必读：别动用户数据
+
+该测试会在**用户真实数据目录**上部署。本机第二次测试前发现 `/sdcard/rime` 是日常输入法数据（含 `hakka_qwerty.schema.yaml`、`hakka.userdb`、`backup/`），做法是：
+
+```bash
+# 测试前备份（示例）
+adb shell mv /sdcard/rime /sdcard/rime.hkrime-backup-$(date +%s)
+# 测试后恢复，并把测试产物挪走
+```
+
+测试收尾也要做：默认输入法切回 Gboard、卸载测试 APK、清理 `rime.hkrime-test-*` 目录。详见 [reports/DEVICE-TEST-REPORT.md](reports/DEVICE-TEST-REPORT.md)。
 
 ---
 
 ## 6. 产物与校验
 
-### 6.1 定稿值（2026-11-08 第二轮）
+### 6.1 当前交付物（`artifacts/`，仓库外 `../artifacts/`）
 
-| 项 | Debug APK | Release APK |
+| 文件 | 大小 | sha256 |
 |---|---|---|
-| 路径 | `artifacts/hkrime-debug.apk` | `artifacts/hkrime-release.apk` |
-| 大小 | **17,233,842 B** | **11,004,041 B** |
-| sha256 | `d0e6159c79844e465d22cf2b80834246e47d9c81dd344a0de226dd7b6917aac7` | `b2e7b748d88b87eeded4aab2dac95724b19a264080196768795ae0f5b4b0426e` |
-| package | `com.hazukieq.hkrime` | 同左 |
-| versionCode / versionName | `20220701` / `3.2.7` | 同左 |
-| minSdk / targetSdk | 21 / 33 | 同左 |
-| 签名 | debug key | 新 keystore（证书 SHA-256 `d9d7d91a…93cb`） |
-| native-code | `arm64-v8a`，仅 1 个 `librime_jni.so`（13,587,744 B） | 同左 |
+| `librime_jni.so` | 13,587,744 B | `fd4372553592830cc8af03a7cae10009eb1882f2eada957086513a7fbc60f03f` |
+| `librime_jni-release-opt.so` | 6,065,152 B | `6b6173d10039262a57205efb321d195d72c1e71b568ec8ba0320beaf4696f920` |
+| `hkrime-debug.apk` | 13,437,603 B | `fe6ae286697614a52afbe4ef1a8db75e3df8fbf167d404c2d22805ef3597e575` |
+| `hkrime-release.apk` | 11,405,775 B | `62b63eb2555229a6df9e78bdc7719da857fd4db7cd26973b7e3533d760ddd0a5` |
 
-> 体积比上一轮（11.4 MB / 9.6 MB）大，原因：本轮恢复了 29 个 OpenCC 文件 + 并入 16 个客家话文件（`2b50c1f`，+269,435 行）。
+release 证书：SHA-256 `d9d7d91ae5e7c789ff79b8eb9a1644461e5b7b2c48b52a184d993a90594693cb`，
+DN `CN=hkrime, OU=hazukieq, O=hkrime-fork, L=Guiping, ST=Guangxi, C=CN`。
 
-### 6.2 校验命令
+**体积说明**：APK 比上一版大（debug +1.87 MB / release +1.40 MB），原因是并入 `luna_pinyin.dict.yaml`（889,946 B）与 3 个新方案/词典，不是废数据。
+
+### 6.2 重要口径：APK 字节 hash 不保证跨构建可复现
+
+APK 是 zip 容器，**条目时间戳与顺序**会让同一份代码两次 clean 构建产出不同字节。因此：
+
+- ✅ 可以承诺：clean 构建**尺寸稳定**（debug ≈13.44 MB、release ≈11.41 MB）。
+- ❌ 不要承诺：任意时刻 clean build 得到**同一个 sha256**。
+- 文档与发布记录里的 sha256 是**该次交付物**的指纹，用于校验收到的文件没被改动。
+
+### 6.3 校验命令
 
 ```bash
-APK=artifacts/hkrime-debug.apk
-AAPT2=$ANDROID_HOME/build-tools/36.0.0/aapt2   # 本机只有 aapt2 可用，aapt 无输出
+# ① 交付物指纹
+sha256sum artifacts/librime_jni.so artifacts/hkrime-debug.apk artifacts/hkrime-release.apk
+cat artifacts/SHA256SUMS
 
-unzip -l  "$APK" | grep 'lib/'            # 期望：只有 1 行 librime_jni.so
-unzip -p  "$APK" lib/arm64-v8a/librime_jni.so | sha256sum
-#   应与 app/libs/arm64-v8a/librime_jni.so 一致：fd437255…f03f
+# ② APK 里到底打进了哪个 .so（唯一，且字节一致）
+unzip -l artifacts/hkrime-debug.apk | grep librime_jni
+unzip -p artifacts/hkrime-debug.apk lib/arm64-v8a/librime_jni.so | sha256sum
+#   期望：与 app/libs/arm64-v8a/librime_jni.so 的 sha256 相同
 
-$AAPT2 dump badging "$APK" | head -3
-#   package: name='com.hazukieq.hkrime' versionCode='20220701' versionName='3.2.7'
-#   minSdkVersion:'21'  targetSdkVersion:'33'
+# ③ 16 KB 对齐（build-tools 35+）
+zipalign -c -P 16 4 artifacts/hkrime-debug.apk && echo "zipalign OK"
+zipalign -c -P 16 4 artifacts/hkrime-release.apk && echo "zipalign OK"
 
-# 16 KB 页对齐（构建产物级）
-$ANDROID_HOME/build-tools/36.0.0/zipalign -c -P 16 4 "$APK"   # 退出码 0
+# ④ 包名/版本
+/home/hazukie/Android/Sdk/build-tools/36.0.0/aapt2 dump badging artifacts/hkrime-release.apk | head -3
+#   package: name='com.hazukieq.hkrime' versionCode='20220701' versionName='3.2.7' …
 
-# 签名证书
-$ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs artifacts/hkrime-release.apk
-#   DN: CN=hkrime, OU=hazukieq, O=hkrime-fork, L=Guiping, ST=Guangxi, C=CN
-#   SHA-256: d9d7d91ae5e7c789ff79b8eb9a1644461e5b7b2c48b52a184d993a90594693cb
+# ⑤ 签名
+apksigner verify --print-certs artifacts/hkrime-release.apk
+
+# ⑥ JNI 符号契约（源码声明 vs .so 导出）
+./script/verify-jni-symbols.sh
+#   OK: JNI 符号契约一致（73 个声明全部导出，无旧包名残留）
+
+# ⑦ rime 资产静态自检
+python3 script/verify-rime-assets.py
+#   结果: 53 passed, 0 failed
 ```
 
-### 6.3 安装与手工冒烟
+`.so` 本身的手工复核（`file` / `readelf -d` / `readelf -l` / `nm -D` / `strings`）见 [02 §6.2](02-jni-so.md)。
 
-```bash
-adb install -r artifacts/hkrime-debug.apk
-adb logcat -c && adb logcat | grep -iE 'UnsatisfiedLink|dlopen|AndroidRuntime'
-# 手动：设置→输入法→启用 hkrime → 选择 → 点输入框 → 打字 → 看候选
-```
+### 6.4 还没验证的
 
-系统级冒烟（启用/选择/上屏）本轮**尚未做**，仪器测试只覆盖应用内数据链路——见 06 路线图。
-
----
-
-## 7. 常见报错
-
-| 报错 / 现象 | 原因 | 解法 |
-|---|---|---|
-| `Unsupported class file major version 65` / Kotlin 编译崩 | 用了 JDK 21 | `export JAVA_HOME=$HOME/opt/jdk17/jdk-17.0.9` |
-| `IllegalAccessError: class com.google.googlejavaformat.java... cannot access class com.sun.tools.javac...` | google-java-format 在 JDK 17 下需 `--add-exports` | `gradle.properties:7-12` 已含 5 个 `--add-exports jdk.compiler/...=ALL-UNNAMED`，确认没被覆盖删除 |
-| `NDK not configured. Download it with SDK manager.` / 找不到 24.0.8215888 | `ndkVersion` 硬编码，本机未装 | SDK Manager 装 NDK `24.0.8215888`，或改 `app/build.gradle:6`（不建议，会引入差异） |
-| `SDK location not found` | 缺 `local.properties` | 写 `sdk.dir=/home/hazukie/Android/Sdk` |
-| `assembleRelease` 在 `lintVitalAnalyzeRelease` 失败 | 环境 lint 问题 | 加 `-x lintVitalAnalyzeRelease -x lintVitalRelease` |
-| release 产物未签名 / 装不上 | 三级密钥来源都没有 | `./script/gen-keystore.sh`，或设 `HKREME_*` 环境变量，或放仓库根 `release.properties` |
-| `Could not read store file` / `Keystore was tampered` | 密钥路径错或口令错 | 检查 `~/.android-keys/hkrime-release.properties` 里的 `storeFile` 与口令；与 05 §6 的密钥说明对齐 |
-| `make opencc-data` 失败（`No such file: app/src/main/jni/OpenCC`） | `jni/` 被 `.gitignore:14` 忽略，仓库内无此目录 | 不要用 Makefile 的 opencc 目标；OpenCC 词典已随 assets 提供（`assets/rime/opencc/`），见 [07](07-opencc-and-rime-data.md) |
-| `make debug` / `make release` 失败 | Makefile 是上游遗产，`spotlessCheck` + `opencc-data` 前置在当前环境不成立 | 直接用 `./gradlew`，见 §3 |
-| `am instrument` 卡住不返回 | 权限被拒触发 `Config.setTheme`↔`init` 无限递归 | 重设 `appops ... MANAGE_EXTERNAL_STORAGE allow`；命令套 `timeout 300` |
-| 系统弹「此应用不符合 16 KB 对齐要求」 | `.so` 的 LOAD 段按 4 KB 对齐 | 用带 `max-page-size=16384` 的脚本重建；见 02 §7 |
-| 装机后输入法「启用」列表里没有 hkrime | 包名变了 / 未重装 | 卸载旧包后重装；见 06 §2 |
-| 键盘能出、候选永远空 | 没有可用输入方案（不是构建问题） | 见 06 §4.1、07 §8 |
-
----
-
-## 8. 代码风格与格式化
-
-`build.gradle:63-77` 用 **spotless 6.3.0**：
-
-| 目标 | 规则 |
+| 项 | 状态 |
 |---|---|
-| `app/src/main/java/com/hazukieq/hkrime/**/*.java` | google-java-format **1.15.0** |
-| `app/src/main/java/com/hazukieq/hkrime/**/*.kt` | ktlint **0.44.0** |
+| 键盘界面人工冒烟（打字/上屏/翻页/主题/简繁/情联开关/反查） | ⬜ 未做 |
+| release 包真机安装运行 | ⬜ 仅做了签名与对齐校验 |
+| lint 全量通过 | ⬜ 被 `-x lintVital*` 绕过 |
+| 真机 IME 设为默认并长期使用 | ⬜ 测试后已切回 Gboard |
+
+---
+
+## 7. 工具与脚本速查
+
+| 脚本 | 行数 | 用途 |
+|---|---|---|
+| `script/build-jni-so.sh` | 419 | 从上游 v3.2.7 重建 `librime_jni.so`（含 16 KB 对齐、pin 校验、strip） |
+| `script/verify-jni-symbols.sh` | 237 | 解析 Java/Kotlin 的 `native`/`external fun` 声明，与 `.so` 的 `Java_*` 导出逐条比对（需 python3） |
+| `script/verify-rime-assets.py` | 183 | 静态自检：`schema_list`→schema 文件、schema 的 `dictionary`→`dict.yaml`、`opencc_config`→json、json 引用的 txt/ocd2（允许 ocd2 由同名 txt 生成）、ywz/lenth 多值抽查 |
+| `script/gen-keystore.sh` | 79 | 生成 release 密钥与属性文件（`~/.android-keys/`） |
+| `script/changelog.sh` | 8 | 旧脚本，含拼写 bug（`$curent`），**目前不可用** |
+
+---
+
+## 8. 常见报错
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `Unsupported class file major version 65` / lint 崩 | 用了 JDK 21 | `export JAVA_HOME=$HOME/opt/jdk17/jdk-17.0.9` |
+| `SigningConfig "release" is missing required property "storeFile"` | `ebb18c1` 之前的旧行为 | 升级到 `ebb18c1`+；或提供 keystore；或直接产出 unsigned |
+| `DOES NOT VERIFY: Missing META-INF/MANIFEST.MF` | 产物是未签名 APK | 用 `apksigner sign` 后置签名（2.3） |
+| `Caused by: java.lang.UnsatisfiedLinkError: …` | `.so` 与 Java 不匹配（旧 85 MB 库症状） | 确认 `app/libs/*/librime_jni.so` 是最新构建；跑 `verify-jni-symbols.sh` |
+| `am instrument` 长时间不返回 | 权限被拒 → `Config` 递归 | `appops set … MANAGE_EXTERNAL_STORAGE allow`；用 `timeout 300` 包裹；重装后需重设 |
+| 系统弹「此应用不符合 16 KB 对齐要求」 | `.so` 未按 16 KB 对齐 | 用含 `max-page-size=16384` 的脚本重建（`9dc8c32` 已固化）；`zipalign -c -P 16 4` 复核 |
+| 方案列表为空 / 点开没字 | assets 未部署完、缺 `default.custom.yaml`、或 schema 缺词典 | 见 [06 §4.1](06-troubleshooting-roadmap.md)；跑 `verify-rime-assets.py` |
+| `make` 失败（`jni/OpenCC` 不存在） | Makefile 的 `opencc-data` 仍依赖被 gitignore 的 JNI 子模块 | 不要用 `make`；OpenCC 资源已随仓库提交，直接 `./gradlew` |
+| `./gradlew` 卡在下载 | 网络 / 镜像 | 检查 `build.gradle:22` 的阿里云镜像配置；本地已有 `gradle-7.5-bin` 缓存 |
+| `zipalign: unknown option -P` | build-tools 过旧 | 用 build-tools 35+ |
+| 测试断言 `.ocd2 >= 17` 失败 | OpenCC 资源未拷进 APK | 确认 `assets/rime/opencc/` 有 34 个文件；重装 APK（同版本覆盖不会重拷 assets，需卸载或清数据） |
+
+---
+
+## 9. 代码风格（spotless）
 
 ```bash
-./gradlew spotlessCheck     # 检查（CI 语义）
-./gradlew spotlessApply     # 自动修复
+./gradlew spotlessCheck     # 检查
+./gradlew spotlessApply     # 自动修正（会改文件，提交前跑）
 ```
 
-> spotless 的 target 已随改名更新为 `com/hazukieq/hkrime/...`；
-> 若新增了包目录，记得同步改 `build.gradle:63-77`，否则新文件不被检查。
+配置在根 `build.gradle:63-77`：Java 用 google-java-format 1.15.0，Kotlin 用 ktlint 0.44.0，
+target 已改为 `app/src/main/java/com/hazukieq/hkrime/**`。
+
+> 在 JDK 17 下跑需要 `gradle.properties` 里的 `--add-exports jdk.compiler/...` 参数（已配）。
+> 注意 `gradle.properties` 有**两段** `org.gradle.jvmargs`，后者覆盖前者；当前两段都含堆参数，暂不丢配置，
+> 但建议合并成一行（见 06 技术债）。

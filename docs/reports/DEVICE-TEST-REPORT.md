@@ -59,3 +59,48 @@ timeout 300 adb shell am instrument -w -r -e class com.hazukieq.hkrime.RimeDataT
 - 已 `mv /sdcard/rime /sdcard/rime.hkrime-backup-1794089473` 备份；测试后把测试产生的新目录挪到 `/sdcard/rime.hkrime-test-1794090265`，并恢复原 `/sdcard/rime`。
 - 默认输入法已恢复为 Gboard；测试 APK（`com.hazukieq.hkrime.test`）已卸载。
 - `com.hazukieq.hkrime` 仍安装在设备上（未设为默认输入法），供用户自行试用/卸载。
+
+---
+
+# 第二轮：缺口修复后（`726a209`，2026-11-08）
+
+> 本节为**追加**，上文（第一轮真机验证）保持原样不改。第二轮指 `726a209` 补齐
+> `hakka_qwerty` / `ipa_yunlong` / `luna_pinyin` 与 `ywz`/`lenth` 滤镜之后的复测。
+
+## 环境与方式
+
+| 项 | 值 |
+| --- | --- |
+| 设备 | Xiaomi M2012K11AC（Android 16，16KB page），adb serial `5f08bc20` |
+| 被测代码 | `726a209`（缺口修复）+ 测试增强（`RimeDataTest.kt` 147 行） |
+| 权限 | `adb shell appops set com.hazukieq.hkrime MANAGE_EXTERNAL_STORAGE allow`（重装后必须重设） |
+| 部署方式 | **强制 fresh**：测试开始即 `sharedDir.deleteRecursively()` 并删 `userDataDir/build`（`RimeDataTest.kt:47-48`），否则同版本覆盖安装不会重拷 assets |
+| 命令 | `timeout 300 adb shell am instrument -w -r -e class com.hazukieq.hkrime.RimeDataTest com.hazukieq.hkrime.test/androidx.test.runner.AndroidJUnitRunner` |
+
+## 结论
+
+**PASS**：`OK (1 test)`。缺口修复后，三个方案均可部署、词典全部编译、两个滤镜可加载。
+
+## 实测数据
+
+| 项目 | 本次结果 | 第一轮结果（对照） |
+| --- | --- | --- |
+| 生成 `.ocd2` | **18** | 15 |
+| `userDataDir/build` 的 `.bin` | **10** | 3（仅 hakka.*） |
+| schema 列表 | **3 项**：客语12键 / 客语26键 / 雲龍國際音標 | 非空（仅客语12键可用） |
+| OpenCC 版本 | `ver.1.1.4` | 同 |
+| 转换 | `s2t`/`t2s`/`s2tw`/`s2twp` 四组通过 | 同 |
+| 滤镜 | `ywz.ocd2`、`lenth.ocd2` 生成；`openccConvert("不屑","ywz.json")`、`("qq","lenth.json")` 非 null | 文件缺失，未测 |
+| 新增 bin | `hakka_qwerty.prism.bin`、`ipa_yunlong.*`、`luna_pinyin.*` | 无 |
+
+> 说明：`ywz`/`lenth` 的**多值候选**（如 `不屑 → [不屑, 😒]`）由 librime `simplifier` 的
+> `Opencc::ConvertWord` 输出；JNI `Rime.openccConvert` 只取首值。因此测试只断言「配置可加载、不返回 null」，
+> 多值在键盘上的表现**未在本轮验证**（见 `docs/06 §4.8`、`docs/07 §3.1`）。
+
+## 设备侧用户数据恢复
+
+- 测试前同样是真实用户数据：把 `/sdcard/rime` 备份为 `rime.hkrime-backup-*`，测试后恢复；
+- 测试产物目录挪到 `rime.hkrime-test-*` 后清理；
+- 默认输入法已切回 Gboard；
+- 测试 APK（`com.hazukieq.hkrime.test`）已卸载。
+
