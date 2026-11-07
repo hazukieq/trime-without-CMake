@@ -20,6 +20,7 @@ android {
             //noinspection ChromeOsAbiSupport
             abiFilters "arm64-v8a" // ,"armeabi-v7a"
         }
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -40,18 +41,33 @@ android {
         }
     }
 
-    def propsFile = rootProject.file('release.properties') //store release config in gradle.properties
-    def configName = 'release'
-
-    if (propsFile.exists() && android.signingConfigs.hasProperty(configName)) {
-        def props = new Properties()
-        props.load(new FileInputStream(propsFile))
-        if (props!=null && props.containsKey('storeFile')) {
-            android.signingConfigs[configName].storeFile = rootProject.file(props['storeFile'])
-            android.signingConfigs[configName].storePassword = props['storePassword']
-            android.signingConfigs[configName].keyAlias = props['keyAlias']
-            android.signingConfigs[configName].keyPassword = props['keyPassword']
+    // 发布签名配置（密钥不随仓库分发）。查找顺序：
+    //   1) 仓库根 release.properties（已 gitignore，本地开发用；见 release.properties.example）
+    //   2) ~/.android-keys/hkrime-release.properties（推荐：密钥文件不在仓库内）
+    //   3) 环境变量 HKREME_STORE_FILE / HKREME_STORE_PASSWORD / HKREME_KEY_ALIAS / HKREME_KEY_PASSWORD
+    // 都找不到时 release 构建不签名（可用 apksigner 后置签名）。
+    def signingProps = new Properties()
+    def propsFile = [rootProject.file('release.properties'),
+                     new File(System.getProperty('user.home'), '.android-keys/hkrime-release.properties')].find { it.exists() }
+    if (propsFile != null) {
+        propsFile.withInputStream { signingProps.load(it) }
+        logger.lifecycle("release 签名配置: ${propsFile}")
+    }
+    def keyStorePath = signingProps.getProperty('storeFile') ?: System.getenv('HKREME_STORE_FILE')
+    if (keyStorePath != null && !keyStorePath.trim().isEmpty()) {
+        def ksFile = new File(keyStorePath.trim())
+        if (!ksFile.isAbsolute()) ksFile = rootProject.file(keyStorePath.trim())
+        if (ksFile.exists()) {
+            android.signingConfigs.release.storeFile = ksFile
+            android.signingConfigs.release.storePassword = signingProps.getProperty('storePassword') ?: System.getenv('HKREME_STORE_PASSWORD')
+            android.signingConfigs.release.keyAlias = signingProps.getProperty('keyAlias') ?: System.getenv('HKREME_KEY_ALIAS') ?: 'hkrime'
+            android.signingConfigs.release.keyPassword = signingProps.getProperty('keyPassword') ?: System.getenv('HKREME_KEY_PASSWORD')
+            logger.lifecycle("release 签名 keystore: ${ksFile}")
+        } else {
+            logger.warn("release 签名跳过：keystore 不存在 -> ${ksFile}")
         }
+    } else {
+        logger.lifecycle('release 签名未配置（release.properties / ~/.android-keys / 环境变量均缺失），release APK 不签名')
     }
 
     buildFeatures {
@@ -83,6 +99,10 @@ dependencies {
     //PermissionX
     implementation 'com.guolindev.permissionx:permissionx:1.7.1'
     implementation 'com.google.android.material:material:1.8.0'
+
+    // 仪器测试（部署 / OpenCC 功能验证）
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test:runner:1.5.2'
 
     // 吐司框架：https://github.com/getActivity/Toaster
     //implementation 'com.github.getActivity:Toaster:12.0'

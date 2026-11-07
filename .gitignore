@@ -216,3 +216,6 @@ Icon
 /app/release/output-metadata.json
 /.idea/
 /app/src/main/jni
+
+# 构建产物校验和（build-jni-so.sh 生成）
+app/libs/**/*.so.sha256
