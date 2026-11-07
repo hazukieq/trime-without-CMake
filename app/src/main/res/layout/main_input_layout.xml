@@ -7,7 +7,7 @@
 
     <include android:id="@+id/candidate_view" layout="@layout/candidate_bar" />
 
-    <com.osfans.trime.ime.keyboard.KeyboardView
+    <com.hazukieq.hkrime.ime.keyboard.KeyboardView
         android:id="@+id/main_keyboard_view"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />

@@ -6,7 +6,7 @@ android {
     ndkVersion "24.0.8215888"
 
     defaultConfig {
-        applicationId "com.tumuyan.trime"
+        applicationId "com.hazukieq.hkrime"
         minSdkVersion 21
         targetSdkVersion 33
         versionCode 20220701
@@ -63,7 +63,7 @@ android {
             jniLibs.srcDirs = ['libs']
         }
     }
-    namespace 'com.osfans.trime'
+    namespace 'com.hazukieq.hkrime'
 }
 
 dependencies {

@@ -15,7 +15,7 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
-        android:name="com.osfans.trime.TrimeApplication"
+        android:name="com.hazukieq.hkrime.TrimeApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_app_icon"
         android:label="@string/trime_app_name"
@@ -56,7 +56,7 @@
             android:launchMode="singleTask" />
         <!-- Using an activity alias to disable/enable the app icon in the launcher -->
         <activity-alias
-            android:name="com.osfans.trime.PrefLauncherAlias"
+            android:name="com.hazukieq.hkrime.PrefLauncherAlias"
             android:exported="true"
             android:label="@string/trime_app_name"
             android:launchMode="singleTask"

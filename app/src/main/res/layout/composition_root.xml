@@ -24,7 +24,7 @@
   android:layout_width="wrap_content"
   android:layout_height="wrap_content">
 
-  <com.osfans.trime.ime.text.Composition
+  <com.hazukieq.hkrime.ime.text.Composition
     android:id="@+id/compositions"
     android:ellipsize="none"
     android:layout_width="wrap_content"

@@ -1,0 +1,95 @@
+/**
+ * Adapted from [fcitx5-android/LogActivity.kt](https://github.com/fcitx5-android/fcitx5-android/blob/e44c1c7/app/src/main/java/org/fcitx/fcitx5/android/ui/main/LogActivity.kt)
+ */
+package com.hazukieq.hkrime.settings
+
+import android.os.Bundle
+import android.view.View
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import cat.ereza.customactivityoncrash.CustomActivityOnCrash
+import com.hazukieq.hkrime.R
+import com.hazukieq.hkrime.TrimeApplication
+import com.hazukieq.hkrime.databinding.ActivityLogBinding
+import com.hazukieq.hkrime.settings.components.LogView
+import com.hazukieq.hkrime.util.DeviceInfo
+import com.hazukieq.hkrime.util.Logcat
+import com.hazukieq.hkrime.util.bindOnNotNull
+import com.hazukieq.hkrime.util.iso8601UTCDateTime
+import com.hazukieq.hkrime.util.toast
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.launch
+import java.io.OutputStreamWriter
+import com.hazukieq.hkrime.BuildConfig
+
+class LogActivity : AppCompatActivity() {
+
+    private lateinit var launcher: ActivityResultLauncher<String>
+    private lateinit var logView: LogView
+
+    private fun registerLauncher() {
+        launcher = registerForActivityResult(CreateDocument("todo/todo")) { uri ->
+            lifecycleScope.launch(NonCancellable + Dispatchers.IO) {
+                runCatching {
+                    if (uri != null)
+                        contentResolver.openOutputStream(uri)?.let { OutputStreamWriter(it) }
+                    else null
+                }.bindOnNotNull { x ->
+                    x.use {
+                        logView
+                            .currentLog
+                            .let { log ->
+                                runCatching {
+                                    it.write("--------- Build Info\n")
+                                    it.write("${BuildConfig.BUILD_INFO}\n")
+                                    it.write("--------- Device Info\n")
+                                    it.write(DeviceInfo.get(this@LogActivity))
+                                    it.write(log.toString())
+                                }
+                            }
+                    }
+                }?.toast()
+            }
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val binding = ActivityLogBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        with(binding) {
+            setSupportActionBar(toolbar.toolbar)
+            this@LogActivity.logView = logView
+            logView.setLogcat(
+                if (CustomActivityOnCrash.getConfigFromIntent(intent) == null) {
+                    supportActionBar!!.apply {
+                        setDisplayHomeAsUpEnabled(true)
+                        setTitle(R.string.real_time_logs)
+                    }
+                    Logcat()
+                } else {
+                    supportActionBar!!.setTitle(R.string.crash_logs)
+                    clearButton.visibility = View.GONE
+                    AlertDialog.Builder(this@LogActivity)
+                        .setTitle(R.string.app_crash)
+                        .setMessage(R.string.app_crash_message)
+                        .setPositiveButton(android.R.string.ok) { _, _ -> }
+                        .show()
+                    Logcat(TrimeApplication.getLastPid())
+                }
+            )
+            clearButton.setOnClickListener {
+                logView.clear()
+            }
+            exportButton.setOnClickListener {
+                launcher.launch("$packageName-${iso8601UTCDateTime()}.txt")
+            }
+        }
+        registerLauncher()
+    }
+}
