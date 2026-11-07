@@ -123,6 +123,7 @@
     land: false,
     width: 360,
     zoom: 1,
+    fit: true,
     ascii: false,
     dark: false,
     showSymbol: true,
@@ -146,7 +147,7 @@
     editor: $('editor'), fileInput: $('fileInput'),
     status: $('status'), themeMeta: $('themeMeta'), cursorInfo: $('cursorInfo'),
     selScheme: $('selScheme'), selKeyboard: $('selKeyboard'),
-    selOrientation: $('selOrientation'), inpWidth: $('inpWidth'), inpZoom: $('inpZoom'),
+    selOrientation: $('selOrientation'), inpWidth: $('inpWidth'), inpZoom: $('inpZoom'), chkFit: $('chkFit'), stage: document.querySelector('.stage'),
     chkAscii: $('chkAscii'), chkDark: $('chkDark'), chkSymbol: $('chkSymbol'),
     chkHint: $('chkHint'), chkCandidates: $('chkCandidates'), chkCandStruct: $('chkCandStruct'),
     candLegend: $('candLegend'),
@@ -1331,7 +1332,14 @@
   }
 
   function applyZoom() {
-    const z = S.zoom;
+    // 默认「适应宽度」：把键盘缩放到中间列可用宽度（留 28px 边距），并保持水平居中。
+    // 手动拖「缩放」滑杆则切换为固定百分比。
+    let z = S.zoom;
+    if (S.fit) {
+      const avail = Math.max(120, (el.stage ? el.stage.clientWidth : 480) - 28);
+      z = Math.max(0.4, Math.min(4, avail / S.width));
+      if (el.inpZoom) el.inpZoom.value = String(Math.round(z * 100));
+    }
     el.device.style.transform = 'scale(' + z + ')';
     el.device.style.marginBottom = (el.device.offsetHeight * (z - 1)) + 'px';
   }
@@ -1468,7 +1476,14 @@
       S.layout = layoutKeyboard(S.keyboardName);
       renderAll();
     });
-    el.inpZoom.addEventListener('input', () => { S.zoom = Number(el.inpZoom.value) / 100; applyZoom(); });
+    el.inpZoom.addEventListener('input', () => {
+      S.fit = false;
+      if (el.chkFit) el.chkFit.checked = false;
+      S.zoom = Number(el.inpZoom.value) / 100;
+      applyZoom();
+    });
+    el.chkFit.addEventListener('change', () => { S.fit = el.chkFit.checked; applyZoom(); });
+    window.addEventListener('resize', () => applyZoom());
     el.chkAscii.addEventListener('change', () => { S.ascii = el.chkAscii.checked; renderAll(); });
     el.chkDark.addEventListener('change', () => {
       S.dark = el.chkDark.checked;
