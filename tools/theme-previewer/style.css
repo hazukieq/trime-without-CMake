@@ -178,11 +178,6 @@ main {
 .cand-legend .title { color: var(--fg); font-weight: 700; margin-right: 2px; }
 .cand-legend .sw { width: 10px; height: 10px; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255,255,255,.25); }
 .cand-legend b { color: var(--fg); font-weight: 600; }
-.key-pop {
-  position: absolute; z-index: 40; display: flex; align-items: center; justify-content: center;
-  border-radius: 8px; pointer-events: none; box-shadow: 0 8px 22px rgba(0,0,0,.5);
-  white-space: nowrap; overflow: hidden; line-height: 1.1;
-}
 .sample-row { display: flex; gap: 10px; padding: 0 12px 10px; flex: none; }
 .sample-row .field input { width: 100%; }
 

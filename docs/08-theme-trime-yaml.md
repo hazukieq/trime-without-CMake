@@ -615,7 +615,7 @@ python3 -m http.server 8765           # 或 ./tools/theme-previewer/serve.sh
 | 区域 | 能力 |
 |---|---|
 | 左栏 | 实时编辑 YAML（250ms 防抖），显示行/列，Ctrl+Enter 立即渲染，「还原」回磁盘版本 |
-| 中栏 | 配色方案（37）/ 键盘（17）/ 竖横屏 / 屏宽 / 缩放 / 西文 / 深色 / 符号 / hint / 按键弹窗 / 候选栏 / **候选区结构标注** / 方案名（空格键标签） |
+| 中栏 | 配色方案（37）/ 键盘（17）/ 竖横屏 / 屏宽 / 缩放 / 西文 / 深色 / 符号 / hint / 候选栏 / **候选区结构标注** / 方案名（空格键标签） |
 | 设备预览 | 只渲染键盘本体（无 App 内容区）；按 `Keyboard#layout` 复刻的绝对坐标渲染键盘，候选栏/编码区按真实样式渲染 |
 | 候选区结构 | 勾选后在候选栏上画虚线外框、给每个候选画独立框、给 comment 区画斜纹带，并在下方列出构成：背景/高亮底/文字/注释字/分隔线的实际颜色 + 高度/字号/内边距/间距/注释位置 |
 | 候选区点击探查 | 点候选字 / 注释（拼音）/ 分隔线 / 候选栏空白，右侧「候选区」tab 会显示该部分的几何计算（外框 left/width、measureText 结果、文字与注释中心 X、颜色命中键、高度公式） |
@@ -643,8 +643,8 @@ python3 -m http.server 8765           # 或 ./tools/theme-previewer/serve.sh
 - 候选栏：**完全照抄真机几何**——`comment_on_top` 且有注释时 `高度 = candidate_view_height + comment_height`，文字画在下半区、注释带在上方；注释在下方时高度仍为 `candidate_view_height`，文字左移 `commentWidth/2`、注释贴右缘；候选框宽度按 `measureText(word) + 2×candidate_padding`（有注释时再与注释宽取大 / 相加），间距 `candidate_spacing` 走 `x += width + spacing`。
 - 预览器不再为了可读性撑高候选栏（旧版本那处刻意偏离已删除）。
 - `{Left}`、`[]{Left}`、`{}{Left}` 这类花括号 send/text 串在预览器里统一显示成 `{}`（不展示内部内容，避免长符号名糊在键角上）。
-- 按键预览：**点击按键**时显示（鼠标扫过不反应），按 `preview_text_size` / `preview_height` 计算气泡尺寸，宽度按文本实测并夹在屏幕内，上方放不下时落到键下方（真机固定画在键上方）。
-- 选中的键按 `hilited_key_back_color` / `hilited_key_text_color` 高亮（即真机按下时的样子）；再点一次同一键、或点键盘布局外的任何位置（含键间空白）即取消。
+- 交互：**点击按键**即选中，按 `hilited_key_back_color` / `hilited_key_text_color` / `hilited_key_symbol_color` 高亮（即真机按下时的样子），右侧「按键」tab 展示事件解析；再点一次同一键、或点键盘布局外的任何位置（含键间空白）即取消。
+- 按键放大气泡（真机 `preview_*`）不再渲染：它是按下瞬间的浮层，静态预览里意义不大，去掉后视觉更干净。
 - 滑动/长按的交互不做，仅在「按键」tab 里列出所有事件槽位。
 - 悬浮键盘（liquid_keyboard）不渲染，只展示配置。
 

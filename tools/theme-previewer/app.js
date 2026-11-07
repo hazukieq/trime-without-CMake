@@ -127,7 +127,6 @@
     dark: false,
     showSymbol: true,
     showHint: true,
-    showPreview: true,
     showCandidates: true,
     showCandStruct: true,
     selectedCand: -1,
@@ -149,7 +148,7 @@
     selScheme: $('selScheme'), selKeyboard: $('selKeyboard'),
     selOrientation: $('selOrientation'), inpWidth: $('inpWidth'), inpZoom: $('inpZoom'),
     chkAscii: $('chkAscii'), chkDark: $('chkDark'), chkSymbol: $('chkSymbol'),
-    chkHint: $('chkHint'), chkPreview: $('chkPreview'), chkCandidates: $('chkCandidates'), chkCandStruct: $('chkCandStruct'),
+    chkHint: $('chkHint'), chkCandidates: $('chkCandidates'), chkCandStruct: $('chkCandStruct'),
     candLegend: $('candLegend'),
     inpSchema: $('inpSchema'), inpComposition: $('inpComposition'), inpCandidates: $('inpCandidates'),
     device: $('device'), composeBar: $('composeBar'), candidateBar: $('candidateBar'),
@@ -1067,7 +1066,6 @@
 
   function renderKeyboard() {
     const kbEl = el.keyboard;
-    hideKeyPreview();
     kbEl.innerHTML = '';
     if (!S.layout) return;
     const L = S.layout;
@@ -1163,14 +1161,11 @@
         // 再点一次同一个键 = 取消选中
         if (S.selectedKey === idx) {
           S.selectedKey = null;
-          hideKeyPreview();
           renderKeyboard();
           renderKeyDetail(null);
           return;
         }
         selectKey(idx);
-        if (S.showPreview) showKeyPreview(k, label);
-        else hideKeyPreview();
       });
       kbEl.appendChild(d);
     });
@@ -1187,54 +1182,14 @@
     return displayLabel(token);
   }
 
-  let popEl = null;
+  // 用 canvas 实测文本宽度（候选栏几何、按键尺寸计算都依赖它）
   const measureCanvas = document.createElement('canvas');
   function measureText(text, font) {
     const ctx = measureCanvas.getContext('2d');
-    if (!ctx) return text.length * 20;
+    if (!ctx) return String(text).length * 20;
     ctx.font = font;
-    return ctx.measureText(text).width;
+    return ctx.measureText(String(text)).width;
   }
-  function showKeyPreview(k, label) {
-    hideKeyPreview();
-    if (!label) return;
-    const style = (S.theme && S.theme.style) || {};
-    const fs = px(style.preview_text_size, 40);
-    const font = fs + 'px ' + fontCss(style.preview_font, 'sans-serif');
-    const h = Math.max(px(style.preview_height, 60), fs + 16);
-    const pad = Math.round(Math.max(10, h * 0.28));
-    const textW = Math.ceil(measureText(label, font));
-    const w = Math.min(Math.max(k.width, textW + pad * 2), Math.round(S.width * 0.94));
-    const off = num(style.preview_offset, 0);
-    const vcorr = num(style.vertical_correction, 0);
-    const pop = document.createElement('div');
-    pop.className = 'key-pop';
-    pop.textContent = label;
-    pop.style.height = h + 'px';
-    pop.style.width = w + 'px';
-    // 键坐标是相对 #keyboard 的，气泡挂在 #device 下，必须加键盘偏移
-    const baseX = el.keyboard.offsetLeft || 0;
-    const baseY = el.keyboard.offsetTop || 0;
-    const devH = el.device.clientHeight;
-    // 水平：对准键中心，再夹在设备可视区内
-    const left = Math.min(Math.max(0, baseX + k.left + k.width / 2 - w / 2), Math.max(0, S.width - w));
-    pop.style.left = left + 'px';
-    // 垂直：默认在键上方（preview_offset 为负值表示再往上）；上方放不下就落到键下方
-    let top = baseY + k.y - h - off + vcorr;
-    if (top < 2) top = baseY + k.y + k.height + 6;
-    top = Math.min(Math.max(0, top), Math.max(0, devH - h - 2));
-    pop.style.top = top + 'px';
-    pop.style.background = color('preview_back_color') || 'rgba(40,44,52,.92)';
-    pop.style.color = color('preview_text_color') || '#fff';
-    pop.style.fontSize = fs + 'px';
-    pop.style.fontFamily = fontCss(style.preview_font, 'sans-serif');
-    pop.style.borderRadius = Math.min(14, Math.round(h * 0.22)) + 'px';
-    pop.style.padding = '0 ' + pad + 'px';
-    pop.style.boxSizing = 'border-box';
-    el.device.appendChild(pop);
-    popEl = pop;
-  }
-  function hideKeyPreview() { if (popEl && popEl.parentNode) popEl.parentNode.removeChild(popEl); popEl = null; }
 
   /* ------------------------------ 渲染：检查器 ------------------------------ */
   function renderColors() {
@@ -1515,7 +1470,6 @@
     });
     el.chkSymbol.addEventListener('change', () => { S.showSymbol = el.chkSymbol.checked; renderKeyboard(); });
     el.chkHint.addEventListener('change', () => { S.showHint = el.chkHint.checked; renderKeyboard(); });
-    el.chkPreview.addEventListener('change', () => { S.showPreview = el.chkPreview.checked; hideKeyPreview(); });
     el.chkCandidates.addEventListener('change', () => { S.showCandidates = el.chkCandidates.checked; renderComposition(); renderCandidates(); });
     el.chkCandStruct.addEventListener('change', () => { S.showCandStruct = el.chkCandStruct.checked; renderCandidates(); });
     el.inpSchema.addEventListener('input', () => { S.schemaName = el.inpSchema.value; renderKeyboard(); });
@@ -1529,16 +1483,12 @@
     document.addEventListener('click', (ev) => {
       const t = ev.target;
       if (t && t.closest && t.closest('.key')) return;
-      if (S.selectedKey === null && !popEl) return;
+      if (S.selectedKey === null) return;
       S.selectedKey = null;
-      hideKeyPreview();
       renderKeyboard();
       renderKeyDetail(null);
     }, true);
 
-    // 鼠标离开窗口 / 窗口失焦时，收掉按键放大预览（避免残留在屏幕上）
-    window.addEventListener('blur', () => hideKeyPreview());
-    document.addEventListener('mouseleave', () => hideKeyPreview());
     document.addEventListener('dragover', (e) => { e.preventDefault(); });
     document.addEventListener('drop', (e) => {
       e.preventDefault();
