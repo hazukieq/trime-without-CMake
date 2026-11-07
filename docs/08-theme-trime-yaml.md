@@ -643,7 +643,8 @@ python3 -m http.server 8765           # 或 ./tools/theme-previewer/serve.sh
 - 候选栏：**完全照抄真机几何**——`comment_on_top` 且有注释时 `高度 = candidate_view_height + comment_height`，文字画在下半区、注释带在上方；注释在下方时高度仍为 `candidate_view_height`，文字左移 `commentWidth/2`、注释贴右缘；候选框宽度按 `measureText(word) + 2×candidate_padding`（有注释时再与注释宽取大 / 相加），间距 `candidate_spacing` 走 `x += width + spacing`。
 - 预览器不再为了可读性撑高候选栏（旧版本那处刻意偏离已删除）。
 - `{Left}`、`[]{Left}`、`{}{Left}` 这类花括号 send/text 串在预览器里统一显示成 `{}`（不展示内部内容，避免长符号名糊在键角上）。
-- 按键预览：按 `preview_text_size` / `preview_height` 计算气泡尺寸，宽度按文本实测并夹在屏幕内，上方放不下时落到键下方（真机固定画在键上方）。
+- 按键预览：**点击按键**时显示（鼠标扫过不反应），按 `preview_text_size` / `preview_height` 计算气泡尺寸，宽度按文本实测并夹在屏幕内，上方放不下时落到键下方（真机固定画在键上方）。
+- 选中的键按 `hilited_key_back_color` / `hilited_key_text_color` 高亮（即真机按下时的样子）；再点一次同一键、或点键盘布局外的任何位置（含键间空白）即取消。
 - 滑动/长按的交互不做，仅在「按键」tab 里列出所有事件槽位。
 - 悬浮键盘（liquid_keyboard）不渲染，只展示配置。
 

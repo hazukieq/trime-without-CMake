@@ -1067,6 +1067,7 @@
 
   function renderKeyboard() {
     const kbEl = el.keyboard;
+    hideKeyPreview();
     kbEl.innerHTML = '';
     if (!S.layout) return;
     const L = S.layout;
@@ -1156,11 +1157,21 @@
       }
       if (S.selectedKey === idx) d.classList.add('sel');
 
-      d.addEventListener('mouseenter', () => {
+      // 只在点击时显示「被 hover 的样子」+ 冒泡预览；鼠标扫过不做任何反应
+      d.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        // 再点一次同一个键 = 取消选中
+        if (S.selectedKey === idx) {
+          S.selectedKey = null;
+          hideKeyPreview();
+          renderKeyboard();
+          renderKeyDetail(null);
+          return;
+        }
+        selectKey(idx);
         if (S.showPreview) showKeyPreview(k, label);
+        else hideKeyPreview();
       });
-      d.addEventListener('mouseleave', () => hideKeyPreview());
-      d.addEventListener('click', () => selectKey(idx));
       kbEl.appendChild(d);
     });
   }
@@ -1514,6 +1525,17 @@
     document.querySelectorAll('.side-tabs .tab').forEach((t) => t.addEventListener('click', () => switchSideTab(t.dataset.stab)));
 
     // 拖拽 YAML 到页面
+    // 点击键盘布局之外的任何地方 → 清除选中的按键与预览
+    document.addEventListener('click', (ev) => {
+      const t = ev.target;
+      if (t && t.closest && t.closest('.key')) return;
+      if (S.selectedKey === null && !popEl) return;
+      S.selectedKey = null;
+      hideKeyPreview();
+      renderKeyboard();
+      renderKeyDetail(null);
+    }, true);
+
     // 鼠标离开窗口 / 窗口失焦时，收掉按键放大预览（避免残留在屏幕上）
     window.addEventListener('blur', () => hideKeyPreview());
     document.addEventListener('mouseleave', () => hideKeyPreview());
