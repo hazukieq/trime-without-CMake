@@ -24,6 +24,10 @@
   （含 `keyboard_height` 高度锁定、右侧填满、空位占位），候选栏/编码区按 `Candidate`/`Composition` 的样式渲染。
 - **候选区结构**（默认开）：候选栏虚线外框、每个候选独立框、comment 区斜纹带，下方图例给出
   实际用到的颜色（背景/高亮底/文字/高亮字/注释字/分隔线）与高度/字号/内边距/间距/注释位置。
+- **候选区点击探查**：点候选字 / 注释（拼音）/ 分隔线 / 候选栏空白，右侧「候选区」tab 显示该部分的
+  几何与颜色计算（外框 left/width、measureText、文字与注释中心 X、颜色命中键、高度公式）。
+  候选栏几何与 `Candidate.updateCandidateWidth()` / `onDraw()` 逐项对齐：`comment_on_top` 时高度为
+  `candidate_view_height + comment_height`，文字居中在下半区、注释在顶部 band。
 - **右侧 tabs**
   - 问题：YAML 解析错误（带行列）、缺 style / 方案 / 键盘、未知按键名、style 缺键、键盘高度锁定提示；
   - 颜色：当前渲染用到的每个色键 → 最终颜色 + 命中的来源键（即 fallback 链走了几跳）；

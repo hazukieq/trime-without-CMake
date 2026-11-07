@@ -109,15 +109,24 @@ main {
   display: flex; align-items: center; padding: 0 8px; font-size: 13px;
   min-height: 28px; overflow: hidden;
 }
-.candidate-bar { display: flex; align-items: center; overflow: hidden; position: relative; }
+.candidate-bar { overflow: hidden; position: relative; }
 .candidate {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  white-space: nowrap; flex: none; line-height: 1.05; position: relative; z-index: 1;
+  position: absolute; top: 0; z-index: 1; cursor: pointer;
+  white-space: nowrap; line-height: 1;
 }
-.candidate .word { font-weight: 400; }
-.candidate .comment { opacity: .85; }
-.candidate.hl .word { font-weight: 600; }
-.candidate .sep { position: absolute; right: 0; top: 22%; bottom: 22%; width: 1px; opacity: .55; }
+.candidate:hover { box-shadow: inset 0 0 0 1px rgba(120,170,255,.55); }
+.candidate.sel { box-shadow: inset 0 0 0 2px var(--accent); }
+.cand-word {
+  position: absolute; transform: translate(-50%, -50%); white-space: nowrap;
+  font-weight: 400; cursor: pointer;
+}
+.cand-comment {
+  position: absolute; transform: translateX(-50%); white-space: nowrap; text-align: center;
+  opacity: .85; cursor: pointer;
+}
+.cand-word:hover, .cand-comment:hover { outline: 1px dashed var(--accent); outline-offset: 2px; }
+.candidate.hl .cand-word { font-weight: 600; }
+.candidate .sep { position: absolute; opacity: .55; pointer-events: none; }
 .keyboard { position: relative; }
 .key {
   position: absolute; display: flex; align-items: center; justify-content: center;
@@ -173,8 +182,12 @@ main {
 .side-tab { display: none; padding: 10px 12px 18px; }
 .side-tab.active { display: block; }
 .side-note { color: var(--fg-faint); font-size: 11.5px; margin-bottom: 8px; line-height: 1.55; }
-.side-note code, .key-detail code { background: #1b2232; border-radius: 4px; padding: 0 4px; font-family: var(--mono); font-size: 11px; }
+.side-note code, .key-detail code, .cand-detail code { background: #1b2232; border-radius: 4px; padding: 0 4px; font-family: var(--mono); font-size: 11px; }
 .empty { color: var(--fg-faint); font-size: 12px; padding: 10px 0; }
+.key-detail .note, .key-detail .divider { font-size: 11.5px; color: var(--fg-faint); line-height: 1.5; margin: -4px 0 8px; }
+.key-detail .divider { height: 1px; background: var(--line); margin: 10px 0; }
+.key-detail .kv b { font-weight: 600; color: var(--fg); }
+.key-detail .kv code { justify-self: start; }
 
 .issue-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .issue {

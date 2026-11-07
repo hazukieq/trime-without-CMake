@@ -106,8 +106,11 @@ trime.yaml
 | `text_size` | `16` | 编码区字号 |
 | `text_height` | 注释掉 | 编码区高度（`#text_height: 22`，本主题未启用） |
 
-> 视觉上 28sp 的候选栏放 22sp 字 + 12sp 注释必然溢出，真机同样会裁切；
-> 想要更宽松就把 `candidate_view_height` 调到 34–40。
+> **注释在上时会自动加高**：`Candidate.updateCandidateWidth()` 里
+> `params.height = (shouldShowComment && isCommentOnTop) ? candidate_view_height + comment_height : candidate_view_height`，
+> 默认主题即 28 + 12 = 40sp；文字画在下半区（中心 = comment_height + candidate_view_height/2），
+> 注释画在上方 comment_height 带内。只有 `comment_on_top: false` 时才把注释塞进 `candidate_view_height` 内（此时 word 左移、注释贴右缘）。
+> 所以「28sp 栏塞 22sp 字必裁切」是误读——真正会裁的是注释在下的配置。
 
 ### 3.4 字体
 
@@ -600,6 +603,7 @@ python3 -m http.server 8765           # 或 ./tools/theme-previewer/serve.sh
 | 中栏 | 配色方案（37）/ 键盘（17）/ 竖横屏 / 屏宽 / 缩放 / 西文 / 深色 / 符号 / hint / 按键弹窗 / 候选栏 / **候选区结构标注** / 方案名（空格键标签） |
 | 设备预览 | 只渲染键盘本体（无 App 内容区）；按 `Keyboard#layout` 复刻的绝对坐标渲染键盘，候选栏/编码区按真实样式渲染 |
 | 候选区结构 | 勾选后在候选栏上画虚线外框、给每个候选画独立框、给 comment 区画斜纹带，并在下方列出构成：背景/高亮底/文字/注释字/分隔线的实际颜色 + 高度/字号/内边距/间距/注释位置 |
+| 候选区点击探查 | 点候选字 / 注释（拼音）/ 分隔线 / 候选栏空白，右侧「候选区」tab 会显示该部分的几何计算（外框 left/width、measureText 结果、文字与注释中心 X、颜色命中键、高度公式） |
 | 右栏-问题 | YAML 解析错误（含行列）、缺 style/方案/键盘、未知按键名、style 缺键、键盘高度锁定提示 |
 | 右栏-颜色 | 渲染用到的每个色键：解析值 + 命中的来源键（即 fallback 链走到了哪） |
 | 右栏-键盘 | 每个键盘的键数/行数/高度 |
@@ -621,7 +625,8 @@ python3 -m http.server 8765           # 或 ./tools/theme-previewer/serve.sh
 
 - 字体：真机用 `assets/rime/fonts/*.ttf`，预览器用系统 sans-serif（字体缺失时真机也会回退）。
 - 图片背景（`.9.png` 九宫格、皮肤三层）不做合成。
-- 候选栏：无注释时按 `candidate_view_height` 固定高度；有注释时会按需撑高（真机是硬裁），这是为可读性做的唯一刻意偏离。
+- 候选栏：**完全照抄真机几何**——`comment_on_top` 且有注释时 `高度 = candidate_view_height + comment_height`，文字画在下半区、注释带在上方；注释在下方时高度仍为 `candidate_view_height`，文字左移 `commentWidth/2`、注释贴右缘；候选框宽度按 `measureText(word) + 2×candidate_padding`（有注释时再与注释宽取大 / 相加），间距 `candidate_spacing` 走 `x += width + spacing`。
+- 预览器不再为了可读性撑高候选栏（旧版本那处刻意偏离已删除）。
 - `{Left}`、`[]{Left}`、`{}{Left}` 这类花括号 send/text 串在预览器里统一显示成 `{}`（不展示内部内容，避免长符号名糊在键角上）。
 - 按键预览：按 `preview_text_size` / `preview_height` 计算气泡尺寸，宽度按文本实测并夹在屏幕内，上方放不下时落到键下方（真机固定画在键上方）。
 - 滑动/长按的交互不做，仅在「按键」tab 里列出所有事件槽位。

@@ -130,6 +130,8 @@
     showPreview: true,
     showCandidates: true,
     showCandStruct: true,
+    selectedCand: -1,
+    candGeom: [],
     schemaName: '客语12键',
     composition: 'ngin',
     candidates: [],
@@ -154,7 +156,7 @@
     keyboard: $('keyboard'), stageHint: $('stageHint'), patchMode: $('patchMode'),
     issueList: $('issueList'), issuesEmpty: $('issuesEmpty'), badgeIssues: $('badgeIssues'),
     colorTable: $('colorTable').querySelector('tbody'), curScheme: $('curScheme'),
-    kbTable: $('kbTable').querySelector('tbody'), keyDetail: $('keyDetail'),
+    kbTable: $('kbTable').querySelector('tbody'), keyDetail: $('keyDetail'), candDetail: $('candDetail'),
     styleTable: $('styleTable').querySelector('tbody'),
   };
 
@@ -785,87 +787,200 @@
     const bar = el.candidateBar;
     bar.innerHTML = '';
     const style = (S.theme && S.theme.style) || {};
-    const h = px(style.candidate_view_height, STYLE_DEFAULTS.candidate_view_height);
-    const padding = num(style.candidate_padding, 5);
-    const spacing = num(style.candidate_spacing, 0.5);
-    const fontSize = px(style.candidate_text_size, 22);
-    const commentSize = px(style.comment_text_size, 12);
+    const cvh = px(style.candidate_view_height, STYLE_DEFAULTS.candidate_view_height);
+    const padding = px(style.candidate_padding, STYLE_DEFAULTS.candidate_padding);
+    const spacing = px(style.candidate_spacing, STYLE_DEFAULTS.candidate_spacing);
+    const fontSize = px(style.candidate_text_size, STYLE_DEFAULTS.candidate_text_size);
+    const commentSize = px(style.comment_text_size, STYLE_DEFAULTS.comment_text_size);
+    const commentHeight = px(style.comment_height, STYLE_DEFAULTS.comment_height);
     const commentOnTop = !!style.comment_on_top;
     const bg = color('candidate_background') || color('back_color') || 'transparent';
-    // 真机按 candidate_view_height 硬裁；预览器优先「看得清」，26sp 的栏里放 22+12 会把注释切掉半截，
-    // 这里按内容撑高（仅预览，不改变主题语义），并在 docs/08 §12 里注明这处差异。
-    const hasComment = (S.candidates.length ? S.candidates : parseCandidates()).some((c) => c.comment);
-    const barH = hasComment ? Math.max(h, fontSize + commentSize + 10) : h;
+    const cands = S.candidates.length ? S.candidates : parseCandidates();
+    const hasComment = cands.some((c) => c.comment);
+    // Candidate.updateCandidateWidth()：params.height = 有注释且注释在上 ? candidate_view_height + comment_height
+    //                                                       : candidate_view_height
+    const showComment = hasComment;
+    const barH = (showComment && commentOnTop) ? cvh + commentHeight : cvh;
     bar.style.height = barH + 'px';
     bar.style.background = bg;
     if (!S.showCandidates) { bar.style.display = 'none'; return; }
-    bar.style.display = 'flex';
-    const cands = S.candidates.length ? S.candidates : parseCandidates();
+    bar.style.display = 'block';
+
+    const candFont = fontSize + 'px ' + fontCss(style.candidate_font, 'sans-serif');
+    const cmFont = commentSize + 'px ' + fontCss(style.comment_font, 'sans-serif');
+    // 真机：wordY 以候选 View 中心为基准，comment_on_top 时下移 commentHeight/2（即文字居中在下半区）；
+    //       注释在下方时 word 上移 commentHeight/2。
+    const wordCenterY = showComment
+      ? (commentOnTop ? commentHeight + cvh / 2 : cvh / 2 - commentHeight / 2)
+      : barH / 2;
+
+    let x = 0;
+    const geom = [];
     cands.forEach((c, i) => {
-      const d = document.createElement('div');
-      d.className = 'candidate' + (i === 0 ? ' hl' : '');
-      d.style.padding = '0 ' + (padding + spacing) + 'px';
-      d.style.height = '100%';
+      const wordW = measureText(c.word, candFont);
+      const cmW = c.comment ? measureText(c.comment, cmFont) : 0;
+      let itemW = wordW + 2 * padding;               // measureText(word) + 2*candidatePadding
+      if (c.comment) {
+        // comment_on_top：Math.max(wordW+2p, commentW)；否则 wordW+2p+commentW
+        itemW = commentOnTop ? Math.max(itemW, cmW) : itemW + cmW;
+      }
+      itemW = Math.round(itemW);
+
+      const item = document.createElement('div');
+      item.className = 'candidate' + (i === 0 ? ' hl' : '') + (S.selectedCand === i ? ' sel' : '');
+      item.style.left = x + 'px';
+      item.style.width = itemW + 'px';
+      item.style.height = barH + 'px';
+      item.dataset.index = String(i);
       if (i === 0) {
         const hlBg = color('hilited_candidate_back_color');
-        if (hlBg) d.style.background = hlBg;
+        if (hlBg) item.style.background = hlBg;
       }
-      const wordColor = i === 0 ? (color('hilited_candidate_text_color') || color('candidate_text_color')) : color('candidate_text_color');
-      const commentColor = i === 0 ? (color('hilited_comment_text_color') || color('comment_text_color')) : color('comment_text_color');
-      const w = document.createElement('div');
-      w.className = 'word';
+
+      const wordColor = i === 0 ? (color('hilited_candidate_text_color') || color('candidate_text_color'))
+                               : color('candidate_text_color');
+      const commentColor = i === 0 ? (color('hilited_comment_text_color') || color('comment_text_color'))
+                                   : color('comment_text_color');
+      // wordX = rect.centerX；注释在下方时 wordX -= commentWidth/2
+      const wordCx = (c.comment && !commentOnTop) ? itemW / 2 - cmW / 2 : itemW / 2;
+      const w = document.createElement('span');
+      w.className = 'cand-word';
       w.textContent = c.word;
-      w.style.fontSize = fontSize + 'px';
-      w.style.lineHeight = '1.02';
+      w.style.font = candFont;
       w.style.color = wordColor || 'inherit';
-      w.style.fontFamily = fontCss((S.theme.style || {}).candidate_font, 'sans-serif');
-      let cm = null;
+      w.style.left = wordCx + 'px';
+      w.style.top = wordCenterY + 'px';
+      w.dataset.part = 'word';
+      item.appendChild(w);
+
+      let cm = null, cmCx = 0;
       if (c.comment) {
-        cm = document.createElement('div');
-        cm.className = 'comment';
+        cm = document.createElement('span');
+        cm.className = 'cand-comment';
         cm.textContent = c.comment;
-        cm.style.fontSize = commentSize + 'px';
-        cm.style.lineHeight = '1.02';
+        cm.style.font = cmFont;
         cm.style.color = commentColor || 'inherit';
-        cm.style.fontFamily = fontCss((S.theme.style || {}).comment_font, 'sans-serif');
+        cm.style.height = commentHeight + 'px';
+        cm.style.lineHeight = commentHeight + 'px';
+        // commentX = rect.centerX（在上）；commentX = rect.right - commentWidth/2（在下）
+        cmCx = commentOnTop ? itemW / 2 : itemW - cmW / 2;
+        cm.style.left = cmCx + 'px';
+        cm.style.top = (commentOnTop ? 0 : barH - commentHeight) + 'px';
+        cm.dataset.part = 'comment';
+        item.appendChild(cm);
       }
-      // 真机 Candidate.java：comment_on_top=true 时 comment 画在 word 上方（word 下移）
-      if (commentOnTop) { if (cm) d.appendChild(cm); d.appendChild(w); }
-      else { d.appendChild(w); if (cm) d.appendChild(cm); }
-      d.style.maxHeight = h + 'px';
+
       if (i < cands.length - 1) {
         const sep = document.createElement('div');
         sep.className = 'sep';
+        sep.style.left = (itemW - spacing) + 'px';
+        sep.style.width = (spacing * 2) + 'px';
+        sep.style.top = Math.round(barH * 0.2) + 'px';
+        sep.style.height = Math.round(barH * 0.6) + 'px';
         sep.style.background = color('candidate_separator_color') || 'transparent';
-        d.appendChild(sep);
+        sep.dataset.part = 'sep';
+        item.appendChild(sep);
       }
-      bar.appendChild(d);
-    });
 
-    // ---- 候选区结构标注：虚线外框 + 注释带 + 高度徽标 + 图例 ----
+      item.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const part = (ev.target && ev.target.dataset && ev.target.dataset.part) || 'item';
+        selectCandidate(i, part);
+      });
+      bar.appendChild(item);
+      geom.push({
+        index: i, word: c.word, comment: c.comment || '',
+        left: x, width: itemW, wordW: Math.round(wordW), commentW: Math.round(cmW),
+        wordCx: Math.round(wordCx), commentCx: Math.round(cmCx),
+        padding, spacing, fontSize, commentSize, commentHeight, cvh, barH, commentOnTop, showComment,
+        bg,
+      });
+      x += itemW + spacing;
+    });
+    bar.onclick = () => selectCandidate(-1, 'bar');
+
+    S.candGeom = geom;
+    // ---- 候选区结构标注：虚线外框 + 注释带 + 图例 ----
     bar.classList.toggle('annotate', !!S.showCandStruct);
     if (S.showCandStruct) {
       const g = document.createElement('div');
       g.className = 'cand-guide';
-      if (hasComment) {
+      if (showComment) {
         const band = document.createElement('div');
         band.className = 'cand-comment-band';
-        band.style.height = commentSize + 'px';
+        band.style.height = commentHeight + 'px';
         if (commentOnTop) band.style.top = '0px';
         else band.style.bottom = '0px';
-        band.title = 'comment 区（' + commentSize + 'px，' + (commentOnTop ? '在上方' : '在下方') + '）';
+        band.title = 'comment 区（comment_height=' + commentHeight + 'px，' + (commentOnTop ? '在上方' : '在下方') + '）';
         g.appendChild(band);
       }
       bar.appendChild(g);
       renderCandLegend({
-        barH, cfgH: h, fontSize, commentSize, padding, spacing, commentOnTop, hasComment,
-        candCount: cands.length,
+        barH, cfgH: cvh, commentHeight, fontSize, commentSize, padding, spacing,
+        commentOnTop, hasComment, candCount: cands.length,
       });
     } else if (el.candLegend) {
       el.candLegend.hidden = true;
     }
   }
 
+  function selectCandidate(i, part) {
+    S.selectedCand = i;
+    renderCandidates();
+    switchSideTab('cand');
+    renderCandDetail(i, part);
+  }
+
+  function renderCandDetail(i, part) {
+    const box = el.candDetail;
+    if (!box) return;
+    const g = i >= 0 ? (S.candGeom || [])[i] : null;
+    if (part === 'bar' || !g) {
+      const any = (S.candGeom || [])[0];
+      if (!any) { box.innerHTML = '<div class="empty">当前没有候选。</div>'; return; }
+      const bgR = resolveColor('candidate_background');
+      const sepR = resolveColor('candidate_separator_color');
+      box.innerHTML =
+        '<div class="kv"><span>候选栏高度</span><b>' + any.barH + 'px</b></div>' +
+        '<div class="note">＝ candidate_view_height ' + any.cvh + 'px' +
+          (any.showComment && any.commentOnTop ? ' ＋ comment_height ' + any.commentHeight + 'px（注释在上）' : '（无注释，或注释在下）') + '</div>' +
+        '<div class="kv"><span>候选栏背景</span><b>' + (bgR.css || '—') + '</b></div>' +
+        '<div class="kv"><span>命中键</span><code>' + esc(bgR.from || '—') + '</code></div>' +
+        '<div class="kv"><span>分隔线颜色</span><b>' + (sepR.css || '—') + '</b></div>' +
+        '<div class="kv"><span>候选内边距 candidate_padding</span><b>' + any.padding + 'px</b></div>' +
+        '<div class="kv"><span>候选间距 candidate_spacing</span><b>' + any.spacing + 'px</b></div>' +
+        '<div class="kv"><span>候选总宽</span><b>' + (S.candGeom.length ? (S.candGeom[S.candGeom.length - 1].left + S.candGeom[S.candGeom.length - 1].width) : 0) + 'px</b></div>' +
+        '<div class="note">点击某个候选字/注释可看单项计算；点击该行任意空白回到这里。</div>';
+      return;
+    }
+    const wordColorKey = i === 0 ? 'hilited_candidate_text_color' : 'candidate_text_color';
+    const commentColorKey = i === 0 ? 'hilited_comment_text_color' : 'comment_text_color';
+    const wR = resolveColor(wordColorKey);
+    const cR = resolveColor(commentColorKey);
+    box.innerHTML =
+      '<div class="kv"><span>第 ' + (g.index + 1) + ' 项' + (i === 0 ? '（高亮项）' : '') + '</span><b>' + esc(g.word) + (g.comment ? ' <span class="dim">/ ' + esc(g.comment) + '</span>' : '') + '</b></div>' +
+      '<div class="note">点击的是：' + ({ word: '候选字', comment: '注释（拼音/提示）', sep: '分隔线', item: '候选外框' }[part] || part) + '</div>' +
+      '<div class="divider"></div>' +
+      '<div class="kv"><span>候选外框</span><b>left ' + g.left + 'px ／ width ' + g.width + 'px</b></div>' +
+      '<div class="note">width = measureText(word) ' + g.wordW + 'px + 2×padding ' + g.padding + 'px' +
+        (g.comment ? (g.commentOnTop ? '，再与 comment 宽 ' + g.commentW + 'px 取较大值' : ' + comment 宽 ' + g.commentW + 'px') : '') + '</div>' +
+      '<div class="kv"><span>候选字</span><b>' + esc(g.word) + '</b></div>' +
+      '<div class="kv"><span>字号 / 颜色</span><b>' + g.fontSize + 'px ／ ' + (wR.css || '—') + '</b></div>' +
+      '<div class="kv"><span>颜色命中键</span><code>' + esc(wR.from || wordColorKey) + '</code></div>' +
+      '<div class="kv"><span>文字中心 X</span><b>' + g.wordCx + 'px（相对本项左缘）</b></div>' +
+      (g.comment ?
+        '<div class="divider"></div>' +
+        '<div class="kv"><span>注释</span><b>' + esc(g.comment) + '</b></div>' +
+        '<div class="kv"><span>字号 / 颜色</span><b>' + g.commentSize + 'px ／ ' + (cR.css || '—') + '</b></div>' +
+        '<div class="kv"><span>颜色命中键</span><code>' + esc(cR.from || commentColorKey) + '</code></div>' +
+        '<div class="kv"><span>注释中心 X</span><b>' + g.commentCx + 'px（' + (g.commentOnTop ? '与外框中心对齐' : '贴外框右缘') + '）</b></div>' +
+        '<div class="kv"><span>注释带高度</span><b>' + g.commentHeight + 'px（comment_height）</b></div>'
+        : '<div class="note">该项没有 comment。</div>') +
+      '<div class="divider"></div>' +
+      '<div class="kv"><span>注释位置</span><b>comment_on_top = ' + g.commentOnTop + '</b></div>' +
+      '<div class="kv"><span>候选栏高度</span><b>' + g.barH + 'px</b></div>' +
+      '<div class="note">＝ candidate_view_height ' + g.cvh + 'px' + (g.showComment && g.commentOnTop ? ' ＋ comment_height ' + g.commentHeight + 'px' : '') + '</div>';
+  }
   function renderCandLegend(info) {
     const L = el.candLegend;
     if (!L) return;
@@ -889,7 +1004,7 @@
       '<span class="chip">注释 <b>' + info.commentSize + 'px</b></span>' +
       '<span class="chip">内边距 <b>' + info.padding + '</b></span>' +
       '<span class="chip">间距 <b>' + info.spacing + '</b></span>' +
-      '<span class="chip">斜纹 = comment ' + info.commentSize + 'px，<b>' + (info.commentOnTop ? '在上' : '在下') + '</b></span>' +
+      '<span class="chip">斜纹 = comment 带 <b>' + info.commentHeight + 'px</b>（comment_height），<b>' + (info.commentOnTop ? '在上' : '在下') + '</b></span>' +
       '<span class="chip">共 <b>' + info.candCount + '</b> 个候选</span>';
   }
 

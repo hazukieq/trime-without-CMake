@@ -94,6 +94,7 @@
       <button class="tab" data-stab="colors">颜色</button>
       <button class="tab" data-stab="keyboards">键盘</button>
       <button class="tab" data-stab="key">按键</button>
+      <button class="tab" data-stab="cand">候选区</button>
       <button class="tab" data-stab="style">style</button>
     </div>
 
@@ -116,6 +117,13 @@
       <div class="side-tab" data-panel="key">
         <div id="keyDetail" class="key-detail">
           <div class="empty">点击预览里的任意按键查看它的事件解析与原始 YAML。</div>
+        </div>
+      </div>
+
+      <div class="side-tab" data-panel="cand">
+        <div class="side-note">点击预览里的候选字、注释（拼音）或候选栏空白处，查看该部分的真实构成与计算过程。</div>
+        <div id="candDetail" class="key-detail">
+          <div class="empty">尚未选择候选区中的元素。</div>
         </div>
       </div>
 
