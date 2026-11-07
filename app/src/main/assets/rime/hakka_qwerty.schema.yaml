@@ -1,0 +1,134 @@
+# Rime schema
+# encoding: utf-8
+#
+schema:
+  schema_id: hakka_qwerty
+  name: 客语26键
+  version: "2021.1.22"
+  author:
+    - 作者 叶月绘梨依
+  description: |
+    - 这是一款专门为高峰客家话设计的拼音输入方案。具体拼音输入教程，请参考叶月绘梨依撰写的高峰客家拼音教程。该方案设计主要参考了luna拼音方案。
+     相关词汇整理主要依据：李城宗先生的硕士论文『高峰客家话方言研究』中的词汇资料以及客家方言标准音词典、客家方言词语考释，同时高峰客家发音还参考了汉典等。
+
+switches:
+  - name: simplification
+    reset: 0
+    states: ["简","繁"]
+  - name: ywz
+    reset: 0    #0为默认关闭，1为默认开启，推荐默认关闭
+    states: [ 关, 情 ]    #控制开关，可自定义括号内，开关显示内容
+  - name: lenth
+    reset: 0    #0为默认关闭，1为默认开启，推荐默认关闭
+    states: [ 关, 联 ]    #控制开关
+  
+  - name: full_shape
+    states: [ "全","半" ]
+
+  - options: [ _key_Hide ]
+    states: ["                                ▽"]
+  
+  #- options: [keyboard.default, _keyboard_mini]
+  #states: [ "-", mini]
+  
+  #- name: _hide_candidate #关闭候选栏
+  #  reset: 1
+
+engine:
+  processors:
+    - ascii_composer
+    - recognizer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+  segmentors:
+    - ascii_segmentor
+    - matcher
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
+  translators:
+    - punct_translator
+    - script_translator
+    - table_translator@custom_phrase
+    - reverse_lookup_translator
+  filters:
+    - simplifier
+    - uniquifier
+    - simplifier@ywz
+    - simplifier@lenth
+
+speller:
+  alphabet: abcdefghijklmnopqrstuvz
+  initials: abcdefghijklmnopqrstuvz
+  delimiter: " '"
+  algebra:
+    - abbrev/^([a-z]).+$/$1/
+    - abbrev/^(th).+$/$1/
+    - abbrev/^(ng).*$/$1/
+    - abbrev/^(nz).+$/$1/
+    #以下为自定义修改，
+    #允许si，ci，zi尖团音输入，提高拼音准确性
+    #- xform/^nz/y/ #允许nz=y，开启便捷输入
+    #- xform/^ng/x/ # 允许ng=x，开启便捷输入
+    #- xform/^th/xl/ #允许th=w，开启便捷输入
+    #- xform/^si/shi/ #恢复拼音方案中sh的输入
+    #- xform/^zi/zshi/ #恢复拼音方案中zsh的输入
+    #- xform/^ci/cshi/ #恢复拼音方案中csh的输入
+    #- derive/^q/$1/#允许零声母输入,a=qa,e=qe,o=qo,u=qu
+    #- derive/([ei])n$/$1ng/#纠正eng=en,ing=in
+    # 韵母w 变为u
+    - derive/w$/u/
+    #- derive/im$/in/#模糊输入in=im
+    #- derive/em$/en/#模糊输入en=em
+    #- derive/on$/om/#模糊输入om=on
+    #- derive/iam$/ian/#模糊输入ian=iam
+    #- derive/ian$/iam/#模糊输入iam=ian
+    #- derive/am$/an/#模糊输入an=am
+    #- derive/ap$/at/#模糊输入at=ap
+    #- derive/ep$/et/#模糊输入et=ep
+    #- derive/up$/ut/#模糊输入ut=up
+    #- derive/ip$/it/#模糊输入it=ip
+    #- derive/^j/y/#允许输入y=j，y实际上等同于j（把这行开头的#去掉即可生效)
+    #- derive/([auo])ng$/$1gn/#纠正agn=ang,ugn=ung,ogn=ong
+
+translator:
+  dictionary: hakka
+  prism: hakka_qwerty
+  #四个字以下时才会开启拼音提示
+  #spelling_hints: 1
+  enable_user_dict: true
+  enable_sentence: true
+
+custom_phrase:
+  dictionary: ""
+  user_dict: custom_phrase
+  db_class: tabledb
+  enable_completion: true
+  enable_sentence: true
+  initial_quality: "1000"
+
+reverse_lookup:
+  dictionary: luna_pinyin
+  prefix: "`"
+  suffix: "'"
+  tips: 〔普拼〕
+  preedit_format:
+    - xform/([nl])v/$1ü/
+    - xform/([nl])ue/$1üe/
+    - xform/([jqxy])v/$1u/
+
+punctuator:
+  import_preset: symbols
+
+key_binder:
+  import_preset: default
+
+recognizer:
+  import_preset: default
+  patterns:
+    reverse_lookup: "`[a-z]*'?$"
+    punct: "^w([A-Z|a-z]*|[0-9]|10)$"
