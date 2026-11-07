@@ -924,6 +924,13 @@
   }
 
   function selectCandidate(i, part) {
+    // 再点同一个候选 → 取消选中（点候选栏空白除外，那是看栏级信息）
+    if (i >= 0 && S.selectedCand === i && part !== 'bar') {
+      S.selectedCand = -1;
+      renderCandidates();
+      renderCandDetail(-1);
+      return;
+    }
     S.selectedCand = i;
     renderCandidates();
     switchSideTab('cand');
@@ -1479,14 +1486,22 @@
     document.querySelectorAll('.side-tabs .tab').forEach((t) => t.addEventListener('click', () => switchSideTab(t.dataset.stab)));
 
     // 拖拽 YAML 到页面
-    // 点击键盘布局之外的任何地方 → 清除选中的按键与预览
+    // 点击「布局之外」→ 清除选中态：按键与候选分别判断（点键清候选、点候选清按键、点空白全清）
     document.addEventListener('click', (ev) => {
       const t = ev.target;
-      if (t && t.closest && t.closest('.key')) return;
-      if (S.selectedKey === null) return;
-      S.selectedKey = null;
-      renderKeyboard();
-      renderKeyDetail(null);
+      const inKey = !!(t && t.closest && t.closest('.key'));
+      const inCand = !!(t && t.closest && t.closest('.candidate'));
+      const inBar = !!(t && t.closest && t.closest('#candidateBar'));
+      if (!inCand && !inBar && S.selectedCand >= 0) {
+        S.selectedCand = -1;
+        renderCandidates();
+        renderCandDetail(-1);
+      }
+      if (!inKey && S.selectedKey !== null) {
+        S.selectedKey = null;
+        renderKeyboard();
+        renderKeyDetail(null);
+      }
     }, true);
 
     document.addEventListener('dragover', (e) => { e.preventDefault(); });
