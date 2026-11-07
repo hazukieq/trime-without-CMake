@@ -1,0 +1,190 @@
+# 03 · 构建
+
+> 覆盖：**编 APK**（日常）与**编 native `.so`**（改包名/升级 librime 时）两条链路。
+> 基线 HEAD `7436b6d`。所有命令在仓库根 `trime-workspace/hkrime/` 下执行。
+
+## 目录
+
+1. [环境要求](#1-环境要求)
+2. [编 APK（最常用）](#2-编-apk最常用)
+3. [编 native `.so`](#3-编-native-so)
+4. [产物与校验](#4-产物与校验)
+5. [常见报错](#5-常见报错)
+6. [代码风格与格式化](#6-代码风格与格式化)
+
+---
+
+## 1. 环境要求
+
+### 1.1 版本矩阵（本机实测）
+
+| 组件 | 要求 | 本机值 | 说明 |
+|---|---|---|---|
+| JDK | **17** | `$HOME/opt/jdk17/jdk-17.0.9`（`openjdk 17.0.9 / JBR-17.0.9+7`） | **不要用系统默认的 JDK 21**：AGP 7.4.2 + Gradle 7.5 未适配 21 |
+| Gradle | 7.5 | wrapper 自动下载，`~/.gradle/wrapper/dists/gradle-7.5-bin` 已缓存 | `gradle/wrapper/gradle-wrapper.properties:3` |
+| AGP | 7.4.2 | `build.gradle:37` | |
+| Kotlin | 1.8.20 / 插件 1.7.20 | `build.gradle:10,53` | |
+| compileSdk | 33 | `app/build.gradle:5` | |
+| NDK | 24.0.8215888 | `/home/hazukie/Android/Sdk/ndk/24.0.8215888` | `app/build.gradle:6` **硬编码**，版本不存在会直接失败 |
+| CMake | 3.22.1 | `$ANDROID_HOME/cmake/3.22.1/bin/cmake` | native 构建用；Gradle 侧由 `externalNativeBuild` 不需要（本仓库不编 C++） |
+| Ninja | 1.10.2 | 随 SDK cmake 附带 | 同上 |
+| SDK | platform 33 | `/home/hazukie/Android/Sdk`（`local.properties` 的 `sdk.dir`） | |
+
+```bash
+export JAVA_HOME="$HOME/opt/jdk17/jdk-17.0.9"
+export PATH="$JAVA_HOME/bin:$PATH"
+java -version    # 期望：openjdk version "17.0.9"
+```
+
+> `local.properties` 不入库（`.gitignore:38`），新机器需自己写 `sdk.dir=/path/to/Android/Sdk`。
+
+### 1.2 两个容易被忽略的前置
+
+| 前置 | 为什么 |
+|---|---|
+| **git 可用且在仓库内** | `app/build.gradle:94-143` 的 `getBuildInfo/getCommitInfo/getGitBranch…` 都靠执行 `git …` 命令取 BUILD_INFO（打包时写进 `BuildConfig`）。纯拷贝目录（无 `.git`）构建可能取不到信息 |
+| **`release.properties` 存在** | `app/build.gradle:43-55` 无条件读取它填 signingConfig；缺失会让 `assembleRelease` 失败（debug 也读，但只在校验签名配置时用到） |
+
+## 2. 编 APK（最常用）
+
+```bash
+cd /home/hazukie/Projects/common/trime-workspace/hkrime
+export JAVA_HOME="$HOME/opt/jdk17/jdk-17.0.9"
+
+# 1) Debug（日常开发；已签名，可直接装）
+./gradlew :app:assembleDebug
+#    产物：app/build/outputs/apk/debug/trime-3.2.7-debug.apk
+#    实测：clean 后全量 BUILD SUCCESSFUL in 24s
+
+# 2) Release（正式包；注意 lint 绕过，见下）
+./gradlew :app:assembleRelease -x lintVitalAnalyzeRelease -x lintVitalRelease
+#    产物：app/build/outputs/apk/release/trime-3.2.7-release.apk
+
+# 3) 只做静态检查（跑 lint，不打包）
+./gradlew :app:lintDebug
+
+# 4) 清干净重来
+./gradlew clean
+```
+
+### 为什么 release 要 `-x lintVital…`
+
+本环境 `lintVitalAnalyzeRelease` 报错（与本项目代码无关的 lint 环境问题），
+`lintVitalRelease` 依赖它，故一并跳过，否则 `assembleRelease` 直接失败。
+副作用：**release 包未经过 lint 检查**，属于已知欠债（见 [06](06-troubleshooting-roadmap.md) §5）。
+
+### APK 名与路径（易错）
+
+| 名称 | 值 |
+|---|---|
+| Gradle 产物名 | **`trime-3.2.7-debug.apk`**（`archivesBaseName = "trime-$versionName"`，`app/build.gradle:14`） |
+| 完整路径 | `app/build/outputs/apk/debug/trime-3.2.7-debug.apk` |
+| 对外交付名 | `artifacts/hkrime-debug.apk`（人工改名后的拷贝） |
+
+> ⚠ 不是 `app-debug.apk`。文档与脚本里出现 `app-debug.apk` 的地方都是错的。
+
+### 为什么不再需要编 C++
+
+本仓库是 **without-CMake** fork：native 库以**预编译 `.so` 提交在 `app/libs/arm64-v8a/`**，
+`app/build.gradle:61-65` 用 `sourceSets.main.jniLibs.srcDirs = ['libs']` 直接打包。
+所以 `assembleDebug` **不触发** NDK 编译，NDK 只是 `ndkVersion` 声明（版本仍需存在，否则配置期校验失败）。
+
+## 3. 编 native `.so`
+
+只有三种情况需要：**改包名**、**升级/降级 librime**、**换了 patch 逻辑**。
+
+```bash
+# 默认流程（clone 上游 v3.2.7 → 校验 pin → patch → cmake+ninja → strip → 安装 → 校验）
+./script/build-jni-so.sh
+
+# 已 clone 过源码（离线、最快）：复用源码树
+./script/build-jni-so.sh --src-dir ../jni-build/trime-v3.2.7
+
+# 强制从头（清源码树与构建目录；实测冷构建 18–21s）
+./script/build-jni-so.sh --clean
+
+# 出 -O2 优化版（约 6 MB，默认不装入 app）
+./script/build-jni-so.sh --build-type Release --out-dir /tmp/opt
+```
+
+完整参数表、内部 7 步流程、`-UBOOST_EXCLUDE_LIBRARIES` 坑，见 [02-jni-so.md](02-jni-so.md) §5。
+构建完成后**必须**跑校验：
+
+```bash
+./script/verify-jni-symbols.sh
+# OK: JNI 符号契约一致（73 个声明全部导出，无旧包名残留）
+```
+
+> 关键约束：**.so 与 Java 包名必须同批**。改了 `applicationId`/`namespace` 而不重编 `.so`，
+> 运行期必 `UnsatisfiedLinkError`（旧库全部按 `com.osfans.trime` 编）。
+
+## 4. 产物与校验
+
+### 4.1 Debug APK 定稿值
+
+| 项 | 值 |
+|---|---|
+| 路径 | `artifacts/hkrime-debug.apk` |
+| 大小 | **11,418,991 B** |
+| sha256 | `8cc718eb0b90071e2bb514c71dc999baca4de2a48d3a54deb598865a09cce545` |
+| package | `com.hazukieq.hkrime` |
+| versionCode / versionName | `20220701` / `3.2.7` |
+| minSdk / targetSdk | 21 / 33 |
+| native-code | `arm64-v8a`（APK 内 `lib/arm64-v8a/` **只有 1 个** `librime_jni.so`，13,587,824 B） |
+
+### 4.2 校验命令
+
+```bash
+APK=artifacts/hkrime-debug.apk
+AAPT2=$ANDROID_HOME/build-tools/36.0.0/aapt2   # 本机只有 aapt2 可用，aapt 无输出
+
+unzip -l  "$APK" | grep 'lib/'            # 期望：只有 1 行 librime_jni.so
+unzip -p  "$APK" lib/arm64-v8a/librime_jni.so | sha256sum
+#   应与 app/libs/arm64-v8a/librime_jni.so 一致：d6b295b6…ca098ec
+
+$AAPT2 dump badging "$APK" | head -3
+#   package: name='com.hazukieq.hkrime' versionCode='20220701' versionName='3.2.7'
+
+# 签名（debug 用自动生成的 debug key；release 用 skeys.jks）
+$ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs "$APK"
+```
+
+### 4.3 安装与冒烟（**尚未执行**）
+
+```bash
+adb install -r artifacts/hkrime-debug.apk
+adb logcat -c && adb logcat | grep -iE 'UnsatisfiedLink|dlopen|AndroidRuntime'
+# 手动：设置→输入法→启用 hkrime → 选择 → 点输入框 → 打字 → 看候选
+```
+
+## 5. 常见报错
+
+| 报错 / 现象 | 原因 | 解法 |
+|---|---|---|
+| `Unsupported class file major version 65` / Kotlin 编译崩 | 用了 JDK 21 | `export JAVA_HOME=$HOME/opt/jdk17/jdk-17.0.9` |
+| `IllegalAccessError: class com.google.googlejavaformat.java... cannot access class com.sun.tools.javac...` | google-java-format 在 JDK 17 下需 `--add-exports` | `gradle.properties:7-12` 已含 5 个 `--add-exports jdk.compiler/...=ALL-UNNAMED`，确认没被覆盖删除 |
+| `NDK not configured. Download it with SDK manager.` / 找不到 24.0.8215888 | `ndkVersion` 硬编码，本机未装 | SDK Manager 装 NDK `24.0.8215888`，或改 `app/build.gradle:6`（不建议，会引入差异） |
+| `SDK location not found` | 缺 `local.properties` | 写 `sdk.dir=/home/hazukie/Android/Sdk` |
+| `assembleRelease` 在 `lintVitalAnalyzeRelease` 失败 | 环境 lint 问题 | 加 `-x lintVitalAnalyzeRelease -x lintVitalRelease` |
+| `Could not read store file` / `Keystore was tampered` | `release.properties` 缺失或路径错 | 现为相对路径 `storeFile=skeys.jks`（4 行，74 B），确认在仓库根运行 |
+| `make opencc-data` 失败（`No such file: app/src/main/jni/OpenCC`） | `jni/` 被 `.gitignore:14` 忽略，仓库内无此目录 | 不要用 Makefile 的 opencc 目标；OpenCC 词典已随 assets 提供（`assets/rime/opencc/`） |
+| `make debug` / `make release` 失败 | Makefile 是上游遗产，`spotlessCheck` + `opencc-data` 前置在当前环境不成立 | 直接用 `./gradlew`，见 §2 |
+| 装机后输入法「启用」列表里没有 hkrime | 包名变了 / 未重装 | 卸载旧包后重装；见 06 §2 |
+| 键盘能出、候选永远空 | 没有输入方案（不是构建问题） | 见 06 §4.1 |
+
+## 6. 代码风格与格式化
+
+`build.gradle:63-77` 用 **spotless 6.3.0**：
+
+| 目标 | 规则 |
+|---|---|
+| `app/src/main/java/com/hazukieq/hkrime/**/*.java` | google-java-format **1.15.0** |
+| `app/src/main/java/com/hazukieq/hkrime/**/*.kt` | ktlint **0.44.0** |
+
+```bash
+./gradlew spotlessCheck     # 检查（CI 语义）
+./gradlew spotlessApply     # 自动修复
+```
+
+> spotless 的 target 已随改名更新为 `com/hazukieq/hkrime/...`；
+> 若新增了包目录，记得同步改 `build.gradle:63-77`，否则新文件不被检查。
