@@ -33,7 +33,9 @@ android {
             minifyEnabled false
             debuggable false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-android.txt'
-            signingConfig signingConfigs.release
+            // 注意：signingConfig 在文件末尾按「是否找到 keystore」条件赋值，
+            // 不能无条件设置，否则没有密钥时会报
+            // `SigningConfig "release" is missing required property "storeFile"`。
         }
         debug{
             minifyEnabled false
@@ -62,6 +64,7 @@ android {
             android.signingConfigs.release.storePassword = signingProps.getProperty('storePassword') ?: System.getenv('HKREME_STORE_PASSWORD')
             android.signingConfigs.release.keyAlias = signingProps.getProperty('keyAlias') ?: System.getenv('HKREME_KEY_ALIAS') ?: 'hkrime'
             android.signingConfigs.release.keyPassword = signingProps.getProperty('keyPassword') ?: System.getenv('HKREME_KEY_PASSWORD')
+            android.buildTypes.release.signingConfig = android.signingConfigs.release
             logger.lifecycle("release 签名 keystore: ${ksFile}")
         } else {
             logger.warn("release 签名跳过：keystore 不存在 -> ${ksFile}")
@@ -128,7 +131,9 @@ static def getBuildTime() {
 static def getCommitInfo(){
     def text = ' git show --pretty=format:"%ci"'.execute().text.trim()
     text =  (text =~ /${"(\\n.*|\")"}/).replaceAll("").trim()
-    return ' git describe'.execute().text.trim() +  ", " + text
+    // 仓库没有 tag 时 `git describe` 会失败并输出空串（只剩 stderr），
+    // 用 --tags --always 回退到短 sha，保证 BUILD_INFO 里始终有提交号。
+    return ' git describe --tags --always'.execute().text.trim() +  ", " + text
 }
 
 static def getGitBranch(){
