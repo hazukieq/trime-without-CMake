@@ -151,7 +151,14 @@ flowchart TD
 | 版本号变化（`AppVersionUtils.isDifferentVersion`） | `copyFileOrDir("", true)` 覆盖复制，再 `Rime.get(context, false)` |
 | 目录存在且版本未变 | 只补拷 `trime.yaml`，`Rime.get(context, false)` |
 
-复制完成后还会做两件兜底：① 轮询等 `trime.yaml` 落盘（`while(!exists) sleep(100)`）；② 补建空 `default.custom.yaml`——**缺它会表现为「方案列表为空」**（`Config.java:178-212`）。
+复制完成后还会做两件兜底（`Config.java:178-212`）：
+
+1. 轮询等 `trime.yaml` 落盘（`while(!exists) sleep(100)`）；
+2. 若 `default.custom.yaml` 不存在则补建**空文件**——它是 RIME 的「补丁入口」，缺了会让 `default.yaml` 的默认 `schema_list`
+   （`bopomofo_tw`/`luna_pinyin*`）生效，而这些方案在本仓库并不存在，表现为「方案列表为空」。
+
+> 现状：`assets/rime/default.custom.yaml` 已随包提供（12 行，`patch:` + `menu/page_size` + `schema_list`
+> 指向 `hakka_jiugong`/`hakka_qwerty`/`ipa_yunlong`），所以补空文件的兜底通常不会触发；后两项仍缺 schema 文件，见 [07 §8](07-opencc-and-rime-data.md)。
 
 ## 6. 数据目录模型
 
@@ -159,7 +166,7 @@ RIME 需要两个目录（`Rime.init` 把它们传给 native，`Rime.java:329-33
 
 | 目录 | 默认值 | 用途 |
 |---|---|---|
-| shared_data_dir | `getExternalFilesDir(null)/rime` | 只读：方案 `*.schema.yaml`、词典 `*.dict.yaml`、`trime.yaml` 主题 |
+| shared_data_dir | `getExternalFilesDir(null)/rime` | 只读：方案 `*.schema.yaml`、词典 `*.dict.yaml`、`trime.yaml` 主题、`opencc/`（部署后含 `*.ocd2`） |
 | user_data_dir | 同上（默认与 shared 同路径） | 可写：用户词频 `*.userdb`、`*.custom.yaml`、`installation.yaml` |
 
 - 默认值来自 `AppPrefs.kt:346-353`：`EXTERNAL_PATH_PREFIX = appContext.getExternalFilesDir(null)!!.absolutePath`，
@@ -210,5 +217,5 @@ Application.onCreate  TrimeApplication.kt:29-49   安装崩溃捕获、Timber、
 | 加一种键盘布局/主题 | 数据目录里的 `trime.yaml`（主题）+ `*.yaml` 键盘定义，不需要改 Java |
 | 加一个液态键盘分页（如「客家话常用字」） | `ime/symbol/TabManager.java` + `TabTag.java` + 对应 Adapter |
 | 加一个外部命令（部署/同步） | `ime/broadcast/IntentReceiver.kt:50-63` 注册 action + 处理分支 |
-| 内置一套输入方案 | `assets/rime/` 放 `*.schema.yaml`/`*.dict.yaml` + `Config.prepareRime` 会自动复制（见 04） |
+| 内置一套输入方案 | `assets/rime/` 放 `*.schema.yaml`/`*.dict.yaml` + `Config.prepareRime` 会自动复制（见 [07](07-opencc-and-rime-data.md) §8、[04](04-hakka.md) §5） |
 | 换 native 库 | 跑 `script/build-jni-so.sh`（产出 `app/libs/arm64-v8a/librime_jni.so`）+ `script/verify-jni-symbols.sh` 校验（见 02） |

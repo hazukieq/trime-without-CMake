@@ -19,11 +19,14 @@
 | 项 | 状态 |
 |---|---|
 | 包名 / namespace | ✅ `com.hazukieq.hkrime`（103 文件 / 391 行改名） |
-| native 库 | ✅ `app/libs/arm64-v8a/librime_jni.so`，13,587,824 B，73 符号，与新包名匹配 |
-| 构建/校验脚本 | ✅ `script/build-jni-so.sh` + `script/verify-jni-symbols.sh` |
-| APK | ✅ 可产出并静态验证通过（debug 11.4 MB / release 9.6 MB） |
-| 真机冒烟 | ⬜ **尚未执行**（装、启用、打字、上屏、部署均未实测） |
-| 客家话方案 | ❌ **尚未内置**（无方案/词典/资源，`assets/rime/` 只有 2 个主题 yaml） |
+| native 库 | ✅ `app/libs/arm64-v8a/librime_jni.so`，13,587,744 B，73 符号，新包名，**16 KB 页对齐** |
+| 输入方案 | ✅ 内置客家话「客语12键」（`hakka_jiugong`）+ 9 张词典 |
+| OpenCC 简繁 | ✅ 29 个词典/配置，部署时生成 15 个 `.ocd2`（实测 s2t/t2s/s2tw/s2twp） |
+| 构建/校验脚本 | ✅ `build-jni-so.sh` + `verify-jni-symbols.sh` + `gen-keystore.sh` |
+| 签名 | ✅ 密钥已移出仓库（`~/.android-keys/` 或 `HKREME_*` 环境变量） |
+| APK | ✅ debug 17,233,842 B / release 11,004,041 B（新 key 签名，zipalign16 通过） |
+| 真机 | ✅ **数据链路仪器测试通过**（`OK (1 test)`）；⬜ 键盘界面人工冒烟未做 |
+| 已知缺口 | ⚠ 缺 `luna_pinyin`（反查用）、`hakka_qwerty`/`ipa_yunlong` 方案文件、`ywz.json`/`lenth.json`；详见 [`docs/04-hakka.md`](docs/04-hakka.md) §6 |
 
 ### 快速开始
 
@@ -37,18 +40,34 @@ echo "sdk.dir=$HOME/Android/Sdk" > local.properties
 #    产物：app/build/outputs/apk/debug/trime-3.2.7-debug.apk   ← 不是 app-debug.apk
 # 4) 装机
 adb install -r app/build/outputs/apk/debug/trime-3.2.7-debug.apk
-# 5) 正式包（本机 lint 需绕过，详见 docs/03-build.md）
+# 5) 授权「所有文件访问」（Android 11+ 必需，否则部署失败甚至卡死；重装后会重置）
+adb shell appops set com.hazukieq.hkrime MANAGE_EXTERNAL_STORAGE allow
+# 6) 正式包（本机 lint 需绕过，详见 docs/03-build.md）
 ./gradlew :app:assembleRelease -x lintVitalAnalyzeRelease -x lintVitalRelease
 ```
 
 首次启动会走「存储权限 → 启用输入法 → 选择输入法」引导。
-**仓库不含输入方案，能出键盘但候选为空属预期**，需自备 RIME 方案放进数据目录
-（`/sdcard/Android/data/com.hazukieq.hkrime/files/rime/`），做法见 [`docs/04-hakka.md`](docs/04-hakka.md) §6。
+数据目录：`/sdcard/Android/data/com.hazukieq.hkrime/files/rime/`（方案/词典/主题/`opencc/`）。
+**改数据后**：`adb shell am broadcast -a com.hazukieq.hkrime.deploy` 重新部署，或 `adb shell pm clear com.hazukieq.hkrime` 强制重来。
+
+真机仪器测试（验证部署 + OpenCC + 词典编译）：
+
+```bash
+JAVA_HOME=$HOME/opt/jdk17/jdk-17.0.9 ./gradlew assembleDebug assembleDebugAndroidTest
+adb install -r app/build/outputs/apk/debug/trime-3.2.7-debug.apk
+adb install -r -t app/build/outputs/apk/androidTest/debug/trime-3.2.7-debug-androidTest.apk
+adb shell appops set com.hazukieq.hkrime MANAGE_EXTERNAL_STORAGE allow
+timeout 300 adb shell am instrument -w -r \
+  -e class com.hazukieq.hkrime.RimeDataTest \
+  com.hazukieq.hkrime.test/androidx.test.runner.AndroidJUnitRunner   # 期望 OK (1 test)
+```
+
+> 必须套 `timeout`：权限被拒时 `Config.setTheme` ↔ `init` 会无限递归，把调用方挂死（`docs/06` §4.2）。
 
 修改 native / 改包名后必须重建并校验 `.so`（Java 包名写死在二进制里，不能只改代码）：
 
 ```bash
-./script/build-jni-so.sh          # 克隆上游 v3.2.7 → 校验子模块 pin → patch 包名 → cmake+ninja → strip
+./script/build-jni-so.sh          # 克隆上游 v3.2.7 → 校验子模块 pin → patch 包名 → cmake+ninja → strip → 16KB 对齐
 ./script/verify-jni-symbols.sh    # 期望：OK: JNI 符号契约一致（73 个声明全部导出，无旧包名残留）
 ```
 
@@ -57,8 +76,11 @@ adb install -r app/build/outputs/apk/debug/trime-3.2.7-debug.apk
 | 目的 | 命令 |
 |---|---|
 | 编译 Debug / Release | `./gradlew :app:assembleDebug` / `./gradlew :app:assembleRelease -x lintVitalAnalyzeRelease -x lintVitalRelease` |
+| 编译仪器测试 APK | `./gradlew :app:assembleDebugAndroidTest` |
 | 重建 native 库 | `./script/build-jni-so.sh`（`--clean` 强制冷构建，约 20 s） |
 | 校验 `.so` 与 Java 契约 | `./script/verify-jni-symbols.sh` |
+| 生成发布密钥 | `./script/gen-keystore.sh`（写入 `~/.android-keys/`，不覆盖已有） |
+| 校验 16 KB 对齐 | `$ANDROID_HOME/build-tools/36.0.0/zipalign -c -P 16 4 <apk>` |
 | 格式检查 / 自动修 | `./gradlew spotlessCheck` / `./gradlew spotlessApply` |
 | 触发部署 / 同步 | `adb shell am broadcast -a com.hazukieq.hkrime.deploy`（同步用 `.sync`） |
 | 清 App 数据（强制重新部署 assets） | `adb shell pm clear com.hazukieq.hkrime` |
@@ -71,18 +93,21 @@ adb install -r app/build/outputs/apk/debug/trime-3.2.7-debug.apk
 |---|---|
 | [docs/00-overview.md](docs/00-overview.md) | 定位、当前状态、谱系、仓库地图、关键事实速查 |
 | [docs/01-architecture.md](docs/01-architecture.md) | 分层与包职责、按键链路、启动/部署时序、数据目录、线程模型 |
-| [docs/02-jni-so.md](docs/02-jni-so.md) | **`.so` 定稿事实 / 历史崩溃根因 / 怎么重建 / 怎么验证** |
-| [docs/03-build.md](docs/03-build.md) | 环境版本、编 APK 与编 `.so`、产物校验、常见报错 |
-| [docs/04-hakka.md](docs/04-hakka.md) | 5 个 hakka 提交拆解、客家话现状与接入指南 |
-| [docs/05-branches-release.md](docs/05-branches-release.md) | 分支模型、改名影响面 10 层、发布流程、签名安全 |
+| [docs/02-jni-so.md](docs/02-jni-so.md) | **`.so` 定稿事实 / 历史崩溃根因 / 重建 / 验证 / 16 KB 对齐** |
+| [docs/03-build.md](docs/03-build.md) | 环境版本、编 APK 与编 `.so`、**签名配置**、**仪器测试**、常见报错 |
+| [docs/04-hakka.md](docs/04-hakka.md) | 提交史、**客家话数据清单**、缺口与下一步 |
+| [docs/05-branches-release.md](docs/05-branches-release.md) | 分支模型、改名影响面 10 层、发布流程、**签名与密钥安全** |
 | [docs/06-troubleshooting-roadmap.md](docs/06-troubleshooting-roadmap.md) | 四层排障、症状表、诊断命令、技术债与路线图 |
-| [docs/reports/](docs/reports/README.md) | 构建 / 改名 / 集成三份原始报告（证据存档） |
+| [docs/07-opencc-and-rime-data.md](docs/07-opencc-and-rime-data.md) | OpenCC 三种文件关系、部署管线、客家话数据、**扩充指引** |
+| [docs/reports/](docs/reports/README.md) | 构建 / 改名 / 集成 / 真机测试报告（证据存档） |
 
 ### 安全提示
 
-仓库内 `skeys.jks` 与 `release.properties`（含明文口令）**已被提交进 Git**，
-应视为密钥已泄露；正式发布前请生成新 keystore 并改用环境变量 / CI secret 注入，
-详见 [`docs/05-branches-release.md`](docs/05-branches-release.md) §6。
+签名密钥**已从仓库移出**（历史提交中的 `skeys.jks` / `release.properties` 仍是明文，
+旧密钥应视为已泄露；彻底清除需改写 Git 历史，见 [`docs/05-branches-release.md`](docs/05-branches-release.md) §6）。
+当前签名走三级查找：① 仓库根 `release.properties`（已 gitignore）② `~/.android-keys/hkrime-release.properties`
+③ 环境变量 `HKREME_STORE_FILE/HKREME_STORE_PASSWORD/HKREME_KEY_ALIAS/HKREME_KEY_PASSWORD`；
+都没有时 release **不签名**。换签名后旧版本无法覆盖升级，发布前请确认。
 
 ---
 

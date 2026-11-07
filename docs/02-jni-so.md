@@ -1,6 +1,6 @@
 # 02 · JNI 与 `librime_jni.so`（定稿）
 
-> **本篇状态：定稿（v2，2026-11-08）**。`.so` 已重建、`loadLibrary` 已统一、符号契约 73/73 通过。
+> **本篇状态：定稿（v3，2026-11-08 第二轮）**。`.so` 已重建（新包名 + 16 KB 对齐）、`loadLibrary` 已统一、符号契约 73/73 通过、真机仪器测试通过。
 > 历史故障（85 MB 废库）保留在本篇 §2 作为「为什么会崩」的记录与排障依据。
 
 ## 目录
@@ -11,8 +11,9 @@
 4. [为什么改包名必须重编 `.so`](#4-为什么改包名必须重编-so)
 5. [怎么重建（脚本化）](#5-怎么重建脚本化)
 6. [怎么验证](#6-怎么验证)
-7. [优化版 `.so`（备选，未采用）](#7-优化版-so备选未采用)
-8. [附录：72 个 native 方法清单](#8-附录72-个-native-方法清单)
+7. [16 KB page 对齐（Android 15/16 必需）](#7-16-kb-page-对齐android-1516-必需)
+8. [优化版 `.so`（备选，未采用）](#8-优化版-so备选未采用)
+9. [附录：72 个 native 方法清单](#9-附录72-个-native-方法清单)
 
 ---
 
@@ -22,14 +23,16 @@
 
 | 项 | 实测值 |
 |---|---|
-| 大小 | **13,587,824 B**（13.59 MB，比旧 13.5 MB 库 +0.22%） |
-| sha256 | **`d6b295b6f795cc14ba888c8d9e9b1a69a48ee20d9f772555e89e3db65ca098ec`** |
-| BuildID | `707f3101bdb3d87edf387ded0be2ffb43c50c67d` |
+| 大小 | **13,587,744 B**（13.59 MB） |
+| sha256 | **`fd4372553592830cc8af03a7cae10009eb1882f2eada957086513a7fbc60f03f`** |
 | 格式 | `ELF 64-bit LSB shared object, ARM aarch64, version 1 (SYSV), dynamically linked, stripped` |
+| 页对齐 | **4 个 LOAD 段全部 `Align=0x4000`（16 KB）**，见 §7 |
 | 构建类型 | **Debug（`-O0`）**，刻意与旧 13.5 MB 库同构（默认即此；`--build-type Release` 可出 `-O2` 版） |
+| 构建标识 | 无 GNU build-id（strip 后未保留）；`.note.android.ident` 记录 NDK `r24` / `8215888` |
 | 导出符号 | **73 个** `Java_com_hazukieq_hkrime_*`，旧前缀 `Java_com_osfans_trime_` **0 个** |
 | 内嵌版本串 | `1.7.3-74-g43023e16-arm64-v8a`（librime）、`v3.2.7-20261108`（trime）、`ver.1.1.4`（OpenCC） |
 | 内嵌包名 | `com.hazukieq.hkrime`（`traits.app_name`），`com/osfans/trime` **0 处**，`com/hazukieq/hkrime` 10 处 |
+| 调试串 | Debug 构建保留 `__FILE__` 断言串，`strings` 可见构建机路径 `/home/hazukie/Projects/common/trime-workspace/jni-build/trime-v3.2.7/...`——**功能无影响**，仅说明它由 Debug 构建产出 |
 | NEEDED | `liblog.so` `libz.so` `libm.so` `libdl.so` `libc.so` —— **无 `libc++_shared.so`**（`c++_static` 自包含，无需额外打包） |
 | SONAME | `librime_jni.so`（与 `System.loadLibrary("rime_jni")` 的文件名解析一致） |
 
@@ -54,15 +57,15 @@ OK: JNI 符号契约一致（73 个声明全部导出，无旧包名残留）
 
 > 73 = `Rime.java` 的 72 个 `native` + `OpenCCDictManager.kt:15` 的 1 个 `external fun openccDictConv`。
 
-### 历史遗留（不参与构建，建议清理）
+### 历史遗留（已清理）
 
-| 路径 | 内容 | 说明 |
+| 路径 | 状态 | 说明 |
 |---|---|---|
-| `libs_backup/arm64-v8a/librime_jni.so` | 13,558,064 B，sha256 `1b5f1eac…563a` | 旧的**正确但过时**库（`com.osfans.trime` 包名，10 处旧包名）。**不在 `jniLibs.srcDirs` 里，不参与打包、不可加载**；仅作历史备份 |
-| `artifacts/librime_jni-release-opt.so`（仓库外） | 6,065,152 B，sha256 `48d0494d…4355` | `-O2` 优化版备选，**未装入 app**，见 §7 |
+| `libs_backup/arm64-v8a/librime_jni.so` | **已删除**（`2b50c1f`，13,558,064 B → 0） | 旧的**正确但过时**库（`com.osfans.trime` 包名）。删除前是仓库里唯一的「旧包名可用库」；如仍需，可从 git 历史 `92c7aa5`/`c96f92b` 检出 |
+| `app/libs/arm64-v8a/librime_jni_1_5.so` | **已删除**（`922a2ba`） | 13,558,064 B 旧库，与 `libs_backup` 备份同文件 |
+| `artifacts/librime_jni-release-opt.so`（仓库外） | 保留 | 6,065,152 B，sha256 `6b6173d1…f920`，`-O2` 优化版备选，**未装入 app**，见 §8 |
 
-`libs_backup/` 已无保留价值（新库已验证 + 可脚本复现），建议后续 `trash` 之并在 README 注明。
-若保留，务必在文档/README 里写清「**这是旧包名的库，不能用**」，避免再次被误装。
+清理结论：`app/libs/arm64-v8a/` 下只剩 1 个 `.so`，不再存在「装错库」的选项。
 
 ## 2. 历史：为什么曾经会崩
 
@@ -227,8 +230,9 @@ cd /home/hazukie/Projects/common/trime-workspace/hkrime
 |---|---|
 | 冷构建（configure + 357 步编译/链接） | **18–21 s**（20 核 `-j20`；`-j16` 时 19–21 s） |
 | 增量复跑 | ≈ 1.4 s |
-| 幂等性 | 冷构建 3 次，sha256 全部一致 |
-| 完整日志 | `artifacts/build-jni.log`（109,816 B，含环境探测→pin 校验→patch→configure→357 步→strip→校验→汇总） |
+| 幂等性 | 冷构建 3 次，sha256 全部一致（`fd437255…`） |
+| 16 KB 对齐 | 脚本固定注入 `-DCMAKE_SHARED_LINKER_FLAGS="-Wl,-z,max-page-size=16384"`（`:348` 注释、`:366` 实参） |
+| 完整体积 | `.so` 13,587,744 B；构建日志 `app/libs/arm64-v8a/build-jni.log`（239,849 B，含环境探测→pin 校验→patch→configure→357 步→strip→校验→汇总） |
 
 ### 两个已知坑（脚本已规避，手工复现时会踩）
 
@@ -268,14 +272,19 @@ cd /home/hazukie/Projects/common/trime-workspace/hkrime
 SO=app/libs/arm64-v8a/librime_jni.so
 
 file $SO                        # stripped
-stat -c%s $SO                   # 13587824
-sha256sum $SO                   # d6b295b6…ca098ec
+stat -c%s $SO                   # 13587744
+sha256sum $SO                   # fd437255…f03f
 
 nm -D --defined-only $SO | grep -c ' Java_com_hazukieq_hkrime_'   # 73
 nm -D --defined-only $SO | grep -c ' Java_com_osfans_trime_'      # 0
 
 readelf -d $SO | grep -E 'NEEDED|SONAME'   # 无 libc++_shared.so；SONAME=librime_jni.so
-readelf -n $SO | grep 'Build ID'           # 707f3101…
+readelf -n $SO                             # 只有 .note.android.ident（无 GNU build-id）
+
+# 16 KB 页对齐：4 个 LOAD 段应为 0x4000
+$HOME/Android/Sdk/ndk/24.0.8215888/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf -l $SO \
+  | awk '/LOAD/{print $NF}'                # 0x4000 ×4
+
 strings $SO | grep -E '1\.7\.3-74|v3\.2\.7-2026|ver\.1\.1\.4|com\.hazukieq\.hkrime'
 ```
 
@@ -283,35 +292,74 @@ strings $SO | grep -E '1\.7\.3-74|v3\.2\.7-2026|ver\.1\.1\.4|com\.hazukieq\.hkri
 
 ```bash
 APK=../artifacts/hkrime-debug.apk
-unzip -l $APK | grep 'lib/'                 # 只应有 1 个 lib/arm64-v8a/librime_jni.so
+unzip -l $APK | grep 'lib/'                 # 只应有 1 个 lib/arm64-v8a/librime_jni.so（13,587,744）
 unzip -p $APK lib/arm64-v8a/librime_jni.so | sha256sum
-#   应与 app/libs/arm64-v8a/librime_jni.so 一致：d6b295b6…ca098ec
+#   应与 app/libs/arm64-v8a/librime_jni.so 一致：fd437255…f03f
+
+# APK 级 16 KB 对齐（zipalign 校验的是未压缩条目的对齐）
+$ANDROID_HOME/build-tools/36.0.0/zipalign -c -P 16 4 $APK   # 退出码 0 = 通过
+#   注意：`-P 16` 需要 build-tools 35+；34.0.0 的 zipalign 不认这个参数
+
 $ANDROID_HOME/build-tools/36.0.0/aapt2 dump badging $APK | head -3
-#   package: name='com.hazukieq.hkrime' versionCode='20220701' versionName='3.2.7'
+#   package: name='com.hazukieq.hkrime' versionCode='20220701' versionName='3.2.7' minSdk 21 targetSdk 33
 ```
 
-### 6.4 真机验证（**尚未执行，最高优先级待办**）
+### 6.4 真机验证（**已通过：仪器测试**）
+
+`.so` 的真机证据不是「能打字」，而是**仪器测试里 `Rime.get(ctx,true)` 成功完成部署并跑通 4 组 OpenCC 转换**——任何符号/包名不匹配都会在那一步抛 `UnsatisfiedLinkError`。
 
 ```bash
-adb install -r ../artifacts/hkrime-debug.apk
-adb logcat -c && adb logcat | grep -iE 'UnsatisfiedLink|dlopen|AndroidRuntime|rime'
-# 手动：启用输入法 → 选择输入法 → 点输入框 → 打字 → 看候选
+timeout 300 adb shell am instrument -w -r \
+  -e class com.hazukieq.hkrime.RimeDataTest \
+  com.hazukieq.hkrime.test/androidx.test.runner.AndroidJUnitRunner
+# 期望：OK (1 test)
 ```
+
+完整步骤见 [03-build.md](03-build.md) §5、报告 [reports/DEVICE-TEST-REPORT.md](reports/DEVICE-TEST-REPORT.md)。
 
 | 现象 | 判定 |
 |---|---|
-| 无 `UnsatisfiedLinkError`、能出候选并上屏 | 通过 |
-| `No implementation found for ... Rime.setup` | `.so` 与 Java 包名仍不匹配（装错库/没重编） |
-| `dlopen failed: library "libc++_shared.so" not found` | 用了 shared STL 且没打包（当前库不会，已静态链接） |
+| `OK (1 test)` | 通过（部署 + ocd2 生成 + 转换 + 方案列表全部正常） |
+| `No implementation found for ... Rime.setup` | `.so` 与 Java 包名不匹配（装错库/没重编） |
+| `UnsatisfiedLinkError: dlopen failed` | 库缺失或 ABI 不符；`libc++_shared.so not found` 表示用了 shared STL（当前库静态链接，不会出现） |
 | 键盘出但候选为空 | 不是 JNI 问题 → 无输入方案，见 06 §4.1 |
+| 系统弹「不符合 16 KB 对齐要求」 | 用了未加 `max-page-size=16384` 的旧库，见 §7 |
 
-## 7. 优化版 `.so`（备选，未采用）
+## 7. 16 KB page 对齐（Android 15/16 必需）
+
+**背景**：Android 15 起系统支持 16 KB 内存页；Android 16 的部分设备（本轮测试机 Xiaomi M2012K11AC / Android 16 就是）在安装/启动时校验 ELF 的 LOAD 段对齐。4 KB 对齐的 `.so` 会被判不合规，弹系统对话框：
+
+> 此应用不符合 16 KB 对齐要求。ELF 文件对齐检查失败。以下库未进行 16 KB 对齐：`lib/arm64-v8a/librime_jni.so: LOAD 区段未对齐`
+
+**修法**：链接时指定最大页大小。
+
+```bash
+# script/build-jni-so.sh 里已固定带上（:348 注释、:366 实参）
+-DCMAKE_SHARED_LINKER_FLAGS="-Wl,-z,max-page-size=16384"
+```
+
+**验证两层**：
+
+```bash
+SO=app/libs/arm64-v8a/librime_jni.so
+llvm-readelf -l $SO | awk '/LOAD/{print $NF}'          # 期望 0x4000 0x4000 0x4000 0x4000
+
+APK=../artifacts/hkrime-debug.apk
+$ANDROID_HOME/build-tools/36.0.0/zipalign -c -P 16 4 $APK   # 退出码 0
+```
+
+本轮重建后：`librime_jni.so` 13,587,744 B（比 4 KB 版少 80 B）、4 个 LOAD 全 `0x4000`；debug/release 两个 APK 的 `zipalign -c -P 16 4` 均通过；真机 16 KB 弹窗消失。
+
+> debug 包在 Android 16 上还可能弹「Android 应用兼容性…（可调试应用）」提示——那是可调试包的常规提醒；本轮的 16 KB 警告在修复对齐后消失，两者别混为一谈。
+
+## 8. 优化版 `.so`（备选，未采用）
 
 | 项 | 主产物（采用） | 优化版（未采用） |
 |---|---|---|
 | 路径 | `app/libs/arm64-v8a/librime_jni.so` | `artifacts/librime_jni-release-opt.so`（仓库外） |
-| 大小 | 13,587,824 B | **6,065,152 B**（-55%） |
-| sha256 | `d6b295b6…ca098ec` | `48d0494d15ceca24c7d1a0c094c03a903b2a925391743889a036b540b2684355` |
+| 大小 | 13,587,744 B | **6,065,152 B**（-55%） |
+| sha256 | `fd437255…f03f` | `6b6173d10039262a57205efb321d195d72c1e71b568ec8ba0320beaf4696f920` |
+| 16 KB 对齐 | 0x4000 ×4 | 0x4000 ×4（本轮同批重建） |
 | 构建类型 | Debug（`-O0`） | Release（`-O2`） |
 | 复现 | `./script/build-jni-so.sh` | `./script/build-jni-so.sh --build-type Release` |
 
@@ -320,7 +368,7 @@ adb logcat -c && adb logcat | grep -iE 'UnsatisfiedLink|dlopen|AndroidRuntime|ri
 
 `TODO:` 若后续要减包体，先做 A/B：同设备同方案下对比启动/按键延迟与稳定性，再决定是否切到 `--build-type Release`。
 
-## 8. 附录：72 个 native 方法清单
+## 9. 附录：72 个 native 方法清单
 
 按功能分组（`core/Rime.java` 的 `native` 声明，与 `.so` 导出一一对应；另加 1 个 Kotlin OpenCC 方法 = 73）：
 

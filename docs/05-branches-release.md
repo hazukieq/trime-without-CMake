@@ -1,7 +1,7 @@
 # 05 · 分支模型与发布
 
-> 覆盖：分支职责、**为什么改名与换 `.so` 必须同批**、改名影响面全清单、发布流程、签名与密钥安全、旧数据迁移。
-> 基线提交 `68f876f`（分支 `dev`）；当前 HEAD 以 `git log -1` 为准。
+> 覆盖：分支职责、**为什么改名与换 `.so` 必须同批**、改名影响面全清单、发布流程、版本号、签名与密钥安全、旧数据迁移、回滚。
+> 基线提交 `bebad9f`（分支 `dev`）；当前 HEAD 以 `git log -1` 为准。
 
 ## 目录
 
@@ -23,44 +23,38 @@
 | 分支 | 角色 | 内容 | 谁可以推 |
 |---|---|---|---|
 | **`main`** | **稳定主线** | 原 `develop` 的内容**原样不动**（= `tumuyan/trime-without-CMake` 的 without-CMake 主线，`com.tumuyan.trime` + 旧 `.so`） | 仅同步上游/修 CI 类改动 |
-| **`dev`** | **hkrime 开发线** | 原 `hakka` 的全部成果：改名 `com.hazukieq.hkrime` + 重编 `.so` + 脚本 + 文档 | 日常开发 |
+| **`dev`** | **hkrime 开发线** | 原 `hakka` 的全部成果：改名 `com.hazukieq.hkrime` + 重编 `.so` + 脚本 + 数据 + 文档 | 日常开发 |
 | `feature/*` / `fix/*` | 短分支 | 从 `dev` 切出，PR 回 `dev` | — |
 
 ```text
 main   ──●──●──●  (without-CMake 稳定主线，com.tumuyan.trime)
          ╲
-dev       ●──●──●  (hkrime：com.hazukieq.hkrime + 新 .so)
+dev       ●──●──●  (hkrime：com.hazukieq.hkrime + 新 .so + 客家话数据)
 ```
 
-> **现状（2026-11-08 已执行）**：远端只剩 `main`（=`14d365e`，默认分支）与 `dev`（迁移时 tip `68f876f`，其后新增 `b1d9b57` 文档提交）；
+> **现状（2026-11-08 已执行）**：远端为 `main`（=`14d365e`，默认分支）与 `dev`（迁移时 tip `68f876f`，其后新增 `b1d9b57`、`feb4310`、`2b50c1f`、`9dc8c32`、`bebad9f`）；
 > 旧 `develop`/`hakka` 已删除。迁移前快照：`develop=14d365ec`、`hakka=0c1e58ac`。
 > 回滚：`git push origin 14d365ec:refs/heads/develop 0c1e58ac:refs/heads/hakka`，并把默认分支改回 `develop`。
 
-### 迁移命令（2026-11-08 已执行；以下为可复现步骤）
+### 迁移步骤（已执行；保留供复现）
+
+GitHub 没有「分支改名」API，实际用「建新 ref → 改默认分支 → 删旧 ref」：
 
 ```bash
-# 1) 本地改名
-git branch -m develop main
-git branch -m hakka dev
-
-# 2) 推新分支并设跟踪
-git push -u origin main
-git push -u origin dev
-
-# 3) GitHub 上把默认分支切到 main（Settings → Branches）
-# 4) 确认无误后删除旧远端分支
-git push origin --delete develop hakka
-```
-
-实际执行记录（GitHub 没有「分支改名」API，实际用「建新 ref → 改默认分支 → 删旧 ref」）：
-
-```bash
-# 用本地分支/sha 直接建远端分支
+# 1) 用本地分支/sha 直接建远端分支
 git push -u origin hakka:dev
 git push origin origin/develop:refs/heads/main
-git push origin --delete develop hakka            # 或 gh api -X DELETE .../git/refs/heads/develop
+
+# 2) 改默认分支
 gh api -X PATCH repos/hazukieq/trime-without-CMake -f default_branch=main
-# 本地：git branch -m hakka dev; git branch --track main origin/main; git fetch --prune
+
+# 3) 确认后删旧分支
+git push origin --delete develop hakka
+
+# 4) 本地改名与跟踪
+git branch -m hakka dev
+git branch --track main origin/main
+git fetch --prune
 ```
 
 注意事项：
@@ -78,8 +72,11 @@ gh api -X PATCH repos/hazukieq/trime-without-CMake -f default_branch=main
 ① dev 分支上：applicationId == namespace == com.hazukieq.hkrime
 ② dev 分支上：app/libs/arm64-v8a/ 只有 librime_jni.so，且 73 符号前缀为 com_hazukieq_hkrime
 ③ dev 分支上：仓库内 "rime_jni_1_5" 出现次数 == 0
-④ main 分支上：上述三条**都应是旧值**（com.tumuyan.trime / com_osfans_trime）
+④ dev 分支上：libs_backup/ 不存在；仓库根无 skeys.jks / release.properties
+⑤ main 分支上：上述①-④都应是旧值（com.tumuyan.trime / com_osfans_trime / 旧库 / 旧路径）
 ```
+
+---
 
 ## 2. 改名与换 .so 为什么必须同批
 
@@ -101,14 +98,23 @@ gh api -X PATCH repos/hazukieq/trime-without-CMake -f default_branch=main
 它内嵌 10 处旧包名、73 个符号带 `com_osfans_trime` 前缀。所以「用旧库 + 新包名」= 必崩，
 不存在「先改名、库以后再换」的中间可用态。
 
+本轮**同批**完成的两件事，可以对照 `git log` 看：
+
+```text
+922a2ba  refactor: rename package to com.hazukieq.hkrime
+7436b6d  build(jni): rebuild librime_jni.so for com.hazukieq.hkrime
+```
+
 ### 发布纪律
 
 | 规则 | 检查手段 |
 |---|---|
-| 改名与换库在**同一提交/同一 release** | `git log` 中 `922a2ba`（改名）与 `7436b6d`（重编）相邻 |
+| 改名与换库在**同一提交/同一 release** | `git log` 中 `922a2ba` 与 `7436b6d` 相邻 |
 | release 前必跑符号契约 | `./script/verify-jni-symbols.sh` → `OK` |
-| release 前必查 APK 内库哈希 | `unzip -p … \\| sha256sum` 与 `app/libs/…` 一致 |
+| release 前必查 APK 内库哈希 | `unzip -p … \| sha256sum` 与 `app/libs/…` 一致（`fd437255…`） |
 | 禁止单独 cherry-pick「改名」到 main | main 保持旧包名 |
+
+---
 
 ## 3. 改名影响面清单（10 层）
 
@@ -122,9 +128,9 @@ gh api -X PATCH repos/hazukieq/trime-without-CMake -f default_branch=main
 | 4 | IME 子类型配置 | `res/xml/method.xml:24 android:settingsActivity` | ✅ **最易漏**，漏了则点输入法设置崩 |
 | 5 | 广播 action | `IntentReceiver.kt:63-64` → `com.hazukieq.hkrime.deploy` / `.sync` | ✅ **外部脚本（Tasker/adb）需同步改** |
 | 6 | native `.so` | 73 个 `Java_com_*` 符号 + `jni-utils.h` 的 `FindClass` 7 处 + `traits.app_name` | ✅ 已重编（见 02） |
-| 7 | 存储目录 | `getExternalFilesDir(null)/rime` 随 `applicationId` 变化 | ⚠ 旧数据不继承，见 §7 |
-| 8 | IME id | `ComponentName(appContext, TrimeImeService::class.java).flattenToShortString()` 随包名变 | ⚠ 系统里存的是旧 id → **必须重新启用输入法** |
-| 9 | 主题内引用 | `assets/rime/trime.yaml`、`tongwenfeng.trime.yaml`（改名时曾被误改成 hkrime 链接，已还原） | ⚠ 只应改「应用自身」标识，**不要改作者/商店 URL** |
+| 7 | RIME 数据里的引用 | `assets/rime/*.trime.yaml` 的 `run`/`broadcast` 目标（`trime.yaml:940-941`、`:953-954`；另两个主题同理） | ✅ assets 内旧包名 0 处 |
+| 8 | 存储目录 | `getExternalFilesDir(null)/rime` 随 `applicationId` 变化 | ⚠ 旧数据不继承，见 §7 |
+| 9 | IME id | `ComponentName(appContext, TrimeImeService::class.java).flattenToShortString()` 随包名变 | ⚠ 系统里存的是旧 id → **必须重新启用输入法** |
 | 10 | 遗留上游链接 | `res/xml/about_preference.xml:116`（Play 商店）、`:121`（Coolapk）仍指 `com.osfans.trime` | ⚠ **故意保留**：点「评价」会打开上游 app；如要改需换成 hkrime 自己的商店页（暂无）→ 已知残留 |
 
 ### 改名的三条禁忌（来自这次实战）
@@ -132,8 +138,12 @@ gh api -X PATCH repos/hazukieq/trime-without-CMake -f default_branch=main
 | 禁忌 | 事故 | 正确做法 |
 |---|---|---|
 | 全局 `sed` 不设边界 | `github.com/osfans/trime` 被改成不存在的 `github.com/hazukieq/hkrime`；商店链接同理 | 先 `grep -n` 看命中，分三批 sed：`com\.osfans\.trime`（包名）、`com/osfans/trime`（JNI 路径）、`com.tumuyan.trime`（applicationId）；**改完 `git diff` 逐条复读** |
-| 只改 Java 不改 XML | `method.xml` 的 `settingsActivity` 漏 → 设置入口崩溃 | 用 `grep -rn 'com\.osfans' app/src/main` 兜底到 0（除有意保留的商店 URL） |
+| 只改 Java 不改 XML / yaml | `method.xml` 的 `settingsActivity`、主题里的 `run`/`broadcast` 包名漏改 → 设置入口崩 / 部署按钮失效 | 用 `grep -rn 'com\.osfans' app/src/main` 兜底到 0（除有意保留的商店 URL） |
 | 只改代码不改 `.so` | 见 §2 | 同批重编 + 契约校验 |
+
+> 关于 `traits.app_name`：它不影响 JNI 符号，但会影响 librime 的日志/应用标识。改名时必须与包名一致（否则日志里仍叫旧名）。见 02 §4。
+
+---
 
 ## 4. 发布流程
 
@@ -143,34 +153,41 @@ export JAVA_HOME="$HOME/opt/jdk17/jdk-17.0.9"
 # 0) 前置：符号契约（改过 native 代码/换库时必做）
 ./script/verify-jni-symbols.sh
 
-# 1) Debug 包（内部验证）
+# 1) Debug 包（内部验证 + 仪器测试用）
 ./gradlew :app:assembleDebug
 #    → app/build/outputs/apk/debug/trime-3.2.7-debug.apk
 
-# 2) Release 包（对外；lint 绕过见 03 §2）
+# 2) Release 包（对外；lint 绕过见 03 §3）
 ./gradlew :app:assembleRelease -x lintVitalAnalyzeRelease -x lintVitalRelease
 #    → app/build/outputs/apk/release/trime-3.2.7-release.apk
+#    签名来源见 §6（~/.android-keys 或环境变量）
 
 # 3) 静态校验
 AAPT2=$ANDROID_HOME/build-tools/36.0.0/aapt2
-$AAPT2 dump badging <apk> | head -3         # package/version 正确
-unzip -l <apk> | grep 'lib/'                # 只有 1 个 librime_jni.so
-unzip -p <apk> lib/arm64-v8a/librime_jni.so | sha256sum   # == d6b295b6…ca098ec
+$AAPT2 dump badging <apk> | head -3                       # package/version 正确
+unzip -l <apk> | grep 'lib/'                              # 只有 1 个 librime_jni.so
+unzip -p <apk> lib/arm64-v8a/librime_jni.so | sha256sum   # == fd437255…f03f
+$ANDROID_HOME/build-tools/36.0.0/zipalign -c -P 16 4 <apk>      # 16 KB 对齐
 $ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs <apk>
 
-# 4) 真机冒烟（**当前未执行**，见 06 §5）
-adb install -r <apk>
+# 4) 数据链路验证（真机仪器测试，见 03 §5）
+timeout 300 adb shell am instrument -w -r -e class com.hazukieq.hkrime.RimeDataTest \
+  com.hazukieq.hkrime.test/androidx.test.runner.AndroidJUnitRunner    # OK (1 test)
 ```
 
-### 已产出交付物
+### 已产出交付物（2026-11-08 第二轮）
 
 | 产物 | 大小 | sha256 | 说明 |
 |---|---|---|---|
-| `artifacts/hkrime-debug.apk` | **11,418,991 B** | `8cc718eb0b90071e2bb514c71dc999baca4de2a48d3a54deb598865a09cce545` | 可安装（debug key 签名） |
-| `artifacts/hkrime-release.apk` | **9,586,652 B** | `9fe31e156084e275612cce1ee285900f1a5fde0033eadb9bd098cfb7353575fe` | 已用 `skeys.jks` 签名；**未过 lint**，仅静态验证 |
+| `artifacts/hkrime-debug.apk` | **17,233,842 B** | `d0e6159c79844e465d22cf2b80834246e47d9c81dd344a0de226dd7b6917aac7` | 可安装（debug key） |
+| `artifacts/hkrime-release.apk` | **11,004,041 B** | `b2e7b748d88b87eeded4aab2dac95724b19a264080196768795ae0f5b4b0426e` | 新 keystore 签名，`apksigner verify` 通过；**未过 lint** |
 
 两者 package 均为 `com.hazukieq.hkrime`、versionCode `20220701`、versionName `3.2.7`、
-minSdk 21 / targetSdk 33 / native-code `arm64-v8a`。
+minSdk 21 / targetSdk 33 / native-code `arm64-v8a`，`zipalign -c -P 16 4` 均通过。
+
+> 体积比上轮（11.4 MB / 9.6 MB）增大，是因为 `2b50c1f` 恢复了 29 个 OpenCC 文件并并入 16 个客家话文件（+269,435 行）。
+
+---
 
 ## 5. 版本号策略
 
@@ -180,33 +197,66 @@ minSdk 21 / targetSdk 33 / native-code `arm64-v8a`。
 | `versionCode` | `20220701`（上游日期式） | 改为递增整数（如 1,2,3…），避免与上游日期码冲突；**必须 > 20220701** 才能覆盖安装旧版 |
 | `BUILD_INFO` | 构建时由 `app/build.gradle:94-143` 通过 git 命令注入 | 保留，便于定位「哪个提交出的包」 |
 
-> ⚠ 若 `versionCode` 不增，同包名的旧安装包无法覆盖升级；跨包名（com.tumuyan.trime → com.hazukieq.hkrime）则是两个独立 app，可共存。
+> ⚠ 同包名的旧安装包若 `versionCode` 不增则无法覆盖升级；跨包名（`com.tumuyan.trime` → `com.hazukieq.hkrime`）则是两个独立 app，可共存（同时装两个输入法会互相干扰，建议只留一个）。
+
+---
 
 ## 6. 签名与密钥安全
 
-### 现状（**高风险**）
+### 6.1 现状：密钥已移出仓库
 
-| 项 | 内容 |
+`bebad9f` 把签名材料从版本库移出：
+
+| 项 | 现状 |
 |---|---|
-| `skeys.jks` | 2,517 B，**已提交到版本库**（`.gitignore:71-73` 本就忽略 `*.jks`，但 `92c7aa5` 用 `git add -f` 强行加入） |
-| `release.properties` | 74 B，4 行：`storeFile=skeys.jks`、`storePassword=263909`、`keyAlias=key0`、`keyPassword=263909` —— **口令明文入库** |
-| `keystore.tar.enc` | 10,256 B，上游遗留的加密密钥包（口令未知） |
-| `.gitignore` | 曾在 `0c1e58a` 被改成放开 `*.jks`/`release.properties`，等于**主动允许密钥入库** |
+| 仓库根 `skeys.jks` | **已删除**（2,517 B → 0） |
+| 仓库根 `release.properties` | **已删除**（74 B，曾含明文 `263909`） |
+| `release.properties.example` | 新增，7 行占位模板（不含真实口令） |
+| `~/.android-keys/hkrime-release.jks` | 2,744 B，`600`（构建机私有） |
+| `~/.android-keys/hkrime-release.properties` | 147 B，`600` |
+| `script/gen-keystore.sh` | 79 行，随机口令 + `chmod 700/600`，已存在则拒绝覆盖 |
 
-**风险**：任何拿到仓库的人都能签出「官方」更新包（供应链投毒）；密钥一旦泄露，
-在 Play/应用商店分发的版本必须换 key（会丢升级链）。
+### 6.2 新证书指纹（现行）
 
-### 建议处置顺序
+```text
+DN      : CN=hkrime, OU=hazukieq, O=hkrime-fork, L=Guiping, ST=Guangxi, C=CN
+别名    : hkrime
+SHA-256 : d9d7d91ae5e7c789ff79b8eb9a1644461e5b7b2c48b52a184d993a90594693cb
+SHA-1   : 6b105cf8df1761a7c2320dedb23661be10cd9abb
+MD5     : 60a6c4ad49eb532090b2363c35d84f1c
+有效期  : 10000 天（2048-bit RSA）
+```
 
-| 优先级 | 动作 |
+校验命令：
+
+```bash
+$ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs artifacts/hkrime-release.apk
+```
+
+### 6.3 旧密钥仍留在 git 历史（必须知道）
+
+| 事实 | 后果 |
 |---|---|
-| 🔴 P0 | **停止**继续提交新密钥；把 `skeys.jks` 与 `release.properties` 从**当前树**移除（`trash`，不 `rm`），改用 `local.properties` / `~/.gradle/gradle.properties` / CI secret 注入 |
-| 🔴 P0 | 从 `.gitignore` 恢复对 `*.jks`、`*.keystore`、`release.properties` 的忽略；`keystore.tar.enc` 一并评估 |
-| 🟠 P1 | 历史清理（`git filter-repo` 抹除历史中的密钥）**需要强推**，会影响所有克隆 → 单独决策、通知协作者 |
-| 🟠 P1 | 生成**新的** release keystore（口令随机、离线保存），旧 key 仅用于给已装机用户出最后一版迁移包 |
-| 🟡 P2 | 若要公开发布，确认 debug key 不用于任何对外包（当前 `hkrime-release.apk` 已用 skeys 签，符合预期） |
+| `skeys.jks` 与明文 `release.properties` 由 `92c7aa5`/`4af2a94` 引入，仍可从历史检出 | 任何人拿到仓库历史都能签出「旧 key 的官方包」 |
+| 旧证书指纹（上一版文档记录 `32208d47…`）已随换 key 作废 | 用旧 key 签的包**无法**覆盖安装新 key 的包 |
+| 彻底清除需 `git filter-repo` 改写历史 + **force push** | 所有克隆/PR 需重新对齐；需所有者决策 |
 
-> `TODO:` 决策「是否重签/换 key」需要所有者拍板；本文只给方案，未执行任何历史改写。
+**换签名后的兼容性**：Android 只认「同包名 + 同签名」为升级。新 key 签的 hkrime 与旧 key 签的
+`com.tumuyan.trime` / 旧 `com.hazukieq.hkrime` 包互不覆盖——用户需卸载重装（会丢应用内数据，词库若在 `/sdcard/rime` 则不受影响）。
+
+### 6.4 处置优先级
+
+| 优先级 | 动作 | 状态 |
+|---|---|---|
+| 🔴 P0 | 密钥移出当前树、`.gitignore` 恢复忽略 | ✅ 已做（`bebad9f`） |
+| 🔴 P0 | 新 keystore 生成 + 构建走三级查找 | ✅ 已做 |
+| 🟠 P1 | 历史密钥清理（filter-repo + force push） | ⬜ 未做（需所有者拍板） |
+| 🟠 P1 | 旧 key 泄露风险评估：若仓库曾公开，应视旧 key 为已泄露 | ⬜ 待确认仓库可见性 |
+| 🟡 P2 | 密钥备份策略（离线介质/密码管理器） | ⬜ 未做 |
+
+> 注：换 key 不是「更安全」的自动保证——**新 key 丢失同样致命**。`gen-keystore.sh` 已警告「一旦丢失，已发布版本无法升级」。
+
+---
 
 ## 7. 旧用户数据迁移
 
@@ -214,12 +264,13 @@ minSdk 21 / targetSdk 33 / native-code `arm64-v8a`。
 
 | 版本 | 数据目录 |
 |---|---|
-| 旧（`com.tumuyan.trime` / `com.osfans.trime`） | `/sdcard/Android/data/<旧包名>/files/rime` 或用户自设的 `/sdcard/rime` |
-| 新（`com.hazukieq.hkrime`） | `/sdcard/Android/data/com.hazukieq.hkrime/files/rime` |
+| 旧（`com.tumuyan.trime` / `com.osfans.trime`） | `/sdcard/Android/data/<旧包名>/files/rime`，或用户自设的 `/sdcard/rime` |
+| 新（`com.hazukieq.hkrime`） | `/sdcard/Android/data/com.hazukieq.hkrime/files/rime`（默认），用户可改 |
 
 ```bash
-# 迁移用户词库/配置（需 adb 或文件管理器；注意 Android 11+ 限制）
-adb shell "run-as com.hazukieq.hkrime ls files/rime" 2>/dev/null
+# 查看新包的数据目录（需 MANAGE_EXTERNAL_STORAGE）
+adb shell ls /storage/emulated/0/Android/data/com.hazukieq.hkrime/files/rime
+
 # 推荐做法：让用户在新版设置里把 shared_data_dir / user_data_dir 指回旧目录
 #   （AppPrefs 的 conf__shared_data_dir / conf__user_data_dir，见 01 §6）
 ```
@@ -232,25 +283,34 @@ adb shell "run-as com.hazukieq.hkrime ls files/rime" 2>/dev/null
 
 > 当前是 **C**。`TODO:` 若要产品化，优先做 B 的最小版（只复制 `*.userdb`、`*.custom.yaml`、`installation.yaml`）。
 
+**权限提醒**：`MANAGE_EXTERNAL_STORAGE`（「所有文件访问」）在**每次重装后都会被系统重置**为拒绝。
+未授权时 `Config.prepareRime` 写 sharedDataDir 会失败，并可能触发 06 §4.2 的递归卡死。发布说明里应写清这一句。
+
+---
+
 ## 8. 交付清单与回滚
 
 ### 一次完整发布应产出
 
 ```text
-✅ app/libs/arm64-v8a/librime_jni.so       13,587,824 B  sha256 d6b295b6…
-✅ script/build-jni-so.sh / verify-jni-symbols.sh   （可复现凭据）
+✅ app/libs/arm64-v8a/librime_jni.so       13,587,744 B  sha256 fd437255…f03f（16 KB 对齐）
+✅ script/build-jni-so.sh / verify-jni-symbols.sh / gen-keystore.sh
 ✅ 符号契约输出 OK（73/73，0 旧包名）
-✅ artifacts/hkrime-debug.apk              11,418,991 B  sha256 8cc718eb…
-✅ artifacts/hkrime-release.apk            9,586,652 B   sha256 9fe31e15…
-⬜ 真机冒烟记录（启动/切换/打字/上屏/主题切换/部署）
+✅ artifacts/hkrime-debug.apk              17,233,842 B  sha256 d0e6159c…
+✅ artifacts/hkrime-release.apk            11,004,041 B  sha256 b2e7b748…（新 key，verify 通过）
+✅ 真机仪器测试 OK (1 test)（部署/ocd2/四组转换/hakka.table.bin）
+⬜ 真机 IME 界面冒烟（启用/选择/打字/上屏/主题切换/部署按钮）
 ⬜ release lint 通过（当前用 -x 绕过）
+⬜ 历史密钥清理（需改写历史，未决策）
 ```
 
 ### 回滚
 
 | 场景 | 操作 |
 |---|---|
-| 新 `.so` 有运行时问题 | `git checkout <上一提交> -- app/libs/arm64-v8a/librime_jni.so`，同时确认 Java 侧包名与该库匹配（旧库只配旧包名） |
-| 改名引入崩溃 | 回退 `922a2ba` + `7436b6d` 两个提交（**必须一起回退**） |
-| APK 装不上/签名冲突 | 卸载后重装；确认 `versionCode` 递增 |
+| 新 `.so` 有运行时问题 | `git checkout <上一提交> -- app/libs/arm64-v8a/librime_jni.so`，**同时确认 Java 侧包名与该库匹配**（旧库只配旧包名） |
+| 改名引入崩溃 | 回退 `922a2ba` + `7436b6d`（**必须一起回退**） |
+| 数据不见了 | 检查 `shared_data_dir` 是否被改；旧数据仍在旧包名目录或 `/sdcard/rime` |
+| APK 装不上/签名冲突 | 卸载后重装；确认 `versionCode` 递增、签名一致（见 §6.3） |
+| 16 KB 弹窗复发 | 确认 `.so` 的 LOAD 段 `0x4000`、APK `zipalign -P 16` 通过（02 §7） |
 | 分支重命名搞乱 | 远端保留旧分支直到验证完成；本地 `git branch -m` 可随时改回 |
