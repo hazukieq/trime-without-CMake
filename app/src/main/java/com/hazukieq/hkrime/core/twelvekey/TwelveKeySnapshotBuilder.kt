@@ -68,10 +68,11 @@ object TwelveKeySnapshotBuilder {
     }
 
     /** 快照緩存鍵：input + 分段（status 也會影響 consumedEnd）。 */
-    fun cacheKey(local: Local): String = local.input + "|" + local.segmentsKey
+    fun cacheKey(local: Local, full: Boolean): String =
+        local.input + "|" + local.segmentsKey + (if (full) "|full" else "|bar")
 
     /** 全量枚舉 + 分組；不讀引擎以外的東西。調用方需持引擎鎖（可在後台線程）。 */
-    fun build(local: Local): TwelveKeySnapshot {
+    fun build(local: Local, maxCandidates: Int = MAX_CANDIDATES): TwelveKeySnapshot {
         if (local.isEmpty) return TwelveKeySnapshot.EMPTY
         val input = local.input
         val consumedEnd = local.consumedEnd
@@ -80,7 +81,7 @@ object TwelveKeySnapshotBuilder {
         // 全量枚舉：native 由 engine-probe 並行補，可能 UnsatisfiedLinkError → 降級單頁。
         val flat: List<Pair<String, String>>
         var degraded = false
-        val snapshot = runCatching { Rime.candidatesSnapshot(MAX_CANDIDATES) }.getOrNull()
+        val snapshot = runCatching { Rime.candidatesSnapshot(maxCandidates) }.getOrNull()
         if (snapshot != null) {
             flat = snapshot.map { row -> (row.getOrNull(0) ?: "") to (row.getOrNull(1) ?: "") }
         } else {

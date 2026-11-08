@@ -57,7 +57,7 @@ class TwelveKeyController(
      *
      * [immediate] 用於「點候選/開面板」這類需要盡快更新的場景（仍不阻塞 UI 線程）。
      */
-    fun refresh(immediate: Boolean = false) {
+    fun refresh(immediate: Boolean = false, full: Boolean = false) {
         val gen = ++generation
         refreshJob?.cancel()
         // 直接派到 Default：避免「先排到 Main 佇列、再 withContext(Default)」多一次主線程來回，
@@ -71,10 +71,13 @@ class TwelveKeyController(
                         if (local.isEmpty) {
                             Triple(local, TwelveKeySnapshot.EMPTY, false)
                         } else {
-                            val key = TwelveKeySnapshotBuilder.cacheKey(local)
+                            val key = TwelveKeySnapshotBuilder.cacheKey(local, full)
                             val cached = cacheLookup(key) { it }
                             val t0 = System.nanoTime()
-                            val built = cached ?: TwelveKeySnapshotBuilder.build(local)
+                            val built = cached ?: TwelveKeySnapshotBuilder.build(
+                                local,
+                                if (full) TwelveKeySnapshotBuilder.MAX_CANDIDATES else BAR_CANDIDATES,
+                            )
                             if (com.hazukieq.hkrime.BuildConfig.DEBUG) {
                                 Timber.d(
                                     "twelvekey:build %s cached=%s ms=%.1f",
@@ -112,7 +115,7 @@ class TwelveKeyController(
                 if (local.isEmpty) {
                     TwelveKeySnapshot.EMPTY
                 } else {
-                    val k = TwelveKeySnapshotBuilder.cacheKey(local)
+                    val k = TwelveKeySnapshotBuilder.cacheKey(local, true)
                     key = k
                     cacheLookup(k) { it } ?: TwelveKeySnapshotBuilder.build(local)
                 }
@@ -157,6 +160,8 @@ class TwelveKeyController(
     }
 
     companion object {
+        /** 面板關閉時只枚舉候選條需要的條數：避免每次按鍵都全量枚舉 600 條（按鍵卡頓）。 */
+        private const val BAR_CANDIDATES = 16
         /**
          * librime session 非線程安全：後台枚舉與 UI 線程的 process_key / get_context 必須串行。
          * 鍵盤事件入口（TextInputManager.onEvent 等）也持同一把鎖。

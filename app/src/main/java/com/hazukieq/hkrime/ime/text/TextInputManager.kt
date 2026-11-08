@@ -250,7 +250,7 @@ class TextInputManager private constructor() :
                 twelveKeyController?.refreshSync()
             }
             candidatePanelController?.toggle()
-            twelveKeyController?.refresh(immediate = true)
+            twelveKeyController?.refresh(immediate = true, full = true)
             candidateView?.setPanelOpen(candidatePanelController?.isShown == true)
             return
         }
@@ -273,7 +273,8 @@ class TextInputManager private constructor() :
             if (snapshot == null || (!snapshot.hasCandidates && snapshot.fallback == null)) return
         }
         candidatePanelController?.show()
-        twelveKeyController?.refresh(immediate = true)
+        // 面板要完整分組：開面板時全量枚舉一次
+        if (isTwelveKeyMode()) twelveKeyController?.refresh(immediate = true, full = true)
         candidateView?.setPanelOpen(candidatePanelController?.isShown == true)
     }
 
@@ -345,9 +346,12 @@ class TextInputManager private constructor() :
     /** 候選刷新後呼叫：12 鍵重建快照；其它方案只刷新展開面板。 */
     fun onCandidatesRefreshed() {
         if (isTwelveKeyMode()) {
-            // 按鍵後立即重建快照（不 debounce）：實測枚舉只要 2–20ms，等 120ms 反而
-            // 讓候選條落後於按鍵（用戶反饋「候選詞顯示有延遲」）。
-            twelveKeyController?.refresh(immediate = true)
+            // 按鍵後立即重建快照（不 debounce）；面板關閉時只枚舉候選條需要的 16 條，
+            // 面板打開才全量枚舉（按鍵卡頓的另一半原因：每鍵 600 條枚舉）。
+            twelveKeyController?.refresh(
+                immediate = true,
+                full = isCandidatePanelShown(),
+            )
             return
         }
         candidateBarBinder?.clear()

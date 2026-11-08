@@ -781,5 +781,27 @@ librime 1.7.3 的 `script_translator` **根本不讀 `enable_sentence`**（源�
    （即輸入用了簡拼）就**不做 MakeSentence**——簡拼詞仍可由詞典直接命中；
 2. 另加硬上限 `kMaxSentenceSyllables = 12`，完整拼音的極長輸入也不爆。
 
-重編後 `.so`：13,603,168 B，sha256 `de94aeba7fed7ecb7122c0187e5940cd7e19e5973761404cbde3778386e4bded`，75 個 JNI 導出。
+重編後 `.so`：13,603,232 B，sha256 `94bed12b8356109880373f38f71eb706cfe5c8aa9b02b588d15a325ab80b1732`，75 個 JNI 導出。
 壓測：連按 `kl` 40 次，PID 不變、無新 ANR；候選仍為 可口可樂 等，preedit 顯示 `k l k l …`（聲母）。
+
+
+## 15.7 簡拼卡頓：兩處修補（2026-11-08）
+
+症狀：簡拼後按鍵「格外卡」，gfx p90 250ms、每鍵→候選落地 270ms（無 ANR）。
+
+用 `dbgkey` 打點拆開：`process_key` 每鍵 ~250ms，`getContexts` 2ms，App 端枚舉 8ms。
+`process_key` 卡在 `ScriptTranslation::Evaluate`：即使不做句子裝配，`user_dict->Lookup`
+對簡拼的 SyllableGraph 仍做 leveldb DFS。
+
+兩處改動：
+
+1. **librime**（`script_translator.cc`）：偵測到 abbrev 拼寫就**連用戶詞庫都不查**
+   （主詞典照常，簡拼詞仍命中）；完整拼音輸入仍走用戶詞庫。
+   效果：`process_key` 250ms → **40ms**。
+2. **App**：候選條只需 12–16 條，面板關閉時只枚舉 `BAR_CANDIDATES=16`，打開面板才全量 600
+   （`TwelveKeySnapshotBuilder.build(local, maxCandidates)`，緩存 key 帶 `|bar`/`|full`）。
+   效果：枚舉 30ms → **8ms**。
+
+合計：按鍵→候選條落地 **270ms → ~70ms**（p90 250ms → 73ms），不再 ANR。
+剩餘 40ms 在 librime 的主詞典 Lookup（簡拼每個位置仍有幾十條分支），要再快就得限制
+簡拼分支或給 Lookup 加 limit，屬下一步可選項。
