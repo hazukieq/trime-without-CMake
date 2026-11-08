@@ -214,17 +214,29 @@ class TextInputManager private constructor() :
     }
 
     fun showCandidatePanel() {
-        val panel = candidatePanel ?: return
         val root = candidatePanelRoot ?: return
         // 空組字（不是組字中）就不要展開；但「組字中且沒有候選」仍要開，
         // 這樣左列還能看到剩下的音節（例如只剩 u），右柵格可以是空的。
         if (!Rime.isComposing()) {
             return
         }
-        // 面板只展示「候選欄這一頁之外」的候選；收集後立刻把 Rime 還原到原頁，
-        // 因此展開/滾動都不會改動候選欄（第一行）的內容。
-        // 先用「當前頁」立刻把面板貼出來（0 成本），後面頁碼全部改成面板顯示後分批補，
+        // 先用「當前頁」立刻把面板貼出來（0 成本），其餘頁碼等面板顯示後分批補，
         // 12 鍵單鍵模糊匹配可能十幾頁，同步收集會讓展開卡 200ms 以上。
+        startPanelCollection()
+        rebuildPinyinGroups()
+        inputArea?.layoutParams?.height = mainKeyboardView?.height
+            ?: android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+        inputArea?.requestLayout()
+        mainKeyboardView?.visibility = View.GONE
+        root.visibility = View.VISIBLE
+    }
+
+    /** 面板內容從「當前頁」開始、其餘頁碼分批補；換音節/重開面板都走這裡。 */
+    private fun startPanelCollection() {
+        val panel = candidatePanel ?: return
+        collectionGen++
+        val gen = collectionGen
+        panelSeen.clear()
         panelItems = currentPageItems()
         if (panelItems.isEmpty() && Rime.isComposing()) {
             // 完全沒有候選（例如只剩一個 u）：把剩下的編碼本身當候選，點了就原樣上屏
@@ -233,19 +245,11 @@ class TextInputManager private constructor() :
                 panelItems = mutableListOf(CandidatePanelAdapter.Item(rest, "", -1, -1))
             }
         }
-        panelSeen.clear()
         panelItems.forEach { panelSeen.add(it.text + "\u0001" + it.comment) }
         candidatePanelAdapter?.submit(panelItems)
-        inputArea?.layoutParams?.height = mainKeyboardView?.height
-            ?: android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-        inputArea?.requestLayout()
-        rebuildPinyinGroups()
-        mainKeyboardView?.visibility = View.GONE
-        root.visibility = View.VISIBLE
-        panel.scrollToPosition(0)
-        collectionGen++
+        if (isCandidatePanelShown()) panel.scrollToPosition(0)
         collecting = true
-        collectRest(collectionGen, 2)
+        collectRest(gen, 2)
     }
 
     /** 面板顯示後分批補後面頁碼的候選；面板關閉/重開時用 generation 作廢舊任務。 */
@@ -365,7 +369,11 @@ class TextInputManager private constructor() :
             candidatePanel?.postDelayed({ if (!Rime.isComposing()) hideCandidatePanel() }, 250)
             return
         }
-        // 面板只展示「當前頁」，index 直接對應 librime 的候選序號（不再預先翻頁收集）
+        // 面板項目的 pageOffset 是「第幾頁」（0=當前頁）：先翻到那一頁再選
+        repeat(pageOffset) {
+            if (!Rime.hasRight()) return
+            trime.handleKey(KeyEvent.KEYCODE_PAGE_DOWN, 0)
+        }
         Rime.selectCandidate(indexInPage)
         activeEditorInstance.commitRimeText()
         trime.updateComposing()
@@ -718,17 +726,8 @@ class TextInputManager private constructor() :
         Rime.getContexts()
         trime.updateComposing()
         rebuildPinyinGroups()
-        // 這一節的候選就是當前頁：不要再做 pageDown 收集，否則 selectCandidate 的 index 會錯
-        panelItems = currentPageItems()
-        if (panelItems.isEmpty() && Rime.isComposing()) {
-            // 完全沒有候選（例如只剩一個 u）：把剩下的編碼本身當候選，點了就原樣上屏
-            val rest = remainingCode()
-            if (rest.isNotEmpty()) {
-                panelItems = mutableListOf(CandidatePanelAdapter.Item(rest, "", -1, -1))
-            }
-        }
-        candidatePanelAdapter?.submit(panelItems)
-        candidatePanel?.scrollToPosition(0)
+        // 換到另一節後重新收一批（先貼當前頁，其餘頁碼分批補）
+        startPanelCollection()
     }
 
     /**
@@ -762,19 +761,7 @@ class TextInputManager private constructor() :
         val panel = candidatePanel ?: return
         if (!isCandidatePanelShown()) return
         if (collecting) return // 分批收集進行中：別把它重置成「同步全收」
-        collectionGen++
-        panelSeen.clear()
-        panelItems = collectCandidatePanelItems(1, panelMaxPages)
-        if (panelItems.isEmpty()) panelItems = currentPageItems()
-        if (panelItems.isEmpty() && Rime.isComposing()) {
-            // 完全沒有候選（例如只剩一個 u）：把剩下的編碼本身當候選，點了就原樣上屏
-            val rest = remainingCode()
-            if (rest.isNotEmpty()) {
-                panelItems = mutableListOf(CandidatePanelAdapter.Item(rest, "", -1, -1))
-            }
-        }
-        candidatePanelAdapter?.submit(panelItems)
-        panel.scrollToPosition(0)
+        startPanelCollection()
     }
 
     /**
