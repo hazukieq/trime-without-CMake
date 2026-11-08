@@ -1115,19 +1115,27 @@ ni, ni hau 才对。当选了 ni 之后应该剩下 hau，和 12 键逻辑一致
   `ni hau` 註腳；點「ni」組再點「你」→ 上屏「你」、preedit 剩 `你 hau`，左列變 `hau`、
   右格 好/号/耗/豪…（與 12 鍵的空格/選字行為一致）。
 
-## 15.22 面板 rail 竖线与 12 键翻页键（2026-11-09）
+## 15.22 面板 rail 竖线与 12 键 `/`、`、` 键（2026-11-09）
 
 用戶（附截圖）：「框起来的竖条占满高亮左边呀，不要竖线一半，太难看了。然后呢，
-去除掉 12 键的 `/`、`、` 的翻页」。
+去除掉 12 键的 `/`、`、` 的翻页」。随后澄清：「`/`、`、` 这两个键不是不要，是将其在
+输入状态下的按键改为打开/关闭展开面板。——没有打开/关闭展开面板的 api，就创建」。
 
 - **rail 选中竖线满高**：`CandidateGroupAdapter` 里那条 3dp accent 竖线原本写死
   `height = rowHeight*0.42`、`topMargin = rowHeight*0.29`（居中短横线，上下留白）。
   改为 `LinearLayout.LayoutParams(barWidth, rowHeight)`、去掉 topMargin：竖线从高亮
   行顶部贯到底部（左缘 6dp 内缩不变），与选中底色等高。
-- **12 键去掉 `/`、`、` 翻页键**：`jiugong_simp` 第 2/3 行末尾原本各是一枚
-  `width:16` 的 `composing: Up/Down` 翻页键。面板展开后本来就是全量候选
-  （`MAX_CANDIDATES=600` 流式滚动），翻页键无用且挤占整行 1/6 宽度，直接删除：
-  行 2/3 变为 `[16][17][17][17][17]`（84%），右侧留 16% 空白；字母键列与第 1 行
-  保持对齐。`giugiung_simp`/`tung` 里的同款键未动（非当前启用方案）。
-- 真機驗收：12 键键盘行 2/3 右侧不再有 `/`、`、`；候选条 84px 不变；展开面板后
-  选中组（`fu ga` 等多组场景）左缘竖线贯穿整行高亮。
+- **`/`、`、` 改造成面板开关（不再翻页）**：这两枚键原来靠 `composing: Up/Down`
+  在输入中当翻页键（面板展开后本来就是全量候选 `MAX_CANDIDATES=600` 流式滚动，
+  翻页无意义）。现在：
+  - 主题 `preset_keys` 新增 `Panel_toggle_slash` / `Panel_toggle_dun`
+    = `{send: function, command: candidate_panel}`（沿用 `KEYCODE_FUNCTION` 的
+    「trime 命令」通道：`TextInputManager.onEventLocked` 里新增
+    `event.command == "candidate_panel" -> toggleCandidatePanel()`）；
+  - `jiugong_simp` 两枚键恢复为 `{click: '/', composing: Panel_toggle_slash, width: 16}`
+    与 `{click: '、', composing: Panel_toggle_dun, width: 16}` —— `composing:` 事件
+    只在 `Rime.isComposing()` 时生效（`Key.getEvent()`），所以**输入中按一下开面板、
+    再按（或点候选条 ▲）收起**；非输入状态仍是原来的标点行为。
+- 真機驗收：12 键输入 `nzia` 后按 `/` → 展开分组面板（左列 `nzia` + 右格候选，
+  竖线满高）；点 ▲ 收起后再按 `、` → 再次展开；未输入时按 `/` 仍走标点候选。
+  候選條高度 84px 不变（12 键 / 26 键 / 英文全键盘一致）。

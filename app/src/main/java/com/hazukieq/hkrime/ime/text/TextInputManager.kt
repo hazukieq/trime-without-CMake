@@ -666,6 +666,9 @@ class TextInputManager private constructor() :
                     trime.selectLiquidKeyboard(arg)
                 } else if (event.command == "paste_by_char") {
                     trime.pasteByChar()
+                } else if (event.command == "candidate_panel") {
+                    // 12 鍵的 /、：輸入中開/關展開面板（主題 Panel_toggle_*，用戶 2026-11-09）
+                    toggleCandidatePanel()
                 } else {
                     val textFromCommand = ShortcutUtils
                         .call(trime, event.command, arg)
