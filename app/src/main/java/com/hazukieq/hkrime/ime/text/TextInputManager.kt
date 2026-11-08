@@ -72,6 +72,10 @@ class TextInputManager private constructor() :
     private var panelItems: MutableList<CandidatePanelAdapter.Item> = mutableListOf()
     /** 面板一次最多收集的頁數，防止極端情況下卡住 */
     private val panelMaxPages = 20
+    /** 分批收集的世代號：面板關閉/重開就作廢還沒跑完的分批任務 */
+    private var collectionGen = 0
+    /** 是否還有分批收集任務在跑（跑的時候不要在 onCandidatesRefreshed 裡重置面板） */
+    private var collecting = false
     var candidateRoot: ScrollView? = null
     var candidateView: Candidate? = null
 
@@ -217,10 +221,9 @@ class TextInputManager private constructor() :
         }
         // 面板只展示「候選欄這一頁之外」的候選；收集後立刻把 Rime 還原到原頁，
         // 因此展開/滾動都不會改動候選欄（第一行）的內容。
-        panelItems = collectCandidatePanelItems()
-        if (panelItems.isEmpty()) {
-            panelItems = currentPageItems() // 只有截斷、沒有下一頁時，退化成展示當前頁完整內容
-        }
+        // 先用「當前頁」立刻把面板貼出來（0 成本），後面頁碼全部改成面板顯示後分批補，
+        // 12 鍵單鍵模糊匹配可能十幾頁，同步收集會讓展開卡 200ms 以上。
+        panelItems = currentPageItems()
         if (panelItems.isEmpty() && Rime.isComposing()) {
             // 完全沒有候選（例如只剩一個 u）：把剩下的編碼本身當候選，點了就原樣上屏
             val rest = remainingCode()
@@ -236,6 +239,26 @@ class TextInputManager private constructor() :
         mainKeyboardView?.visibility = View.GONE
         root.visibility = View.VISIBLE
         panel.scrollToPosition(0)
+        collectionGen++
+        collecting = true
+        collectRest(collectionGen, 2, replace = true)
+    }
+
+    /** 面板顯示後分批補後面頁碼的候選；面板關閉/重開時用 generation 作廢舊任務。 */
+    private fun collectRest(gen: Int, fromPage: Int, replace: Boolean) {
+        if (fromPage > panelMaxPages) { collecting = false; return }
+        candidatePanel?.post {
+            if (gen != collectionGen || !isCandidatePanelShown()) { collecting = false; return@post }
+            val more = collectCandidatePanelItems(fromPage, 3)
+            if (more.isEmpty()) {
+                collecting = false
+                if (replace) { panelItems = currentPageItems(); candidatePanelAdapter?.submit(panelItems) }
+                return@post
+            }
+            if (replace) panelItems = more else panelItems.addAll(more)
+            candidatePanelAdapter?.submit(panelItems)
+            collectRest(gen, fromPage + 3, false)
+        }
     }
 
     /** 目前 preedit 裡還沒被轉換的編碼（去掉漢字/占位符/空格），例如只剩 u 時回傳 "u"。 */
@@ -244,8 +267,26 @@ class TextInputManager private constructor() :
         return preedit.filter { it.code < 128 && (it.isLetterOrDigit() || it == '\'') }
     }
 
-    /** 收集「當前頁之後」的所有候選；結束後用 pageUp 還原，候選欄狀態不變。 */
-    private fun collectCandidatePanelItems(): MutableList<CandidatePanelAdapter.Item> {
+
+    /** preedit 的顯示分段：librime 把每個 segment 用空格分開，且已套用方案的 preedit_format。
+     *  12 鍵客語這種「輸入碼 ≠ 拼音」的方案，用它當左列標籤才可讀。 */
+    private fun preeditDisplayTokens(): List<String> {
+        val t = (Rime.getCompositionText() ?: "").replace("\u2038", "").trim()
+        if (t.isEmpty()) return emptyList()
+        return t.split(Regex("\\s+")).filter { it.isNotBlank() }
+    }
+
+    /** 用 preedit 的顯示分段覆蓋左列標籤（只在數量一致時，避免錯位）。 */
+    private fun applyDisplayLabels(items: MutableList<CandidateGroupAdapter.PinyinGroupAdapterItem>) {
+        val tokens = preeditDisplayTokens()
+        if (tokens.size != items.size) return
+        for (i in items.indices) {
+            items[i] = items[i].copy(text = tokens[i])
+        }
+    }
+
+    /** 收集「當前頁之後」的候選（可分批）：從第 fromPage 頁開始收 pages 頁，結束後用 pageUp 還原。 */
+    private fun collectCandidatePanelItems(fromPage: Int, pages: Int): MutableList<CandidatePanelAdapter.Item> {
         val items = mutableListOf<CandidatePanelAdapter.Item>()
         if (!Rime.hasRight()) return items
         var offset = 1
@@ -253,15 +294,14 @@ class TextInputManager private constructor() :
         while (Rime.hasRight() && offset <= panelMaxPages) {
             trime.handleKey(KeyEvent.KEYCODE_PAGE_DOWN, 0)
             moved++
-            val cs = Rime.getCandidatesWithoutSwitch() ?: break
-            for (i in cs.indices) {
-                    items.add(
-                    CandidatePanelAdapter.Item(
-                        cs[i].text ?: "", cs[i].comment ?: "", offset, i
-                    )
-                )
+            if (offset >= fromPage && offset < fromPage + pages) {
+                val cs = Rime.getCandidatesWithoutSwitch() ?: break
+                for (i in cs.indices) {
+                    items.add(CandidatePanelAdapter.Item(cs[i].text ?: "", cs[i].comment ?: "", offset, i))
+                }
             }
             offset++
+            if (offset >= fromPage + pages) break
         }
         // 還原到第一頁（候選欄所顯示的頁），候選欄內容與 caret 都不受影響
         repeat(moved) { trime.handleKey(KeyEvent.KEYCODE_PAGE_UP, 0) }
@@ -298,6 +338,7 @@ class TextInputManager private constructor() :
     }
 
     fun hideCandidatePanel() {
+        collectionGen++
         // 不依賴 isCandidatePanelShown()：狀態可能與實際可見性不同步（換輸入框/會話切換後），
         // 這裡一律把「面板 GONE / 鍵盤 VISIBLE / 高度 WRAP_CONTENT」恢復，避免留下空白區。
         val root = candidatePanelRoot ?: mainKeyboardView ?: return
@@ -449,6 +490,20 @@ class TextInputManager private constructor() :
         return out
     }
 
+    /** 12 鍵方案：這個「碼」對應的鍵帽文字（例如碼 "5" 對應鍵帽 "kl"）；找不到回傳 null。 */
+    private fun keyLabelForCode(code: String): String? {
+        // 主題的 preset_keys 就是「鍵帽文字 -> 實際送出」的對照表（例如 label: kl, send: 5）
+        val presets = com.hazukieq.hkrime.ime.keyboard.Key.presetKeys ?: return null
+        for (m in presets.values) {
+            val send = m["send"] ?: continue
+            if (send == code) {
+                val label = m["label"]
+                if (!label.isNullOrBlank() && label != code) return label
+            }
+        }
+        return null
+    }
+
     /** 由 preedit 重建左側音節組：邊界由 librime 的光標切分（XK_Left）取得。 */
     private fun rebuildPinyinGroups() {
         val adapter = candidateGroupAdapter ?: return
@@ -478,6 +533,29 @@ class TextInputManager private constructor() :
             for (ch in preeditClean) { if (isCjk(ch)) n += ch.toString().toByteArray(Charsets.UTF_8).size else break }
             startByte = n
         }
+        // 12 鍵這類「一鍵 = 一個碼」的方案：input 每個字節就是一按鍵，
+        // 左列按「按鍵」分組，標籤用 preedit 的顯示寫法（例如 1→ng、4→o），而不是碼串。
+        run {
+            val dispTokens = preeditDisplayTokens()
+            if (dispTokens.size == ib.size && ib.size > 1) {
+                val caret = Rime.RimeGetCaretPos()
+                val items = ArrayList<CandidateGroupAdapter.PinyinGroupAdapterItem>()
+                for (i in dispTokens.indices) {
+                    val code = String(ib, i, 1, Charsets.UTF_8)
+                    val label = keyLabelForCode(code) ?: dispTokens[i]
+                    items.add(
+                        CandidateGroupAdapter.PinyinGroupAdapterItem(
+                            i, label, i, i + 1, converted = false, incomplete = false,
+                            selected = caret == i + 1,
+                        )
+                    )
+                }
+                adapter.submit(items)
+                candidateGroupList?.visibility = View.VISIBLE
+                return
+            }
+        }
+
         var convertedPrefix = ""
         val syllables = SyllableLexicon.syllables(trime)
         val slices = ArrayList<Triple<String, Int, Int>>()
@@ -520,6 +598,7 @@ class TextInputManager private constructor() :
                     )
                 )
             }
+            applyDisplayLabels(items)
             adapter.submit(items)
             candidateGroupList?.visibility = View.VISIBLE
             return
@@ -559,6 +638,7 @@ class TextInputManager private constructor() :
                 )
             )
         }
+        applyDisplayLabels(items)
         adapter.submit(items)
         candidateGroupList?.visibility = View.VISIBLE
     }
@@ -676,7 +756,9 @@ class TextInputManager private constructor() :
     private fun refreshPanelItems() {
         val panel = candidatePanel ?: return
         if (!isCandidatePanelShown()) return
-        panelItems = collectCandidatePanelItems()
+        if (collecting) return // 分批收集進行中：別把它重置成「同步全收」
+        collectionGen++
+        panelItems = collectCandidatePanelItems(1, panelMaxPages)
         if (panelItems.isEmpty()) panelItems = currentPageItems()
         if (panelItems.isEmpty() && Rime.isComposing()) {
             // 完全沒有候選（例如只剩一個 u）：把剩下的編碼本身當候選，點了就原樣上屏
