@@ -139,3 +139,16 @@ recognizer:
   patterns:
     reverse_lookup: "`[a-z]*'?$"
     punct: "^w([A-Z|a-z]*|[0-9]|10)$"
+
+# 表情/顏文字 filter 的配置段：`filters` 裡寫了 simplifier@ywz / simplifier@lenth，
+# 就必須有同名的段（opencc_config + option_name），否則 librime 構造 filter 失敗 →
+# 開關按了也沒反應（用戶 2026-11-09：「ywz.ocd 似乎沒有生效，聯想詞也沒有」）。
+ywz:
+  opencc_config: ywz.json
+  option_name: ywz
+  tips: all    #none无注释, char单字注释, all全部注释
+
+lenth:
+  opencc_config: lenth.json
+  option_name: lenth
+  tips: none    #none无注释, char单字注释, all全部注释

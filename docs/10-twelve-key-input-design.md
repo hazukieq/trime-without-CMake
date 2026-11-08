@@ -1591,3 +1591,28 @@ Kotlin 解析 `commitText(Rime.getCommitText())` 時優先選**無默認參數**
 
 **真機驗收**：Termux 終端裡打 `kl` 得到碼串 `5`，在候選條上從右往左滑 →
 面板不開、不上屏、候選條無滾動；只有點擊才上屏。
+
+## 15.37 客語26鍵的 ywz / 聯想詞開關失效（2026-11-09）
+
+**現象**（用戶）：「ywz.ocd 似乎沒有生效誒，聯想詞也沒有」。
+
+排查：
+- `ywz`（顏文字/表情）與 `lenth`（聯想詞）都是 librime 的 `simplifier@<name>` filter，
+  除了在 `engine/filters` 裡寫 `simplifier@ywz`，還必須在**同一個 schema** 裡有同名配置段：
+  ```yaml
+  ywz:
+    opencc_config: ywz.json
+    option_name: ywz
+    tips: all
+  ```
+  否則 librime 構造該 filter 失敗，**靜默跳過**（本機 librime 編譯時關掉了日誌，看不到錯誤）。
+- `hakka_jiugong.schema.yaml` 有 `ywz:` / `lenth:` 段；`hakka_qwerty.schema.yaml`
+  （客語26鍵）只有 `filters: - simplifier@ywz - simplifier@lenth` 和 switch 定義，
+  **缺配置段** → 26 鍵方案下兩個開關按了都沒反應。
+
+修法：補 `hakka_qwerty.schema.yaml` 的 `ywz:` / `lenth:` 兩段（與 12 鍵一致），
+push 到 `/sdcard/hkrime` + 廣播 deploy。
+
+真機驗收（客語26鍵）：
+- 開「情」→ 打 `but`（不）→ 候選出現 `不 (＞﹏＜)`；
+- 開「聯」→ 打 `gung`（公）→ 候選出現 `公` `公共` `公家` 等聯想詞。
