@@ -1338,3 +1338,23 @@ librime 1.11+ 的 API 兼容（关键坑）：
    新增 `Rime.isEngineReady()`（`mSchema != null && mSchemaList != null`），在
    `getStatus()`、`onKey(int,int)`、`onText(CharSequence)`、`toggleOption(int)` 入口保護：
    引擎未就緒時丟棄按鍵，等後台維護完成 `initSchema()` 後自動恢復。
+
+## 15.29 新库按键卡顿：Release vs Debug（2026-11-09）
+
+用户反馈「连续点击按键是卡顿，旧库则不会」。
+
+真机 A/B 实测（vivo V2520A，12 键键盘连点 `nz`）：
+| 库 | 构建 | 单次按键 `process_key` 耗时 | 连打表现 |
+| --- | --- | --- | --- |
+| librime 1.7.3 | Debug | < 1ms | 流畅 |
+| librime 1.17.0 | **Debug（-O0）** | **~2480ms** | 每按一次卡 2.4 秒 |
+| librime 1.17.0 | **Release（-O2/NDEBUG）** | 远小于注入间隔（20 次连点 1.2s 内全部上屏） | 流畅 |
+
+根因：独立工程 `script/build.sh` 早期沿用旧脚本的 `BUILD_TYPE=Debug`（旧脚本注释写着「默认 Debug 与现有 13.5MB 库一致」）。
+librime 1.7.3 在 -O0 下还能勉强跑，但 1.17 代码量（含 lua/charcode/octagram 三个插件）大得多，
+`ScriptTranslator` 里的模板/容器代码在 -O0 下被放大到秒级。
+
+修法：
+- `rime-jni/script/build.sh` 默认 `BUILD_TYPE=Release`；库从 13.9MB → **6.16MB**（strip 后），符号校验仍 75/75。
+- 需要排查符号/崩溃时才用 `--build-type Debug`（注释里写明性能代价）。
+- `hkrime/app/libs/arm64-v8a/librime_jni.so` 换成 Release 版并重装 APK，真机连打恢复正常。
