@@ -836,3 +836,15 @@ BFS 隊列峰值 766 —— 也就是說 37ms 全是簡拼圖 BFS 的展開成�
 
 代價：簡拼時候選召回被截斷（低頻長詞可能不進候選），面板分組仍正常（實測 `55` 出 5 組）。
 完整拼音路徑分支少，預算遠未觸頂，不受影響。
+
+
+## 15.9 左列排序與跑馬燈（2026-11-08）
+
+用戶：「展開面板，我需要單個音節排在前面，方便對聯想詞不滿意時手動選。然後多個音節的
+哪怕沒有選中也要跑馬燈，否則看不清楚了」。
+
+- `TwelveKeySnapshotBuilder.group()`：分組後按音節數升序 stable sort（單音節組在前，
+  同音節數保持候選順序）。`ngin/ngio/ngh/ngi` 這類單音節組因此排在 `ngin hau` 前面。
+- `CandidateGroupAdapter.onBindViewHolder()`：`marquee = selected || 讀音含空格`；
+  多音節行 `isSelected=true` + `ellipsize=MARQUEE` + `marqueeRepeatLimit=-1`，
+  單音節行仍只有選中時滾動。

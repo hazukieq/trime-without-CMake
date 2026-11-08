@@ -123,13 +123,14 @@ class CandidateGroupAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = getItem(position)
-        // 讀音比 rail 寬時用跑馬燈：選中行自動滾動，未選中行省略號（用戶 2026-11-08 指示）
-        holder.text.isSelected = item.selected
-        holder.text.ellipsize = if (item.selected) {
-            TextUtils.TruncateAt.MARQUEE
-        } else {
-            TextUtils.TruncateAt.END
-        }
+        // 跑馬燈：多音節讀音一定滾動（未選中也滾，否則 rail 放不下看不懂），
+        // 單音節只在選中時滾動、其餘省略號（用戶 2026-11-08 指示）
+        val multiSyllable = item.reading.count { it == ' ' } >= 1
+        val marquee = item.selected || multiSyllable
+        holder.text.isSelected = marquee
+        holder.text.ellipsize =
+            if (marquee) TextUtils.TruncateAt.MARQUEE else TextUtils.TruncateAt.END
+        holder.text.marqueeRepeatLimit = if (multiSyllable) -1 else 0
         holder.root.background = if (item.selected) {
             GradientDrawable().apply {
                 cornerRadius = dp(10f).toFloat()

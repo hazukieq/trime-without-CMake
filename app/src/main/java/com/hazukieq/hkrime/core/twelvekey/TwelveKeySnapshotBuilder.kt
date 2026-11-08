@@ -171,6 +171,8 @@ object TwelveKeySnapshotBuilder {
             grouped.getOrPut(reading) { ArrayList() }
                 .add(CandidateItem(text = text, comment = comment, index = index))
         }
+        // 左列排序：單音節組排前面（用戶 2026-11-08：對聯想詞不滿意時，先手動選單字），
+        // 其餘按音節數升序，同音節數保持候選原有順序（stable sort）。
         return grouped.entries.take(MAX_GROUPS).map { (reading, items) ->
             SyllableGroup(
                 reading = reading,
@@ -179,6 +181,6 @@ object TwelveKeySnapshotBuilder {
                 },
                 items = items,
             )
-        }
+        }.sortedBy { if (it.syllables.isEmpty()) 1 else it.syllables.size }
     }
 }
