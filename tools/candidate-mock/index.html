@@ -87,63 +87,41 @@
   .k.space{grid-column:span 4}
   .k.enter{background:var(--accent);color:#fff}
 
-  /* 展开面板（覆盖键盘区） */
-  .panel-expand{position:absolute;left:0;right:0;bottom:0;height:292px;background:var(--page);
-    border-radius:18px 18px 0 0;border-top:1px solid var(--border);
-    box-shadow:0 -14px 34px rgba(15,23,32,.18);display:none;flex-direction:column;overflow:hidden}
-  .panel-expand.show{display:flex;animation:slideUp .18s ease-out}
-  @keyframes slideUp{from{transform:translateY(18px);opacity:.6}to{transform:none;opacity:1}}
-  .pe-head{display:flex;align-items:center;gap:8px;padding:0 14px;height:46px;flex:none;
-    background:var(--back);border-bottom:1px solid var(--border)}
-  .pe-head .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:7px}
-  .pe-title{font-size:13.5px;font-weight:600;color:#20303c;display:flex;align-items:center}
-  .pe-sub{font-size:11.5px;color:var(--ccomment);margin-left:2px}
-  .pe-head .grow{flex:1}
-  .pe-close{background:transparent;border:0;color:var(--ctext);font-size:12.5px;padding:6px 6px;border-radius:7px;cursor:pointer}
-  .pe-close:hover{background:var(--hback);color:var(--htext)}
-  .pe-close span{font-size:13px;margin-left:2px}
+  /* 展开面板（覆盖键盘区；无标题栏/底栏，尽量少占空间） */
+  .panel-expand{position:absolute;left:0;right:0;bottom:0;height:292px;background:var(--page);border-radius:16px 16px 0 0;box-shadow:0 -6px 22px rgba(20,30,40,.12);
+    border-radius:16px 16px 0 0;border-top:1px solid var(--border);
+    box-shadow:0 -12px 30px rgba(15,23,32,.16);display:none;overflow:hidden}
+  .panel-expand.show{display:flex;animation:slideUp .16s ease-out}
+  @keyframes slideUp{from{transform:translateY(14px);opacity:.65}to{transform:none;opacity:1}}
 
-  .pe-body{flex:1;min-height:0;display:flex;overflow:hidden}
-  /* 左：拼音组（无水计数） */
-  .pe-left{width:92px;flex:none;background:#dde2e5;padding:6px 0;overflow-y:auto;scrollbar-width:none}
+  /* 左：拼音组（只有拼音，无数量） */
+  .pe-left{width:92px;flex:none;background:#dde2e5;padding:8px 0;overflow-y:auto;scrollbar-width:none;border-radius:16px 0 0 0}
   .pe-left::-webkit-scrollbar{display:none}
-  .pe-left .g{position:relative;display:flex;align-items:center;height:42px;padding:0 14px;
+  .pe-left .g{position:relative;display:flex;align-items:center;height:44px;padding:0 14px;
     font:15px/1.2 ui-monospace,SFMono-Regular,monospace;color:var(--ctext);cursor:pointer;white-space:nowrap;
     transition:background .12s,color .12s}
-  .pe-left .g::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;background:transparent}
+  .pe-left .g::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:transparent}
   .pe-left .g:hover{background:#d2d8dc}
-  .pe-left .g.on{background:var(--page);color:#12222c;font-weight:700;box-shadow:inset 0 1px 0 var(--border),inset 0 -1px 0 var(--border)}
+  .pe-left .g.on{background:var(--page);color:#12222c;font-weight:700}
   .pe-left .g.on::before{background:var(--accent)}
 
   /* 右：候选网格，独立纵向滚动（RecyclerView 形态） */
-  .pe-right{flex:1;min-width:0;position:relative;display:flex;flex-direction:column;background:var(--page)}
+  .pe-right{flex:1;min-width:0;position:relative;display:flex;flex-direction:column;background:var(--page);border-radius:0 16px 0 0}
   .pe-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#b9c2c8 transparent}
   .pe-scroll::-webkit-scrollbar{width:6px}
   .pe-scroll::-webkit-scrollbar-thumb{background:#c3ccd2;border-radius:6px}
   .pe-scroll::-webkit-scrollbar-track{background:transparent}
-  .pe-grid{display:grid;grid-template-columns:repeat(4,1fr);padding:8px 8px 14px;gap:8px}
-  .pe-cell{min-height:52px;border-radius:10px;background:#f1f4f5;display:flex;align-items:center;justify-content:center;
-    color:var(--ctext);font-size:21px;cursor:pointer;position:relative;padding:2px 4px;
-    transition:background .12s,color .12s,transform .08s;box-shadow:0 1px 0 rgba(255,255,255,.8) inset}
+  .pe-grid{display:grid;grid-template-columns:repeat(4,1fr);padding:10px 10px 16px;gap:8px}
+  .pe-cell{min-height:56px;border-radius:10px;background:#f1f4f5;display:flex;align-items:center;justify-content:center;
+    color:var(--ctext);font-size:21px;cursor:pointer;position:relative;padding:2px 6px;
+    transition:background .12s,color .12s,transform .08s}
   .pe-cell:hover{background:var(--hback);color:var(--htext)}
   .pe-cell:active{transform:scale(.96)}
   .pe-cell.hl{background:var(--hback);color:var(--htext);font-weight:600;box-shadow:0 0 0 1.5px var(--accent) inset}
-  .pe-cell .c{position:absolute;top:3px;left:0;right:0;text-align:center;font-size:10px;color:var(--ccomment);font-weight:400}
   .pe-cell.w{font-size:17px}
-  .pe-fade{position:absolute;left:0;right:0;bottom:0;height:30px;pointer-events:none;
+  .pe-fade{position:absolute;left:0;right:0;bottom:0;height:34px;pointer-events:none;z-index:3;
     background:linear-gradient(to bottom,rgba(245,246,247,0),var(--page));opacity:0;transition:opacity .15s}
   .pe-fade.show{opacity:1}
-
-  .pe-foot{display:flex;align-items:center;gap:10px;padding:0 14px;height:42px;flex:none;
-    border-top:1px solid var(--border);background:var(--back);color:var(--ccomment);font-size:12px}
-  .pe-foot .grow{flex:1}
-  .pe-hint{display:flex;align-items:center;gap:6px}
-  .pe-hint::before{content:"↕";font-size:12px;color:#9aa6b2}
-  .pager{display:flex;align-items:center;gap:2px}
-  .pager button{background:transparent;border:0;color:var(--ctext);font-size:17px;line-height:1;padding:4px 9px;border-radius:7px;cursor:pointer}
-  .pager button:hover{background:var(--hback);color:var(--htext)}
-  .pager button:disabled{opacity:.3;cursor:default}
-  .pager .page{padding:0 6px;font:12px/1 ui-monospace,monospace;color:var(--ccomment);min-width:38px;text-align:center}
 
   /* 方案 C：全网格页 */
   .gridpage{position:absolute;left:0;right:0;bottom:0;height:300px;background:var(--page);border-top:1px solid var(--border);display:none;flex-direction:column}
@@ -196,29 +174,14 @@
       <div class="candbar" id="candbar"></div>
       <div class="kbwrap" id="kbwrap"><div class="kbrows" id="kbrows"></div></div>
 
-      <!-- B：展开面板 -->
+      <!-- B：展开面板（只有拼音组列 + 候选网格，不放标题栏/底栏） -->
       <div class="panel-expand" id="expand">
-        <div class="pe-head">
-          <span class="pe-title"><i class="dot"></i>候选</span>
-          <span class="pe-sub" id="peSub"></span>
-          <span class="grow"></span>
-          <button class="pe-close" id="btnCollapse">收起<span>⌄</span></button>
-        </div>
-        <div class="pe-body">
-          <div class="pe-left" id="peLeft"></div>
-          <div class="pe-right">
-            <div class="pe-scroll" id="peScroll">
-              <div class="pe-grid" id="peGrid"></div>
-            </div>
-            <div class="pe-fade" id="peFade"></div>
+        <div class="pe-left" id="peLeft"></div>
+        <div class="pe-right">
+          <div class="pe-scroll" id="peScroll">
+            <div class="pe-grid" id="peGrid"></div>
           </div>
-        </div>
-        <div class="pe-foot">
-          <span class="pe-hint" id="peInfo">上下滑动看更多</span>
-          <span class="grow"></span>
-          <span class="pager">
-            <button id="pePrev">‹</button><span class="page" id="pePage">1/1</span><button id="peNext">›</button>
-          </span>
+          <div class="pe-fade" id="peFade"></div>
         </div>
       </div>
 
@@ -347,8 +310,11 @@ function renderCandBar(){
   });
 
   const wrap=document.createElement('div'); wrap.className='exwrap';
-  const ex=document.createElement('button'); ex.className='exbtn'; ex.textContent='▼';
-  ex.title='展开候选面板';
+  const ex=document.createElement('button'); ex.className='exbtn';
+  // 面板打开时箭头朝上，点它收起（面板本身没有标题栏/底栏，收起入口就是这里）
+  const opened = S.variant==='c' ? S.gridOpen : (S.expandOpen && S.variant==='b');
+  ex.textContent = opened ? '▲' : '▼';
+  ex.title = opened ? '收起候选面板' : '展开候选面板';
   ex.onclick=()=>{ if(S.variant==='c'){S.gridOpen=!S.gridOpen;S.expandOpen=false;} else {S.expandOpen=!S.expandOpen;S.gridOpen=false;} render(); };
   wrap.appendChild(ex);
   bar.appendChild(wrap);
@@ -382,42 +348,31 @@ function renderExpand(){
   e.classList.toggle('show', open);
   if(!open) return;
 
-  // 左列：只显示拼音，不显示数量
+  // 左列：只有拼音
   const left=$('#peLeft'); left.innerHTML='';
   DATA.segs.forEach((s,i)=>{
     const d=document.createElement('div');
     d.className='g'+(i===S.activeSeg?' on':'');
     d.textContent=s.py;
-    d.title=s.py;
     d.onclick=()=>{ S.activeSeg=i; S.page=0; render(); };
     left.appendChild(d);
   });
 
-  // 右侧候选：独立纵向滚动网格（RecyclerView 形态）
+  // 右侧：纵向滚动网格，铺全部候选（滚动代替翻页）
   const grid=$('#peGrid'); grid.innerHTML='';
-  const list=DATA.segs[S.activeSeg].cands;
-  const perPage = 40;
-  const pageCount = Math.max(1, Math.ceil(list.length/perPage));
-  const start = S.page*perPage;
-  list.slice(start, start+perPage).forEach((w,i)=>{
+  DATA.segs[S.activeSeg].cands.forEach((w,i)=>{
     const c=document.createElement('div');
-    c.className='pe-cell'+(w.length>1?' w':'')+((start+i)===0?' hl':'');
+    c.className='pe-cell'+(w.length>1?' w':'')+(i===0?' hl':'');
     c.textContent=w;
     c.onclick=()=>commit(w);
     grid.appendChild(c);
   });
 
-  $('#peSub').textContent = DATA.segs[S.activeSeg].py + ' · 共 ' + list.length + ' 个';
-  $('#peInfo').textContent = pageCount>1 ? '上下滑动看更多 · 第 ' + (S.page+1) + ' 页' : '上下滑动看更多';
-  $('#pePage').textContent = (S.page+1)+'/'+pageCount;
-  $('#pePrev').disabled = S.page<=0;
-  $('#peNext').disabled = S.page>=pageCount-1;
-
-  // 滚动到顶部 + 渐隐提示
   const sc=$('#peScroll'); sc.scrollTop=0;
   const fade=$('#peFade');
   requestAnimationFrame(()=>{ fade.classList.toggle('show', sc.scrollHeight > sc.clientHeight + 2); });
 }
+
 function renderGrid(){
   const g=$('#gridpage');
   g.classList.toggle('show', S.gridOpen && S.variant==='c');
@@ -432,7 +387,7 @@ function render(){
   renderEditor(); renderCompose(); renderCandBar(); renderExpand(); renderGrid();
   const desc = {
     a:'现状：候选栏是一整条 Canvas，宽度不够就出 ◀ ▶；▼ 打开 liquid 的候选网格页。',
-    b:'推荐：单行候选放不下就截断（不再有 ◀ ▶），右侧只有 ▼；展开后左侧拼音组、右侧网格，点组切候选，点词上屏该组；候选为空时 ▼ 变成收起键盘。',
+    b:'推荐：单行候选放不下就截断（不再有 ◀ ▶），右侧只有 ▼；展开面板只有「左拼音组 + 右滚动候选」两栏，再点 ▼ 或按返回键收起；候选为空时 ▼ 变成收起键盘。',
     c:'九宫格：点 ▼ 全屏铺候选网格（相当于把现有 liquid CANDIDATE 页做成正式候选页）；候选同样单行截断、候选为空时按钮收起键盘。'
   };
   $('#vdesc').textContent = desc[S.variant];
@@ -456,9 +411,6 @@ document.getElementById('input').oninput=(e)=>{
   DATA.segs.forEach((s,i)=>{ if(parts[i]) s.py=parts[i]; });
   S.activeSeg=0; S.page=0; render();
 };
-document.getElementById('btnCollapse').onclick=()=>{S.expandOpen=false;render();};
-document.getElementById('pePrev').onclick=()=>{ if(S.page>0){S.page--;render();} };
-document.getElementById('peNext').onclick=()=>{ const n=Math.ceil(DATA.segs[S.activeSeg].cands.length/40); if(S.page<n-1){S.page++;render();} };
 document.addEventListener('scroll', (e)=>{
   if(e.target && e.target.id==='peScroll'){
     const sc=e.target, fade=document.getElementById('peFade');
