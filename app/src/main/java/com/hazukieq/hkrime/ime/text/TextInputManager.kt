@@ -66,6 +66,8 @@ class TextInputManager private constructor() :
     private var candidateGroupAdapter: CandidateGroupAdapter? = null
     /** 左側音節組：本次點擊選中的下標（-1 表示跟隨 caret） */
     private var activeGroupIndex = -1
+    private var activeGroupStartByte = 0
+    private var activeGroupText = ""
     private var lastGroupText: String? = null
     private var panelItems: MutableList<CandidatePanelAdapter.Item> = mutableListOf()
     /** 面板一次最多收集的頁數，防止極端情況下卡住 */
@@ -278,6 +280,10 @@ class TextInputManager private constructor() :
     }
 
     private fun pickPanelCandidate(pageOffset: Int, indexInPage: Int) {
+        if (pageOffset < 0) {
+            pickLookupWord(indexInPage)
+            return
+        }
         // 面板展示的是「當前頁之後」的頁，提交時需要先翻到那一頁
         var delta = pageOffset
         while (delta > 0) {
@@ -285,13 +291,12 @@ class TextInputManager private constructor() :
             if (!Rime.hasRight()) break
             delta--
         }
-        // 只選中這一段，不強制上屏：模擬數字鍵讓 Rime 自己決定（還有未轉換段時繼續組字）
-        if (indexInPage in 0..8) {
-            trime.handleKey(KeyEvent.KEYCODE_1 + indexInPage, 0)
-        } else if (Rime.selectCandidate(indexInPage) && !Rime.isComposing()) {
+        // 直接讓 librime 選這一項：還有未轉換段時它會保留組字，全部處理完才上屏
+        Rime.selectCandidate(indexInPage)
+        trime.updateComposing()
+        if (!Rime.isComposing()) {
             activeEditorInstance.commitRimeText()
         }
-        trime.updateComposing()
         if (!Rime.isComposing()) {
             hideCandidatePanel()
         } else {
@@ -300,11 +305,9 @@ class TextInputManager private constructor() :
                 trime.handleKey(KeyEvent.KEYCODE_PAGE_UP, 0)
             }
             trime.updateComposing()
-            panelItems = collectCandidatePanelItems()
-            if (panelItems.isEmpty()) panelItems = currentPageItems()
-            candidatePanelAdapter?.submit(panelItems)
-            candidatePanel?.scrollToPosition(0)
+            activeGroupIndex = -1
             rebuildPinyinGroups()
+            refreshPanelItems()
         }
     }
 
@@ -494,9 +497,86 @@ class TextInputManager private constructor() :
      *
      * 光標只在右側挑中漢字（真正上屏/轉換一段）時才由 librime 自己消費。
      */
+    /**
+     * 點擊左側音節組：用「把 caret 移到該音節起點」的方式讓 librime 給這一節的候選
+     * （不寫入、不轉換任何字）；右側候選欄/展開面板立即切成這一節的候選。
+     * 只有用戶在右側挑字時才真正消費/轉換。
+     */
     private fun selectPinyinGroup(group: CandidateGroupAdapter.PinyinGroupAdapterItem) {
         activeGroupIndex = group.index
+        // 不碰 librime：直接用字典做「快速查找」，右側列這一節的單音節字/詞
+        val words = SyllableLexicon.lookup(trime, group.text)
+        if (words.isEmpty()) {
+            return
+        }
+        activeGroupStartByte = group.startByte
+        activeGroupText = group.text
+        panelItems = words.withIndex()
+            .map { (i, w) -> CandidatePanelAdapter.Item(w, "", -1, i) }
+            .toMutableList()
+        candidatePanelAdapter?.submit(panelItems)
+        candidatePanel?.scrollToPosition(0)
         rebuildPinyinGroups()
+    }
+
+    /**
+     * 用 librime 自己的左/右光標鍵把 caret 移到指定字節位置。
+     * 只調 set_caret_pos 不會刷新候選，必須走 processKey(XK_Left/Right)。
+     */
+    private fun moveCaretTo(targetByte: Int) {
+        var caret = Rime.RimeGetCaretPos()
+        var guard = 0
+        while (caret > targetByte && guard++ < 64) {
+            if (!Rime.process_key(0xff51 /* XK_Left */, 0)) break
+            val next = Rime.RimeGetCaretPos()
+            if (next == caret) break
+            caret = next
+        }
+        guard = 0
+        while (caret < targetByte && guard++ < 64) {
+            if (!Rime.process_key(0xff53 /* XK_Right */, 0)) break
+            val next = Rime.RimeGetCaretPos()
+            if (next == caret) break
+            caret = next
+        }
+    }
+
+    /**
+     * 從「字典快速查找」清單裡挑一個字：只有到這一步才動 librime。
+     * 先看當前候選頁有沒有它；沒有就把 caret 移到該音節再找一次；仍沒有就提示。
+     */
+    private fun pickLookupWord(index: Int) {
+        val word = panelItems.getOrNull(index)?.text ?: return
+        if (selectCandidateByText(word)) return
+        // 候選頁裡沒有：把 caret 移到該音節起點，讓 librime 給這一節的候選再試一次
+        moveCaretTo(activeGroupStartByte)
+        trime.updateComposing()
+        rebuildPinyinGroups()
+        if (selectCandidateByText(word)) return
+        android.widget.Toast.makeText(trime, "「$word」不在當前候選頁", android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    private fun selectCandidateByText(word: String): Boolean {
+        val cs = Rime.getCandidatesWithoutSwitch() ?: return false
+        val idx = cs.indexOfFirst { (it.text ?: "") == word }
+        if (idx < 0) return false
+        Rime.selectCandidate(idx)
+        trime.updateComposing()
+        if (!Rime.isComposing()) {
+            activeEditorInstance.commitRimeText()
+            hideCandidatePanel()
+        }
+        return true
+    }
+
+    /** 重新收集展開面板內容（保持「面板不影響候選欄」的約定）。 */
+    private fun refreshPanelItems() {
+        val panel = candidatePanel ?: return
+        if (!isCandidatePanelShown()) return
+        panelItems = collectCandidatePanelItems()
+        if (panelItems.isEmpty()) panelItems = currentPageItems()
+        candidatePanelAdapter?.submit(panelItems)
+        panel.scrollToPosition(0)
     }
 
     /**
