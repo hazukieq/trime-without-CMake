@@ -1289,9 +1289,31 @@ public class Trime extends LifecycleInputMethodService {
     dialog.show();
   }
 
-  /** 彈出{@link ColorPickerDialog 配色對話框} */
+  /** 彈出現代風格（類 Apple）配色選擇對話框。 */
   public void showColorDialog() {
-    new ColorPickerDialog(this).show();
+    final com.hazukieq.hkrime.data.Config config =
+        com.hazukieq.hkrime.data.Config.get(this);
+    final String[] keys = config.getColorKeys().clone();
+    java.util.Arrays.sort(keys);
+    final String[] names = config.getColorNames(keys);
+    final String selected =
+        com.hazukieq.hkrime.data.AppPrefs.defaultInstance().getLooks().getSelectedColor();
+    int checked = java.util.Arrays.binarySearch(keys, selected);
+    if (checked < 0) checked = 0;
+    final com.hazukieq.hkrime.ime.dialog.ModernListDialog dialog =
+        com.hazukieq.hkrime.ime.dialog.ModernListDialog.singleChoice(
+            this,
+            getString(R.string.looks__selected_color_title),
+            java.util.Arrays.asList(names),
+            checked,
+            index -> {
+              if (index < 0 || index >= keys.length) return;
+              com.hazukieq.hkrime.data.AppPrefs.defaultInstance()
+                  .getLooks()
+                  .setSelectedColor(keys[index]);
+              initKeyboard();
+            });
+    showDialog(dialog);
   }
 
   /**
@@ -1304,18 +1326,15 @@ public class Trime extends LifecycleInputMethodService {
       showOptionsDialog();
       return;
     }
-    final AlertDialog dialog =
-        new AlertDialog.Builder(this, R.style.AlertDialogTheme)
-            .setTitle("方案开关")
-            .setItems(
-                labels,
-                (d, index) -> {
-                  Rime.toggleOption(index);
-                  updateComposing();
-                  d.dismiss();
-                })
-            .setNegativeButton(android.R.string.cancel, (d, which) -> d.dismiss())
-            .create();
+    final com.hazukieq.hkrime.ime.dialog.ModernListDialog dialog =
+        com.hazukieq.hkrime.ime.dialog.ModernListDialog.actionList(
+            this,
+            "方案开关",
+            java.util.Arrays.asList(labels),
+            index -> {
+              Rime.toggleOption(index);
+              updateComposing();
+            });
     showDialog(dialog);
   }
 

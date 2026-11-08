@@ -943,3 +943,20 @@ BFS 隊列峰值 766 —— 也就是說 37ms 全是簡拼圖 BFS 的展開成�
 （沒有則取當前快照的 `barItems.first()`）→ `selectCandidate(item.index)`。
 
 驗證：`nz` → 條首「年」→ 空格 → 上屏「年」。
+
+## 15.15 對話框現代化（類 Apple，2026-11-09）
+
+用戶：「配色和 schema switch 的对话框美化统一设计，要求有现代美感，可以类Apple」。
+
+新增 `ime/dialog/ModernListDialog.kt`，兩個對話框共用同一套視覺：
+
+- 卡片：22dp 圓角、左右 32dp / 上下 24dp 留白、純色 surface（深色模式自動切 #1C1C1E）；
+- 標題：17sp Bold 居中，上 22dp / 下 18dp；
+- 列表行：50dp 高、17sp，行間 1px 髮絲線（左縮進 20dp）；單選模式右側 2dp 藍色勾（#007AFF）；
+- 底部：髮絲線 + 文字按鈕（取消 / 確定），按壓 ripple；**action 模式只留「取消」**
+  （點行即生效，避免一個沒意義的「確定」）；
+- 窗口 `Gravity.CENTER` + WRAP_CONTENT，`setDimAmount(0.4f)`，背景透明。
+
+接入：`Trime.showColorDialog()`（單選 + 確定後 `initKeyboard()` 立即生效）、
+`Trime.showSchemaSwitchDialog()`（action 模式，點行 `Rime.toggleOption`）。
+`ColorPickerDialog` 僅 settings 仍在用，IME 內不再走它。
