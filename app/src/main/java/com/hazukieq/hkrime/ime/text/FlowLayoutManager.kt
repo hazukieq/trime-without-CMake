@@ -84,10 +84,10 @@ class FlowLayoutManager(private val gap: Int) : RecyclerView.LayoutManager() {
         }
         if (row.items.isNotEmpty()) rows.add(row)
 
-        // ③ 定位：每行水平居中；縱向從 -scrollOffset 開始
+        // ③ 定位：左對齊（用戶 2026-11-08 否決了居中）；縱向從 -scrollOffset 開始
         var y = paddingTop - scrollOffset
         for (r in rows) {
-            var x = paddingLeft + (avail - r.width) / 2
+            var x = paddingLeft
             for (tile in r.items) {
                 layoutDecoratedWithMargins(tile.view, x, y, x + tile.width, y + tile.height)
                 x += tile.width + gap

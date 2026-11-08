@@ -30,7 +30,7 @@
             <!-- 左側：拼音音節組（自切音節，僅顯示/導航） -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/candidate_group_list"
-                android:layout_width="92dp"
+                android:layout_width="88dp"
                 android:layout_height="match_parent"
                 android:background="#FFEDF0F2"
                 android:paddingTop="6dp"
@@ -43,7 +43,10 @@
                 android:layout_weight="1"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
-                android:padding="6dp" />
+                android:paddingStart="8dp"
+                android:paddingEnd="2dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp" />
         </LinearLayout>
     </FrameLayout>
 
