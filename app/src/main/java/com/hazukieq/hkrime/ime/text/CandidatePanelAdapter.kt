@@ -101,13 +101,6 @@ class CandidatePanelAdapter(
             isSingleLine = true
             includeFontPadding = false
             setTextSize(TypedValue.COMPLEX_UNIT_PX, commentSize)
-            // 拼音是次要信息：寬度跟著「詞」走，唸法太長就自動縮字，不撐寬格子
-            setAutoSizeTextTypeUniformWithConfiguration(
-                7,
-                commentSize.toInt(),
-                1,
-                TypedValue.COMPLEX_UNIT_PX,
-            )
             setPadding(0, dp(1f), 0, 0)
         }
         box.addView(word)
@@ -118,8 +111,10 @@ class CandidatePanelAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = getItem(position)
         holder.word.text = item.text
+        val wordWidth = holder.word.paint.measureText(item.text)
+        val commentWidth = if (item.comment.isEmpty()) 0f else holder.comment.paint.measureText(item.comment)
         val tileWidth = maxOf(
-            holder.word.paint.measureText(item.text).toInt() + padH * 2,
+            maxOf(wordWidth, commentWidth).toInt() + padH * 2,
             minTileWidth,
         )
         holder.box.layoutParams = ViewGroup.MarginLayoutParams(
