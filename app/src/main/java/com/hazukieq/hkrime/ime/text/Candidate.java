@@ -112,6 +112,15 @@ public class Candidate extends View {
   private int commentTextColor, hilitedCommentTextColor;
   private int candidateViewHeight, commentHeight, candidateSpacing, candidatePadding;
   private boolean shouldShowComment = true, isCommentOnTop, candidateUseCursor;
+  /**
+   * 當前這批候選是否「真的」有拼音註釋要畫。
+   *
+   * <p>只有真的有註釋才給註釋單獨留一行；否則候選條會比 12 鍵（關閉註釋）高出一行
+   * comment_height，同一台機器上 12 鍵與全字母鍵盤的候選區高度就不一致
+   * （用戶 2026-11-09：全字母鍵盤高度應該和 12 鍵一致）。hakka_qwerty 等方案沒有
+   * spelling_hints，候選 comment 全空，不該白留一行。
+   */
+  private boolean showCommentRow = false;
 
   public void reset(Context context) {
     Config config = Config.get(context);
@@ -302,11 +311,11 @@ public class Candidate extends View {
                 - (candidatePaint.ascent() + candidatePaint.descent()) / 2;
         // 有拼音註釋時整排候選詞一起讓出註釋行的高度，否則第一個候選（唯一帶註釋的）
         // 會被壓低、與後面的字不在同一水平線（用戶 2026-11-08 指出）。
-        if (shouldShowComment) {
+        if (showCommentRow) {
           wordY += isCommentOnTop ? commentHeight / 2.0f : -commentHeight / 2.0f;
         }
         // 候選區：只有第一個候選標拼音（其餘候選共用同一讀音，重複標註很難看）
-        if (shouldShowComment && i == 0) {
+        if (showCommentRow && i == 0) {
           String comment = ((ComputedCandidate.Word) computedCandidate).getComment();
           if (comment != null && !comment.isEmpty()) {
             float commentX = computedCandidate.getGeometry().centerX();
@@ -365,9 +374,9 @@ public class Candidate extends View {
     return new Rect(left, 0, left + width, getMeasuredHeight());
   }
 
-  /** 圖標垂直中心 = 候選詞那一行的中心（comment_on_top 時在拼音注釋下方）。 */
+  /** 圖標垂直中心 = 候選詞那一行的中心（comment_on_top 且真的有注釋時在拼音注釋下方）。 */
   private float iconCenterY(Rect rect) {
-    final float offset = (shouldShowComment && isCommentOnTop) ? commentHeight / 2f : 0f;
+    final float offset = (showCommentRow && isCommentOnTop) ? commentHeight / 2f : 0f;
     return rect.centerY() + offset;
   }
 
@@ -451,6 +460,14 @@ public class Candidate extends View {
     computedCandidates.clear();
     updateCandidates();
 
+    // 註釋行只在「真的有註釋」時才佔高度：沒有註釋的方案（hakka_qwerty 等全字母方案）
+    // 和 12 鍵候選條保持同樣高度（用戶 2026-11-09：全字母鍵盤高度要和 12 鍵一致）。
+    showCommentRow =
+        shouldShowComment
+            && numCandidates > 0
+            && candidates != null
+            && !TextUtils.isEmpty(candidates[startNum].comment);
+
     int avail = expectWidth > 0 ? expectWidth : getMeasuredWidth();
     if (avail <= 0) avail = getResources().getDisplayMetrics().widthPixels;
 
@@ -526,7 +543,7 @@ public class Candidate extends View {
     LayoutParams params = getLayoutParams();
     params.width = width;
     params.height =
-        (shouldShowComment && isCommentOnTop)
+        (showCommentRow && isCommentOnTop)
             ? candidateViewHeight + commentHeight
             : candidateViewHeight;
     setLayoutParams(params);

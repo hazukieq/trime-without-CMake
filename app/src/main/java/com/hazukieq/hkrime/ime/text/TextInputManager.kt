@@ -88,6 +88,8 @@ class TextInputManager private constructor() :
         private val DELIMITER_PROPERTY_KEY = """^((\{Escape\})?[^{}]+).*$""".toRegex()
         /** Delimiter regex to split language/locale tags. */
         private val DELIMITER_SPLITTER = """[-_]""".toRegex()
+        /** 非 12 鍵方案展開面板一次枚舉的候選上限（與 12 鍵快照一致）。 */
+        private const val PANEL_ENUM_MAX = 600
         private var instance: TextInputManager? = null
 
         @Synchronized
@@ -285,10 +287,17 @@ class TextInputManager private constructor() :
             if (twelveKeyController?.snapshot?.isEmpty != false) twelveKeyController?.refreshSync()
             val snapshot = twelveKeyController?.snapshot
             if (snapshot == null || (!snapshot.hasCandidates && snapshot.fallback == null)) return
+            candidatePanelController?.showFollowingBar()
+            // 面板要完整分組：開面板時全量枚舉一次
+            twelveKeyController?.refresh(immediate = true, full = true)
+        } else {
+            // 非 12 鍵方案（客語 26 鍵等「全字母」）：面板內容由 App 現算一份全局下標候選，
+            // 交給同一個面板控制器顯示。之前這條路徑沒人餵內容、show() 又直接 return，
+            // 導致全字母方案按 ▼ 完全打不開（用戶 2026-11-09）。
+            val items = legacyPanelItems()
+            if (items.isEmpty()) return
+            candidatePanelController?.showLegacy(items)
         }
-        candidatePanelController?.showFollowingBar()
-        // 面板要完整分組：開面板時全量枚舉一次
-        if (isTwelveKeyMode()) twelveKeyController?.refresh(immediate = true, full = true)
         candidateView?.setPanelOpen(candidatePanelController?.isShown == true)
     }
 
@@ -326,13 +335,42 @@ class TextInputManager private constructor() :
     }
 
     private fun onPickPanelCandidate(item: CandidatePanelAdapter.Item) {
-        if (!isTwelveKeyMode()) return
+        if (!isTwelveKeyMode()) {
+            pickLegacyPanelCandidate(item)
+            return
+        }
         if (item.index < 0) {
             // fallback：本地原文上屏
             twelveKeyController?.snapshot?.fallback?.let { twelveKeyController?.commitFallback(it) }
             return
         }
         twelveKeyController?.selectCandidate(item.index)
+    }
+
+    /**
+     * 非 12 鍵面板點候選：走 librime 的全量下標（與 12 鍵同一套語義）。
+     * index < 0 是「本地原文」兜底項：直接提交當前組合，不學習。
+     */
+    private fun pickLegacyPanelCandidate(item: CandidatePanelAdapter.Item) {
+        if (item.index < 0) {
+            withEngineLock { runCatching { Rime.commitComposition() } }
+            runCatching { activeEditorInstance.commitRimeText() }
+                .onFailure { Timber.e(it, "legacy panel: commitRimeText failed") }
+            return
+        }
+        val ok = withEngineLock {
+            runCatching {
+                val selected = Rime.select_candidate(item.index)
+                if (selected) Rime.getContexts()
+                selected
+            }.getOrDefault(false)
+        }
+        if (!ok) {
+            Timber.w("legacy panel: select_candidate(%d) failed", item.index)
+            return
+        }
+        runCatching { activeEditorInstance.commitRimeText() }
+            .onFailure { Timber.e(it, "legacy panel: commitRimeText failed") }
     }
 
     /** 除錯：只印出分段信息，不再移動 caret / 改引擎狀態。 */
@@ -375,63 +413,36 @@ class TextInputManager private constructor() :
             hideCandidatePanel()
             return
         }
-        val items = (Rime.getCandidatesWithoutSwitch() ?: emptyArray()).mapIndexed { index, candidate ->
-            CandidatePanelAdapter.Item(
-                candidate.text ?: "",
-                candidate.comment ?: "",
-                index,
-            )
+        candidatePanelController?.updateLegacy(legacyPanelItems())
+    }
+
+    // ---------- 展開面板：非 12 鍵方案（全字母 26 鍵等） ----------
+
+    /**
+     * 非 12 鍵方案的右格候選：一次性全量枚舉（全局下標，點擊直接 `select_candidate(index)`，
+     * 語義與 12 鍵面板一致）。沒有候選（只剩未轉換編碼）時給一條「本地原文」兜底項（index = -1）。
+     */
+    private fun legacyPanelItems(): List<CandidatePanelAdapter.Item> {
+        val items = withEngineLock {
+            runCatching {
+                Rime.candidatesSnapshot(PANEL_ENUM_MAX).mapIndexedNotNull { index, row ->
+                    val text = row.getOrNull(0).orEmpty()
+                    if (text.isEmpty()) null
+                    else CandidatePanelAdapter.Item(text, row.getOrNull(1).orEmpty(), index)
+                }
+            }.getOrDefault(emptyList())
         }
-        candidatePanelController?.submitLegacy(legacyGroupItems(), items)
+        if (items.isNotEmpty()) return items
+        val rest = remainingCode()
+        return if (rest.isEmpty()) emptyList()
+        else listOf(CandidatePanelAdapter.Item(rest, "本地原文", -1))
     }
 
-
-    // ---------- 左側音節組（僅非 12 鍵方案使用；12 鍵左列由快照 comment 分組提供） ----------
-
-    private fun isCjk(c: Char): Boolean =
-        c.code in 0x3400..0x9FFF || c.code in 0xF900..0xFAFF
-
-    private fun buildGroupsFromSegments(
-        bytes: ByteArray,
-        segs: IntArray,
-    ): List<Triple<String, Int, Boolean>> {
-        val out = ArrayList<Triple<String, Int, Boolean>>()
-        var i = 0
-        while (i + 2 < segs.size) {
-            val startByte = segs[i]
-            val endByte = segs[i + 1]
-            val status = segs[i + 2]
-            i += 3
-            if (startByte < 0 || endByte <= startByte || endByte > bytes.size) continue
-            val segText = String(bytes, startByte, endByte - startByte, Charsets.UTF_8)
-                .trim { it == '\'' || it == ' ' }
-            if (segText.isBlank()) continue
-            out.add(Triple(segText, startByte, status >= 2))
-        }
-        return out
-    }
-
-    /** 非 12 鍵路徑的左列：直接按 librime 的分段重建（不做任何 caret 探測）。 */
-    private fun legacyGroupItems(): List<CandidateGroupAdapter.GroupItem> {
-        val input = runCatching { Rime.RimeGetInput() }.getOrNull().orEmpty()
-        if (input.isEmpty()) return emptyList()
-        val bytes = input.toByteArray(Charsets.UTF_8)
-        val segments = runCatching { Rime.getRimeCompositionSegments() }.getOrDefault(IntArray(0))
-        return buildGroupsFromSegments(bytes, segments)
-            .mapIndexed { index, (text, _, converted) ->
-                CandidateGroupAdapter.GroupItem(
-                    index = index,
-                    reading = text,
-                    selected = false,
-                    converted = converted,
-                )
-            }
-    }
-
-    /** 兼容舊調用點。 */
-    private fun rebuildPinyinGroups() {
-        if (!isCandidatePanelShown()) return
-        candidatePanelController?.submitLegacy(legacyGroupItems(), emptyList())
+    /** 目前 preedit 裡還沒被轉換的編碼（去掉漢字/占位符/空格），例如只剩 u 時回傳 "u"。 */
+    private fun remainingCode(): String {
+        val preedit = runCatching { Rime.getCompositionText() }.getOrNull().orEmpty()
+            .replace("\u2038", "")
+        return preedit.filter { it.code < 128 && (it.isLetterOrDigit() || it == '\'') }
     }
 
     /**

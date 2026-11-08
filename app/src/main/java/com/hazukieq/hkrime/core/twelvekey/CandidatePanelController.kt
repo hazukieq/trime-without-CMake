@@ -47,6 +47,15 @@ class CandidatePanelController(
     private var activeGroup = 0
     private var lastInput: String? = null
 
+    /**
+     * 非 12 鍵方案（客語 26 鍵等「全字母」方案）走舊路徑：面板內容由外部準備好後交給
+     * [showLegacy] / [updateLegacy]，不讀 [snapshot]。
+     *
+     * 之前 show() 直接 `if (snapshot.isEmpty) return`，而舊路徑永遠不會有快照，
+     * 導致這些方案按 ▼ 完全打不開面板（用戶 2026-11-09 反饋）。
+     */
+    private var legacyMode = false
+
     init {
         this.groupList?.apply {
             layoutManager = LinearLayoutManager(context)
@@ -87,7 +96,7 @@ class CandidatePanelController(
     }
 
     fun show() {
-        if (snapshot.isEmpty) return
+        if (!legacyMode && snapshot.isEmpty) return
         val height = keyboardView?.let { if (it.height > 0) it.height else it.measuredHeight } ?: 0
         if (height > 0) {
             inputArea?.layoutParams?.let {
@@ -97,12 +106,35 @@ class CandidatePanelController(
         }
         keyboardView?.visibility = View.GONE
         panelRoot?.visibility = View.VISIBLE
-        render(scrollGrid = true, scrollGroups = true)
+        if (!legacyMode) render(scrollGrid = true, scrollGroups = true)
+    }
+
+    /**
+     * 非 12 鍵方案：候選由外部一次性算好（全局下標），這裡只負責貼上面板。
+     *
+     * 這些方案沒有「按 comment 分組」的讀音資訊，左列音節索引沒有意義，直接隱藏，
+     * 寬度全部留給候選格。
+     */
+    fun showLegacy(items: List<CandidatePanelAdapter.Item>) {
+        legacyMode = true
+        groupList?.visibility = View.GONE
+        groupAdapter.clear()
+        gridAdapter.submit(items)
+        show()
+        grid?.scrollToPosition(0)
+    }
+
+    /** 面板已顯示時按鍵/上屏後刷新右格（只在舊路徑用）。 */
+    fun updateLegacy(items: List<CandidatePanelAdapter.Item>) {
+        if (!legacyMode || !isShown) return
+        gridAdapter.submit(items)
     }
 
     fun hide() {
+        legacyMode = false
         panelRoot?.visibility = View.GONE
         keyboardView?.visibility = View.VISIBLE
+        groupList?.visibility = View.VISIBLE
         inputArea?.layoutParams?.let {
             it.height = FrameLayout.LayoutParams.WRAP_CONTENT
             inputArea.requestLayout()
@@ -114,6 +146,9 @@ class CandidatePanelController(
 
     /** 每次按鍵/上屏後由上層調用：整個面板只讀這一份快照。 */
     fun submit(next: TwelveKeySnapshot) {
+        // 一旦走快照路徑，就恢復 12 鍵的「左列音節索引 + 右格」佈局。
+        legacyMode = false
+        groupList?.visibility = View.VISIBLE
         val previousReading = snapshot.groups.getOrNull(activeGroup)?.reading
         val inputChanged = next.input != lastInput
         if (inputChanged) lastInput = next.input
@@ -154,17 +189,9 @@ class CandidatePanelController(
         return if (idx >= 0) idx else 0
     }
 
-    /** 舊路徑（非 12 鍵）兼容：直接給已算好的左列/右格。 */
-    fun submitLegacy(groups: List<CandidateGroupAdapter.GroupItem>, items: List<CandidatePanelAdapter.Item>) {
-        if (isShown) {
-            groupAdapter.submit(groups)
-            gridAdapter.submit(items)
-            groupList?.scrollToPosition(0)
-            grid?.scrollToPosition(0)
-        }
-    }
-
     private fun pickGroup(group: CandidateGroupAdapter.GroupItem) {
+        // 舊路徑沒有分組資料（左列已隱藏），點組不該把面板重繪成空。
+        if (legacyMode) return
         if (group.index == activeGroup) return
         activeGroup = group.index
         // 切組：只把右格滾到頂，左列保持當前滾動位置。
