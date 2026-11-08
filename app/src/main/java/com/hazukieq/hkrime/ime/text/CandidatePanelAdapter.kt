@@ -61,6 +61,15 @@ class CandidatePanelAdapter(
 
     private val hideComment = Rime.getOption("_hide_comment")
 
+    /** 只有組數 >= 2（多個讀音）時才標註拼音；單讀音時留白反而清爽。 */
+    private var showComment = true
+
+    fun setShowComment(value: Boolean) {
+        if (showComment == value) return
+        showComment = value
+        notifyItemRangeChanged(0, itemCount)
+    }
+
     class VH(val box: LinearLayout, val word: TextView, val comment: TextView) :
         RecyclerView.ViewHolder(box)
 
@@ -112,7 +121,11 @@ class CandidatePanelAdapter(
         val item = getItem(position)
         holder.word.text = item.text
         val wordWidth = holder.word.paint.measureText(item.text)
-        val commentWidth = if (item.comment.isEmpty()) 0f else holder.comment.paint.measureText(item.comment)
+        val commentWidth = if (showComment && !hideComment && item.comment.isNotEmpty()) {
+            holder.comment.paint.measureText(item.comment)
+        } else {
+            0f
+        }
         val tileWidth = maxOf(
             maxOf(wordWidth, commentWidth).toInt() + padH * 2,
             minTileWidth,
@@ -121,7 +134,7 @@ class CandidatePanelAdapter(
             tileWidth,
             ViewGroup.LayoutParams.WRAP_CONTENT,
         )
-        if (hideComment || item.comment.isEmpty()) {
+        if (hideComment || !showComment || item.comment.isEmpty()) {
             holder.comment.visibility = View.GONE
         } else {
             holder.comment.visibility = View.VISIBLE

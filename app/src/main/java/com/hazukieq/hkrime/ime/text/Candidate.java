@@ -300,7 +300,8 @@ public class Candidate extends View {
         float wordY =
             computedCandidates.get(0).getGeometry().centerY()
                 - (candidatePaint.ascent() + candidatePaint.descent()) / 2;
-        if (shouldShowComment) {
+        // 候選區：只有第一個候選標拼音（其餘候選共用同一讀音，重複標註很難看）
+        if (shouldShowComment && i == 0) {
           String comment = ((ComputedCandidate.Word) computedCandidate).getComment();
           if (comment != null && !comment.isEmpty()) {
             float commentX = computedCandidate.getGeometry().centerX();

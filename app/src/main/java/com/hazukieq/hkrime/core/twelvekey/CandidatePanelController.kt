@@ -175,6 +175,7 @@ class CandidatePanelController(
                 )
             },
         )
+        gridAdapter.setShowComment(groups.size >= 2)
         gridAdapter.submit(
             groups[activeGroup].items.map {
                 CandidatePanelAdapter.Item(text = it.text, comment = it.comment, index = it.index)
