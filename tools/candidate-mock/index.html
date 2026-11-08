@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>候选区 UI Mock · hkrime</title>
+<style>
+  :root{
+    /* 取自 hkrime 默认主题 preset_color_schemes.default */
+    --back:#e4e7e9;            /* back_color 候选区背景 */
+    --border:#c1c7ca;          /* border_color */
+    --sep:#c1c7ca;             /* candidate_separator_color */
+    --ctext:#5a676e;           /* candidate_text_color */
+    --ccomment:#7b868c;        /* comment_text_color */
+    --hback:#d3d7da;           /* hilited_candidate_back_color */
+    --htext:#000000;           /* hilited_candidate_text_color */
+    --hcomment:#000000;
+    --keybg:#eceff1;           /* key_back_color */
+    --keytext:#37474f;         /* key_text_color */
+    --keysym:#5f6b73;          /* key_symbol_color */
+    --kb:#ffffff;              /* keyboard_back_color */
+    --accent:#23948e;          /* text_color / on_key_back_color */
+    --page:#f5f6f7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#0d1117;color:#d6dee8;font:14px/1.6 -apple-system,"Noto Sans SC","Microsoft YaHei",sans-serif}
+  .wrap{display:flex;gap:24px;padding:22px 26px;align-items:flex-start}
+  .panel{width:340px;flex:none}
+  h1{font-size:17px;margin:0 0 4px}
+  .sub{color:#8b98aa;font-size:12px;margin-bottom:16px}
+  .variants{display:flex;flex-direction:column;gap:8px;margin-bottom:18px}
+  .variant{border:1px solid #243044;background:#141a24;border-radius:10px;padding:10px 12px;cursor:pointer;transition:.15s}
+  .variant:hover{border-color:#33425c}
+  .variant.on{border-color:var(--accent);background:#16241f}
+  .variant b{display:block;font-size:13px}
+  .variant span{color:#8b98aa;font-size:12px}
+  .ctl{border-top:1px solid #1d2635;padding-top:14px}
+  .ctl label{display:block;color:#8b98aa;font-size:12px;margin:10px 0 4px}
+  .ctl input[type=text]{width:100%;background:#111721;border:1px solid #243044;color:#d6dee8;border-radius:7px;padding:7px 9px;font:13px/1.4 ui-monospace,monospace}
+  .ctl .row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  button{background:#1b2431;color:#cfd8e3;border:1px solid #2b3850;border-radius:7px;padding:6px 12px;font-size:12.5px;cursor:pointer}
+  button:hover{background:#22303f}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .notes{margin-top:20px;color:#8b98aa;font-size:12px;line-height:1.75}
+  .notes b{color:#c3cedb}
+  .notes code{background:#182030;border-radius:4px;padding:1px 4px;font-size:11px}
+
+  /* ---------- 手机框 ---------- */
+  .stage{flex:1;display:flex;justify-content:center}
+  .phone{width:360px;flex:none;background:#0b0f17;border-radius:22px;padding:8px;box-shadow:0 24px 60px rgba(0,0,0,.6),0 0 0 1px #1d2635}
+  .screen{width:100%;height:640px;background:var(--page);border-radius:15px;overflow:hidden;position:relative;display:flex;flex-direction:column}
+  .editor{flex:1;min-height:0;padding:14px 16px 10px;color:#1f2a33;font-size:16px;line-height:1.5;word-break:break-all}
+  .editor .caret{display:inline-block;width:1.5px;height:17px;background:var(--accent);vertical-align:-2px;animation:blink 1.1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .editor .hint{color:#9aa6b2;font-size:13px}
+
+  /* 预编辑行（拼音串 / 拼音组） */
+  .compose{background:var(--back);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:6px 10px;display:flex;align-items:center;gap:3px;min-height:38px;flex-wrap:wrap}
+  .seg{padding:1px 5px;border-radius:5px;font:14px/1.35 ui-monospace,monospace;color:var(--ctext);cursor:pointer;border:1px dashed transparent}
+  .seg:hover{border-color:var(--border)}
+  .seg.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .seg.done{color:var(--accent);font-weight:600}
+  .compose .sp{color:#9aa6b2}
+
+  /* 候选区（单行） */
+  .candbar{background:var(--back);display:flex;align-items:stretch;min-height:40px;overflow:hidden;position:relative}
+  .cand{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 9px;cursor:pointer;min-width:0}
+  .cand .w{font-size:22px;line-height:1.05;color:var(--ctext);white-space:nowrap}
+  .cand .c{font-size:12px;line-height:1;color:var(--ccomment);white-space:nowrap;margin-bottom:2px}
+  .cand.hl{background:var(--hback)}
+  .cand.hl .w{color:var(--htext)}
+  .cand:hover{background:#dfe3e6}
+  .arrows{display:flex;align-items:center;margin-left:auto;background:var(--back)}
+  .arrows button{background:transparent;border:0;color:var(--ccomment);font-size:15px;padding:0 8px;height:100%;border-radius:0}
+  .arrows button:hover{background:var(--hback);color:var(--htext)}
+  .exbtn{color:var(--ctext)!important;font-size:14px!important}
+
+  /* 键盘占位 */
+  .kbwrap{flex:none;background:var(--kb);padding:6px}
+  .kbrows{display:flex;flex-direction:column;gap:5px}
+  .kbrow{display:flex;gap:4px;height:52px;flex:none}
+  .k{flex:1;border-radius:7px;background:var(--keybg);display:flex;align-items:center;justify-content:center;color:var(--keytext);font-size:13px;position:relative}
+  .k .s{position:absolute;top:2px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--keysym)}
+  .k.fn{background:#f7f8f9}
+  .k.space{grid-column:span 4}
+  .k.enter{background:var(--accent);color:#fff}
+
+  /* 展开面板（覆盖键盘区） */
+  .panel-expand{position:absolute;left:0;right:0;bottom:0;height:300px;background:var(--page);border-top:1px solid var(--border);display:none;flex-direction:column;box-shadow:0 -8px 22px rgba(0,0,0,.12)}
+  .panel-expand.show{display:flex}
+  .pe-head{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);background:var(--back)}
+  .pe-head .t{font-size:12.5px;color:var(--ctext)}
+  .pe-head .grow{flex:1}
+  .pe-body{display:flex;min-height:196px}
+  .pe-left{width:88px;flex:none;background:var(--back);border-right:1px solid var(--border);padding:6px 0;overflow:auto}
+  .pe-left .g{padding:7px 10px;font:14px/1.2 ui-monospace,monospace;color:var(--ctext);cursor:pointer;border-left:3px solid transparent;white-space:nowrap}
+  .pe-left .g:hover{background:#dfe3e6}
+  .pe-left .g.on{background:var(--hback);border-left-color:var(--accent);color:var(--htext);font-weight:600}
+  .pe-left .g .n{color:var(--ccomment);font-size:10.5px;margin-left:4px}
+  .pe-right{flex:1;overflow:auto}
+  .pe-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);padding:1px}
+  .pe-cell{background:var(--page);min-height:48px;display:flex;align-items:center;justify-content:center;color:var(--ctext);font-size:20px;cursor:pointer;position:relative}
+  .pe-cell:hover{background:var(--hback);color:var(--htext)}
+  .pe-cell .c{position:absolute;top:2px;font-size:10px;color:var(--ccomment)}
+  .pe-cell.hl{background:var(--hback);color:var(--htext)}
+  .pe-foot{display:flex;align-items:center;gap:8px;padding:6px 10px;border-top:1px solid var(--border);background:var(--back);color:var(--ccomment);font-size:12px}
+  .pe-foot .grow{flex:1}
+  .pager{display:flex;gap:6px}
+  .pager button{padding:2px 8px}
+
+  /* 方案 C：全网格页 */
+  .gridpage{position:absolute;left:0;right:0;bottom:0;height:300px;background:var(--page);border-top:1px solid var(--border);display:none;flex-direction:column}
+  .gridpage.show{display:flex}
+  .gridpage{display:none;flex-direction:column}
+  .gridpage .gbody{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);padding:1px;flex:1;min-height:0;overflow-y:auto;align-content:start}
+  .gridpage .gcell{background:var(--page);height:52px;display:flex;align-items:center;justify-content:center;font-size:21px;color:var(--ctext);cursor:pointer}
+  .gridpage .gcell:hover{background:var(--hback);color:var(--htext)}
+  .gridpage .gcell.hl{background:var(--hback);color:var(--htext)}
+  .badge{display:inline-block;font-size:10.5px;color:#8b98aa;border:1px solid #2b3850;border-radius:20px;padding:0 7px;margin-left:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="panel">
+    <h1>候选区 UI Mock</h1>
+    <div class="sub">hkrime / Trime fork · 三种形态对比（配色取自默认主题）</div>
+
+    <div class="variants" id="variants">
+      <div class="variant on" data-v="a"><b>A · 现状：单行自绘 + 横滚</b><span>一整条 Canvas 画完，宽度溢出可左右滑；右侧 ◀ ▶ ▼</span></div>
+      <div class="variant" data-v="b"><b>B · 单行 + 「▼」展开面板 <span class="badge">推荐</span></b><span>单行只放一行，点 ▼ 展开：左侧拼音组，右侧候选网格</span></div>
+      <div class="variant" data-v="c"><b>C · 九宫格候选页</b><span>点 ▼ 直接铺满候选网格（现有 liquid CANDIDATE 页的形态）</span></div>
+    </div>
+
+    <div class="ctl">
+      <label>输入串（用空格分词模拟拼音组）</label>
+      <input type="text" id="input" value="ni hao ma">
+      <div class="row">
+        <button id="btnType" class="primary">模拟上屏一段</button>
+        <button id="btnReset">重置</button>
+      </div>
+      <label>说明</label>
+      <div style="color:#8b98aa;font-size:12px;line-height:1.7" id="vdesc"></div>
+    </div>
+
+    <div class="notes">
+      <b>这页只验证交互形态</b>，像素级细节（字号/间距/圆角/阴影）仍以 <code>trime.yaml</code> 与
+      <code>Candidate.java</code> 为准。<br>
+      <b>B 的关键</b>：展开面板出现时，左侧拼音组点一下 → 右侧候选切到该组的候选；点候选 = 上屏该组，
+      自动跳到下一组。<br>
+      <b>数据来源</b>：librime 的 <code>get_caret_pos / set_caret_pos</code> + <code>RimeComposition.sel_start/sel_end</code>
+      可以推出「拼音组」，JNI 已导出，不需要改 librime。
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="phone"><div class="screen" id="screen">
+      <div class="editor" id="editor"><span class="hint">点下面键盘/候选试试</span><span class="caret"></span></div>
+      <div class="compose" id="compose"></div>
+      <div class="candbar" id="candbar"></div>
+      <div class="kbwrap" id="kbwrap"><div class="kbrows" id="kbrows"></div></div>
+
+      <!-- B：展开面板 -->
+      <div class="panel-expand" id="expand">
+        <div class="pe-head">
+          <span class="t">候选 · 拼音组</span>
+          <span class="grow"></span>
+          <button id="btnCollapse">收起 ▼</button>
+        </div>
+        <div class="pe-body">
+          <div class="pe-left" id="peLeft"></div>
+          <div class="pe-right"><div class="pe-grid" id="peGrid"></div></div>
+        </div>
+        <div class="pe-foot">
+          <span id="peInfo"></span>
+          <span class="grow"></span>
+          <span class="pager"><button>‹</button><span id="pePage">1/3</span><button>›</button></span>
+        </div>
+      </div>
+
+      <!-- C：九宫格页 -->
+      <div class="gridpage" id="gridpage">
+        <div class="pe-head">
+          <span class="t">全部候选</span><span class="grow"></span>
+          <button id="btnGridClose">收起 ▼</button>
+        </div>
+        <div class="gbody" id="gridBody"></div>
+        <div class="pe-foot"><span id="gridInfo"></span><span class="grow"></span><span class="pager"><button>‹</button><span>1/2</span><button>›</button></span></div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<script>
+/* ---------------- 模拟数据：拼音组 + 每组候选 + 整句候选 ---------------- */
+const DATA = {
+  segs: [
+    {py:'ni',  cands:['你','尼','泥','呢','逆','拟','腻','妮','倪','怩','伲','旎','妳','钕']},
+    {py:'hao', cands:['好','号','浩','豪','耗','郝','嚎','壕','皓','昊','蚝','毫','嗥','濠']},
+    {py:'ma',  cands:['吗','嘛','妈','麻','马','码','骂','蚂','玛','嘛','蟆','犸','抹','杩']},
+  ],
+  sentence: ['你好吗','你好','尼好','你号','妮浩','泥耗','你豪','拟郝','呢嚎','逆壕','腻皓','怩昊']
+};
+
+const S = {
+  variant:'a',
+  typed:'',            // 已上屏
+  activeSeg:0,         // B 面板里选中/正在输入的组
+  page:0,
+  expandOpen:false,
+  gridOpen:false,
+};
+
+const $ = s => document.querySelector(s);
+
+/* ---------------- 键盘占位 ---------------- */
+const KB_ROWS = [
+  ['1','2','3','4','5','6','7','8','9','0'],
+  ['q','w','e','r','t','y','u','i','o','p'],
+  ['a','s','d','f','g','h','j','k','l','⌫'],
+  ['⇧','z','x','c','v','b','n','m','⌫'],
+  ['123','符','中',{t:'空格',f:4},'。',{t:'回车',f:2}],
+];
+function buildKeyboard(){
+  const wrap = document.getElementById('kbrows'); wrap.innerHTML='';
+  KB_ROWS.forEach(row=>{
+    const r=document.createElement('div'); r.className='kbrow';
+    row.forEach(item=>{
+      const o = (typeof item==='string') ? {t:item,f:1} : item;
+      const d=document.createElement('div');
+      d.className='k'+(o.t==='回车'?' enter':'')+(o.t==='空格'?' space':'');
+      d.style.flex = o.f;
+      d.textContent = o.t;
+      r.appendChild(d);
+    });
+    wrap.appendChild(r);
+  });
+}
+
+/* ---------------- 渲染 ---------------- */
+function renderEditor(){
+  const ed = $('#editor');
+  const rest = DATA.segs.slice(S.activeSeg).map(s=>s.py).join(' ');
+  ed.innerHTML = (S.typed?`<span>${S.typed}</span>`:'') + `<span class="caret"></span>` +
+                 (S.typed?'':'<span class="hint">点下面键盘/候选试试</span>');
+}
+function renderCompose(){
+  const c = $('#compose'); c.innerHTML='';
+  DATA.segs.forEach((s,i)=>{
+    const d=document.createElement('span');
+    d.className='seg'+(i===S.activeSeg?' active':'')+(i<S.activeSeg?' done':'');
+    d.textContent=s.py;
+    d.title=`第 ${i+1} 组：${s.py}`;
+    d.onclick=()=>{ S.activeSeg=i; S.page=0; S.expandOpen=true; render(); };
+    c.appendChild(d);
+    if(i<DATA.segs.length-1){ const sp=document.createElement('span'); sp.className='sp'; sp.textContent='|'; c.appendChild(sp); }
+  });
+}
+function candBarCands(){
+  const seg = DATA.segs[S.activeSeg];
+  const list = S.activeSeg < DATA.segs.length ? seg.cands : DATA.sentence;
+  const per = S.variant==='b' ? 5 : 8;
+  return {list, per};
+}
+function renderCandBar(){
+  const bar=$('#candbar'); bar.innerHTML='';
+  const {list, per} = candBarCands();
+  const start = S.page*per;
+  const slice = list.slice(start, start+per);
+  slice.forEach((w,i)=>{
+    const d=document.createElement('div');
+    d.className='cand'+(i===0?' hl':'');
+    d.innerHTML=`<div class="w">${w}</div>`;
+    d.onclick=()=>commit(w);
+    bar.appendChild(d);
+  });
+  const arrows=document.createElement('div'); arrows.className='arrows';
+  const prev=document.createElement('button'); prev.textContent='◀'; prev.onclick=()=>{S.page=Math.max(0,S.page-1);render();};
+  const next=document.createElement('button'); next.textContent='▶'; next.onclick=()=>{S.page++;render();};
+  const ex=document.createElement('button'); ex.className='exbtn'; ex.textContent='▼';
+  ex.onclick=()=>{ if(S.variant==='c'){S.gridOpen=!S.gridOpen;S.expandOpen=false;} else {S.expandOpen=!S.expandOpen;S.gridOpen=false;} render(); };
+  arrows.append(prev,next,ex);
+  bar.appendChild(arrows);
+}
+function renderExpand(){
+  const e=$('#expand');
+  e.classList.toggle('show', S.expandOpen && S.variant==='b');
+  if(!e.classList.contains('show')) return;
+  const left=$('#peLeft'); left.innerHTML='';
+  DATA.segs.forEach((s,i)=>{
+    const d=document.createElement('div');
+    d.className='g'+(i===S.activeSeg?' on':'');
+    d.innerHTML=`${s.py}<span class="n">${s.cands.length}</span>`;
+    d.onclick=()=>{S.activeSeg=i;S.page=0;render();};
+    left.appendChild(d);
+  });
+  const grid=$('#peGrid'); grid.innerHTML='';
+  const list=DATA.segs[S.activeSeg].cands;
+  list.forEach((w,i)=>{
+    const c=document.createElement('div'); c.className='pe-cell'+(i===0?' hl':'');
+    c.textContent=w; c.onclick=()=>commit(w); grid.appendChild(c);
+  });
+  $('#peInfo').textContent=`${DATA.segs[S.activeSeg].py} · ${list.length} 个候选`;
+  $('#pePage').textContent=`1/${Math.max(1,Math.ceil(list.length/8))}`;
+}
+function renderGrid(){
+  const g=$('#gridpage');
+  g.classList.toggle('show', S.gridOpen && S.variant==='c');
+  if(!g.classList.contains('show')) return;
+  const body=$('#gridBody'); body.innerHTML='';
+  const list=DATA.segs[S.activeSeg].cands.concat(DATA.sentence);
+  list.forEach((w,i)=>{ const c=document.createElement('div'); c.className='gcell'+(i===0?' hl':''); c.textContent=w; c.onclick=()=>commit(w); body.appendChild(c); });
+  $('#gridInfo').textContent=`全部 ${list.length} 个候选（九宫格 4 列）`;
+}
+function render(){
+  document.querySelectorAll('.variant').forEach(v=>v.classList.toggle('on', v.dataset.v===S.variant));
+  renderEditor(); renderCompose(); renderCandBar(); renderExpand(); renderGrid();
+  const desc = {
+    a:'现状：候选栏是一整条 Canvas，宽度不够就出 ◀ ▶；▼ 打开 liquid 的候选网格页。',
+    b:'推荐：单行只放 5 个 + ▼；展开后左侧拼音组、右侧网格，点组切候选，点词上屏该组。',
+    c:'九宫格：点 ▼ 全屏铺候选网格（相当于把现有 liquid CANDIDATE 页做成正式候选页）。'
+  };
+  $('#vdesc').textContent = desc[S.variant];
+}
+
+/* ---------------- 交互 ---------------- */
+function commit(word){
+  S.typed += word;
+  if(S.activeSeg < DATA.segs.length-1){ S.activeSeg++; }
+  else { S.activeSeg = DATA.segs.length; }
+  S.page=0; S.expandOpen=false; S.gridOpen=false;
+  render();
+}
+document.getElementById('btnType').onclick=()=>{
+  const seg=DATA.segs[S.activeSeg];
+  if(seg) commit(seg.cands[0]);
+};
+document.getElementById('btnReset').onclick=()=>{ S.typed=''; S.activeSeg=0; S.page=0; S.expandOpen=false; S.gridOpen=false; render(); };
+document.getElementById('input').oninput=(e)=>{
+  const parts=e.target.value.trim().split(/\s+/).filter(Boolean);
+  DATA.segs.forEach((s,i)=>{ if(parts[i]) s.py=parts[i]; });
+  S.activeSeg=0; S.page=0; render();
+};
+document.getElementById('btnCollapse').onclick=()=>{S.expandOpen=false;render();};
+document.getElementById('btnGridClose').onclick=()=>{S.gridOpen=false;render();};
+document.querySelectorAll('.variant').forEach(v=>{
+  v.onclick=()=>{ S.variant=v.dataset.v; S.page=0; S.expandOpen=(S.variant==='b'); S.gridOpen=(S.variant==='c'); render(); };
+});
+
+buildKeyboard();
+render();
+</script>
+</body>
+</html>

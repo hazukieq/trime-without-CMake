@@ -34,10 +34,11 @@
 | 7 | [05-branches-release.md](05-branches-release.md) | 分支模型（main/dev）、改名影响面 10 层、发布流程、**签名与密钥安全** | 发布/交接时 |
 | 8 | [06-troubleshooting-roadmap.md](06-troubleshooting-roadmap.md) | 四层排障、症状表、诊断命令、技术债与 roadmap | 出问题时 |
 | 9 | [08-theme-trime-yaml.md](08-theme-trime-yaml.md) | **trime.yaml 主题全解**（style/配色/按键/键盘/悬浮键盘/坑）+ **主题预览器用法** | 改主题、调键盘布局、查配色时 |
+| 10 | [09-candidate-ui-evaluation.md](09-candidate-ui-evaluation.md) | **候选区改造评估**（单行+展开面板 / 九宫格，参考搜狗等实现，含可交互 mock） | 改候选栏、做展开页、评估成本时 |
 | 10 | [reports/](reports/README.md) | 构建 / 改名 / 集成 / 真机报告（**原样存档**） | 要查证据/细节时 |
 
 **最短路径**：00 → 03（把包装上）→ 05 §4（发版）→ 07（改数据）→ 06（出问题）。
-改主题/键盘：直接读 **08**，再开 `tools/theme-previewer/` 实时看效果。
+改主题/键盘：直接读 **08**，再开 `tools/theme-previewer/` 实时看效果；改候选区：读 **09**，开 `tools/candidate-mock/` 点一遍三种形态。
 
 ## 约定
 
@@ -50,6 +51,7 @@
 | 命令环境 | 默认在仓库根执行，`JAVA_HOME=$HOME/opt/jdk17/jdk-17.0.9` |
 | 敏感信息 | 文档**不复述**密钥口令；签名部分见 05 §6 |
 | 主题预览 | `tools/theme-previewer/`：浏览器内实时渲染 `trime.yaml`，不用装机（见 08 §12） |
+| 候选区 mock | `tools/candidate-mock/`：A 现状 / B 单行+展开面板 / C 九宫格，三种形态可点（见 09） |
 | APK hash 口径 | sha256 是**该次交付物**的指纹，**不承诺**「任意 clean build 同 hash」（zip 时间戳/条目顺序）；可承诺尺寸稳定 |
 
 ## 关键数字（速查）
