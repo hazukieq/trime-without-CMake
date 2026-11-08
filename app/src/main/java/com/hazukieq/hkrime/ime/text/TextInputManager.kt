@@ -210,9 +210,9 @@ class TextInputManager private constructor() :
     fun showCandidatePanel() {
         val panel = candidatePanel ?: return
         val root = candidatePanelRoot ?: return
-        // 沒有任何候選（空組字）就不要展開，避免出現一塊空白面板
-        val current = Rime.getCandidatesWithoutSwitch()
-        if (current.isNullOrEmpty() && !Rime.hasRight()) {
+        // 空組字（不是組字中）就不要展開；但「組字中且沒有候選」仍要開，
+        // 這樣左列還能看到剩下的音節（例如只剩 u），右柵格可以是空的。
+        if (!Rime.isComposing()) {
             return
         }
         // 面板只展示「候選欄這一頁之外」的候選；收集後立刻把 Rime 還原到原頁，
@@ -242,6 +242,7 @@ class TextInputManager private constructor() :
             moved++
             val cs = Rime.getCandidatesWithoutSwitch() ?: break
             for (i in cs.indices) {
+                if (isRawCodeCandidate(cs[i].text, i)) continue
                 items.add(
                     CandidatePanelAdapter.Item(
                         cs[i].text ?: "", cs[i].comment ?: "", offset, i
@@ -256,11 +257,30 @@ class TextInputManager private constructor() :
         return items
     }
 
+
+    /** librime 在「完全沒有翻譯」時會把原始編碼本身當候選返回（例如單獨的 u）；
+     *  這種「自身編碼」不該出現在候選欄/展開面板裡，這裡統一把它過濾掉。 */
+    private fun isRawCodeCandidate(text: String?, indexInPage: Int): Boolean {
+        val t = (text ?: "").trim()
+        if (t.isEmpty()) return false
+        if (!t.all { it.isLetterOrDigit() && it.code < 128 || it == '\'' }) return false
+        val preedit = (Rime.getCompositionText() ?: "").replace("\u2038", "")
+        val raw = preedit.filter { it.code < 128 && it.isLetterOrDigit() || it == '\'' }
+            .replace("'", "")
+        if (raw.isEmpty()) return false
+        val norm = t.replace(" ", "").replace("'", "")
+        if (norm == raw) return true
+        // 也過濾「剩餘未轉換部分」本身（例如選完 ngin 後的 hau / u）
+        return raw.endsWith(norm) && norm.length >= 1 && indexInPage >= 0 &&
+            raw.length > norm.length
+    }
+
     /** 當前頁的完整候選（候選欄被截斷時，面板用來展示被截斷的部分）。 */
     private fun currentPageItems(): MutableList<CandidatePanelAdapter.Item> {
         val items = mutableListOf<CandidatePanelAdapter.Item>()
         val cs = Rime.getCandidatesWithoutSwitch() ?: return items
         for (i in cs.indices) {
+            if (isRawCodeCandidate(cs[i].text, i)) continue
             items.add(CandidatePanelAdapter.Item(cs[i].text ?: "", cs[i].comment ?: "", 0, i))
         }
         return items
