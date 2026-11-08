@@ -107,7 +107,18 @@ class ModernListDialog private constructor(
                 ).apply { leftMargin = dp(20); rightMargin = dp(20); bottomMargin = dp(16) },
             )
         }
-        items.forEachIndexed { index, _ -> card.addView(buildRow(index)) }
+        items.forEachIndexed { index, _ ->
+            card.addView(
+                buildRow(index),
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    leftMargin = dp(16); rightMargin = dp(16)
+                    topMargin = dp(3); bottomMargin = dp(3)
+                },
+            )
+        }
         card.addView(buildButtons())
 
         root.addView(
@@ -205,26 +216,17 @@ class ModernListDialog private constructor(
         }
         checks.add(check)
 
-        return LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            row.minimumHeight = dp(48)
-            addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-            if (index != items.lastIndex) {
-                addView(
-                    View(context).apply { setBackgroundColor(hairline) },
-                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1)
-                        .apply { leftMargin = dp(20) },
-                )
-            }
+        // 不用分割線：每行是獨立圓角淺底「選項片」，靠底色與間距區分。
+        row.minimumHeight = dp(48)
+        row.background = android.graphics.drawable.GradientDrawable().apply {
+            cornerRadius = dp(12).toFloat()
+            setColor(if (night) 0xFF2C2C2E.toInt() else 0xFFF2F2F7.toInt())
         }
+        return row
     }
 
     private fun buildButtons(): View = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        addView(
-            View(context).apply { setBackgroundColor(hairline) },
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1),
-        )
         addView(
             LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL

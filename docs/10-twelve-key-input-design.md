@@ -1002,3 +1002,20 @@ BFS 隊列峰值 766 —— 也就是說 37ms 全是簡拼圖 BFS 的展開成�
   `pref_help__user_community`（QQ 群整組）、`pref_help__marketplace`（Google Play / Coolapk 整組）、
   `about__donation`（支付寶捐贈）、`about__product_prime`（PRIME）。
   保留：應用信息、開源許可、尋求幫助（wiki/issues）、支持（貢獻代碼）。
+
+## 15.18 列表去分割線 + 底部留白（2026-11-09）
+
+用戶：「IME所有界面都不要用分割线，选项本来就能区分了(选项背景白色，界面背景浅灰色)」；
+另要求「贡献代码选项底部应该有留白」。
+
+- 根因：`PreferenceFragmentCompat` 的 RecyclerView 帶了默認 `DividerItemDecoration`，
+  在兩張白色圓角卡片之間畫 1px 深灰線；`onViewCreated(view)` 拿到的是外層容器，
+  之前對 `view as? RecyclerView` 的判斷永遠不成立。
+- 修法：新增 `settings/PreferenceListStyle.kt` 的 `View.tunePreferenceList()`，
+  在容器內找到 `androidx.preference.R.id.recycler_view`，移除全部 ItemDecoration，
+  並設 `clipToPadding=false` + 底部 padding 24dp；6 個 Fragment 與 AboutFragment
+  的 `onViewCreated` 統一調用。
+- 對話框同理：`ModernListDialog` 選項行改成獨立圓角淺底「選項片」（12dp 圓角、
+  左右 16dp/上下 3dp 間距），刪掉行間與按鈕上的髮絲線。
+- `about_preference.xml`：維基教程/問題反饋鏈接改成
+  `https://github.com/hazukieq/trime-without-CMake/{wiki,issues}`。

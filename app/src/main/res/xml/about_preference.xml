@@ -61,12 +61,12 @@
         <Preference android:key="pref_wiki" android:title="@string/pref_wiki"
             app:iconSpaceReserved="false">
             <intent android:action="android.intent.action.VIEW"
-                android:data="https://github.com/osfans/trime/wiki/UserGuide" />
+                android:data="https://github.com/hazukieq/trime-without-CMake/wiki" />
         </Preference>
         <Preference android:key="pref_issues" android:title="@string/pref_issues"
             app:iconSpaceReserved="false">
             <intent android:action="android.intent.action.VIEW"
-                android:data="https://github.com/osfans/trime/issues" />
+                android:data="https://github.com/hazukieq/trime-without-CMake/issues" />
         </Preference>
     </PreferenceCategory>
 <PreferenceCategory app:key="about__support_category"

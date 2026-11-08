@@ -55,7 +55,12 @@ class AboutActivity : AppCompatActivity() {
     }
 
     class AboutFragment : PreferenceFragmentCompat() {
-        override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        view.tunePreferenceList()
+    }
+
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.about_preference, rootKey)
             findPreference<Preference>("about__changelog")
                 ?.writeLibraryVersionToSummary(BuildConfig.BUILD_VERSION)

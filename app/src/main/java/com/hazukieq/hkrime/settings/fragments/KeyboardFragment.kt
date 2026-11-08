@@ -1,11 +1,14 @@
 package com.hazukieq.hkrime.settings.fragments
 
+import com.hazukieq.hkrime.settings.tunePreferenceList
+
 import android.content.SharedPreferences
 import android.os.Bundle
 import android.view.Menu
 import androidx.core.view.forEach
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
+import android.view.View
 import com.hazukieq.hkrime.R
 import com.hazukieq.hkrime.core.Rime
 import com.hazukieq.hkrime.data.AppPrefs
@@ -15,6 +18,11 @@ import com.hazukieq.hkrime.settings.components.SoundPickerDialog
 class KeyboardFragment :
     PreferenceFragmentCompat(),
     SharedPreferences.OnSharedPreferenceChangeListener {
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        view.tunePreferenceList()
+    }
+
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         addPreferencesFromResource(R.xml.keyboard_preference)
 

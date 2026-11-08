@@ -1,11 +1,14 @@
 package com.hazukieq.hkrime.settings.fragments
 
+import com.hazukieq.hkrime.settings.tunePreferenceList
+
 import android.content.Context
 import android.os.Bundle
 import android.view.Menu
 import androidx.core.view.forEach
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
+import android.view.View
 import androidx.preference.SwitchPreferenceCompat
 import com.hazukieq.hkrime.R
 import com.hazukieq.hkrime.data.AppPrefs
@@ -21,6 +24,11 @@ import timber.log.Timber
 class ConfFragment : PreferenceFragmentCompat(), CoroutineScope by MainScope() {
 
     private val prefs get() = AppPrefs.defaultInstance()
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        view.tunePreferenceList()
+    }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         addPreferencesFromResource(R.xml.conf_preference)
