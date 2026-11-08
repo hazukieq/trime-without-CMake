@@ -221,6 +221,13 @@ class TextInputManager private constructor() :
         if (panelItems.isEmpty()) {
             panelItems = currentPageItems() // 只有截斷、沒有下一頁時，退化成展示當前頁完整內容
         }
+        if (panelItems.isEmpty() && Rime.isComposing()) {
+            // 完全沒有候選（例如只剩一個 u）：把剩下的編碼本身當候選，點了就原樣上屏
+            val rest = remainingCode()
+            if (rest.isNotEmpty()) {
+                panelItems = mutableListOf(CandidatePanelAdapter.Item(rest, "", -1, -1))
+            }
+        }
         candidatePanelAdapter?.submit(panelItems)
         inputArea?.layoutParams?.height = mainKeyboardView?.height
             ?: android.view.ViewGroup.LayoutParams.WRAP_CONTENT
@@ -229,6 +236,12 @@ class TextInputManager private constructor() :
         mainKeyboardView?.visibility = View.GONE
         root.visibility = View.VISIBLE
         panel.scrollToPosition(0)
+    }
+
+    /** 目前 preedit 裡還沒被轉換的編碼（去掉漢字/占位符/空格），例如只剩 u 時回傳 "u"。 */
+    private fun remainingCode(): String {
+        val preedit = (Rime.getCompositionText() ?: "").replace("\u2038", "")
+        return preedit.filter { it.code < 128 && (it.isLetterOrDigit() || it == '\'') }
     }
 
     /** 收集「當前頁之後」的所有候選；結束後用 pageUp 還原，候選欄狀態不變。 */
@@ -242,8 +255,7 @@ class TextInputManager private constructor() :
             moved++
             val cs = Rime.getCandidatesWithoutSwitch() ?: break
             for (i in cs.indices) {
-                if (isRawCodeCandidate(cs[i].text, i)) continue
-                items.add(
+                    items.add(
                     CandidatePanelAdapter.Item(
                         cs[i].text ?: "", cs[i].comment ?: "", offset, i
                     )
@@ -280,7 +292,6 @@ class TextInputManager private constructor() :
         val items = mutableListOf<CandidatePanelAdapter.Item>()
         val cs = Rime.getCandidatesWithoutSwitch() ?: return items
         for (i in cs.indices) {
-            if (isRawCodeCandidate(cs[i].text, i)) continue
             items.add(CandidatePanelAdapter.Item(cs[i].text ?: "", cs[i].comment ?: "", 0, i))
         }
         return items
@@ -301,7 +312,15 @@ class TextInputManager private constructor() :
     }
 
     private fun pickPanelCandidate(pageOffset: Int, indexInPage: Int) {
-        if (pageOffset < 0) return
+        if (pageOffset < 0) {
+            // 哨兵項：面板裡的「剩餘編碼」——用 librime 原樣 commit 掉目前的組合
+            Rime.commitComposition()
+            activeEditorInstance.commitRimeText()
+            trime.updateComposing()
+            // 等這次點擊完全結束再收面板，否則抬手事件會漏給下面的鍵盤（比如多出一個 r）
+            candidatePanel?.postDelayed({ if (!Rime.isComposing()) hideCandidatePanel() }, 250)
+            return
+        }
         // 面板只展示「當前頁」，index 直接對應 librime 的候選序號（不再預先翻頁收集）
         Rime.selectCandidate(indexInPage)
         activeEditorInstance.commitRimeText()
@@ -319,7 +338,14 @@ class TextInputManager private constructor() :
             lastGroupText = ""
             rebuildPinyinGroups()
             panelItems = currentPageItems()
-            candidatePanelAdapter?.submit(panelItems)
+            if (panelItems.isEmpty() && Rime.isComposing()) {
+            // 完全沒有候選（例如只剩一個 u）：把剩下的編碼本身當候選，點了就原樣上屏
+            val rest = remainingCode()
+            if (rest.isNotEmpty()) {
+                panelItems = mutableListOf(CandidatePanelAdapter.Item(rest, "", -1, -1))
+            }
+        }
+        candidatePanelAdapter?.submit(panelItems)
             candidatePanel?.scrollToPosition(0)
         }, 80)
     }
@@ -385,6 +411,13 @@ class TextInputManager private constructor() :
         activeGroupIndex = -1
         rebuildPinyinGroups()
         panelItems = currentPageItems()
+        if (panelItems.isEmpty() && Rime.isComposing()) {
+            // 完全沒有候選（例如只剩一個 u）：把剩下的編碼本身當候選，點了就原樣上屏
+            val rest = remainingCode()
+            if (rest.isNotEmpty()) {
+                panelItems = mutableListOf(CandidatePanelAdapter.Item(rest, "", -1, -1))
+            }
+        }
         candidatePanelAdapter?.submit(panelItems)
     }
 
@@ -602,6 +635,13 @@ class TextInputManager private constructor() :
         rebuildPinyinGroups()
         // 這一節的候選就是當前頁：不要再做 pageDown 收集，否則 selectCandidate 的 index 會錯
         panelItems = currentPageItems()
+        if (panelItems.isEmpty() && Rime.isComposing()) {
+            // 完全沒有候選（例如只剩一個 u）：把剩下的編碼本身當候選，點了就原樣上屏
+            val rest = remainingCode()
+            if (rest.isNotEmpty()) {
+                panelItems = mutableListOf(CandidatePanelAdapter.Item(rest, "", -1, -1))
+            }
+        }
         candidatePanelAdapter?.submit(panelItems)
         candidatePanel?.scrollToPosition(0)
     }
@@ -638,6 +678,13 @@ class TextInputManager private constructor() :
         if (!isCandidatePanelShown()) return
         panelItems = collectCandidatePanelItems()
         if (panelItems.isEmpty()) panelItems = currentPageItems()
+        if (panelItems.isEmpty() && Rime.isComposing()) {
+            // 完全沒有候選（例如只剩一個 u）：把剩下的編碼本身當候選，點了就原樣上屏
+            val rest = remainingCode()
+            if (rest.isNotEmpty()) {
+                panelItems = mutableListOf(CandidatePanelAdapter.Item(rest, "", -1, -1))
+            }
+        }
         candidatePanelAdapter?.submit(panelItems)
         panel.scrollToPosition(0)
     }
