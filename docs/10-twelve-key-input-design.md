@@ -848,3 +848,20 @@ BFS 隊列峰值 766 —— 也就是說 37ms 全是簡拼圖 BFS 的展開成�
 - `CandidateGroupAdapter.onBindViewHolder()`：`marquee = selected || 讀音含空格`；
   多音節行 `isSelected=true` + `ellipsize=MARQUEE` + `marqueeRepeatLimit=-1`，
   單音節行仍只有選中時滾動。
+
+
+## 15.10 簡拼分支均衡取樣（2026-11-08）
+
+用戶反饋：敲 `kl`（碼 `5`）打開面板，左列幾乎全是 k 開頭的音節，l 開頭只有 2 個。
+
+原因：`Table::Query` 按 `map` 順序展開分支，預算（6000 次 Access/Advance）耗盡時只覆蓋
+前面那批音節；k 排在 l 前，於是 l 幾乎沒被展開。
+
+修法（`src/rime/dict/table.cc`，`Table::Query`）：
+
+- 每個位置的音節分支先按「位置 + 音節 id」的確定性散列排序再入隊，預算在全部分支上
+  **均勻取樣**（k、l 各佔約一半，不再是先到先得）；
+- 預算 6000 → 12000（約 +3ms），換取更完整的覆蓋。
+
+實測 `kl kl`：左列出現 `kiap / le / ka / kiung / lim …` 交錯，k/l 均衡；
+候選條仍按詞頻排序。
