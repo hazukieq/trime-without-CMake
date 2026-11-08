@@ -451,7 +451,6 @@ class TextInputManager private constructor() :
 
     /** 候選刷新後呼叫：組字結束（無候選）時自動收起展開面板，避免留下空白面板 */
     fun onCandidatesRefreshed() {
-        updateCandidateBarVisibility()
         if (!isCandidatePanelShown()) return
         if (!Rime.isComposing()) {
             hideCandidatePanel()
@@ -475,14 +474,6 @@ class TextInputManager private constructor() :
             }
         }
         candidatePanelAdapter?.submit(panelItems)
-    }
-
-    /** 完全沒有輸入（不組字且無候選）時，候選欄整條收起，不佔鍵盤上方空間。 */
-    private fun updateCandidateBarVisibility() {
-        val bar = candidateRoot ?: return
-        val composing = Rime.isComposing()
-        val hasCandidates = !(Rime.getCandidatesWithoutSwitch()?.isEmpty() ?: true)
-        bar.visibility = if (composing || hasCandidates) View.VISIBLE else View.GONE
     }
 
     // ---------- 左側拼音音節組（方案 2：自切音節，僅顯示/導航） ----------
