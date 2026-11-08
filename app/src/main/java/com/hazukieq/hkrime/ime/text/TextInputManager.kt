@@ -6,6 +6,10 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import com.hazukieq.hkrime.core.Rime
+import com.hazukieq.hkrime.core.twelvekey.CandidateBarBinder
+import com.hazukieq.hkrime.core.twelvekey.CandidatePanelController
+import com.hazukieq.hkrime.core.twelvekey.TwelveKeyController
+import com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshot
 import com.hazukieq.hkrime.data.AppPrefs
 import com.hazukieq.hkrime.data.Config
 import com.hazukieq.hkrime.databinding.InputRootBinding
@@ -20,9 +24,6 @@ import com.hazukieq.hkrime.ime.keyboard.Keyboard.printModifierKeyState
 import com.hazukieq.hkrime.ime.keyboard.KeyboardSwitcher
 import com.hazukieq.hkrime.ime.keyboard.KeyboardView
 import com.hazukieq.hkrime.util.ShortcutUtils
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import com.hazukieq.hkrime.util.startsWithAsciiChar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
@@ -59,25 +60,13 @@ class TextInputManager private constructor() :
 
     private var mainKeyboardView: KeyboardView? = null
     private var inputArea: android.widget.FrameLayout? = null
-    private var candidatePanel: RecyclerView? = null
-    private var candidatePanelAdapter: CandidatePanelAdapter? = null
     private var candidatePanelRoot: android.view.View? = null
-    private var candidateGroupList: RecyclerView? = null
-    private var candidateGroupAdapter: CandidateGroupAdapter? = null
-    /** 左側音節組：本次點擊選中的下標（-1 表示跟隨 caret） */
-    private var activeGroupIndex = -1
-    private var activeGroupStartByte = 0
-    private var activeGroupText = ""
-    private var lastGroupText: String? = null
-    private var panelItems: MutableList<CandidatePanelAdapter.Item> = mutableListOf()
-    /** 已進面板的候選（text+comment），避免分批補頁時重複收集。 */
-    private val panelSeen = HashSet<String>()
-    /** 面板一次最多收集的頁數，防止極端情況下卡住 */
-    private val panelMaxPages = 20
-    /** 分批收集的世代號：面板關閉/重開就作廢還沒跑完的分批任務 */
-    private var collectionGen = 0
-    /** 是否還有分批收集任務在跑（跑的時候不要在 onCandidatesRefreshed 裡重置面板） */
-    private var collecting = false
+
+    /** 12 鍵：一次按鍵 = 一個不可變快照，候選條與面板都只讀它。 */
+    private var twelveKeyController: TwelveKeyController? = null
+    private var candidatePanelController: CandidatePanelController? = null
+    private var candidateBarBinder: CandidateBarBinder? = null
+
     var candidateRoot: ScrollView? = null
     var candidateView: Candidate? = null
 
@@ -181,7 +170,7 @@ class TextInputManager private constructor() :
             it.reset(trime)
         }
 
-        // 候選展開面板（自繪網格，不復用 liquidKeyboard）
+        // 候選展開面板（只讀快照；12 鍵走 Snapshot，其它方案走舊的分段左列）
         inputArea = uiBinding.main.inputArea
         candidatePanelRoot = uiBinding.main.candidatePanelRoot
         runCatching {
@@ -189,32 +178,70 @@ class TextInputManager private constructor() :
                 com.hazukieq.hkrime.data.Config.get(trime).getColor("keyboard_back_color") ?: 0xFFFFFFFF.toInt()
             )
         }
-        candidateGroupList = uiBinding.main.candidateGroupList.also { list ->
-            list.layoutManager = LinearLayoutManager(trime)
-            candidateGroupAdapter = CandidateGroupAdapter(trime, onPick = { selectPinyinGroup(it) })
-            list.adapter = candidateGroupAdapter
+        candidatePanelController = CandidatePanelController(
+            context = trime,
+            keyboardView = mainKeyboardView,
+            inputArea = inputArea,
+            panelRoot = candidatePanelRoot,
+            groupListView = uiBinding.main.candidateGroupList,
+            grid = uiBinding.main.candidatePanel,
+        ).also { controller ->
+            controller.onPickCandidate = { item -> onPickPanelCandidate(item) }
+            controller.onHideKeyboard = { trime.requestHideSelf(0) }
         }
-        candidatePanel = uiBinding.main.candidatePanel.also { panel ->
-            panel.layoutManager = GridLayoutManager(trime, 4)
-            candidatePanelAdapter = CandidatePanelAdapter(
-                trime,
-                onPick = { pageOffset, indexInPage -> pickPanelCandidate(pageOffset, indexInPage) },
-            )
-            panel.adapter = candidatePanelAdapter
-        }
+        candidateBarBinder = CandidateBarBinder(candidateView)
+        twelveKeyController = TwelveKeyController(
+            onSnapshot = { snapshot -> onTwelveKeySnapshot(snapshot) },
+            // 12 鍵的 preedit 由 TwelveKeyPreedit 改寫，長度與 librime 的 sel_start/sel_end 不一致，
+            // Composition.setWindow() 會在 updateComposing() 內拋 StringIndexOutOfBoundsException。
+            // 這裡保證：commit buffer 先落地；updateComposing 失敗只記日誌，進程不死，快照照常重建。
+            onEngineChanged = {
+                val committed = runCatching { Rime.getCommit() }.getOrDefault(false)
+                if (committed) {
+                    val text = Rime.getCommitText()
+                    Timber.i("twelvekey: commit buffer=[%s]", text)
+                    runCatching { activeEditorInstance.commitText(text, false) }
+                        .onFailure { Timber.e(it, "twelvekey: commitText failed") }
+                } else {
+                    Timber.i("twelvekey: no commit buffer after select")
+                }
+                runCatching { trime.updateComposing() }
+                    .onFailure { Timber.e(it, "twelvekey: updateComposing failed") }
+                twelveKeyController?.refresh()
+            },
+            onCommitText = { text ->
+                runCatching {
+                    activeEditorInstance.commitText(text)
+                    trime.updateComposing()
+                }.onFailure { Timber.e(it, "twelvekey: fallback commit failed") }
+            },
+        )
     }
 
     // ---------- 候選展開面板 ----------
 
-    fun isCandidatePanelShown(): Boolean = candidatePanelRoot?.visibility == android.view.View.VISIBLE
+    private fun isTwelveKeyMode(): Boolean = runCatching {
+        // 主題 style/keyboards 裡的名字是 hakka_jiugong（其 preset 為 jiugong_simp），兩者都接受
+        val keyboard = keyboardSwitcher.getCurrentKeyboardName()
+        Rime.getSchemaId() == "hakka_jiugong" &&
+            (keyboard == "hakka_jiugong" || keyboard == "jiugong_simp")
+    }.getOrDefault(false)
 
-    /** 切換展開面板；關閉鍵盤由候選欄的 ⌄ 負責 */
+    fun isCandidatePanelShown(): Boolean =
+        candidatePanelController?.isShown == true ||
+            candidatePanelRoot?.visibility == android.view.View.VISIBLE
+
+    /** 切換展開面板；空候選時 ▼ 的語義是「收起鍵盤」。 */
     fun toggleCandidatePanel() {
+        if (isTwelveKeyMode()) {
+            twelveKeyController?.refresh()
+            candidatePanelController?.toggle()
+            return
+        }
         if (isCandidatePanelShown()) {
             hideCandidatePanel()
             return
         }
-        // 沒有在組字（候選為空）時，▼ 的語義是「收起鍵盤」，不是展開面板
         if (!Rime.isComposing()) {
             Trime.getService().requestHideSelf(0)
             return
@@ -223,274 +250,92 @@ class TextInputManager private constructor() :
     }
 
     fun showCandidatePanel() {
-        val root = candidatePanelRoot ?: return
-        // 空組字（不是組字中）就不要展開；但「組字中且沒有候選」仍要開，
-        // 這樣左列還能看到剩下的音節（例如只剩 u），右柵格可以是空的。
-        if (!Rime.isComposing()) {
-            return
+        if (!Rime.isComposing()) return
+        if (isTwelveKeyMode()) {
+            twelveKeyController?.refresh()
+            val snapshot = twelveKeyController?.snapshot
+            if (snapshot == null || (!snapshot.hasCandidates && snapshot.fallback == null)) return
         }
-        // 先用「當前頁」立刻把面板貼出來（0 成本），其餘頁碼等面板顯示後分批補，
-        // 12 鍵單鍵模糊匹配可能十幾頁，同步收集會讓展開卡 200ms 以上。
-        startPanelCollection()
-        rebuildPinyinGroups()
-        inputArea?.layoutParams?.height = mainKeyboardView?.height
-            ?: android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-        inputArea?.requestLayout()
-        mainKeyboardView?.visibility = View.GONE
-        root.visibility = View.VISIBLE
-    }
-
-    /** 面板內容從「當前頁」開始、其餘頁碼分批補；換音節/重開面板都走這裡。 */
-    private fun startPanelCollection() {
-        val panel = candidatePanel ?: return
-        collectionGen++
-        val gen = collectionGen
-        panelSeen.clear()
-        panelItems = currentPageItems()
-        if (panelItems.isEmpty() && Rime.isComposing()) {
-            // 完全沒有候選（例如只剩一個 u）：把剩下的編碼本身當候選，點了就原樣上屏
-            val rest = remainingCode()
-            if (rest.isNotEmpty()) {
-                panelItems = mutableListOf(CandidatePanelAdapter.Item(rest, "", -1, -1))
-            }
-        }
-        panelItems.forEach { panelSeen.add(it.text + "\u0001" + it.comment) }
-        candidatePanelAdapter?.submit(panelItems)
-        if (isCandidatePanelShown()) panel.scrollToPosition(0)
-        collecting = true
-        collectRest(gen, 2)
-    }
-
-    /** 面板顯示後分批補後面頁碼的候選；面板關閉/重開時用 generation 作廢舊任務。 */
-    private fun collectRest(gen: Int, fromPage: Int) {
-        if (fromPage > panelMaxPages) { collecting = false; return }
-        candidatePanel?.post {
-            if (gen != collectionGen || !isCandidatePanelShown()) { collecting = false; return@post }
-            val more = collectCandidatePanelItems(fromPage, 3)
-            if (more.isEmpty()) { collecting = false; return@post }
-            val fresh = more.filter { panelSeen.add(it.text + "\u0001" + it.comment) }
-            if (fresh.isEmpty()) { collectRest(gen, fromPage + 3); return@post }
-            // 只追加、不整表刷新：RecyclerView 的滾動位置才不會被拉回頂部
-            panelItems.addAll(fresh)
-            candidatePanelAdapter?.addItems(fresh)
-            collectRest(gen, fromPage + 3)
-        }
-    }
-
-    /** 目前 preedit 裡還沒被轉換的編碼（去掉漢字/占位符/空格），例如只剩 u 時回傳 "u"。 */
-    private fun remainingCode(): String {
-        val preedit = (Rime.getCompositionText() ?: "").replace("\u2038", "")
-        return preedit.filter { it.code < 128 && (it.isLetterOrDigit() || it == '\'') }
-    }
-
-
-    /** preedit 的顯示分段：librime 把每個 segment 用空格分開，且已套用方案的 preedit_format。
-     *  12 鍵客語這種「輸入碼 ≠ 拼音」的方案，用它當左列標籤才可讀。 */
-    private fun preeditDisplayTokens(): List<String> {
-        val t = (Rime.getCompositionText() ?: "").replace("\u2038", "").trim()
-        if (t.isEmpty()) return emptyList()
-        return t.split(Regex("\\s+")).filter { it.isNotBlank() }
-    }
-
-    /** 用 preedit 的顯示分段覆蓋左列標籤（只在數量一致時，避免錯位）。 */
-    private fun applyDisplayLabels(items: MutableList<CandidateGroupAdapter.PinyinGroupAdapterItem>) {
-        val tokens = preeditDisplayTokens()
-        if (tokens.size != items.size) return
-        for (i in items.indices) {
-            items[i] = items[i].copy(text = tokens[i])
-        }
-    }
-
-    /** 收集「當前頁之後」的候選（可分批）：從第 fromPage 頁開始收 pages 頁，結束後用 pageUp 還原。 */
-    private fun collectCandidatePanelItems(fromPage: Int, pages: Int): MutableList<CandidatePanelAdapter.Item> {
-        val items = mutableListOf<CandidatePanelAdapter.Item>()
-        if (!Rime.hasRight()) return items
-        var offset = 1
-        var moved = 0
-        while (Rime.hasRight() && offset <= panelMaxPages) {
-            trime.handleKey(KeyEvent.KEYCODE_PAGE_DOWN, 0)
-            moved++
-            if (offset >= fromPage && offset < fromPage + pages) {
-                val cs = Rime.getCandidatesWithoutSwitch() ?: break
-                for (i in cs.indices) {
-                    items.add(CandidatePanelAdapter.Item(cs[i].text ?: "", cs[i].comment ?: "", offset, i))
-                }
-            }
-            offset++
-            if (offset >= fromPage + pages) break
-        }
-        // 還原到第一頁（候選欄所顯示的頁），候選欄內容與 caret 都不受影響
-        repeat(moved) { trime.handleKey(KeyEvent.KEYCODE_PAGE_UP, 0) }
-        trime.updateComposing()
-        return items
-    }
-
-
-    /** librime 在「完全沒有翻譯」時會把原始編碼本身當候選返回（例如單獨的 u）；
-     *  這種「自身編碼」不該出現在候選欄/展開面板裡，這裡統一把它過濾掉。 */
-    private fun isRawCodeCandidate(text: String?, indexInPage: Int): Boolean {
-        val t = (text ?: "").trim()
-        if (t.isEmpty()) return false
-        if (!t.all { it.isLetterOrDigit() && it.code < 128 || it == '\'' }) return false
-        val preedit = (Rime.getCompositionText() ?: "").replace("\u2038", "")
-        val raw = preedit.filter { it.code < 128 && it.isLetterOrDigit() || it == '\'' }
-            .replace("'", "")
-        if (raw.isEmpty()) return false
-        val norm = t.replace(" ", "").replace("'", "")
-        if (norm == raw) return true
-        // 也過濾「剩餘未轉換部分」本身（例如選完 ngin 後的 hau / u）
-        return raw.endsWith(norm) && norm.length >= 1 && indexInPage >= 0 &&
-            raw.length > norm.length
-    }
-
-    /** 當前頁的完整候選（候選欄被截斷時，面板用來展示被截斷的部分）。 */
-    private fun currentPageItems(): MutableList<CandidatePanelAdapter.Item> {
-        val items = mutableListOf<CandidatePanelAdapter.Item>()
-        val cs = Rime.getCandidatesWithoutSwitch() ?: return items
-        for (i in cs.indices) {
-            items.add(CandidatePanelAdapter.Item(cs[i].text ?: "", cs[i].comment ?: "", 0, i))
-        }
-        return items
+        candidatePanelController?.show()
     }
 
     fun hideCandidatePanel() {
-        collectionGen++
-        // 不依賴 isCandidatePanelShown()：狀態可能與實際可見性不同步（換輸入框/會話切換後），
-        // 這裡一律把「面板 GONE / 鍵盤 VISIBLE / 高度 WRAP_CONTENT」恢復，避免留下空白區。
-        val root = candidatePanelRoot ?: mainKeyboardView ?: return
-        // 打開時已把 Rime 還原到原頁，這裡不需要再翻頁
-        root.visibility = View.GONE
-        mainKeyboardView?.visibility = View.VISIBLE
-        inputArea?.layoutParams?.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-        inputArea?.requestLayout()
-        candidatePanelAdapter?.clear()
-        candidateGroupAdapter?.clear()
-        if (Rime.isComposing()) trime.updateComposing()
+        candidatePanelController?.hide()
+        if (Rime.isComposing()) {
+            runCatching { trime.updateComposing() }
+                .onFailure { Timber.e(it, "twelvekey: hide updateComposing failed") }
+        }
     }
 
-    private fun pickPanelCandidate(pageOffset: Int, indexInPage: Int) {
-        if (pageOffset < 0) {
-            // 哨兵項：面板裡的「剩餘編碼」——用 librime 原樣 commit 掉目前的組合
-            Rime.commitComposition()
-            activeEditorInstance.commitRimeText()
-            trime.updateComposing()
-            // 等這次點擊完全結束再收面板，否則抬手事件會漏給下面的鍵盤（比如多出一個 r）
-            candidatePanel?.postDelayed({ if (!Rime.isComposing()) hideCandidatePanel() }, 250)
+    /** 12 鍵快照落地：條與面板同源，面板保持打開直到輸入清空。 */
+    private fun onTwelveKeySnapshot(snapshot: TwelveKeySnapshot) {
+        candidateBarBinder?.bind(snapshot)
+        candidatePanelController?.submit(snapshot)
+        if (snapshot.isEmpty || (!snapshot.hasCandidates && snapshot.fallback == null)) {
+            if (candidatePanelController?.isShown == true) candidatePanelController?.hide()
+        }
+    }
+
+    private fun onPickPanelCandidate(item: CandidatePanelAdapter.Item) {
+        if (!isTwelveKeyMode()) return
+        if (item.index < 0) {
+            // fallback：本地原文上屏
+            twelveKeyController?.snapshot?.fallback?.let { twelveKeyController?.commitFallback(it) }
             return
         }
-        // 面板項目的 pageOffset 是「第幾頁」（0=當前頁）：先翻到那一頁再選
-        repeat(pageOffset) {
-            if (!Rime.hasRight()) return
-            trime.handleKey(KeyEvent.KEYCODE_PAGE_DOWN, 0)
-        }
-        Rime.selectCandidate(indexInPage)
-        activeEditorInstance.commitRimeText()
-        trime.updateComposing()
-        // 等這一幀的組字狀態落定後再判斷：librime 選完一節會 Forward 到下一節，
-        // 這裡可能瞬時 isComposing()==false，不能立刻收面板。
-        candidatePanel?.postDelayed({
-            if (!Rime.isComposing()) {
-                hideCandidatePanel()
-                return@postDelayed
-            }
-            Rime.getContexts()
-            trime.updateComposing()
-            activeGroupIndex = -1
-            lastGroupText = ""
-            rebuildPinyinGroups()
-            panelItems = currentPageItems()
-            if (panelItems.isEmpty() && Rime.isComposing()) {
-            // 完全沒有候選（例如只剩一個 u）：把剩下的編碼本身當候選，點了就原樣上屏
-            val rest = remainingCode()
-            if (rest.isNotEmpty()) {
-                panelItems = mutableListOf(CandidatePanelAdapter.Item(rest, "", -1, -1))
-            }
-        }
-        candidatePanelAdapter?.submit(panelItems)
-            candidatePanel?.scrollToPosition(0)
-        }, 80)
+        twelveKeyController?.selectCandidate(item.index)
     }
 
-    /** 除錯：逐個 caret 位置印出 librime 的分段/候選，用於確認引擎切割行為 */
+    /** 除錯：只印出分段信息，不再移動 caret / 改引擎狀態。 */
     fun debugCaretScan() {
-        val text = Rime.getCompositionText() ?: return
-        val bytes = text.toByteArray(Charsets.UTF_8)
-        val saved = Rime.RimeGetCaretPos()
-        for (pos in 0..bytes.size) {
-            val ok = Rime.RimeSetCaretPos(pos)
-            Rime.getContexts()
-            val c = Rime.getComposition()
-            val cs = Rime.getCandidatesWithoutSwitch()
-            val head = cs.take(3).joinToString("|") { (it.text ?: "") + (it.comment ?: "") }
-            Timber.i(
-                "caretScan pos=%s ok=%s nowCaret=%s sel=%s-%s cands=%s",
-                pos, ok, Rime.RimeGetCaretPos(), c.getSelStart(), c.getSelEnd(), head
-            )
-        }
-        Rime.RimeSetCaretPos(saved)
-        Rime.getContexts()
+        val input = Rime.RimeGetInput() ?: return
+        Timber.i(
+            "caretScan input=[%s] caret=%s segs=%s",
+            input,
+            Rime.RimeGetCaretPos(),
+            Rime.getRimeCompositionSegments().joinToString(","),
+        )
     }
 
-    /** 除錯：用 Rime 自己的左移鍵移動 caret，看它把光標按音節跳到哪些位置 */
+    /** 除錯：列印當前快照。 */
     fun debugCaretProbe() {
-        val text = Rime.getCompositionText() ?: return
-        val len = text.toByteArray(Charsets.UTF_8).size
-        val saved = Rime.RimeGetCaretPos()
-        Rime.RimeSetCaretPos(len)
-        Rime.getContexts()
-        Timber.i("caretProbe start preedit=[%s] len=%s caret=%s", text, len, Rime.RimeGetCaretPos())
-        repeat(len + 2) {
-            val ok = Rime.process_key(0xff51, 0) // XK_Left
-            Rime.getContexts()
-            val c = Rime.getComposition()
-            val cs = Rime.getCandidatesWithoutSwitch()
-            val head = cs.take(2).joinToString("|") { (it.text ?: "") }
-            Timber.i(
-                "caretProbe segsAfterLeft=%s",
-                Rime.getRimeCompositionSegments().joinToString(",")
-            )
-            Timber.i(
-                "caretProbe left ok=%s caret=%s sel=%s-%s cands=%s",
-                ok, Rime.RimeGetCaretPos(), c.getSelStart(), c.getSelEnd(), head
-            )
-        }
-        Rime.RimeSetCaretPos(saved)
-        Rime.getContexts()
+        val snapshot = twelveKeyController?.snapshot
+        Timber.i(
+            "caretProbe snapshot input=[%s] consumedEnd=%s remaining=[%s] groups=%s",
+            snapshot?.input,
+            snapshot?.consumedEnd,
+            snapshot?.remaining,
+            snapshot?.groups?.joinToString("|") { "${it.reading}:${it.size}" },
+        )
     }
 
-    /** 候選刷新後呼叫：組字結束（無候選）時自動收起展開面板，避免留下空白面板 */
+    /** 候選刷新後呼叫：12 鍵重建快照；其它方案只刷新展開面板。 */
     fun onCandidatesRefreshed() {
+        if (isTwelveKeyMode()) {
+            twelveKeyController?.refresh()
+            return
+        }
+        candidateBarBinder?.clear()
         if (!isCandidatePanelShown()) return
         if (!Rime.isComposing()) {
             hideCandidatePanel()
             return
         }
-        // 還在組字但這一節暫時沒有候選（例如只剩一個 u）時，面板留著、右側可以空，
-        // 這樣左列還能看到「剩下的音節」，符合「選 ha 後剩 u」的預期。
-        // 組字內容變了（例如剛轉換掉一段）：左側音節組與面板一起跟著更新
-        lastGroupText = ""
-        activeGroupIndex = -1
-        rebuildPinyinGroups()
-        // 分批補頁時，collectCandidatePanelItems() 每翻一頁都會走這裡；
-        // 此時不能把 panelItems 重置成「當前頁」，否則前面補進來的批次全被沖掉
-        if (collecting) return
-        panelItems = currentPageItems()
-        if (panelItems.isEmpty() && Rime.isComposing()) {
-            // 完全沒有候選（例如只剩一個 u）：把剩下的編碼本身當候選，點了就原樣上屏
-            val rest = remainingCode()
-            if (rest.isNotEmpty()) {
-                panelItems = mutableListOf(CandidatePanelAdapter.Item(rest, "", -1, -1))
-            }
+        val items = (Rime.getCandidatesWithoutSwitch() ?: emptyArray()).mapIndexed { index, candidate ->
+            CandidatePanelAdapter.Item(
+                candidate.text ?: "",
+                candidate.comment ?: "",
+                index,
+            )
         }
-        candidatePanelAdapter?.submit(panelItems)
+        candidatePanelController?.submitLegacy(legacyGroupItems(), items)
     }
 
-    // ---------- 左側拼音音節組（方案 2：自切音節，僅顯示/導航） ----------
+
+    // ---------- 左側音節組（僅非 12 鍵方案使用；12 鍵左列由快照 comment 分組提供） ----------
 
     private fun isCjk(c: Char): Boolean =
         c.code in 0x3400..0x9FFF || c.code in 0xF900..0xFAFF
-
-    private fun utf8Len(s: String): Int = s.toByteArray(Charsets.UTF_8).size
 
     private fun buildGroupsFromSegments(
         bytes: ByteArray,
@@ -505,272 +350,34 @@ class TextInputManager private constructor() :
             i += 3
             if (startByte < 0 || endByte <= startByte || endByte > bytes.size) continue
             val segText = String(bytes, startByte, endByte - startByte, Charsets.UTF_8)
-                .trim().trim('\'', ' ')
+                .trim { it == '\'' || it == ' ' }
             if (segText.isBlank()) continue
-            val converted = status >= 2
-            out.add(Triple(segText, startByte, converted))
+            out.add(Triple(segText, startByte, status >= 2))
         }
         return out
     }
 
-    /** 12 鍵方案：這個「碼」對應的鍵帽文字（例如碼 "5" 對應鍵帽 "kl"）；找不到回傳 null。 */
-    private fun keyLabelForCode(code: String): String? {
-        // 主題的 preset_keys 就是「鍵帽文字 -> 實際送出」的對照表（例如 label: kl, send: 5）
-        val presets = com.hazukieq.hkrime.ime.keyboard.Key.presetKeys ?: return null
-        for (m in presets.values) {
-            val send = m["send"] ?: continue
-            if (send == code) {
-                val label = m["label"]
-                if (!label.isNullOrBlank() && label != code) return label
+    /** 非 12 鍵路徑的左列：直接按 librime 的分段重建（不做任何 caret 探測）。 */
+    private fun legacyGroupItems(): List<CandidateGroupAdapter.GroupItem> {
+        val input = runCatching { Rime.RimeGetInput() }.getOrNull().orEmpty()
+        if (input.isEmpty()) return emptyList()
+        val bytes = input.toByteArray(Charsets.UTF_8)
+        val segments = runCatching { Rime.getRimeCompositionSegments() }.getOrDefault(IntArray(0))
+        return buildGroupsFromSegments(bytes, segments)
+            .mapIndexed { index, (text, _, converted) ->
+                CandidateGroupAdapter.GroupItem(
+                    index = index,
+                    reading = text,
+                    selected = false,
+                    converted = converted,
+                )
             }
-        }
-        return null
     }
 
-    /** 由 preedit 重建左側音節組：邊界由 librime 的光標切分（XK_Left）取得。 */
+    /** 兼容舊調用點。 */
     private fun rebuildPinyinGroups() {
-        val adapter = candidateGroupAdapter ?: return
-        val raw = Rime.getCompositionText() ?: run { adapter.clear(); return }
-        if (raw.isEmpty()) {
-            adapter.clear()
-            candidateGroupList?.visibility = View.GONE
-            return
-        }
-        // 左列列出「下一個音節」的所有可行切分（例如 hau 可以切 ha | hau，選 ha 後剩 u）。
-        // 判斷方式：把 caret 放到每個字節位置 p，讓 librime 只編譯 input[0..p]；
-        // 若編譯結果正好是一段 [start, p) 且該段文本是字典裡的合法音節，就認為 p 是一個切分點。
-        val input = Rime.RimeGetInput() ?: ""
-        val ib = input.toByteArray(Charsets.UTF_8)
-        // 已轉換前綴：用 librime 的分段（字節偏移是 input 的，不是 preedit 的）取最後一個已確認段的 end
-        val nativeSegs = Rime.getRimeCompositionSegments()
-        var startByte = 0
-        for (i in 0 until nativeSegs.size / 3) {
-            val end = nativeSegs[i * 3 + 1]
-            val status = nativeSegs[i * 3 + 2]
-            if (status >= 2) startByte = maxOf(startByte, end)
-        }
-        // 若沒有已確認段但 preedit 已經是漢字開頭，退回用 preedit 的 CJK 前綴長度
-        val preeditClean = raw.replace("\u2038", "")
-        if (startByte == 0 && preeditClean.isNotEmpty() && isCjk(preeditClean[0])) {
-            var n = 0
-            for (ch in preeditClean) { if (isCjk(ch)) n += ch.toString().toByteArray(Charsets.UTF_8).size else break }
-            startByte = n
-        }
-        // 12 鍵這類「一鍵 = 一個碼」的方案：input 每個字節就是一按鍵，
-        // 左列按「按鍵」分組，標籤用 preedit 的顯示寫法（例如 1→ng、4→o），而不是碼串。
-        // 12 鍵（hakka_jiugong）按方案 id 判斷最穩：一鍵 = 一個碼，
-        // 左列就按 input 的每個字節分組，標籤取鍵帽（preset_keys 的 label），不猜拼音。
-        if (Rime.getSchemaId() == "hakka_jiugong" && ib.isNotEmpty()) {
-            val caret = Rime.RimeGetCaretPos()
-            val items = ArrayList<CandidateGroupAdapter.PinyinGroupAdapterItem>()
-            for (i in ib.indices) {
-                val code = String(ib, i, 1, Charsets.UTF_8)
-                val label = keyLabelForCode(code) ?: code
-                items.add(
-                    CandidateGroupAdapter.PinyinGroupAdapterItem(
-                        i, label, i, i + 1, converted = false, incomplete = false,
-                        selected = caret == i + 1,
-                    )
-                )
-            }
-            adapter.submit(items)
-            candidateGroupList?.visibility = View.VISIBLE
-            return
-        }
-
-        var convertedPrefix = ""
-        val syllables = SyllableLexicon.syllables(trime)
-        val slices = ArrayList<Triple<String, Int, Int>>()
-        val savedCaret = Rime.RimeGetCaretPos()
-        var p = startByte + 1
-        while (p <= ib.size && slices.size < 6) {
-            Rime.RimeSetCaretPos(p)
-            Rime.getContexts()
-            val segs = Rime.getRimeCompositionSegments()
-            val lastEnd = if (segs.size >= 3) segs[segs.size - 2] else -1
-            val candCount = Rime.getCandidatesWithoutSwitch()?.size ?: 0
-            val text = String(ib, startByte, p - startByte, Charsets.UTF_8)
-                .replace(" ", "").replace("'", "").trim()
-            if (lastEnd == p && candCount > 0 && text.isNotEmpty() && text in syllables) {
-                slices.add(Triple(text, startByte, p))
-            }
-            p++
-        }
-        // 最後再補一個「整個剩下的輸入」選項（例如 nginhau 的 ngin hau），標籤用 preedit 的寫法
-        if (slices.isEmpty() || slices.last().third < ib.size) {
-            Rime.RimeSetCaretPos(ib.size)
-            Rime.getContexts()
-            val rest = String(ib, startByte, ib.size - startByte, Charsets.UTF_8)
-                .replace(" ", "").replace("'", "")
-            val pieces = SyllableLexicon.split(trime, rest)
-            val full = if (pieces.isNotEmpty() && pieces.joinToString("") { it.first } == rest)
-                pieces.joinToString(" ") { it.first } else rest
-            if (full.isNotEmpty()) slices.add(Triple(full, startByte, ib.size))
-        }
-        Rime.RimeSetCaretPos(savedCaret)
-        Rime.getContexts()
-        if (slices.isNotEmpty()) {
-            val items = ArrayList<CandidateGroupAdapter.PinyinGroupAdapterItem>()
-            var idx = 0
-            for ((text, st, en) in slices) {
-                items.add(
-                    CandidateGroupAdapter.PinyinGroupAdapterItem(
-                        idx++, text, st, en, converted = false, incomplete = false,
-                        selected = savedCaret == en,
-                    )
-                )
-            }
-            applyDisplayLabels(items)
-            adapter.submit(items)
-            candidateGroupList?.visibility = View.VISIBLE
-            return
-        }
-        val groups = if (raw == lastGroupText && cachedGroups.isNotEmpty()) {
-            cachedGroups
-        } else {
-            probeGroups(raw).also {
-                cachedGroups = it
-                lastGroupText = raw
-                activeGroupIndex = -1
-            }
-        }
-        if (groups.isEmpty()) {
-            adapter.clear()
-            candidateGroupList?.visibility = View.GONE
-            return
-        }
-        val caretNow = Rime.RimeGetCaretPos()
-        // 光標分段有時會退化成一字一段（例如剛 commit 完重打剩下的音節）→ 用字典音節表兜底
-        val degenerate = groups.isNotEmpty() && groups.all { it.first.length <= 1 } && groups.size > 1
-        val finalGroups = if (degenerate) {
-            SyllableLexicon.split(trime, Rime.RimeGetInput()).map { (t, b) -> Triple(t, b, false) }
-        } else groups
-        val items = ArrayList<CandidateGroupAdapter.PinyinGroupAdapterItem>()
-        var nextIndex = 0
-        for ((segText, startByte, converted) in finalGroups) {
-            val selected = if (activeGroupIndex >= 0) {
-                activeGroupIndex == nextIndex
-            } else {
-                caretNow > startByte && caretNow <= startByte + utf8Len(segText)
-            }
-            items.add(
-                CandidateGroupAdapter.PinyinGroupAdapterItem(
-                    nextIndex++, segText, startByte, startByte + utf8Len(segText), converted = converted,
-                    incomplete = false, selected = selected
-                )
-            )
-        }
-        applyDisplayLabels(items)
-        adapter.submit(items)
-        candidateGroupList?.visibility = View.VISIBLE
-    }
-
-    private var cachedGroups: List<Triple<String, Int, Boolean>> = emptyList()
-
-    /**
-     * 用 librime 自己的光標切分拿邊界：把 caret 放到末尾，反覆按 XK_Left，
-     * 它會按音節往左跳；跳到的位置就是音節邊界。探測完把 caret 還原。
-     *
-     * 注意：preedit 裡可能帶 caret 佔位符（"‸"），這裡直接在 preedit 的字節上切片，
-     * 所以不需要做任何偏移補償，最後再把佔位符從組文本裡去掉。
-     */
-    private fun probeGroups(raw: String): List<Triple<String, Int, Boolean>> {
-        val savedCaret = Rime.RimeGetCaretPos()
-        val bytes = raw.toByteArray(Charsets.UTF_8)
-        val boundSet = sortedSetOf<Int>(bytes.size)
-        Rime.RimeSetCaretPos(bytes.size)
-        Rime.getContexts()
-        var guard = 0
-        var lastPos = Int.MAX_VALUE
-        while (guard++ < 64) {
-            Rime.process_key(0xff51, 0) // XK_Left
-            Rime.getContexts()
-            val c = Rime.RimeGetCaretPos()
-            if (c <= 0) { boundSet.add(0); break }
-            if (c >= lastPos) break
-            boundSet.add(c)
-            lastPos = c
-            if (boundSet.size > 32) break
-        }
-        Rime.RimeSetCaretPos(savedCaret)
-        Rime.getContexts()
-        if (boundSet.isEmpty()) return emptyList()
-        if (boundSet.first() != 0) boundSet.add(0)
-        boundSet.add(bytes.size)
-
-        val out = ArrayList<Triple<String, Int, Boolean>>()
-        val bounds = boundSet.toList()
-        for (i in 0 until bounds.size - 1) {
-            var sb = bounds[i]
-            var eb = bounds[i + 1]
-            while (sb < eb && (bytes[sb] == ' '.code.toByte() || bytes[sb] == '\''.code.toByte())) sb++
-            while (eb > sb && (bytes[eb - 1] == ' '.code.toByte() || bytes[eb - 1] == '\''.code.toByte())) eb--
-            if (eb <= sb) continue
-            var segText = String(bytes, sb, eb - sb, Charsets.UTF_8)
-                .replace("\u2038", "").replace("\u2040", "").trim()
-            if (segText.isBlank()) continue
-            val pureLatin = segText.all { it in 'a'..'z' || it == '\'' }
-            val pureCjk = segText.all { isCjk(it) }
-            if (!pureLatin && !pureCjk) continue
-            out.add(Triple(segText, sb, pureCjk))
-        }
-        return out
-    }
-
-    /**
-     * 點擊左側音節組：**只更新選中態，不動 caret**。
-     *
-     * 光標只在右側挑中漢字（真正上屏/轉換一段）時才由 librime 自己消費。
-     */
-    /**
-     * 點擊左側音節組：用「把 caret 移到該音節起點」的方式讓 librime 給這一節的候選
-     * （不寫入、不轉換任何字）；右側候選欄/展開面板立即切成這一節的候選。
-     * 只有用戶在右側挑字時才真正消費/轉換。
-     */
-    private fun selectPinyinGroup(group: CandidateGroupAdapter.PinyinGroupAdapterItem) {
-        activeGroupIndex = group.index
-        // 把 caret 移到「這一節的末尾」（= 下一節的起點），librime 就會把候選切成這一節的
-        val endByte = group.endByte
-        moveCaretTo(endByte)
-        Rime.getContexts()
-        trime.updateComposing()
-        rebuildPinyinGroups()
-        // 換到另一節後重新收一批（先貼當前頁，其餘頁碼分批補）
-        startPanelCollection()
-    }
-
-    /**
-     * 用 librime 自己的左/右光標鍵把 caret 移到指定字節位置。
-     * 只調 set_caret_pos 不會刷新候選，必須走 processKey(XK_Left/Right)。
-     */
-    private fun moveCaretTo(targetByte: Int) {
-        var caret = Rime.RimeGetCaretPos()
-        var guard = 0
-        while (caret > targetByte && guard++ < 64) {
-            if (!Rime.process_key(0xff51 /* XK_Left */, 0)) break
-            val next = Rime.RimeGetCaretPos()
-            if (next == caret) break
-            caret = next
-        }
-        guard = 0
-        while (caret < targetByte && guard++ < 64) {
-            if (!Rime.process_key(0xff53 /* XK_Right */, 0)) break
-            val next = Rime.RimeGetCaretPos()
-            if (next == caret) break
-            caret = next
-        }
-    }
-
-    /**
-     * 從「字典快速查找」清單裡挑一個字：只有到這一步才動 librime。
-     * 先看當前候選頁有沒有它；沒有就把 caret 移到該音節再找一次；仍沒有就提示。
-     */
-    /** 重新收集展開面板內容（保持「面板不影響候選欄」的約定）。 */
-    private fun refreshPanelItems() {
-        val panel = candidatePanel ?: return
         if (!isCandidatePanelShown()) return
-        if (collecting) return // 分批收集進行中：別把它重置成「同步全收」
-        startPanelCollection()
+        candidatePanelController?.submitLegacy(legacyGroupItems(), emptyList())
     }
 
     /**
@@ -797,7 +404,7 @@ class TextInputManager private constructor() :
         // 新輸入框/新會話：面板狀態一律復位，否則會留下「鍵盤被 GONE、面板空的」灰塊
         hideCandidatePanel()
         Trime.getService().selectLiquidKeyboard(-1)
-        panelItems.clear()
+        twelveKeyController?.reset()
         candidatePanelRoot?.visibility = android.view.View.GONE
         isComposable = false
         performEnterAsLineBreak = false
@@ -1059,6 +666,10 @@ class TextInputManager private constructor() :
      */
     override fun onCandidatePressed(index: Int) {
         onPress(0)
+        if (isTwelveKeyMode()) {
+            onTwelveKeyCandidatePressed(index)
+            return
+        }
         if (!Rime.isComposing()) {
             if (index >= 0) {
                 Rime.toggleOption(index)
@@ -1080,6 +691,20 @@ class TextInputManager private constructor() :
         }
     }
 
+    /** 12 鍵候選條：index 是條目下標；fallback 是條目列表末尾的本地原文項。 */
+    private fun onTwelveKeyCandidatePressed(index: Int) {
+        val snapshot = twelveKeyController?.snapshot ?: return
+        val item = snapshot.barItems.getOrNull(index)
+        if (item != null) {
+            twelveKeyController?.selectCandidate(item.index)
+            return
+        }
+        val fallback = snapshot.fallback
+        if (fallback != null && index == snapshot.barItems.size) {
+            twelveKeyController?.commitFallback(fallback)
+        }
+    }
+
     override fun onCandidateSymbolPressed(arrow: String) {
         when (arrow) {
             Candidate.PAGE_UP_BUTTON -> onKey(KeyEvent.KEYCODE_PAGE_UP, 0)
@@ -1091,6 +716,8 @@ class TextInputManager private constructor() :
     }
 
     override fun onCandidateLongClicked(index: Int) {
+        // 12 鍵候選條是全局快照，長按刪除要拿到 menu 全局下標；P0 先禁用，避免刪錯詞。
+        if (isTwelveKeyMode()) return
         Rime.deleteCandidate(index)
         trime.updateComposing()
     }

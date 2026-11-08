@@ -35,10 +35,12 @@
 | 8 | [06-troubleshooting-roadmap.md](06-troubleshooting-roadmap.md) | 四层排障、症状表、诊断命令、技术债与 roadmap | 出问题时 |
 | 9 | [08-theme-trime-yaml.md](08-theme-trime-yaml.md) | **trime.yaml 主题全解**（style/配色/按键/键盘/悬浮键盘/坑）+ **主题预览器用法** | 改主题、调键盘布局、查配色时 |
 | 10 | [09-candidate-ui-evaluation.md](09-candidate-ui-evaluation.md) | **候选区改造评估**（单行+展开面板 / 九宫格，参考搜狗等实现，含可交互 mock） | 改候选栏、做展开页、评估成本时 |
-| 10 | [reports/](reports/README.md) | 构建 / 改名 / 集成 / 真机报告（**原样存档**） | 要查证据/细节时 |
+| 11 | [10-twelve-key-input-design.md](10-twelve-key-input-design.md) | **12 键（九宫格）客家话输入设计与实现方案**：librime 能力实证、comment 分组架构、JNI 候选枚举、交互规格、P0/P1/P2 | 要动手实现/评审 12 键时 |
+| 12 | [reports/](reports/README.md) | 构建 / 改名 / 集成 / 真机报告（**原样存档**） | 要查证据/细节时 |
 
 **最短路径**：00 → 03（把包装上）→ 05 §4（发版）→ 07（改数据）→ 06（出问题）。
 改主题/键盘：直接读 **08**，再开 `tools/theme-previewer/` 实时看效果；改候选区：读 **09**，开 `tools/candidate-mock/` 点一遍三种形态。
+实现 12 键输入：读 **11**（含 host 实测数据与 JNI/App 改动清单），再对照 `artifacts/12key/{engine,data,app}` 三份证据报告。
 
 ## 约定
 

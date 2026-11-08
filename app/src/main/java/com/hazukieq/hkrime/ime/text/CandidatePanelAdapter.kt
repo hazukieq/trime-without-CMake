@@ -5,31 +5,32 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.hazukieq.hkrime.core.Rime
 import com.hazukieq.hkrime.data.Config
 
 /**
- * 候選展開面板的網格適配器。
+ * 候選展開面板右側的網格：只讀快照，整表 submitList 替換。
  *
- * 純被動：只負責「顯示 + 點擊回調」，資料由 [TextInputManager] 一次性收集後提交。
+ * [Item.index] 是 librime menu 的全局下標，點擊後直接 Rime.select_candidate(index)。
  */
 class CandidatePanelAdapter(
     private val context: Context,
-    private val onPick: (pageOffset: Int, indexInPage: Int) -> Unit,
-) : RecyclerView.Adapter<CandidatePanelAdapter.VH>() {
+    private val onPick: (Item) -> Unit,
+) : ListAdapter<CandidatePanelAdapter.Item, CandidatePanelAdapter.VH>(DIFF) {
 
     data class Item(
         val text: String,
         val comment: String,
-        val pageOffset: Int,
-        val indexInPage: Int,
+        /** librime menu 全局下標（不是頁內下標） */
+        val index: Int,
     )
-
-    private val items = ArrayList<Item>()
 
     private val cfg = Config.get(context)
     private val textSize = cfg.getPixel("candidate_text_size", 22).toFloat()
@@ -45,36 +46,14 @@ class CandidatePanelAdapter(
         RecyclerView.ViewHolder(box)
 
     fun submit(list: List<Item>) {
-        items.clear()
-        items.addAll(dedupe(list))
-        notifyDataSetChanged()
-    }
-
-    /** 追加一批（保留當前滾動位置，不整表刷新）；同字只留第一次出現，避免分批補頁重收時重複。 */
-    fun addItems(list: List<Item>) {
-        if (list.isEmpty()) return
-        val seen = items.mapTo(HashSet()) { it.text }
-        val fresh = list.filter { seen.add(it.text) }
-        if (fresh.isEmpty()) return
-        val start = items.size
-        items.addAll(fresh)
-        notifyItemRangeInserted(start, fresh.size)
-    }
-
-    private fun dedupe(list: List<Item>): List<Item> {
-        val seen = HashSet<String>()
-        return list.filter { seen.add(it.text) }
+        submitList(list)
     }
 
     fun clear() {
-        items.clear()
-        notifyDataSetChanged()
+        submitList(emptyList())
     }
 
-    override fun getItemCount(): Int = items.size
-
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-        val m = pad
         val box = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -82,7 +61,7 @@ class CandidatePanelAdapter(
             layoutParams = ViewGroup.MarginLayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { setMargins(m, m, m, m) }
+            ).apply { setMargins(pad, pad, pad, pad) }
             background = GradientDrawable().apply {
                 cornerRadius = radius
                 setColor(cellColor)
@@ -105,14 +84,24 @@ class CandidatePanelAdapter(
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
-        val item = items[position]
+        val item = getItem(position)
         holder.word.text = item.text
         if (hideComment || item.comment.isEmpty()) {
-            holder.comment.visibility = android.view.View.GONE
+            holder.comment.visibility = View.GONE
         } else {
-            holder.comment.visibility = android.view.View.VISIBLE
+            holder.comment.visibility = View.VISIBLE
             holder.comment.text = item.comment
         }
-        holder.box.setOnClickListener { onPick(item.pageOffset, item.indexInPage) }
+        holder.box.setOnClickListener { onPick(item) }
+    }
+
+    companion object {
+        private val DIFF = object : DiffUtil.ItemCallback<Item>() {
+            override fun areItemsTheSame(oldItem: Item, newItem: Item): Boolean =
+                oldItem.index == newItem.index
+
+            override fun areContentsTheSame(oldItem: Item, newItem: Item): Boolean =
+                oldItem == newItem
+        }
     }
 }

@@ -40,9 +40,23 @@ import com.hazukieq.hkrime.ime.core.Trime;
 import com.hazukieq.hkrime.util.GraphicUtils;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.List;
 
 /** 顯示候選字詞 */
 public class Candidate extends View {
+
+  /**
+   * 候選條的一項（12 鍵路徑由 App 的快照直接餵入，不再回讀 Rime.getCandidates()）。
+   */
+  public static class BarEntry {
+    public final String text;
+    public final String comment;
+
+    public BarEntry(String text, String comment) {
+      this.text = text;
+      this.comment = comment;
+    }
+  }
 
   /** 處理候選條選字事件 */
   public interface EventListener {
@@ -64,7 +78,10 @@ public class Candidate extends View {
   private WeakReference<EventListener> listener = new WeakReference<>(null);
   private final GraphicUtils graphicUtils;
   private int highlightIndex = -1;
-  private Rime.RimeCandidate[] candidates;
+  private BarEntry[] candidates;
+  /** 非 null 時候選條只讀這份外部快照（12 鍵路徑），不再回讀 Rime。 */
+  private BarEntry[] externalCandidates;
+  private boolean useExternalCandidates = false;
   private final ArrayList<ComputedCandidate> computedCandidates =
       new ArrayList<>(MAX_CANDIDATE_COUNT);
   private int numCandidates;
@@ -148,6 +165,29 @@ public class Candidate extends View {
 
   public void setCandidateListener(@Nullable EventListener listener) {
     this.listener = new WeakReference<>(listener);
+  }
+
+  /**
+   * 12 鍵路徑：候選條只讀 App 快照（與展開面板同源），不調 Rime.getCandidates()。
+   *
+   * <p>空列表時會顯示右側「⌄」收起鍵盤按鈕，行為與舊的空候選一致。
+   */
+  public void setCandidates(@Nullable List<BarEntry> entries) {
+    if (entries == null || entries.isEmpty()) {
+      externalCandidates = new BarEntry[0];
+    } else {
+      externalCandidates = entries.toArray(new BarEntry[0]);
+    }
+    useExternalCandidates = true;
+    setText(0);
+  }
+
+  /** 離開 12 鍵路徑：恢復「候選條自己回讀 Rime.getCandidates()」的舊行為。 */
+  public void clearExternalCandidates() {
+    if (!useExternalCandidates) return;
+    useExternalCandidates = false;
+    externalCandidates = null;
+    setText(0);
   }
 
   /**
@@ -437,9 +477,30 @@ public class Candidate extends View {
   }
 
   private int updateCandidates() {
-    candidates = Rime.getCandidates();
+    if (useExternalCandidates) {
+      candidates = externalCandidates;
+      startNum = 0;
+      highlightIndex = -1;
+      numCandidates = candidates == null ? 0 : candidates.length;
+      return numCandidates;
+    }
+    Rime.RimeCandidate[] rimeCandidates = Rime.getCandidates();
+    if (rimeCandidates == null) {
+      candidates = null;
+      numCandidates = 0;
+      return 0;
+    }
+    BarEntry[] entries = new BarEntry[rimeCandidates.length];
+    for (int i = 0; i < rimeCandidates.length; i++) {
+      Rime.RimeCandidate candidate = rimeCandidates[i];
+      entries[i] =
+          new BarEntry(
+              candidate == null ? "" : candidate.text,
+              candidate == null ? "" : candidate.comment);
+    }
+    candidates = entries;
     highlightIndex = Rime.getCandHighlightIndex() - startNum;
-    numCandidates = candidates == null ? 0 : candidates.length - startNum;
+    numCandidates = candidates.length - startNum;
     return numCandidates;
   }
 }

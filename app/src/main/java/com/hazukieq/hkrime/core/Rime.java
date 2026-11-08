@@ -68,12 +68,35 @@ public class Rime {
 
     public int getStart() {
       if (length == 0) return 0;
-      return new String(bytes, 0, sel_start).length();
+      byte[] b = preedit == null ? bytes : preedit.getBytes();
+      return new String(b, 0, safeUtf8Length(b, sel_start)).length();
     }
 
     public int getEnd() {
       if (length == 0) return 0;
-      return new String(bytes, 0, sel_end).length();
+      byte[] b = preedit == null ? bytes : preedit.getBytes();
+      return new String(b, 0, safeUtf8Length(b, sel_end)).length();
+    }
+
+    /** 把字節偏移夾到 [0, len] 且不回退到 UTF-8 多字節字符中間。 */
+    private static int safeUtf8Length(byte[] b, int offset) {
+      if (b == null) return 0;
+      int n = Math.max(0, Math.min(offset, b.length));
+      while (n > 0 && n < b.length && (b[n] & 0xC0) == 0x80) n--;
+      return n;
+    }
+
+    /**
+     * preedit 被 12 鍵方案改寫後，librime 原始的 length/cursor_pos/sel_* 是舊 preedit 的字節偏移，
+     * 必須重新按新文本歸一化，否則 {@link #getStart()}/{@link #getEnd()} 會越界。
+     */
+    void normalizeAfterRewrite() {
+      if (preedit == null) return;
+      bytes = preedit.getBytes();
+      length = bytes.length;
+      cursor_pos = Math.max(0, Math.min(cursor_pos, bytes.length));
+      sel_start = Math.max(0, Math.min(sel_start, bytes.length));
+      sel_end = Math.max(sel_start, Math.min(sel_end, bytes.length));
     }
   }
 
@@ -304,7 +327,10 @@ public class Rime {
         hint = cs[0].text;
       }
       String decoded = TwelveKeyPreedit.INSTANCE.decode(composition.preedit, hint);
-      if (decoded != null) composition.preedit = decoded;
+      if (decoded != null) {
+        composition.preedit = decoded;
+        composition.normalizeAfterRewrite();
+      }
     }
     return composition;
   }
@@ -655,6 +681,28 @@ public class Rime {
     return arr == null ? new int[0] : arr;
   }
 
+  /**
+   * 全量候選枚舉（不受 menu/page_size 限制，走 RimeCandidateListBegin/Next/End）。
+   *
+   * @param maxCount 上限（建議 600；單鍵最多可達 2000+ 條）
+   * @return 扁平數組 [text0, comment0, text1, comment1, ...]；未組字或無候選返回空數組。
+   *     下標 i 即 {@link #select_candidate(int)} 使用的全量下標（與本數組順序一致）。
+   */
+  public static String[] enumerateCandidates(int maxCount) {
+    String[] arr = enumerate_candidates(maxCount);
+    return arr == null ? new String[0] : arr;
+  }
+
+  /** 同上，解析爲 (text, comment) 對；comment 可能爲空串。 */
+  public static List<String[]> candidatesSnapshot(int maxCount) {
+    String[] flat = enumerateCandidates(maxCount);
+    List<String[]> out = new ArrayList<>(flat.length / 2);
+    for (int i = 0; i + 1 < flat.length; i += 2) {
+      out.add(new String[] {flat[i], flat[i + 1]});
+    }
+    return out;
+  }
+
   public static int RimeGetCaretPos() {
     return get_caret_pos();
   }
@@ -834,6 +882,9 @@ public class Rime {
   public static native int get_caret_pos();
 
   public static native int[] getCompositionSegments();
+
+  /** @see #enumerateCandidates(int) */
+  public static native String[] enumerate_candidates(int maxCount);
 
   public static native void set_caret_pos(int caret_pos);
 
