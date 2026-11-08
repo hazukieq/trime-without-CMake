@@ -27,17 +27,6 @@ object TwelveKeyPreedit {
     /** 單字 → 音節（取字典裡第一次出現的讀音），用來在歧義時對齊第一個候選字。 */
     private val charTable = HashMap<String, String>()
 
-    /** 相鄰字 bigram 次數（關聯度）：key = 前一字 code shl 16 or 後一字 code。 */
-    private val bigrams = HashMap<Int, Int>()
-
-    /** 純詞條詞表（只有漢字，無拼音列）：拿來統計字的共現，給「按段選字」排序。 */
-    private val WORD_DICTS = listOf(
-        "rime/hakka_sougou_words.dict.yaml",
-        "rime/hakka_mobilewords.dict.yaml",
-        "rime/hakka_oftenwords.dict.yaml",
-        "rime/hakka_places.dict.yaml",
-    )
-
     private var loaded = false
 
     fun init(context: Context) {
@@ -72,51 +61,7 @@ object TwelveKeyPreedit {
             if (old == null || old.freq < freq) table[code] = Entry(syllable, freq)
             codeToSyllables.getOrPut(code) { ArrayList() }.add(Entry(syllable, freq))
         }
-        runCatching { loadBigrams(context) }
-        Timber.i(
-            "TwelveKeyPreedit: syllables=%d codes=%d bigrams=%d",
-            counts.size,
-            table.size,
-            bigrams.size,
-        )
-    }
-
-    /** 統計詞表裡相鄰兩字的共現次數（關聯度）。只吃漢字開頭、tab 前的詞條。 */
-    private fun loadBigrams(context: Context) {
-        for (name in WORD_DICTS) {
-            runCatching {
-                context.assets.open(name).bufferedReader(Charsets.UTF_8).useLines { lines ->
-                    lines.forEach { raw ->
-                        if (raw.isBlank() || raw.startsWith("#")) return@forEach
-                        val first = raw[0]
-                        if (first !in '\u4E00'..'\u9FFF') return@forEach
-                        val text = raw.substringBefore('\t').trim()
-                        for (i in 0 until text.length - 1) {
-                            val a = text[i]
-                            val b = text[i + 1]
-                            if (a !in '\u4E00'..'\u9FFF' || b !in '\u4E00'..'\u9FFF') continue
-                            val key = (a.code shl 16) or b.code
-                            bigrams[key] = (bigrams[key] ?: 0) + 1
-                        }
-                    }
-                }
-            }.onFailure { Timber.w(it, "TwelveKeyPreedit: load %s failed", name) }
-        }
-    }
-
-    /**
-     * [text] 與前一字 [prev] 的關聯度（bigram 共現次數）。
-     * 給「分詞後按段選字」排序用 —— 例如打完「區」之後，下一段的「域」應該排在「育」前面。
-     */
-    fun association(prev: Char?, text: String): Int {
-        if (prev == null || text.isEmpty()) return 0
-        return bigrams[(prev.code shl 16) or text[0].code] ?: 0
-    }
-
-    /** 依「與 [prev] 的關聯度」降序排列（穩定排序：關聯度相同保持字典順序）。 */
-    fun rankChars(chars: List<String>, prev: Char?): List<String> {
-        if (prev == null || bigrams.isEmpty() || chars.size < 2) return chars
-        return chars.sortedWith(compareByDescending { association(prev, it) })
+        Timber.i("TwelveKeyPreedit: syllables=%d codes=%d", counts.size, table.size)
     }
 
     /** 拼音 → 12 鍵碼（對應 alphabet 的 abbrev/xform/xlit）。 */

@@ -39,6 +39,8 @@ class EditorInstance(private val ims: InputMethodService) {
         val ic = inputConnection ?: return false
         ic.commitText(text, 1)
         lastCommittedText = text
+        // 統計「用戶常用字 / 用戶自己組的詞」：固定候選區按這兩項排序（不用靜態詞表）。
+        runCatching { com.hazukieq.hkrime.core.twelvekey.SegmentMemory.bump(text) }
         // Fix pressing Delete key will clear the input box issue on BlackBerry
         ic.clearMetaKeyStates(KeyEvent.getModifierMetaStateMask())
         cacheDraft()

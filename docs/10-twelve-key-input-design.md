@@ -1512,3 +1512,32 @@ BuildConfig.DEBUG 的 D 级打，现场难抓）；`TextInputManager.onCandidate
 - 再點一個字 → 上屏（實測得到「区长」），組字結束、錨點清除。
 
 **取捨**：關聯度只有 bigram，不含詞長/詞頻加權；段組候選仍只來自單字字典（不含用戶詞庫）。
+
+## 15.35 候選條排序改用「用戶自己的用字記憶」（不用靜態詞表）（2026-11-09）
+
+**用戶糾正**（m04166）：「你用詞表恰恰是錯的，可以在展開面板中用。但在固定候選區，應該優先
+使用用戶常用字頻率、近期數據庫組詞，這也是為啥說根據這些因素得到列表後，再和第一個字做組詞關聯度。」
+
+**做法**：
+1. 新增 `core/twelvekey/SegmentMemory.kt`（本機記憶，跨會話保存在
+   `SharedPreferences("segment_memory")`）：
+   - `charFreq`：每個漢字被上屏的次數（用戶常用字頻率，上限 400）；
+   - `bigramFreq`：相鄰兩字一起上屏的次數（用戶**自己**打過的組詞習慣 / 近期用詞，上限 3000）；
+   - `bump(committed)`：在 `EditorInstance.commitText()` 裡統計（引擎上屏、標點、分段選字都算；
+     遇到標點/ASCII 會打斷組詞關聯）；
+   - `rank(chars, prev)` = 先比 `bigramScore(prev, ch)`、同分再比 `charScore(ch)`；
+   - 沒有記憶時保持字典順序。
+2. `TwelveKeySnapshotBuilder`：
+   - 分詞輸入時候選條 = 該段所有音節組的字**攤平後全域排序**（不是按組取）——
+     否則關聯度最高的字仍會被「字典音節組順序」擠到後面；
+     排序鍵 = `SegmentMemory.bigramScore(segmentAnchor, text)` → `SegmentMemory.charScore(text)`。
+   - 刪掉先前用 `hakka_sougou_words` 等靜態詞表統計 bigram 的實現（詞表給展開面板用，
+     不進固定候選區排序）。
+3. 上一字記憶（`segmentAnchor`）沿用 §15.34：分段選字上屏後記住該字，下一段候選條以它為錨點。
+
+**真機驗收**：連續三次打 `5'e` 都選「区 … 父」，之後再打 `5'e` 選「区」，
+候選條第二段的第一條就變成「父」（訓練前的順序是「夫 互 父 …」）；
+`shared_prefs/segment_memory.xml` 內容 `char_freq=父:3;区:3`、`bigram_freq=区父:3;父区:2`。
+
+**取捨**：只統計「在本 IME 上屏過的字」，全新用戶第一輪仍是字典順序；
+rime 用戶詞庫（userdb）沒有查詢 API，其權重只能透過引擎候選順序間接體現。

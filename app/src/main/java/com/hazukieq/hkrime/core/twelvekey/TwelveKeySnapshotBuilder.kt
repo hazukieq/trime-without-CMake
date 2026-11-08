@@ -144,7 +144,15 @@ object TwelveKeySnapshotBuilder {
         // 再把剩下的碼餵回引擎，於是第二段接著在候選條出現 —— 全程不開面板（用戶 2026-11-09 指示）。
         // 有 segmentAnchor（剛上屏的前一個字）時，與它關聯度高的字排前面。
         val barEntries = if (segmentGroups.isNotEmpty()) {
-            segmentGroups.flatMap { it.items }.take(BAR_ITEMS)
+            // 全域排序：先把所有音節組的字攤平，再統一按「與前一字的組詞關聯度 → 字頻」排。
+            // 不能按組取（組順序是字典音節順序）—— 否則關聯度最高的字仍可能被擠到後面。
+            segmentGroups.flatMap { it.items }
+                .sortedWith(
+                    compareByDescending<CandidateItem> {
+                        SegmentMemory.bigramScore(segmentAnchor, it.text)
+                    }.thenByDescending { SegmentMemory.charScore(it.text) },
+                )
+                .take(BAR_ITEMS)
         } else {
             ranked.take(BAR_ITEMS).filter { it.text.isNotEmpty() }
         }
@@ -191,7 +199,9 @@ object TwelveKeySnapshotBuilder {
         val first = segments.first()
         val result = ArrayList<SyllableGroup>()
         for (syllable in TwelveKeyPreedit.syllablesForSegment(first)) {
-            val chars = TwelveKeyPreedit.rankChars(
+            // 固定候選區不用靜態詞表：先按用戶自己的組詞記憶（與上一字的關聯度），
+            // 再按用戶常用字頻率排序（見 SegmentMemory）。
+            val chars = SegmentMemory.rank(
                 TwelveKeyPreedit.charsForSyllable(syllable),
                 anchor,
             )
@@ -205,7 +215,7 @@ object TwelveKeySnapshotBuilder {
         if (anchor != null) {
             result.sortWith(
                 compareByDescending { g ->
-                    TwelveKeyPreedit.association(anchor, g.items.first().text)
+                    SegmentMemory.bigramScore(anchor, g.items.first().text)
                 },
             )
         }
