@@ -1569,3 +1569,25 @@ Kotlin 解析 `commitText(Rime.getCommitText())` 時優先選**無默認參數**
 實測（12 鍵，`kl` + 分詞 + `kl` + 分詞 + `def` = `5'5'e`）：前兩段是字典段組；
 選完兩字（健、區）後，最後一段候選條變成 `東 的 都 到 和 點 得 但 會`（引擎詞頻順序），
 不再是字典順序的 `長 訂 叮 盯 釘 …`。
+
+## 15.36 固定候選欄去掉滾動（2026-11-09）
+
+**問題**（用戶）：固定候選區有滾動條/滾動行為，而且**左滑會意外打開展開面板**。
+
+根源：`app/src/main/res/layout/candidate_bar.xml` 的根是自製
+`com.hazukieq.hkrime.ime.text.ScrollView`（HorizontalScrollView 子類），
+它在 `onTouchEvent` 裡把「左滑超過閾值」當成 `pageExAction`（= 打開展開面板），
+右滑當翻頁；同時繼承的 HorizontalScrollView 帶來滾動條與橫向滾動。
+
+**改法**：
+1. `candidate_bar.xml` 根節點由自製 `ScrollView` 換成普通 **`FrameLayout`**
+   （id 仍是 `candidate_root`）——沒有滾動、沒有滾動條、沒有滑動手勢。
+2. `TextInputManager`：`candidateRoot` 型別改 `View`，刪掉 `setPageStr(...)` 三個
+   Runnable（翻頁/展開面板的滑動入口）。
+3. `Trime`：`mCandidateRoot` 型別改 `View`（`mTabRoot` 仍是 ScrollView，符號欄另說）。
+4. `Candidate.onTouchEvent`：加 touch-slop 拖動判定 —— 手指移動超過
+   `ViewConfiguration.getScaledTouchSlop()` 就標記 `dragged`，`ACTION_UP` 時
+   **不上屏任何候選**（以前滑動抬手會被當成「點擊落點處的候選」，誤上屏）。
+
+**真機驗收**：Termux 終端裡打 `kl` 得到碼串 `5`，在候選條上從右往左滑 →
+面板不開、不上屏、候選條無滾動；只有點擊才上屏。

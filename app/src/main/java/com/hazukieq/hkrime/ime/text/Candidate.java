@@ -30,6 +30,7 @@ import android.graphics.drawable.PaintDrawable;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
+import android.view.ViewConfiguration;
 import android.view.View;
 import android.view.ViewGroup.LayoutParams;
 import androidx.annotation.NonNull;
@@ -88,6 +89,10 @@ public class Candidate extends View {
   private WeakReference<EventListener> listener = new WeakReference<>(null);
   private final GraphicUtils graphicUtils;
   private int highlightIndex = -1;
+  private final int touchSlop =
+      ViewConfiguration.get(getContext()).getScaledTouchSlop();
+  private float touchDownX, touchDownY;
+  private boolean dragged = false;
   /** 展開面板是否處於打開狀態（影響 ▼ 的繪製方向）。 */
   private boolean panelOpen = false;
   private int symbolBoxSize;
@@ -555,6 +560,12 @@ public class Candidate extends View {
     updateCandidateWidth();
   }
 
+  /**
+   * 固定候選欄不再滾動（用戶 2026-11-09：去掉滾動條與滾動行為）：
+   * 手指移動超過 touch slop 就整體當作「拖動」，抬手時不上屏任何候選 ——
+   * 以前左滑會被 ScrollView 當成「展開面板」手勢，誤觸率很高；
+   * 現在滑動一律忽略，只有點擊才生效。
+   */
   @SuppressLint("ClickableViewAccessibility")
   @Override
   public boolean onTouchEvent(@NonNull MotionEvent me) {
@@ -564,9 +575,23 @@ public class Candidate extends View {
     switch (me.getActionMasked()) {
       case MotionEvent.ACTION_DOWN:
         timeDown = System.currentTimeMillis();
+        touchDownX = me.getX();
+        touchDownY = me.getY();
+        dragged = false;
+      // fall through
       case MotionEvent.ACTION_MOVE:
         setPressed(true);
-        highlightIndex = getCandidateIndex(x, y);
+        if (!dragged) {
+          float dx = Math.abs(me.getX() - touchDownX);
+          float dy = Math.abs(me.getY() - touchDownY);
+          if (dx > touchSlop || dy > touchSlop) {
+            dragged = true;
+            highlightIndex = -1;
+          }
+        }
+        if (!dragged) {
+          highlightIndex = getCandidateIndex(x, y);
+        }
         invalidate();
         break;
         // updateHighlight(x, y);
@@ -575,10 +600,11 @@ public class Candidate extends View {
         timeMove = System.currentTimeMillis();
         long durationMs = timeMove - timeDown;
         setPressed(false);
-        if (me.getActionMasked() == MotionEvent.ACTION_UP) {
+        if (me.getActionMasked() == MotionEvent.ACTION_UP && !dragged) {
           onCandidateClick(highlightIndex, durationMs >= Config.getDeleteCandidateTimeout());
         }
         highlightIndex = -1;
+        dragged = false;
         invalidate();
         break;
     }

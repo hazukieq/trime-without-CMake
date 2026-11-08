@@ -19,12 +19,13 @@
  */
 -->
 
-<com.hazukieq.hkrime.ime.text.ScrollView
+<!-- 固定候選欄：不滾動、不顯示滾動條、不響應左右滑（用戶 2026-11-09 指示）。
+     之前用自製 HorizontalScrollView，左滑會被當成「展開面板」手勢，誤觸率太高。 -->
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
   android:id="@+id/candidate_root"
   android:layout_width="match_parent"
-  android:layout_height="wrap_content"
-  android:fillViewport="true">
+  android:layout_height="wrap_content">
   <LinearLayout
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
@@ -35,4 +36,4 @@
         android:layout_height="120dp"
         />
   </LinearLayout>
-</com.hazukieq.hkrime.ime.text.ScrollView>
+</FrameLayout>

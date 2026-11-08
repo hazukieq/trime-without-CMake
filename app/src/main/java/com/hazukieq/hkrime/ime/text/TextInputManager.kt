@@ -71,7 +71,7 @@ class TextInputManager private constructor() :
     private var candidateBarBinder: CandidateBarBinder? = null
 
 
-    var candidateRoot: ScrollView? = null
+    var candidateRoot: android.view.View? = null
     var candidateView: Candidate? = null
 
     var locales: Array<Locale> = Array(2) { Locale.getDefault() }
@@ -159,12 +159,8 @@ class TextInputManager private constructor() :
             it.reset(trime)
         }
         // Initialize candidate bar
+        // 固定候選欄現在是普通容器：不滾動、不左右滑（避免左滑誤開展開面板）。
         candidateRoot = uiBinding.main.candidateView.candidateRoot.also {
-            it.setPageStr(
-                Runnable { trime.handleKey(KeyEvent.KEYCODE_PAGE_DOWN, 0) },
-                Runnable { trime.handleKey(KeyEvent.KEYCODE_PAGE_UP, 0) },
-                Runnable { toggleCandidatePanel() }
-            )
             it.visibility = if (Rime.getOption("_hide_candidate")) View.GONE else View.VISIBLE
         }
 

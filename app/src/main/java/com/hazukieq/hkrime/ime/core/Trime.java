@@ -124,7 +124,8 @@ public class Trime extends LifecycleInputMethodService {
   private Candidate mCandidate; // 候選
   private Composition mComposition; // 編碼
   private CompositionRootBinding compositionRootBinding = null;
-  private ScrollView mCandidateRoot, mTabRoot;
+  private View mCandidateRoot;
+  private ScrollView mTabRoot;
   private TabView tabView;
   public InputRootBinding inputRootBinding = null;
   public CopyOnWriteArrayList<EventListener> eventListeners = new CopyOnWriteArrayList<>();
