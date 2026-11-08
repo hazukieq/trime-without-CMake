@@ -241,23 +241,20 @@ class TextInputManager private constructor() :
         panel.scrollToPosition(0)
         collectionGen++
         collecting = true
-        collectRest(collectionGen, 2, replace = true)
+        collectRest(collectionGen, 2)
     }
 
     /** 面板顯示後分批補後面頁碼的候選；面板關閉/重開時用 generation 作廢舊任務。 */
-    private fun collectRest(gen: Int, fromPage: Int, replace: Boolean) {
+    private fun collectRest(gen: Int, fromPage: Int) {
         if (fromPage > panelMaxPages) { collecting = false; return }
         candidatePanel?.post {
             if (gen != collectionGen || !isCandidatePanelShown()) { collecting = false; return@post }
             val more = collectCandidatePanelItems(fromPage, 3)
-            if (more.isEmpty()) {
-                collecting = false
-                if (replace) { panelItems = currentPageItems(); candidatePanelAdapter?.submit(panelItems) }
-                return@post
-            }
-            if (replace) panelItems = more else panelItems.addAll(more)
-            candidatePanelAdapter?.submit(panelItems)
-            collectRest(gen, fromPage + 3, false)
+            if (more.isEmpty()) { collecting = false; return@post }
+            // 只追加、不整表刷新：RecyclerView 的滾動位置才不會被拉回頂部
+            panelItems.addAll(more)
+            candidatePanelAdapter?.addItems(more)
+            collectRest(gen, fromPage + 3)
         }
     }
 
@@ -451,6 +448,9 @@ class TextInputManager private constructor() :
         lastGroupText = ""
         activeGroupIndex = -1
         rebuildPinyinGroups()
+        // 分批補頁時，collectCandidatePanelItems() 每翻一頁都會走這裡；
+        // 此時不能把 panelItems 重置成「當前頁」，否則前面補進來的批次全被沖掉
+        if (collecting) return
         panelItems = currentPageItems()
         if (panelItems.isEmpty() && Rime.isComposing()) {
             // 完全沒有候選（例如只剩一個 u）：把剩下的編碼本身當候選，點了就原樣上屏

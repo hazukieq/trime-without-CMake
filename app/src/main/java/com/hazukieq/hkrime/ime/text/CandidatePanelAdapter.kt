@@ -50,6 +50,14 @@ class CandidatePanelAdapter(
         notifyDataSetChanged()
     }
 
+    /** 追加一批（保留當前滾動位置，不整表刷新）。 */
+    fun addItems(list: List<Item>) {
+        if (list.isEmpty()) return
+        val start = items.size
+        items.addAll(list)
+        notifyItemRangeInserted(start, list.size)
+    }
+
     fun clear() {
         items.clear()
         notifyDataSetChanged()
