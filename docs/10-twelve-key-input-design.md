@@ -1616,3 +1616,23 @@ push 到 `/sdcard/hkrime` + 廣播 deploy。
 真機驗收（客語26鍵）：
 - 開「情」→ 打 `but`（不）→ 候選出現 `不 (＞﹏＜)`；
 - 開「聯」→ 打 `gung`（公）→ 候選出現 `公` `公共` `公家` 等聯想詞。
+
+### 15.37.1 切換方案開關後候選不刷新（2026-11-09）
+
+用戶：「那為什麼12鍵不可以？固定候選欄沒有就算了，在展開面板也沒有？」
+
+排查結論：12 鍵的 `hakka_jiugong.schema.yaml` **本身有** `ywz:` / `lenth:` 配置段，
+filter 是生效的（實測 12 鍵打 `a39` 也能出 `出 不 (＞﹏＜) 弗…`）。
+看起來「開關沒反應」的真正原因是——**切換開關時候選沒有重建**：
+
+- 12 鍵的候選不走 librime 每鍵直出，而是 App 側 `TwelveKeySnapshotBuilder` 的快照；
+- 快照緩存鍵只有 `input|segments|full|學習版本|錨點|分段標記`，**不含方案開關狀態**；
+- 開關一按，引擎裡的候選已經被 filter 改寫，但輸入串沒變 → 快照緩存命中，舊候選原樣吐回。
+  固定候選欄與展開面板都吃這份快照，所以兩邊都「沒反應」。
+
+修法：
+1. `TwelveKeyController` 增加 `optionsVersion` 與 `invalidateForOptions()`，
+   版本號併入快照 cacheKey（`...|o<version>`）；
+2. `TextInputManager.onOptionChanged()` 結尾統一處理：`invalidateForOptions()` +
+   組字中且是 12 鍵 → `refresh(immediate = true)`；非 12 鍵且面板開著 →
+   `candidatePanelController.submit(legacySnapshot())` 重建面板。

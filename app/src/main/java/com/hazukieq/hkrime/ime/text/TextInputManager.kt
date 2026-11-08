@@ -624,6 +624,15 @@ class TextInputManager private constructor() :
             }
         }
         mainKeyboardView?.invalidateAllKeys()
+    
+        // 方案開關（情/聯/簡繁…）會改變 filter 輸出：清快照緩存並立刻重建，
+        // 否則固定候選欄與展開面板都會顯示舊候選（用戶 2026-11-09）。
+        twelveKeyController?.invalidateForOptions()
+        if (isTwelveKeyMode()) {
+            if (Rime.isComposing()) twelveKeyController?.refresh(immediate = true)
+        } else if (isCandidatePanelShown()) {
+            candidatePanelController?.submit(legacySnapshot())
+        }
     }
 
     override fun onPress(keyEventCode: Int) {

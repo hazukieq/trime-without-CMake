@@ -50,6 +50,19 @@ class TwelveKeyController(
      */
     var segmentMode: Boolean = false
 
+    /**
+     * 方案開關（簡/繁、情/聯、全/半…）的版本號。
+     *
+     * 開關一變，引擎的候選就被 filter 改寫（顏文字/聯想詞），但快照緩存鍵只看 input 與分段，
+     * 會把舊候選直接吐回來 → 用戶看到「開關按了沒反應」。所以把版本號也塞進 cacheKey。
+     */
+    private var optionsVersion = 0
+
+    /** 方案開關變化：讓候選快照緩存失效。 */
+    fun invalidateForOptions() {
+        optionsVersion++
+    }
+
     /** 最近 8 條快照（按 input+segments），退格/重打直接命中，不再枚舉。線程安全。 */
     private val snapshots = object :
         LinkedHashMap<String, TwelveKeySnapshot>(CACHE_CAPACITY, 0.75f, true) {
@@ -91,7 +104,7 @@ class TwelveKeyController(
                                 full,
                                 segmentAnchor,
                                 segmentMode,
-                            )
+                            ) + "|o" + optionsVersion
                             val cached = cacheLookup(key) { it }
                             val t0 = System.nanoTime()
                             val built = cached ?: TwelveKeySnapshotBuilder.build(
@@ -144,7 +157,7 @@ class TwelveKeyController(
                         true,
                         segmentAnchor,
                         segmentMode,
-                    )
+                    ) + "|o" + optionsVersion
                     key = k
                     cacheLookup(k) { it } ?: TwelveKeySnapshotBuilder.build(
                         local,
