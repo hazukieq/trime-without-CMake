@@ -267,8 +267,9 @@ class TextInputManager private constructor() :
     }
 
     fun hideCandidatePanel() {
-        val root = candidatePanelRoot ?: return
-        if (!isCandidatePanelShown()) return
+        // 不依賴 isCandidatePanelShown()：狀態可能與實際可見性不同步（換輸入框/會話切換後），
+        // 這裡一律把「面板 GONE / 鍵盤 VISIBLE / 高度 WRAP_CONTENT」恢復，避免留下空白區。
+        val root = candidatePanelRoot ?: mainKeyboardView ?: return
         // 打開時已把 Rime 還原到原頁，這裡不需要再翻頁
         root.visibility = View.GONE
         mainKeyboardView?.visibility = View.VISIBLE
@@ -276,7 +277,7 @@ class TextInputManager private constructor() :
         inputArea?.requestLayout()
         candidatePanelAdapter?.clear()
         candidateGroupAdapter?.clear()
-        trime.updateComposing()
+        if (Rime.isComposing()) trime.updateComposing()
     }
 
     private fun pickPanelCandidate(pageOffset: Int, indexInPage: Int) {
@@ -642,6 +643,8 @@ class TextInputManager private constructor() :
 
     override fun onStartInputView(instance: EditorInstance, restarting: Boolean) {
         super.onStartInputView(instance, restarting)
+        // 新輸入框/新會話：面板狀態一律復位，否則會留下「鍵盤被 GONE、面板空的」灰塊
+        hideCandidatePanel()
         Trime.getService().selectLiquidKeyboard(-1)
         panelItems.clear()
         candidatePanelRoot?.visibility = android.view.View.GONE
