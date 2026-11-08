@@ -300,6 +300,11 @@ public class Candidate extends View {
         float wordY =
             computedCandidates.get(0).getGeometry().centerY()
                 - (candidatePaint.ascent() + candidatePaint.descent()) / 2;
+        // 有拼音註釋時整排候選詞一起讓出註釋行的高度，否則第一個候選（唯一帶註釋的）
+        // 會被壓低、與後面的字不在同一水平線（用戶 2026-11-08 指出）。
+        if (shouldShowComment) {
+          wordY += isCommentOnTop ? commentHeight / 2.0f : -commentHeight / 2.0f;
+        }
         // 候選區：只有第一個候選標拼音（其餘候選共用同一讀音，重複標註很難看）
         if (shouldShowComment && i == 0) {
           String comment = ((ComputedCandidate.Word) computedCandidate).getComment();
@@ -307,13 +312,8 @@ public class Candidate extends View {
             float commentX = computedCandidate.getGeometry().centerX();
             float commentY =
                 commentHeight / 2.0f - (commentPaint.ascent() + commentPaint.descent()) / 2;
-            wordY += commentHeight / 2.0f;
             if (!isCommentOnTop) {
-              float commentWidth = graphicUtils.measureText(commentPaint, comment, commentFont);
-              commentX = computedCandidate.getGeometry().right - commentWidth / 2;
               commentY += computedCandidates.get(0).getGeometry().bottom - commentHeight;
-              wordX -= commentWidth / 2.0f;
-              wordY -= commentHeight / 2.0f;
             }
             commentPaint.setColor(isHighlighted(i) ? hilitedCommentTextColor : commentTextColor);
             graphicUtils.drawText(canvas, comment, commentX, commentY, commentPaint, commentFont);
