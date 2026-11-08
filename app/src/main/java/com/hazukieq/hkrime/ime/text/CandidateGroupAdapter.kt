@@ -52,13 +52,13 @@ class CandidateGroupAdapter(
     private val barColor = accent
     private val typeface: Typeface = Typeface.DEFAULT
 
-    private val rowPadStart = dp(14f)
-    private val rowPadEnd = dp(10f)
+    private val rowPadStart = dp(12f)
+    private val rowPadEnd = dp(6f)
     private val rowHeight = dp(40f)
     private val barWidth = dp(3f)
     private val barRadius = dp(1.5f)
 
-    private var columnWidth = dp(100f)
+    private var columnWidth = dp(88f)
 
     class VH(val root: LinearLayout, val text: TextView, val bar: android.view.View) :
         RecyclerView.ViewHolder(root)
@@ -86,7 +86,10 @@ class CandidateGroupAdapter(
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            layoutParams = RecyclerView.LayoutParams(columnWidth, rowHeight)
+            layoutParams = RecyclerView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                rowHeight,
+            )
         }
         val bar = android.view.View(context).apply {
             layoutParams = LinearLayout.LayoutParams(barWidth, (rowHeight * 0.42f).toInt()).apply {
@@ -106,6 +109,9 @@ class CandidateGroupAdapter(
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             setSingleLine(true)
+            marqueeRepeatLimit = -1
+            isFocusable = true
+            isFocusableInTouchMode = true
             includeFontPadding = false
             setTextColor(normalText)
             typeface = this@CandidateGroupAdapter.typeface
@@ -117,10 +123,12 @@ class CandidateGroupAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = getItem(position)
-        val lp = holder.root.layoutParams
-        if (lp.width != columnWidth) {
-            lp.width = columnWidth
-            holder.root.layoutParams = lp
+        // 讀音比 rail 寬時用跑馬燈：選中行自動滾動，未選中行省略號（用戶 2026-11-08 指示）
+        holder.text.isSelected = item.selected
+        holder.text.ellipsize = if (item.selected) {
+            TextUtils.TruncateAt.MARQUEE
+        } else {
+            TextUtils.TruncateAt.END
         }
         holder.root.background = if (item.selected) {
             GradientDrawable().apply {
