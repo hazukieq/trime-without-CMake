@@ -214,6 +214,69 @@ public class Rime {
       return candidates;
     }
 
+    /** 開關的易懂名稱：librime 的 option name 對普通用戶沒意義。 */
+    private static String switchTitle(String name, List<?> states) {
+      switch (name) {
+        case "ywz":
+          return "颜文字/表情";
+        case "lenth":
+          return "联想短语";
+        case "simplification":
+          return "简繁转换";
+        case "ascii_mode":
+          return "中英文";
+        case "half_shape":
+        case "full_shape":
+          return "全半角";
+        default:
+          if (states != null && states.size() >= 2) {
+            String a = states.get(0).toString();
+            String b = states.get(1).toString();
+            // 像 [关, 情] 這種：用後一個狀態當名稱（情 / 联）
+            if (("关".equals(a) || "關".equals(a)) && !"开".equals(b) && !"開".equals(b)) {
+              return b;
+            }
+          }
+          return name;
+      }
+    }
+
+    /**
+     * 方案開關對話框的行標籤：`✓ 颜文字/表情：当前 关（点按切到 情）`。
+     *
+     * 舊版是「關 → 情」，用戶完全看不出哪邊是開哪邊是關（2026-11-09 反饋）。
+     */
+    public String[] getSwitchDialogLabels() {
+      if (switches.isEmpty()) return new String[0];
+      String[] out = new String[switches.size()];
+      for (int i = 0; i < switches.size(); i++) {
+        Map<String, Object> o = switches.get(i);
+        List<?> states = (List<?>) o.get("states");
+        String name = String.valueOf(o.get("name"));
+        String title = switchTitle(name, states);
+        Integer value = (Integer) o.get("value");
+        if (value == null) value = 0;
+        if (states == null || states.size() < 2) {
+          out[i] = title;
+          continue;
+        }
+        int cur = Math.floorMod(value, states.size());
+        int next = (cur + 1) % states.size();
+        String curLabel = states.get(cur).toString().trim();
+        String nextLabel = states.get(next).toString().trim();
+        boolean on = value != 0;
+        out[i] =
+            (on ? "✓ " : "○ ")
+                + title
+                + "：当前 "
+                + curLabel
+                + "（点按切到 "
+                + nextLabel
+                + "）";
+      }
+      return out;
+    }
+
     /** 方案開關的「當前 → 下一個」標籤，供 ☰ 菜單列表使用。 */
     public String[] getSwitchLabels() {
       if (switches.isEmpty()) return new String[0];
@@ -635,6 +698,11 @@ public class Rime {
   /** ☰ 菜單：方案開關的「當前 → 下一個」列表；沒有開關時返回空數組。 */
   public static String[] getSchemaSwitchLabels() {
     return mSchema == null ? new String[0] : mSchema.getSwitchLabels();
+  }
+
+  /** 方案開關對話框的行標籤（明確顯示「當前/切到」，見 Schema#getSwitchDialogLabels）。 */
+  public static String[] getSchemaSwitchDialogLabels() {
+    return mSchema == null ? new String[0] : mSchema.getSwitchDialogLabels();
   }
 
   public static void setProperty(String prop, String value) {

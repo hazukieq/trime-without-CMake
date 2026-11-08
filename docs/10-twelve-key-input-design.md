@@ -1636,3 +1636,19 @@ filter 是生效的（實測 12 鍵打 `a39` 也能出 `出 不 (＞﹏＜) 弗�
 2. `TextInputManager.onOptionChanged()` 結尾統一處理：`invalidateForOptions()` +
    組字中且是 12 鍵 → `refresh(immediate = true)`；非 12 鍵且面板開著 →
    `candidatePanelController.submit(legacySnapshot())` 重建面板。
+
+## 15.38 方案開關面板重做：明確顯示「當前 / 切到」（2026-11-09）
+
+用戶：「你把开关面板做得让人理解一些，哪边是开，哪边是关，我都看不懂。现在才知道左边是开，右边是关」。
+
+- 舊 UI：`Rime.Schema#getSwitchLabels()` 直接輸出 `states[value] + "  →  " + states[1-value]`，
+  也就是「關 → 情」。左邊是**當前狀態**、右邊是**按下之後會變成**，但看起來像兩個並列選項，
+  用戶無法判斷哪邊是開。
+- 新 UI：`Rime.Schema#getSwitchDialogLabels()`（`Rime.getSchemaSwitchDialogLabels()` 靜態包裝）
+  按選項名給中文標題（`ywz`→颜文字/表情、`lenth`→联想短语、`simplification`→简繁转换、
+  `ascii_mode`→中英文、`half_shape/full_shape`→全半角，其餘沿用 `name`；
+  `states` 形如 `[关, 情]` 的用後一個狀態當標題），行文本為：
+  `✓ 颜文字/表情：当前 情（点按切到 关）` / `○ 简繁转换：当前 简（点按切到 繁）`
+  —— ✓/○ 表示開關是否已開，括號內明確寫出按下去會變成什麼。
+- `Trime.showSchemaSwitchDialog()` 增加說明行「✓ 已开启　○ 已关闭，点按一行即可切换」。
+- 真機（12 鍵 ☰）：三行顯示正確，點「颜文字/表情」後重開變 `✓ … 当前 情（点按切到 关）`。

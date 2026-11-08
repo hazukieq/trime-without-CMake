@@ -1323,7 +1323,7 @@ public class Trime extends LifecycleInputMethodService {
    * 沒有開關時退回方案選擇對話框。
    */
   public void showSchemaSwitchDialog() {
-    final String[] labels = Rime.getSchemaSwitchLabels();
+    final String[] labels = Rime.getSchemaSwitchDialogLabels();
     if (labels.length == 0) {
       showOptionsDialog();
       return;
@@ -1333,6 +1333,7 @@ public class Trime extends LifecycleInputMethodService {
             this,
             "方案开关",
             java.util.Arrays.asList(labels),
+            "✓ 已开启　○ 已关闭，点按一行即可切换",
             index -> {
               Rime.toggleOption(index);
               updateComposing();
