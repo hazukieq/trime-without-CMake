@@ -636,7 +636,6 @@ preset_keyboards:
       - {click: letter_i, long_click: '='}
       - {click: letter_5, long_click: '_'}
       - {click: letter_4, long_click: '*'}
-      - {click: '/', composing: Up, width: 16}
 
       #第三行
       - {key_back_color: 0x00, width: 100, height: 7}
@@ -645,7 +644,6 @@ preset_keyboards:
       - {click: letter_7, long_click: paste}
       - {click: letter_3, long_click: cut}
       - {click: letter_8, long_click: "[]{Left}"}
-      - {click: '、', composing: Down, width: 16}
 
       #第四行
       - {key_back_color: 0x00, width: 100, height: 7}

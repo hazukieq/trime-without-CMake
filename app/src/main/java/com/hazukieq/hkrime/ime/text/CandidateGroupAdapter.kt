@@ -92,9 +92,9 @@ class CandidateGroupAdapter(
             )
         }
         val bar = android.view.View(context).apply {
-            layoutParams = LinearLayout.LayoutParams(barWidth, (rowHeight * 0.42f).toInt()).apply {
+            // 選中豎線佔滿整行高度（用戶 2026-11-09：之前只有 42% 高、上下留空，「太難看」）
+            layoutParams = LinearLayout.LayoutParams(barWidth, rowHeight).apply {
                 marginStart = dp(6f)
-                topMargin = (rowHeight * 0.29f).toInt()
             }
             background = GradientDrawable().apply {
                 cornerRadius = barRadius.toFloat()
