@@ -465,8 +465,9 @@ public class Candidate extends View {
     final int edge = Math.round(12 * getResources().getDisplayMetrics().density);
 
     if (numCandidates <= 0 || candidates == null) {
+      final int iconGap = Math.round(14 * getResources().getDisplayMetrics().density);
       final int rightMost = avail - edge - symbolBoxSize;
-      final int themeLeft = rightMost - symbolBoxSize;
+      final int themeLeft = rightMost - symbolBoxSize - iconGap;
       addMenuSymbol(edge);
       addThemeSymbol(themeLeft);
       computedCandidates.add(
