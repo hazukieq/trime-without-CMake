@@ -47,6 +47,14 @@ class IntentReceiver : BroadcastReceiver(), CoroutineScope by MainScope() {
                 com.hazukieq.hkrime.ime.core.Trime.getService()
                     ?.textInputManager?.toggleCandidatePanel()
             }
+            COMMAND_DEBUG_SHOW_PANEL -> {
+                com.hazukieq.hkrime.ime.core.Trime.getService()
+                    ?.textInputManager?.showCandidatePanel()
+            }
+            COMMAND_DEBUG_HIDE_PANEL -> {
+                com.hazukieq.hkrime.ime.core.Trime.getService()
+                    ?.textInputManager?.hideCandidatePanel()
+            }
             Intent.ACTION_SHUTDOWN -> Rime.destroy()
             else -> return
         }
@@ -57,6 +65,8 @@ class IntentReceiver : BroadcastReceiver(), CoroutineScope by MainScope() {
         context.registerReceiver(this, IntentFilter(COMMAND_SYNC))
         context.registerReceiver(this, IntentFilter(Intent.ACTION_SHUTDOWN))
         context.registerReceiver(this, IntentFilter(COMMAND_DEBUG_TOGGLE_PANEL))
+        context.registerReceiver(this, IntentFilter(COMMAND_DEBUG_SHOW_PANEL))
+        context.registerReceiver(this, IntentFilter(COMMAND_DEBUG_HIDE_PANEL))
     }
 
     fun unregisterReceiver(context: Context) {
@@ -67,5 +77,7 @@ class IntentReceiver : BroadcastReceiver(), CoroutineScope by MainScope() {
         private const val COMMAND_DEPLOY = "com.hazukieq.hkrime.deploy"
         private const val COMMAND_SYNC = "com.hazukieq.hkrime.sync"
         private const val COMMAND_DEBUG_TOGGLE_PANEL = "com.hazukieq.hkrime.debug.togglepanel"
+        private const val COMMAND_DEBUG_SHOW_PANEL = "com.hazukieq.hkrime.debug.showpanel"
+        private const val COMMAND_DEBUG_HIDE_PANEL = "com.hazukieq.hkrime.debug.hidepanel"
     }
 }

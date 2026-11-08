@@ -1247,6 +1247,7 @@ public class Trime extends LifecycleInputMethodService {
         mCandidate.setText(0);
       }
       mCandidate.setExpectWidth(mainKeyboardView.getWidth());
+      if (textInputManager != null) textInputManager.onCandidatesRefreshed();
       // 刷新候选词后，如果候选词超出屏幕宽度，滚动候选栏
       mTabRoot.move(mCandidate.getHighlightLeft(), mCandidate.getHighlightRight());
     }

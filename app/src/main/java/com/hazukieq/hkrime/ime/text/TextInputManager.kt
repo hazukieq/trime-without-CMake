@@ -21,6 +21,7 @@ import com.hazukieq.hkrime.ime.keyboard.KeyboardSwitcher
 import com.hazukieq.hkrime.ime.keyboard.KeyboardView
 import com.hazukieq.hkrime.util.ShortcutUtils
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.hazukieq.hkrime.util.startsWithAsciiChar
 import kotlinx.coroutines.CoroutineScope
@@ -61,6 +62,11 @@ class TextInputManager private constructor() :
     private var candidatePanel: RecyclerView? = null
     private var candidatePanelAdapter: CandidatePanelAdapter? = null
     private var candidatePanelRoot: android.view.View? = null
+    private var candidateGroupList: RecyclerView? = null
+    private var candidateGroupAdapter: CandidateGroupAdapter? = null
+    /** 左側音節組：本次點擊選中的下標（-1 表示跟隨 caret） */
+    private var activeGroupIndex = -1
+    private var lastGroupText: String? = null
     private var panelItems: MutableList<CandidatePanelAdapter.Item> = mutableListOf()
     /** 面板一次最多收集的頁數，防止極端情況下卡住 */
     private val panelMaxPages = 20
@@ -170,6 +176,16 @@ class TextInputManager private constructor() :
         // 候選展開面板（自繪網格，不復用 liquidKeyboard）
         inputArea = uiBinding.main.inputArea
         candidatePanelRoot = uiBinding.main.candidatePanelRoot
+        runCatching {
+            candidatePanelRoot?.setBackgroundColor(
+                com.hazukieq.hkrime.data.Config.get(trime).getColor("keyboard_back_color") ?: 0xFFFFFFFF.toInt()
+            )
+        }
+        candidateGroupList = uiBinding.main.candidateGroupList.also { list ->
+            list.layoutManager = LinearLayoutManager(trime)
+            candidateGroupAdapter = CandidateGroupAdapter(trime, onPick = { selectPinyinGroup(it) })
+            list.adapter = candidateGroupAdapter
+        }
         candidatePanel = uiBinding.main.candidatePanel.also { panel ->
             panel.layoutManager = GridLayoutManager(trime, 4)
             candidatePanelAdapter = CandidatePanelAdapter(
@@ -186,28 +202,31 @@ class TextInputManager private constructor() :
 
     /** 切換展開面板；關閉鍵盤由候選欄的 ⌄ 負責 */
     fun toggleCandidatePanel() {
-        Timber.i("toggleCandidatePanel: shown=%s", isCandidatePanelShown())
         if (isCandidatePanelShown()) hideCandidatePanel() else showCandidatePanel()
     }
 
     fun showCandidatePanel() {
         val panel = candidatePanel ?: return
         val root = candidatePanelRoot ?: return
+        // 沒有任何候選（空組字）就不要展開，避免出現一塊空白面板
+        val current = Rime.getCandidatesWithoutSwitch()
+        if (current.isNullOrEmpty() && !Rime.hasRight()) {
+            return
+        }
         // 面板只展示「候選欄這一頁之外」的候選；收集後立刻把 Rime 還原到原頁，
         // 因此展開/滾動都不會改動候選欄（第一行）的內容。
         panelItems = collectCandidatePanelItems()
         if (panelItems.isEmpty()) {
-            Timber.i("showCandidatePanel: no extra candidates")
             panelItems = currentPageItems() // 只有截斷、沒有下一頁時，退化成展示當前頁完整內容
         }
         candidatePanelAdapter?.submit(panelItems)
         inputArea?.layoutParams?.height = mainKeyboardView?.height
             ?: android.view.ViewGroup.LayoutParams.WRAP_CONTENT
         inputArea?.requestLayout()
+        rebuildPinyinGroups()
         mainKeyboardView?.visibility = View.GONE
         root.visibility = View.VISIBLE
         panel.scrollToPosition(0)
-        Timber.i("showCandidatePanel: items=%s", panelItems.size)
     }
 
     /** 收集「當前頁之後」的所有候選；結束後用 pageUp 還原，候選欄狀態不變。 */
@@ -246,7 +265,6 @@ class TextInputManager private constructor() :
     }
 
     fun hideCandidatePanel() {
-        Timber.i("hideCandidatePanel")
         val root = candidatePanelRoot ?: return
         if (!isCandidatePanelShown()) return
         // 打開時已把 Rime 還原到原頁，這裡不需要再翻頁
@@ -255,6 +273,7 @@ class TextInputManager private constructor() :
         inputArea?.layoutParams?.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
         inputArea?.requestLayout()
         candidatePanelAdapter?.clear()
+        candidateGroupAdapter?.clear()
         trime.updateComposing()
     }
 
@@ -278,6 +297,86 @@ class TextInputManager private constructor() :
                 trime.handleKey(KeyEvent.KEYCODE_PAGE_UP, 0)
             }
             trime.updateComposing()
+            panelItems = collectCandidatePanelItems()
+            if (panelItems.isEmpty()) panelItems = currentPageItems()
+            candidatePanelAdapter?.submit(panelItems)
+            candidatePanel?.scrollToPosition(0)
+        }
+    }
+
+    /** 候選刷新後呼叫：組字結束（無候選）時自動收起展開面板，避免留下空白面板 */
+    fun onCandidatesRefreshed() {
+        if (!isCandidatePanelShown()) return
+        if (Rime.getCandidatesWithoutSwitch().isNullOrEmpty()) hideCandidatePanel()
+    }
+
+    // ---------- 左側拼音音節組（方案 2：自切音節，僅顯示/導航） ----------
+
+    private fun isCjk(c: Char): Boolean =
+        c.code in 0x3400..0x9FFF || c.code in 0xF900..0xFAFF
+
+    private fun utf8Len(s: String): Int = s.toByteArray(Charsets.UTF_8).size
+
+    /** 由 preedit 重建左側音節組：已轉換前綴 + 自切音節。 */
+    private fun rebuildPinyinGroups() {
+        val adapter = candidateGroupAdapter ?: return
+        val text = Rime.getCompositionText() ?: run { adapter.clear(); return }
+        if (text.isEmpty()) {
+            adapter.clear()
+            candidateGroupList?.visibility = View.GONE
+            return
+        }
+        if (text != lastGroupText) {
+            activeGroupIndex = -1
+            lastGroupText = text
+        }
+        var prefixChars = 0
+        while (prefixChars < text.length && isCjk(text[prefixChars])) prefixChars++
+
+        val raw = text.substring(prefixChars)
+        val segs = PinyinSyllables.split(raw)
+        val caret = Rime.RimeGetCaretPos()
+        val items = ArrayList<CandidateGroupAdapter.PinyinGroupAdapterItem>()
+        var nextIndex = 0
+        if (prefixChars > 0) {
+            items.add(
+                CandidateGroupAdapter.PinyinGroupAdapterItem(
+                    nextIndex++, text.substring(0, prefixChars), 0, converted = true,
+                    incomplete = false, selected = activeGroupIndex == 0 || (activeGroupIndex < 0 && caret == 0)
+                )
+            )
+        }
+        val prefixBytes = utf8Len(text.substring(0, prefixChars))
+        for ((idx, seg) in segs.withIndex()) {
+            val startByte = prefixBytes + utf8Len(raw.substring(0, seg.startChar))
+            val endByte =
+                if (idx + 1 < segs.size) prefixBytes + utf8Len(raw.substring(0, segs[idx + 1].startChar))
+                else prefixBytes + utf8Len(raw)
+            val selected = if (activeGroupIndex >= 0) {
+                activeGroupIndex == nextIndex
+            } else {
+                caret >= startByte && caret < endByte
+            }
+            items.add(
+                CandidateGroupAdapter.PinyinGroupAdapterItem(
+                    nextIndex++, seg.text, startByte, converted = false,
+                    incomplete = seg.incomplete, selected = selected
+                )
+            )
+        }
+        adapter.submit(items)
+        candidateGroupList?.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
+    }
+
+    /** 點擊左側音節組：把 caret 移到該組起點（librime 無「按段取候選」，候選可能不變）。 */
+    private fun selectPinyinGroup(group: CandidateGroupAdapter.PinyinGroupAdapterItem) {
+        if (group.converted) return
+        activeGroupIndex = group.index
+        Rime.RimeSetCaretPos(group.startByte)
+        Rime.getContexts()
+        trime.updateComposing()
+        rebuildPinyinGroups()
+        if (isCandidatePanelShown()) {
             panelItems = collectCandidatePanelItems()
             if (panelItems.isEmpty()) panelItems = currentPageItems()
             candidatePanelAdapter?.submit(panelItems)

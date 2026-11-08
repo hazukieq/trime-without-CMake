@@ -27,6 +27,16 @@
             android:visibility="gone">
 
 
+            <!-- 左側：拼音音節組（自切音節，僅顯示/導航） -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/candidate_group_list"
+                android:layout_width="92dp"
+                android:layout_height="match_parent"
+                android:background="#FFEDF0F2"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:clipToPadding="false" />
+
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/candidate_panel"
                 android:layout_width="0dp"
