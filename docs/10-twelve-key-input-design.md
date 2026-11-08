@@ -735,3 +735,23 @@ logcat 中 `FATAL / signal 11 / ANR in com.hazukieq.hkrime` 計數為 0。
 真機遷移：`cp -a /sdcard/rime /sdcard/hkrime`（100MB，含 userdb/build），
 啟動後 pref 自動改成 `/sdcard/hkrime`，日誌確認 `conf__user_data_dir=/sdcard/hkrime`，
 輸入正常。舊的 `/sdcard/rime` 與 `Android/data/.../files/rime` 保留作備份（未刪）。
+
+
+## 15.5 簡拼（兩鍵/多鍵聯想）—— 2026-11-08
+
+用戶反饋「kl,kl（碼 55）出不了聯想組詞」。根因是方案只給 th/nz/ng 做了 abbrev，
+其餘音節沒有「首字母縮寫」，所以 `55` 這種只有聲母的碼串在 prism 裡查不到任何音節。
+
+修法（只動 schema，不動 App）：
+
+```yaml
+    - abbrev/^(th).+$/$1/
+    - abbrev/^(nz).+$/$1/
+    - abbrev/^(ng).+$/$1/
+    # 除上述三者，其餘音節再取首字母做縮寫 → 兩鍵即出聯想組詞
+    - abbrev/^(?!(th|nz|ng))(.).+$/$2/
+```
+
+驗證（vivo 真機）：`55` → 考慮 / 看看 / 來看 / 理論 / 起來；`55555555` → 可口可樂。
+注意 preedit 仍會把 `55` 猜成 `ko keu` 之類的完整音節（TwelveKeyPreedit 的 DP 限制），
+但候選是正確的；要更準可在後續讓 decode 對「單字符碼」只顯示首字母。

@@ -385,3 +385,16 @@ python3 script/verify-rime-assets.py        # 期望：结果: 53 passed, 0 fail
 ```
 
 相关：[02 JNI 与 .so](02-jni-so.md)、[03 构建与测试](03-build.md)、[04 客家话定制](04-hakka.md)、[06 排障与路线图](06-troubleshooting-roadmap.md)。
+
+
+## 2026-11-08 数据与主题收敛（用户定的方向）
+
+- **數據目錄**：`/sdcard/hkrime`（shared 與 user 同目錄，和上游 `/sdcard/rime` 佈局一致）；
+  舊 `/rime` pref 一次性改寫。上游其它輸入法的 `/sdcard/rime` 只讀不寫。
+- **詞庫**：本倉庫自帶的 `hakka.dict.yaml` + 8 張 import 表與舊 hkrime 逐字節一致，
+  不做 tung（`hakka_tung` 是別家資料，按用戶要求不帶過來）。
+  唯一需要遷移的是**用戶學習詞**：`Config.prepareRime()` 會把舊 `/sdcard/rime/*.userdb`
+  與 `custom_phrase.txt` 一次性複製到新目錄（目標已存在則跳過，舊目錄不動）。
+- **主題收斂**：只保留 `hakka_theme.trime.yaml`（內容取自用戶在舊機調好的「標準配色·谷歌白」，
+  並把 12 鍵悬浮窗的 candidate 組件註釋掉）；刪除 `trime.yaml`、`tongwenfeng.trime.yaml`。
+  `Config.defaultName` 與 `AppPrefs.selectedTheme` 的兜底同步改為 `hakka_theme.trime`。

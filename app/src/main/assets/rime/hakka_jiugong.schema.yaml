@@ -73,6 +73,9 @@ speller:
     - abbrev/^(th).+$/$1/
     - abbrev/^(nz).+$/$1/
     - abbrev/^(ng).+$/$1/
+    # 簡拼：除 th/nz/ng（已單獨縮寫）外，其餘音節再取首字母做縮寫，
+    # 這樣「兩鍵 kl,kl」（碼 55）也能聯想出「ka la / ko lo …」之類的組詞。
+    - abbrev/^(?!(th|nz|ng))(.).+$/$2/
     - derive/ap$/at/
     - derive/ep$/et/
     - derive/up$/ut/
