@@ -304,6 +304,49 @@ class TextInputManager private constructor() :
         }
     }
 
+    /** 除錯：逐個 caret 位置印出 librime 的分段/候選，用於確認引擎切割行為 */
+    fun debugCaretScan() {
+        val text = Rime.getCompositionText() ?: return
+        val bytes = text.toByteArray(Charsets.UTF_8)
+        val saved = Rime.RimeGetCaretPos()
+        for (pos in 0..bytes.size) {
+            val ok = Rime.RimeSetCaretPos(pos)
+            Rime.getContexts()
+            val c = Rime.getComposition()
+            val cs = Rime.getCandidatesWithoutSwitch()
+            val head = cs.take(3).joinToString("|") { (it.text ?: "") + (it.comment ?: "") }
+            Timber.i(
+                "caretScan pos=%s ok=%s nowCaret=%s sel=%s-%s cands=%s",
+                pos, ok, Rime.RimeGetCaretPos(), c.getSelStart(), c.getSelEnd(), head
+            )
+        }
+        Rime.RimeSetCaretPos(saved)
+        Rime.getContexts()
+    }
+
+    /** 除錯：用 Rime 自己的左移鍵移動 caret，看它把光標按音節跳到哪些位置 */
+    fun debugCaretProbe() {
+        val text = Rime.getCompositionText() ?: return
+        val len = text.toByteArray(Charsets.UTF_8).size
+        val saved = Rime.RimeGetCaretPos()
+        Rime.RimeSetCaretPos(len)
+        Rime.getContexts()
+        Timber.i("caretProbe start preedit=[%s] len=%s caret=%s", text, len, Rime.RimeGetCaretPos())
+        repeat(len + 2) {
+            val ok = Rime.process_key(0xff51, 0) // XK_Left
+            Rime.getContexts()
+            val c = Rime.getComposition()
+            val cs = Rime.getCandidatesWithoutSwitch()
+            val head = cs.take(2).joinToString("|") { (it.text ?: "") }
+            Timber.i(
+                "caretProbe left ok=%s caret=%s sel=%s-%s cands=%s",
+                ok, Rime.RimeGetCaretPos(), c.getSelStart(), c.getSelEnd(), head
+            )
+        }
+        Rime.RimeSetCaretPos(saved)
+        Rime.getContexts()
+    }
+
     /** 候選刷新後呼叫：組字結束（無候選）時自動收起展開面板，避免留下空白面板 */
     fun onCandidatesRefreshed() {
         if (!isCandidatePanelShown()) return
@@ -330,37 +373,55 @@ class TextInputManager private constructor() :
             activeGroupIndex = -1
             lastGroupText = text
         }
-        var prefixChars = 0
-        while (prefixChars < text.length && isCjk(text[prefixChars])) prefixChars++
+        // 用 librime 自己的切分：按左方向键（XK_Left）它会把光標按音節往左跳，
+        // 收集跳到的所有位置就是音節邊界；探測完把 caret 還原。
+        val savedCaret = Rime.RimeGetCaretPos()
+        val bytes = text.toByteArray(Charsets.UTF_8)
+        val boundSet = sortedSetOf<Int>(bytes.size)
+        Rime.RimeSetCaretPos(bytes.size)
+        Rime.getContexts()
+        var guard = 0
+        var last = bytes.size
+        while (guard++ < 64) {
+            Rime.process_key(0xff51, 0) // XK_Left
+            Rime.getContexts()
+            val c = Rime.RimeGetCaretPos()
+            if (c <= 0) {
+                boundSet.add(0)
+                break
+            }
+            if (c >= last) break // 繞回末尾，探測結束
+            boundSet.add(c)
+            last = c
+        }
+        if (boundSet.isEmpty()) boundSet.add(0)
+        if (boundSet.first() != 0) boundSet.add(0)
+        boundSet.add(bytes.size)
+        Rime.RimeSetCaretPos(savedCaret)
+        Rime.getContexts()
 
-        val raw = text.substring(prefixChars)
-        val segs = Syllables.split(raw)
-        val caret = Rime.RimeGetCaretPos()
+        val bounds = boundSet.toList()
         val items = ArrayList<CandidateGroupAdapter.PinyinGroupAdapterItem>()
         var nextIndex = 0
-        if (prefixChars > 0) {
-            items.add(
-                CandidateGroupAdapter.PinyinGroupAdapterItem(
-                    nextIndex++, text.substring(0, prefixChars), 0, converted = true,
-                    incomplete = false, selected = activeGroupIndex == 0 || (activeGroupIndex < 0 && caret == 0)
-                )
-            )
-        }
-        val prefixBytes = utf8Len(text.substring(0, prefixChars))
-        for ((idx, seg) in segs.withIndex()) {
-            val startByte = prefixBytes + utf8Len(raw.substring(0, seg.startChar))
-            val endByte =
-                if (idx + 1 < segs.size) prefixBytes + utf8Len(raw.substring(0, segs[idx + 1].startChar))
-                else prefixBytes + utf8Len(raw)
+        for (i in 0 until bounds.size - 1) {
+            var startByte = bounds[i]
+            var endByte = bounds[i + 1]
+            // 去掉分隔符（空格、') 之類的間隔符）
+            while (startByte < endByte && (bytes[startByte] == ' '.code.toByte() || bytes[startByte] == '\''.code.toByte())) startByte++
+            while (endByte > startByte && (bytes[endByte - 1] == ' '.code.toByte() || bytes[endByte - 1] == '\''.code.toByte())) endByte--
+            if (endByte <= startByte) continue
+            val segText = String(bytes, startByte, endByte - startByte, Charsets.UTF_8)
+            if (segText.isBlank()) continue
+            val converted = segText.any { isCjk(it) }
             val selected = if (activeGroupIndex >= 0) {
                 activeGroupIndex == nextIndex
             } else {
-                caret >= startByte && caret < endByte
+                savedCaret > startByte && savedCaret <= endByte
             }
             items.add(
                 CandidateGroupAdapter.PinyinGroupAdapterItem(
-                    nextIndex++, seg.text, startByte, converted = false,
-                    incomplete = seg.incomplete, selected = selected
+                    nextIndex++, segText, startByte, converted = converted,
+                    incomplete = false, selected = selected
                 )
             )
         }
