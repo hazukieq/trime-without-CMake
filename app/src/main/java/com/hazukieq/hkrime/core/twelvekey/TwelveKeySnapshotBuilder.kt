@@ -101,14 +101,14 @@ object TwelveKeySnapshotBuilder {
             flat = snapshot.mapIndexed { index, row ->
                 CandidateItem(
                     text = row.getOrNull(0) ?: "",
-                    comment = row.getOrNull(1) ?: "",
+                    comment = cleanComment(row.getOrNull(1)),
                     index = index,
                 )
             }
         } else {
             degraded = true
             flat = singlePageFallback().mapIndexed { index, (text, comment) ->
-                CandidateItem(text, comment, index)
+                CandidateItem(text, cleanComment(comment), index)
             }
         }
 
@@ -184,6 +184,19 @@ object TwelveKeySnapshotBuilder {
             val replacement = FALLBACK_LETTERS[code]
             if (replacement != null) append(replacement) else append(code)
         }
+    }
+
+    /**
+     * rime-ice 這類方案的 `translator/comment_format` 會把拼音包成 `［…］`
+     * （`xform/^/［/` + `xform/$/］/`），面板左列的分組鍵與候選下面那行註釋都不該帶全角括號，
+     * 這裡統一把包裝剝掉；其他形式的 comment 原樣保留。
+     */
+    private fun cleanComment(raw: String?): String {
+        val text = raw?.trim().orEmpty()
+        if (text.length >= 2 && text.startsWith("\uFF3B") && text.endsWith("\uFF3D")) {
+            return text.substring(1, text.length - 1).trim()
+        }
+        return text
     }
 
     private fun singlePageFallback(): List<Pair<String, String>> {

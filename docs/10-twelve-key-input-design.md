@@ -1395,3 +1395,37 @@ max 10ms、0 键 >150ms（注入本身难以复现偶发 spike，最终以用户
 **顺带**：`TwelveKeyController.refresh` 的 `twelvekey:build … ms=` 日志提到 INFO（原来只在
 BuildConfig.DEBUG 的 D 级打，现场难抓）；`TextInputManager.onCandidatesRefreshed` 包了
 `perf: onCandidatesRefreshed …ms`（>40ms 才打）。
+
+## 15.31 带 lua corrector 的全字母方案面板没分组：keep_comments + 去全角括号（2026-11-09）
+
+**现象**（用户 m03683）：雾凇拼音（rime_ice，26 键）展开面板，左列只有「…」、候选下面没有读音。
+
+**排查**：
+- `SchemaCompat` 确实生效了：`/sdcard/hkrime/rime_ice.custom.yaml` 存在，`build/rime_ice.schema.yaml`
+  里也能看到 `spelling_hints: 100` + `always_show_comments: true`。
+- 但候选的 comment 依然是空的。原因在 rime-ice 自己的 `lua/corrector.lua`：
+  ```lua
+  local pinyin = cand.comment:match("^［(.-)］$")   -- rime-ice 的 comment_format 会包 ［］
+  if pinyin and #pinyin > 0 then … else
+    if env.keep_comment then … else cand:get_guine().comment = "" end   -- 清空 comment
+  end
+  ```
+  而 `env.keep_comment = config:get_bool('translator/keep_comments')`——默认 false，
+  于是 corrector 把 translator 刚填好的拼写注释**全清了**，App 分组自然只剩一个空读音。
+
+**修法**（两处）：
+1. `app/src/main/java/com/hazukieq/hkrime/util/SchemaCompat.kt`：`PATCH_BLOCK` 追加
+   `"translator/keep_comments": true`；`ensurePatched()` 增加「旧 patch 修复」分支——
+   文件里已有 `always_show_comments` 但缺 `keep_comments` 时，把新行插到
+   `"translator/always_show_comments"` 那一行之后（否则老设备上已有的 custom.yaml
+   永远补不上）。
+2. `app/src/main/java/com/hazukieq/hkrime/core/twelvekey/TwelveKeySnapshotBuilder.kt`：
+   新增 `cleanComment()`，把 `［…］` 包装剥掉（rime-ice 的
+   `translator/comment_format` 是 `xform/^/［/` + `xform/$/］/`），
+   `build()` 的两处候选映射（`Rime.candidatesSnapshot` 与 `singlePageFallback()`）都过一遍，
+   这样面板左列分组键和候选下面的读音都不带全角括号。
+
+**验证**：装 APK → 广播 `com.hazukieq.hkrime.deploy`（SchemaCompat 会给 rime_ice 补
+`keep_comments` 再全量部署 1.5s）→ 重启 IME → 雾凇拼音输 `nihao` 展开面板：
+左列出现 `ni / ni ji / ni jia / ni jian / ni jiang / ni jiao …`，
+右格候选下面显示 `ni jiu` 等读音（截图 /tmp/r4_panel.png）。
