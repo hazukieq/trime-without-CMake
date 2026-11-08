@@ -68,6 +68,7 @@ class TextInputManager private constructor() :
     private var activeGroupIndex = -1
     private var activeGroupStartByte = 0
     private var activeGroupText = ""
+    private var pendingGroupText = ""
     private var lastGroupText: String? = null
     private var panelItems: MutableList<CandidatePanelAdapter.Item> = mutableListOf()
     /** 面板一次最多收集的頁數，防止極端情況下卡住 */
@@ -421,9 +422,14 @@ class TextInputManager private constructor() :
             return
         }
         val caretNow = Rime.RimeGetCaretPos()
+        // 光標分段有時會退化成一字一段（例如剛 commit 完重打剩下的音節）→ 用字典音節表兜底
+        val degenerate = groups.isNotEmpty() && groups.all { it.first.length <= 1 } && groups.size > 1
+        val finalGroups = if (degenerate) {
+            SyllableLexicon.split(trime, Rime.RimeGetInput()).map { (t, b) -> Triple(t, b, false) }
+        } else groups
         val items = ArrayList<CandidateGroupAdapter.PinyinGroupAdapterItem>()
         var nextIndex = 0
-        for ((segText, startByte, converted) in groups) {
+        for ((segText, startByte, converted) in finalGroups) {
             val selected = if (activeGroupIndex >= 0) {
                 activeGroupIndex == nextIndex
             } else {
@@ -511,6 +517,7 @@ class TextInputManager private constructor() :
         }
         activeGroupStartByte = group.startByte
         activeGroupText = group.text
+        pendingGroupText = group.text
         panelItems = words.withIndex()
             .map { (i, w) -> CandidatePanelAdapter.Item(w, "", -1, i) }
             .toMutableList()
@@ -547,13 +554,46 @@ class TextInputManager private constructor() :
      */
     private fun pickLookupWord(index: Int) {
         val word = panelItems.getOrNull(index)?.text ?: return
-        if (selectCandidateByText(word)) return
-        // 候選頁裡沒有：把 caret 移到該音節起點，讓 librime 給這一節的候選再試一次
-        moveCaretTo(activeGroupStartByte)
+        // 只允許從最前面的音節開始消費（左→右），符合「選完前一節只剩後面」的預期
+        if (activeGroupIndex != 0) {
+            android.widget.Toast.makeText(trime, "請先選前面的音節", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        consumeFirstSyllable(word)
+    }
+
+    /**
+     * 選定左側第一節的字：先把這個字直接上屏，再把該節從 librime 的輸入串裡刪掉，
+     * 剩下的音節重新輸入回去 —— 這樣左列就只剩後面還沒處理的音節。
+     */
+    private fun consumeFirstSyllable(word: String) {
+        val input = Rime.RimeGetInput()
+        val groupText = pendingGroupText
+        if (input.isEmpty() || groupText.isEmpty()) {
+            // 沒有可消費的輸入：直接把字上屏
+            activeEditorInstance.commitText(word, dispatchToRime = false)
+            return
+        }
+        // 1) 這個字直接上屏
+        activeEditorInstance.commitText(word, dispatchToRime = false)
+        // 2) 清掉 librime 目前的輸入串
+        var guard = 0
+        while (Rime.isComposing() && guard++ < 64) {
+            trime.handleKey(KeyEvent.KEYCODE_DEL, 0)
+        }
+        // 3) 把剩下的音節重新打進去
+        val rest = if (input.length >= groupText.length) input.substring(groupText.length) else ""
+        for (ch in rest) {
+            if (ch in 'a'..'z') {
+                trime.handleKey(KeyEvent.KEYCODE_A + (ch - 'a'), 0)
+            } else if (ch in 'A'..'Z') {
+                trime.handleKey(KeyEvent.KEYCODE_A + (ch - 'A'), 0)
+            }
+        }
         trime.updateComposing()
+        activeGroupIndex = -1
         rebuildPinyinGroups()
-        if (selectCandidateByText(word)) return
-        android.widget.Toast.makeText(trime, "「$word」不在當前候選頁", android.widget.Toast.LENGTH_SHORT).show()
+        refreshPanelItems()
     }
 
     private fun selectCandidateByText(word: String): Boolean {

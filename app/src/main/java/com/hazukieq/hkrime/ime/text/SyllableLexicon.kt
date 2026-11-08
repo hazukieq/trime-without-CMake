@@ -14,6 +14,48 @@ object SyllableLexicon {
 
     private var index: Map<String, List<String>>? = null
 
+    /** 音節表（由字典的編碼列得到），用於 fallback 貪心切分。 */
+    fun syllables(context: Context): Set<String> {
+        val idx = index ?: build(context).also { index = it }
+        return idx.keys
+    }
+
+    /**
+     * 用字典音節表貪心切分（最長匹配）；librime 的光標分段退化成一字一段時作為兜底。
+     * 返回每段的 (text, startByte) —— startByte 是 raw 的 UTF-8 字節偏移。
+     */
+    fun split(context: Context, raw: String): List<Pair<String, Int>> {
+        if (raw.isEmpty()) return emptyList()
+        val set = syllables(context)
+        val out = ArrayList<Pair<String, Int>>()
+        val bytes = raw.toByteArray(Charsets.UTF_8)
+        var bytePos = 0
+        var i = 0
+        while (i < raw.length) {
+            // 跳過空格/分隔符
+            if (raw[i] == ' ' || raw[i] == '\'') {
+                i++
+                bytePos += raw[i - 1].toString().toByteArray(Charsets.UTF_8).size
+                continue
+            }
+            var matched = ""
+            var len = Math.min(8, raw.length - i)
+            while (len > 0) {
+                val cand = raw.substring(i, i + len)
+                if (cand in set) {
+                    matched = cand
+                    break
+                }
+                len--
+            }
+            val piece = if (matched.isNotEmpty()) matched else raw.substring(i, i + 1)
+            out.add(piece to bytePos)
+            i += piece.length
+            bytePos += piece.toByteArray(Charsets.UTF_8).size
+        }
+        return out
+    }
+
     fun lookup(context: Context, syllable: String): List<String> {
         val s = syllable.trim().trim('\'', ' ')
         if (s.isEmpty()) return emptyList()
