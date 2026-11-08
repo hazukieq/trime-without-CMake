@@ -334,7 +334,7 @@ class TextInputManager private constructor() :
         while (prefixChars < text.length && isCjk(text[prefixChars])) prefixChars++
 
         val raw = text.substring(prefixChars)
-        val segs = PinyinSyllables.split(raw)
+        val segs = Syllables.split(raw)
         val caret = Rime.RimeGetCaretPos()
         val items = ArrayList<CandidateGroupAdapter.PinyinGroupAdapterItem>()
         var nextIndex = 0
