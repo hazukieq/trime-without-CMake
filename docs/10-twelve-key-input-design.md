@@ -868,3 +868,40 @@ BFS 隊列峰值 766 —— 也就是說 37ms 全是簡拼圖 BFS 的展開成�
 - App 端左列**先按音節數、再按 reading 字母升序**排序，顯示有規律：
   實測 `5 5` 的 rail 為 `ken / ket / ki / ko / kong / ku …`（k 段）→ `len / li / liau / lin / lit / liu …`（l 段），
   k、l 都在且各自按字母排好。
+
+## 15.11 「貨不對版」根因修復 + 所見即所得的學習排序（2026-11-09）
+
+用戶反饋：按 `kl` 後候選條顯示的與展開面板裡的不一樣；點候選條上的字，上屏的卻是別的字。
+
+### 根因一：候選條條目丟了「引擎全域下標」
+
+`TwelveKeySnapshotBuilder.build()` 原先 `flat` 是 `List<Pair<text, comment>>`，
+`barEntries` 用 `mapIndexed { index → CandidateItem(text, comment, index) }` 把**顯示位置**
+當成了引擎下標。一旦 App 側學習排序把順序重排，顯示位置 ≠ 引擎順序，
+`select_candidate(index)` 就會選到另一個字 —— 這正是「貨不對版」。
+
+修法：枚舉時就帶上下標（`snapshot.mapIndexed { i, row → CandidateItem(text, comment, i) }`），
+排序、分組、候選條全部沿用同一個 `index`。
+
+### 根因二：點擊用「當前快照」而不是「綁定到條上的那份」
+
+非同步刷新/學習重排會在「顯示」與「點擊」之間換掉快照。修法：`TextInputManager`
+記住最近一次綁到候選條的 `boundBarItems`，點擊時按它解析下標（顯示與點擊同一份數據）。
+面板同理用各組 `items` 裡的 `index`。
+
+### App 側學習排序（`SelectionMemory`）
+
+- `core/twelvekey/SelectionMemory.kt`：SharedPrefs 計數，key = 讀音 + `\u0001` + 詞；
+  排序分 = `次數 × 1000 + 最近一次選中的序號`（次數優先、同次數最近優先）；
+  上限 800 條、次數上限 9。
+- `TwelveKeySnapshotBuilder`：枚舉結果先按分數穩定排序（同分保持引擎順序），
+  再分組與生成 `barEntries` → 候選條與面板同源。
+- `TwelveKeyController.selectCandidate()`：select 前按快照找到被點中的條目並 `bump()`。
+- 快照緩存鍵加入 `SelectionMemory.version`；每次 `bump()` 自增，避免命中舊快照
+  （否則重打同一輸入會拿到重排前的緩存，看起來「學習沒生效」）。
+
+### 驗證（vivo 真機）
+
+- 敲 `kl` → 點候選條第 6 個「啦」→ 上屏「啦」（修前會上屏別的字）；
+- 再敲 `kl` → 點「看」→ 再敲 `kl`，「看」排到第一位（修前點 5 次都不動）。
+- 面板：點某組的候選，上屏的字與 tile 一致。

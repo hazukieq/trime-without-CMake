@@ -301,6 +301,7 @@ class TextInputManager private constructor() :
             }
             lastKeyAtNs = 0L
         }
+        boundBarItems = snapshot.barItems
         candidateBarBinder?.bind(snapshot)
         candidatePanelController?.submit(snapshot)
         if (snapshot.isEmpty || (!snapshot.hasCandidates && snapshot.fallback == null)) {
@@ -583,6 +584,9 @@ class TextInputManager private constructor() :
     /** 最近一次按鍵的時間戳（ns）：用來量「按鍵 → 候選條落地」的延遲。 */
     private var lastKeyAtNs = 0L
 
+    /** 最近一次綁到候選條的條目（點擊下標必須按這份解析，保證所見即所得）。 */
+    private var boundBarItems: List<CandidateItem> = emptyList()
+
     override fun onEvent(event: Event?) {
         lastKeyAtNs = System.nanoTime()
         withEngineLock { onEventLocked(event) }
@@ -761,13 +765,16 @@ class TextInputManager private constructor() :
     /** 12 鍵候選條：index 是條目下標；fallback 是條目列表末尾的本地原文項。 */
     private fun onTwelveKeyCandidatePressed(index: Int) {
         val snapshot = twelveKeyController?.snapshot ?: return
-        val item = snapshot.barItems.getOrNull(index)
+        // 用「最近一次綁到候選條的那份列表」做下標映射：顯示與點擊必須同一份數據，
+        // 否則非同步刷新/學習重排後會出現「看到的是看、上屏的卻是别字」。
+        val list = if (boundBarItems.isNotEmpty()) boundBarItems else snapshot.barItems
+        val item = list.getOrNull(index)
         if (item != null) {
             twelveKeyController?.selectCandidate(item.index)
             return
         }
         val fallback = snapshot.fallback
-        if (fallback != null && index == snapshot.barItems.size) {
+        if (fallback != null && index == list.size) {
             twelveKeyController?.commitFallback(fallback)
         }
     }

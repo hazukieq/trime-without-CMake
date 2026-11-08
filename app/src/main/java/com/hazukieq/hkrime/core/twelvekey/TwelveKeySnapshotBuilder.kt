@@ -69,7 +69,8 @@ object TwelveKeySnapshotBuilder {
 
     /** 快照緩存鍵：input + 分段（status 也會影響 consumedEnd）。 */
     fun cacheKey(local: Local, full: Boolean): String =
-        local.input + "|" + local.segmentsKey + (if (full) "|full" else "|bar")
+        local.input + "|" + local.segmentsKey +
+            (if (full) "|full" else "|bar") + "|m" + SelectionMemory.version
 
     /** 全量枚舉 + 分組；不讀引擎以外的東西。調用方需持引擎鎖（可在後台線程）。 */
     fun build(local: Local, maxCandidates: Int = MAX_CANDIDATES): TwelveKeySnapshot {
@@ -79,39 +80,46 @@ object TwelveKeySnapshotBuilder {
         val remaining = local.remaining
 
         // 全量枚舉：native 由 engine-probe 並行補，可能 UnsatisfiedLinkError → 降級單頁。
-        val flat: List<Pair<String, String>>
+        // 每條候選必須帶著「引擎全域下標」——重排後顯示順序 ≠ 引擎順序，
+        // 點擊時要回傳原始下標（否則就是「貨不對版」）。
+        val flat: List<CandidateItem>
         var degraded = false
         val snapshot = runCatching { Rime.candidatesSnapshot(maxCandidates) }.getOrNull()
         if (snapshot != null) {
-            flat = snapshot.map { row -> (row.getOrNull(0) ?: "") to (row.getOrNull(1) ?: "") }
+            flat = snapshot.mapIndexed { index, row ->
+                CandidateItem(
+                    text = row.getOrNull(0) ?: "",
+                    comment = row.getOrNull(1) ?: "",
+                    index = index,
+                )
+            }
         } else {
             degraded = true
-            flat = singlePageFallback()
+            flat = singlePageFallback().mapIndexed { index, (text, comment) ->
+                CandidateItem(text, comment, index)
+            }
         }
 
         // App 側學習排序：選過的詞（同讀音+同詞）排前，候選條與面板都吃這個順序。
         val ranked = if (SelectionMemory.hasAny()) {
-            flat.withIndex().sortedWith(
-                compareByDescending<IndexedValue<Pair<String, String>>> {
-                    SelectionMemory.score(it.value.first, it.value.second)
+            flat.sortedWith(
+                compareByDescending<CandidateItem> {
+                    SelectionMemory.score(it.text, it.comment)
                 }.thenBy { it.index },
-            ).map { it.value }
+            )
         } else {
             flat
         }
         val groups = group(ranked)
         // 候選條按「選單順序」取前 N 條：長輸入時 reading 各不相同，
         // 按第 0 組取會只剩 1 條（用戶 2026-11-08 反饋「打到這麼多就停止候選」）。
-        val barEntries = ranked.take(BAR_ITEMS).mapIndexedNotNull { index, (text, comment) ->
-            if (text.isEmpty()) null else CandidateItem(text, comment, index)
-        }
+        val barEntries = ranked.take(BAR_ITEMS).filter { it.text.isNotEmpty() }
         val fallback = if (groups.isEmpty() && remaining.isNotEmpty()) {
             val raw = remaining.takeLast(MAX_FALLBACK_CODE)
             Fallback(rawCode = raw, letters = toLetters(raw))
         } else {
             null
         }
-
         if (degraded) {
             Timber.w("twelvekey: enumerate native missing, degraded to single page (%d)", flat.size)
         }
@@ -172,14 +180,13 @@ object TwelveKeySnapshotBuilder {
     }
 
     /** 按 comment 分組；組順序 = 首次出現順序，不重排。 */
-    private fun group(flat: List<Pair<String, String>>): List<SyllableGroup> {
-        if (flat.isEmpty()) return emptyList()
+    private fun group(items: List<CandidateItem>): List<SyllableGroup> {
+        if (items.isEmpty()) return emptyList()
         val grouped = LinkedHashMap<String, MutableList<CandidateItem>>()
-        flat.forEachIndexed { index, (text, comment) ->
-            if (text.isEmpty()) return@forEachIndexed
-            val reading = if (comment.isBlank()) BLANK_READING else comment
-            grouped.getOrPut(reading) { ArrayList() }
-                .add(CandidateItem(text = text, comment = comment, index = index))
+        items.forEach { item ->
+            if (item.text.isEmpty()) return@forEach
+            val reading = if (item.comment.isBlank()) BLANK_READING else item.comment
+            grouped.getOrPut(reading) { ArrayList() }.add(item)
         }
         // 左列排序：單音節組排前面（用戶 2026-11-08：對聯想詞不滿意時，先手動選單字），
         // 其餘按音節數升序，同音節數保持候選原有順序（stable sort）。

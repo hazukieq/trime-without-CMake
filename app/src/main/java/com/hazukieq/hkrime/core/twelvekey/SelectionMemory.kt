@@ -6,37 +6,54 @@ import android.content.SharedPreferences
 /**
  * 12 鍵「選過的詞往前排」的本地記憶。
  *
- * 為甚麼不依賴 librime 的 userdb：簡拼為了效能跳過了用戶詞庫查詢（或用深度限制），
- * 引擎側學到的詞在簡拼輸入下不一定排到前面；這裡在 App 側記一份輕量計數，
- * 選過的候選（同讀音+同詞）在下次同輸入時直接排前，所見即所得。
+ * 排序鍵 = 選中次數 * 1000 + 最近一次選中的序號（遞增）：
+ * - 次數多者靠前（點 5 次一定比點 1 次前）；
+ * - 次數相同時，最近點的那個在前（點完立刻重打能看到它排第一）。
+ *
+ * 為甚麼不依賴 librime userdb：簡拼為效能跳過/限制了用戶詞庫查詢，
+ * 引擎學到的詞在簡拼下不一定排前；這裡在 App 側記一份輕量、所見即所得的次序。
  */
 object SelectionMemory {
 
     private const val PREFS = "twelvekey_selection"
+    private const val KEY_SEQ = "~seq"
     private const val MAX_ENTRIES = 800
+    private const val MAX_COUNT = 9
 
     private var prefs: SharedPreferences? = null
     private val scores = HashMap<String, Int>()
+    private var seq = 0
+
+    /** 每次 bump 自增：讓快照緩存鍵失效，重排才能立刻生效。 */
+    var version: Int = 0
+        private set
 
     fun init(context: Context) {
         if (prefs != null) return
         val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         prefs = p
-        p.all.forEach { (k, v) -> (v as? Int)?.let { scores[k] = it } }
+        p.all.forEach { (k, v) ->
+            when (v) {
+                is Int -> if (k == KEY_SEQ) seq = v else scores[k] = v
+                else -> Unit
+            }
+        }
     }
 
     private fun key(text: String, comment: String): String =
         if (comment.isBlank()) text else "$comment\u0001$text"
 
-    /** 選中一次：計數 +1（上限 9，避免一次手誤永久霸榜）。 */
+    /** 選中一次：次數 +1，並記住它是最新一次的選擇。 */
     fun bump(text: String, comment: String) {
         if (text.isBlank()) return
         val k = key(text, comment)
-        val next = ((scores[k] ?: 0) + 1).coerceAtMost(9)
-        scores[k] = next
-        prefs?.edit()?.putInt(k, next)?.apply()
+        val old = scores[k] ?: 0
+        val count = ((old / 1000) + 1).coerceAtMost(MAX_COUNT)
+        seq += 1
+        scores[k] = count * 1000 + seq
+        prefs?.edit()?.putInt(k, scores[k]!!)?.putInt(KEY_SEQ, seq)?.apply()
+        version++
         if (scores.size > MAX_ENTRIES) {
-            // 簡單裁剪：清掉計數最低的一批
             val drop = scores.entries.sortedBy { it.value }.take(scores.size - MAX_ENTRIES)
             val e = prefs?.edit()
             drop.forEach { scores.remove(it.key); e?.remove(it.key) }
@@ -46,6 +63,5 @@ object SelectionMemory {
 
     fun hasAny(): Boolean = scores.isNotEmpty()
 
-    fun score(text: String, comment: String): Int =
-        (scores[key(text, comment)] ?: 0) * 2 + (scores[key(text, "")] ?: 0)
+    fun score(text: String, comment: String): Int = scores[key(text, comment)] ?: 0
 }
