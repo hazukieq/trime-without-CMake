@@ -1338,6 +1338,44 @@ public class Trime extends LifecycleInputMethodService {
     showDialog(dialog);
   }
 
+  /**
+   * 長按 ⌘（meta/Menu）鍵：輸入方案選單 —— 切換當前方案（點一下即切）＋ 啟用/停用方案。
+   *
+   * <p>以前這個長按打開的是「設置輸入法／其它輸入法」對話框，內容與按鍵語義不符
+   * （用戶 2026-11-09：「meta键长按弹出菜单的内容不对，应该是输入方案切换以及启用」）。
+   */
+  public void showSchemaMenuDialog() {
+    final String[] names = Rime.getSchemaNames();
+    if (names.length == 0) {
+      new SchemaPickerDialog(this).show();
+      return;
+    }
+    final int current = Rime.getSchemaIndex();
+    final java.util.List<String> items = new java.util.ArrayList<>(names.length + 1);
+    for (int i = 0; i < names.length; i++) {
+      items.add(i == current ? names[i] + "（当前）" : names[i]);
+    }
+    items.add("启用 / 停用方案…");
+    final com.hazukieq.hkrime.ime.dialog.ModernListDialog dialog =
+        com.hazukieq.hkrime.ime.dialog.ModernListDialog.actionList(
+            this,
+            "输入方案",
+            items,
+            index -> {
+              if (index == names.length) {
+                new SchemaPickerDialog(this).show();
+                return;
+              }
+              if (index == current) return;
+              // 方案切換會觸發 librime 的 schema 通知 → initSchema() + initKeyboard()，
+              // 鍵盤/候選條/面板跟著換到新方案的配置。
+              synchronized (Rime.ENGINE_LOCK) {
+                Rime.selectSchema(index);
+              }
+            });
+    showDialog(dialog);
+  }
+
   /** 彈出{@link SchemaPickerDialog 輸入法方案對話框} */
   public void showSchemaDialog() {
     new SchemaPickerDialog(this).show();

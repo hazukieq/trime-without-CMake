@@ -72,8 +72,20 @@ object TwelveKeySnapshotBuilder {
         local.input + "|" + local.segmentsKey +
             (if (full) "|full" else "|bar") + "|m" + SelectionMemory.version
 
-    /** 全量枚舉 + 分組；不讀引擎以外的東西。調用方需持引擎鎖（可在後台線程）。 */
-    fun build(local: Local, maxCandidates: Int = MAX_CANDIDATES): TwelveKeySnapshot {
+    /**
+     * 全量枚舉 + 分組；不讀引擎以外的東西。調用方需持引擎鎖（可在後台線程）。
+     *
+     * @param applyLearning 是否套用 App 側學習排序（12 鍵候選條自己排序；非 12 鍵方案的
+     *   候選條由 librime 直接提供，面板必須保持引擎順序，否則面板順序 ≠ 候選條順序）。
+     * @param mapFallbackLetters 兜底是否把 12 鍵碼映射成拼音字母（非 12 鍵方案輸入的就是
+     *   字母，原樣上屏即可）。
+     */
+    fun build(
+        local: Local,
+        maxCandidates: Int = MAX_CANDIDATES,
+        applyLearning: Boolean = true,
+        mapFallbackLetters: Boolean = true,
+    ): TwelveKeySnapshot {
         if (local.isEmpty) return TwelveKeySnapshot.EMPTY
         val input = local.input
         val consumedEnd = local.consumedEnd
@@ -101,7 +113,7 @@ object TwelveKeySnapshotBuilder {
         }
 
         // App 側學習排序：選過的詞（同讀音+同詞）排前，候選條與面板都吃這個順序。
-        val ranked = if (SelectionMemory.hasAny()) {
+        val ranked = if (applyLearning && SelectionMemory.hasAny()) {
             flat.sortedWith(
                 compareByDescending<CandidateItem> {
                     SelectionMemory.score(it.text, it.comment)
@@ -116,7 +128,7 @@ object TwelveKeySnapshotBuilder {
         val barEntries = ranked.take(BAR_ITEMS).filter { it.text.isNotEmpty() }
         val fallback = if (groups.isEmpty() && remaining.isNotEmpty()) {
             val raw = remaining.takeLast(MAX_FALLBACK_CODE)
-            Fallback(rawCode = raw, letters = toLetters(raw))
+            Fallback(rawCode = raw, letters = if (mapFallbackLetters) toLetters(raw) else raw)
         } else {
             null
         }

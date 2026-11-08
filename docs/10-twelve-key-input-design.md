@@ -1058,3 +1058,41 @@ BFS 隊列峰值 766 —— 也就是說 37ms 全是簡拼圖 BFS 的展開成�
     `rebuildPinyinGroups` / `isCjk`），以及 `CandidatePanelController.submitLegacy(groups, items)`。
 - 真機驗收（hakka_qwerty，輸入 `fu g`）：▼ 展開面板顯示全量候選網格（苦瓜/富家/护驾/胡家/…），
   點「富家」上屏並自動收起面板；12 鍵（hakka_jiugong）面板左列 `nzia` + 右格候選照舊可用。
+
+## 15.20 全字母方案共用左列音節索引 + ⌘ 長按輸入方案選單（2026-11-09）
+
+用戶：「左列音节索引对全字母也有意义的，所以改成一样来哈。12键盘的meta键长按弹出菜单的
+内容不对，应该是输入方案切换以及启用」。
+
+**① 全字母方案（客語 26 鍵）也走同一套快照/分組/面板**
+
+- 之前的權宜做法是「非 12 鍵走 legacyMode：左列隱藏、右格全寬、候選不按讀音分組」，
+  用戶指出左列對全字母同樣有意義 → 取消 legacyMode，**所有方案都只讀同一份
+  `TwelveKeySnapshot`**：
+  - `TwelveKeySnapshotBuilder.build()` 增加 `applyLearning` / `mapFallbackLetters` 兩個參數：
+    非 12 鍵方案候選條由 librime 直接提供，面板必須保持引擎順序（不套 App 學習排序），
+    兜底也直接原樣上屏（輸入的就是字母，不做 12 鍵碼 → 拼音映射）。
+  - `TextInputManager.legacySnapshot()`：非 12 鍵方案開面板/按鍵時現算快照
+    （`local()` 讀 input/segments/remaining → 全量枚舉 → 按 comment 分組），
+    再 `submit(snapshot)` + `show()`；`onCandidatesRefreshed()` 同理刷新。
+  - `hakka_qwerty.schema.yaml` 打開 `spelling_hints: 100`：候選 comment = 詞典精確拼音，
+    左列才能按讀音分組（如 `fu ga` / `fu gai` / `fu gam` / `fu gau` / `fu gen`…），
+    點組只切視圖、點候選仍走 `select_candidate(全局下標)`。
+  - 固定候選欄在所有方案裡都不再顯示/預留拼音註釋：`CandidateBarBinder.clear()` 也改成
+    `setShowComment(false)`，`TextInputManager` 初始化候選條同樣關閉 —— 否則打開
+    `spelling_hints` 後非 12 鍵候選條又會多出一行 comment_height（回到 15.19 的高度不一致）。
+- 真機驗收（客語 26 鍵，輸入 `fu g`）：面板左列 `fu ga / fu gai / fu gam / fu gau / fu gen`…
+  + 右格帶拼音註腳的候選；點 `fu gai` 只剩「湖怪」；點「湖怪」上屏到搜索框並收起面板。
+
+**② ⌘（meta/Menu）鍵長按 → 輸入方案選單**
+
+- 根因：`KEYCODE_MENU`（主題裡 ⌘ 鍵的 `long_click: Menu`）之前走 `showOptionsDialog()`，
+  彈的是「設置輸入法／其它輸入法」，與按鍵語義不符。
+- 修法：`Trime.showSchemaMenuDialog()` —— `ModernListDialog.actionList("输入方案")`：
+  - 列出**已啟用**方案（`Rime.getSchemaNames()`），當前方案標「（当前）」，點一下即切換
+    （`Rime.selectSchema(index)`，持 `ENGINE_LOCK`；引擎的 schema 通知再觸發
+    `initSchema()` + `initKeyboard()`，鍵盤/候選條/面板隨方案切換）；
+  - 最後一行「启用 / 停用方案…」→ 原有 `SchemaPickerDialog`（多選勾選 + 部署）。
+- 真機驗收：12 鍵 ⌘ 長按彈出「输入方案：客语12键（当前）/ 客语26键 / 雲龍國際音標 /
+  启用 / 停用方案…」；點「客语26键」鍵盤立刻變全字母並可展開分組面板；再從 26 鍵鍵盤
+  長按「中文」鍵（`long_click: Menu`）切回 12 鍵；「启用 / 停用方案…」打開多選（三项已勾選）。

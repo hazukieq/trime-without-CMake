@@ -12,6 +12,7 @@ import com.hazukieq.hkrime.core.twelvekey.Fallback
 import com.hazukieq.hkrime.core.twelvekey.CandidatePanelController
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeyController
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshot
+import com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder
 import com.hazukieq.hkrime.data.AppPrefs
 import com.hazukieq.hkrime.data.Config
 import com.hazukieq.hkrime.databinding.InputRootBinding
@@ -88,8 +89,6 @@ class TextInputManager private constructor() :
         private val DELIMITER_PROPERTY_KEY = """^((\{Escape\})?[^{}]+).*$""".toRegex()
         /** Delimiter regex to split language/locale tags. */
         private val DELIMITER_SPLITTER = """[-_]""".toRegex()
-        /** 非 12 鍵方案展開面板一次枚舉的候選上限（與 12 鍵快照一致）。 */
-        private const val PANEL_ENUM_MAX = 600
         private var instance: TextInputManager? = null
 
         @Synchronized
@@ -171,11 +170,13 @@ class TextInputManager private constructor() :
 
         candidateView = uiBinding.main.candidateView.candidates.also {
             it.setCandidateListener(this)
-            it.setShowComment(!Rime.getOption("_hide_comment"))
+            // 固定候選欄不再顯示拼音提示（用戶 2026-11-09「关闭固定候选栏的拼音提示」；
+            // 拼音只用於展開面板左列分組，所以候選條高度對所有方案都是 candidate_view_height）。
+            it.setShowComment(false)
             it.reset(trime)
         }
 
-        // 候選展開面板（只讀快照；12 鍵走 Snapshot，其它方案走舊的分段左列）
+        // 候選展開面板（所有方案都只讀快照：12 鍵由引擎按鍵驅動，全字母方案開面板時現算）
         inputArea = uiBinding.main.inputArea
         candidatePanelRoot = uiBinding.main.candidatePanelRoot
         runCatching {
@@ -291,12 +292,14 @@ class TextInputManager private constructor() :
             // 面板要完整分組：開面板時全量枚舉一次
             twelveKeyController?.refresh(immediate = true, full = true)
         } else {
-            // 非 12 鍵方案（客語 26 鍵等「全字母」）：面板內容由 App 現算一份全局下標候選，
-            // 交給同一個面板控制器顯示。之前這條路徑沒人餵內容、show() 又直接 return，
-            // 導致全字母方案按 ▼ 完全打不開（用戶 2026-11-09）。
-            val items = legacyPanelItems()
-            if (items.isEmpty()) return
-            candidatePanelController?.showLegacy(items)
+            // 非 12 鍵方案（客語 26 鍵等「全字母」）：與 12 鍵同一套快照/分組/面板，
+            // 只是快照由 App 在開面板這一刻現算（引擎自己不發 12 鍵那種通知）。
+            // 之前這條路徑沒人餵內容、show() 又直接 return，導致按 ▼ 完全打不開
+            // （用戶 2026-11-09）。
+            val snapshot = legacySnapshot()
+            if (snapshot.isEmpty) return
+            candidatePanelController?.submit(snapshot)
+            if (candidatePanelController?.isShown != true) candidatePanelController?.show()
         }
         candidateView?.setPanelOpen(candidatePanelController?.isShown == true)
     }
@@ -413,36 +416,29 @@ class TextInputManager private constructor() :
             hideCandidatePanel()
             return
         }
-        candidatePanelController?.updateLegacy(legacyPanelItems())
+        candidatePanelController?.submit(legacySnapshot())
     }
 
     // ---------- 展開面板：非 12 鍵方案（全字母 26 鍵等） ----------
 
     /**
-     * 非 12 鍵方案的右格候選：一次性全量枚舉（全局下標，點擊直接 `select_candidate(index)`，
-     * 語義與 12 鍵面板一致）。沒有候選（只剩未轉換編碼）時給一條「本地原文」兜底項（index = -1）。
+     * 非 12 鍵方案現算一份快照：候選按 comment（spelling_hints 給的精確讀音）分組，
+     * 面板左列音節索引與 12 鍵完全一樣；點擊照舊走 `select_candidate(全局下標)`。
+     *
+     * - `applyLearning = false`：候選條由 librime 直接提供，面板必須保持引擎順序；
+     * - `mapFallbackLetters = false`：輸入的就是字母，兜底原樣上屏。
      */
-    private fun legacyPanelItems(): List<CandidatePanelAdapter.Item> {
-        val items = withEngineLock {
-            runCatching {
-                Rime.candidatesSnapshot(PANEL_ENUM_MAX).mapIndexedNotNull { index, row ->
-                    val text = row.getOrNull(0).orEmpty()
-                    if (text.isEmpty()) null
-                    else CandidatePanelAdapter.Item(text, row.getOrNull(1).orEmpty(), index)
-                }
-            }.getOrDefault(emptyList())
-        }
-        if (items.isNotEmpty()) return items
-        val rest = remainingCode()
-        return if (rest.isEmpty()) emptyList()
-        else listOf(CandidatePanelAdapter.Item(rest, "本地原文", -1))
-    }
-
-    /** 目前 preedit 裡還沒被轉換的編碼（去掉漢字/占位符/空格），例如只剩 u 時回傳 "u"。 */
-    private fun remainingCode(): String {
-        val preedit = runCatching { Rime.getCompositionText() }.getOrNull().orEmpty()
-            .replace("\u2038", "")
-        return preedit.filter { it.code < 128 && (it.isLetterOrDigit() || it == '\'') }
+    private fun legacySnapshot(): TwelveKeySnapshot = withEngineLock {
+        runCatching {
+            val local = TwelveKeySnapshotBuilder.local()
+            if (local.isEmpty) TwelveKeySnapshot.EMPTY
+            else TwelveKeySnapshotBuilder.build(
+                local,
+                TwelveKeySnapshotBuilder.MAX_CANDIDATES,
+                applyLearning = false,
+                mapFallbackLetters = false,
+            )
+        }.getOrDefault(TwelveKeySnapshot.EMPTY)
     }
 
     /**
@@ -690,7 +686,8 @@ class TextInputManager private constructor() :
                 }
             }
             KeyEvent.KEYCODE_PROG_RED -> trime.showColorDialog() // Color schemes
-            KeyEvent.KEYCODE_MENU -> trime.showOptionsDialog()
+            // 長按 ⌘（meta/Menu）鍵：輸入方案切換 + 啟用/停用（用戶 2026-11-09）
+            KeyEvent.KEYCODE_MENU -> trime.showSchemaMenuDialog()
             else -> onKey(event.code, event.mask or trime.keyboardSwitcher.currentKeyboard.modifer)
         }
     }

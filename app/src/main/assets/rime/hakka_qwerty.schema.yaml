@@ -98,8 +98,11 @@ speller:
 translator:
   dictionary: hakka
   prism: hakka_qwerty
-  #四个字以下时才会开启拼音提示
-  #spelling_hints: 1
+  # 打開完整拼音提示（值 = 音節數上限，100 即全量）：候選 comment = 詞典精確拼音。
+  # 展開面板左列的音節索引靠它分組，和 12 鍵完全同一套（用戶 2026-11-09：
+  # 「左列音节索引对全字母也有意义的，所以改成一样来」）。
+  # 固定候選欄本身不顯示這些 comment（CandidateBarBinder 關掉了），只給面板用。
+  spelling_hints: 100
   enable_user_dict: true
   enable_sentence: true
 

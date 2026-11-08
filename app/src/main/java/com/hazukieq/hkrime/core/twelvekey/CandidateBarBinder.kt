@@ -26,9 +26,14 @@ class CandidateBarBinder(private val candidateView: Candidate?) {
         view.setCandidates(entries)
     }
 
-    /** 離開 12 鍵路徑時恢復「候選條自己找 Rime.getCandidates()」的舊行為。 */
+    /**
+     * 離開 12 鍵路徑時恢復「候選條自己找 Rime.getCandidates()」的舊行為。
+     *
+     * 註釋仍然關閉：拼音只給展開面板左列分組用，固定候選欄在所有方案裡都不顯示拼音提示，
+     * 高度才統一（用戶 2026-11-09：全字母鍵盤候選區高度要和 12 鍵一致）。
+     */
     fun clear() {
-        candidateView?.setShowComment(true)
+        candidateView?.setShowComment(false)
         candidateView?.clearExternalCandidates()
     }
 }
