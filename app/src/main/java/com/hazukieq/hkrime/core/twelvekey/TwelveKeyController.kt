@@ -78,14 +78,13 @@ class TwelveKeyController(
                                 local,
                                 if (full) TwelveKeySnapshotBuilder.MAX_CANDIDATES else BAR_CANDIDATES,
                             )
-                            if (com.hazukieq.hkrime.BuildConfig.DEBUG) {
-                                Timber.d(
-                                    "twelvekey:build %s cached=%s ms=%.1f",
-                                    key,
-                                    cached != null,
-                                    (System.nanoTime() - t0) / 1e6,
-                                )
-                            }
+                            // 性能排查用：INFO 级别，真機 logcat 可直接統計每鍵快照耗時
+                            Timber.i(
+                                "twelvekey:build %s cached=%s ms=%.1f",
+                                key,
+                                cached != null,
+                                (System.nanoTime() - t0) / 1e6,
+                            )
                             if (cached == null) cachePut(key, built)
                             Triple(local, built, true)
                         }
@@ -96,7 +95,10 @@ class TwelveKeyController(
             val (local, built, _) = result
             withContext(Dispatchers.Main.immediate) {
                 if (gen != generation) return@withContext
+                val t = System.nanoTime()
                 if (local.isEmpty) emit(TwelveKeySnapshot.EMPTY) else emit(built)
+                val emitMs = (System.nanoTime() - t) / 1e6
+                if (emitMs > 20.0) Timber.w("twelvekey:emit %.1fms", emitMs)
             }
         }
     }

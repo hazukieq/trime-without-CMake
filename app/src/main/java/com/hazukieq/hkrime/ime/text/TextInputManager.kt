@@ -404,6 +404,16 @@ class TextInputManager private constructor() :
 
     /** 候選刷新後呼叫：12 鍵重建快照；其它方案只刷新展開面板。 */
     fun onCandidatesRefreshed() {
+        val refreshT0 = System.nanoTime()
+        try {
+            doOnCandidatesRefreshed()
+        } finally {
+            val ms = (System.nanoTime() - refreshT0) / 1e6
+            if (ms > 40.0) Timber.w("perf: onCandidatesRefreshed %.1fms", ms)
+        }
+    }
+
+    private fun doOnCandidatesRefreshed() {
         if (isTwelveKeyMode()) {
             // 按鍵後立即重建快照（不 debounce）；面板關閉時只枚舉候選條需要的 16 條，
             // 面板打開才全量枚舉（按鍵卡頓的另一半原因：每鍵 600 條枚舉）。

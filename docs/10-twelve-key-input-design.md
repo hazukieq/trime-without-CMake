@@ -1358,3 +1358,40 @@ librime 1.7.3 在 -O0 下还能勉强跑，但 1.17 代码量（含 lua/charcode
 - `rime-jni/script/build.sh` 默认 `BUILD_TYPE=Release`；库从 13.9MB → **6.16MB**（strip 后），符号校验仍 75/75。
 - 需要排查符号/崩溃时才用 `--build-type Debug`（注释里写明性能代价）。
 - `hkrime/app/libs/arm64-v8a/librime_jni.so` 换成 Release 版并重装 APK，真机连打恢复正常。
+
+## 15.30 12 键简拼再卡顿：升级 librime 时丢了旧库的性能补丁（2026-11-09）
+
+**现象**（用户 m03084 / m03198）：换成 librime 1.17 后，「连续点击按键偶发卡顿」，
+打 `kai ciak ji fu cu`（按键序列 kl abc ghi abc ghi abc kl zj ghi def vur abc vur）尤其明显；
+旧库（1.7.3）不会。
+
+**量化**：
+- 用户真实手打 289 键的 process_key 耗时：median 4ms，**40 键 >200ms，最大 778ms**；
+  同一串输入用旧库：max 12ms，无 >200ms。
+- 应用侧快照构建（twelvekey:build）max 35.8ms、cache 命中正常 —— 卡顿在 native `process_key` 内。
+- simpleperf（`--app com.hazukieq.hkrime`，10,767 samples）：librime_jni.so 占 50.94%；
+  热点 `basic_string::append` 5.4%、`leveldb::InternalKeyComparator::Compare` 4.5%、
+  `leveldb::Block::Iter::Seek` 4.1%、`__memcmp` 4.1%、`ParseNextKey` 3.8%、
+  `snappy::DecompressBranchless` 3.6%、`TableQuery::Access` 2.4%、`UserDictionary::DfsLookup` 2.1%。
+  → 12 键简拼（abbrev）长输入时，用户词库 leveldb DFS + 主词典 `Table::Query` BFS 指数爆炸。
+
+**根因**：旧库 `librime 1.7.3` 源码树（`jni-build/trime-v3.2.7/app/src/main/jni/librime`）
+有 2026-11-08 为同一问题打的**本地补丁**（git status 里 table.cc / script_translator.cc /
+rime_api.cc/.h 有改动）；本次升级 1.17 用的是上游原版，补丁没带过来。
+
+**修法**：把两处补丁移植到 `rime-jni/librime`（commit c3c5969，另存
+`rime-jni/patches/0001-12key-abbrev-perf.patch`，README 记录了重新 clone 后的应用步骤）：
+1. `dict/table.cc::Table::Query`：`kMaxChunksPerEnd=48` + `kMaxExpansions=12000` 预算，
+   音节分支按 `remaining()` 降序展开（同权按 SyllableId，保证结果确定）；
+2. `gear/script_translator.cc::ScriptTranslation::Evaluate`：`has_abbrev` 检测
+   （`SyllableGraph.edges` 是三层 map，取 `EdgeProperties.type == kAbbreviation`），
+   简拼长输入跳过 `user_dict->Lookup`、简拼≤2 音节用 depth_limit=2，
+   句子装配要求 `!has_abbrev` 且音节数 ≤12。
+（第三处 `RimeGetCompositionSegments` 已在 glue/rime_compat.cc 用内部 API 重实现，无需移植。）
+
+**验证**：重编 Release 库（6,175,752 B）→ 符号 75/75 → 装 APK 后注入式连打 52 键：
+max 10ms、0 键 >150ms（注入本身难以复现偶发 spike，最终以用户手打复测为准）。
+
+**顺带**：`TwelveKeyController.refresh` 的 `twelvekey:build … ms=` 日志提到 INFO（原来只在
+BuildConfig.DEBUG 的 D 级打，现场难抓）；`TextInputManager.onCandidatesRefreshed` 包了
+`perf: onCandidatesRefreshed …ms`（>40ms 才打）。
