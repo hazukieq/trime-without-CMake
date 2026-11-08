@@ -1232,3 +1232,35 @@ build 出來的 `rime_ice.table.bin` 60MB）：
 已知取捨：首次載入一個大方案（如霧凇拼音 60MB table）仍需一次 1~2 分鐘的構建，
 這是 librime 編譯詞典的成本；**中途殺進程會讓它下次啟動重跑**（見證據 2）。
 建議：首次啟用後就讓它跑完，期間不要強殺輸入法。
+
+## 15.26 啟動白屏：維護不再卡主線程（2026-11-09）
+
+用戶跟進：「現在啟動還是白屏」。logcat 顯示即使是增量部署，
+`Rime.check(false)` 在**主線程**（tid==pid）發現有待做的維護時，仍然
+`join_maintenance_thread()` 阻塞，大方案一次 90+ 秒 → 白屏假死。
+而 `Rime.init` 是主線程調用的（`Config.prepareRime` / `TextInputManager.onInitializeInputUi`），
+所以只要上次部署被打斷（用戶看到「卡住」就強殺 App），下次啟動必白屏。
+
+修法（`core/Rime.java`）：
+- `check()`：若在主線程且維護已啟動 → 置 `maintenancePending = true`，
+  把 `join_maintenance_thread()` 丟到 `rime-maintenance` 守護線程執行並**立即返回**；
+  非主線程仍同步 join（部署對話框那條路徑不變）。
+- `init()`：`maintenancePending` 時跳過 `find_session/create_session/initSchema`，
+  `mSchemaList` 置空，直接返回 —— 主線程絕不阻塞。
+- 背景線程維護完成後 `Handler.post` 回主線程：建 session → `initSchema()` →
+  `Trime.getServiceOrNull().initKeyboard()` 重綁鍵盤，然後 `maintenancePending = false`。
+- 同步補 null 保護：`getSchemaId()` 在無 session 時 native 返回 null → 統一成
+  `.default`（`isEmpty()` 的「無方案」語義）；`getSchemaNames()/getSchemaIndex()`
+  對 `mSchemaList == null` 返回空數組 / 0。
+
+真機驗收（把 rime_ice 重新加回 schema_list 製造一次 90+ 秒維護）：
+- `04:41:51 Rime.check: maintenance pending -> run in background, UI keeps responsive`
+  + `Rime.init: maintenance pending, deferred session creation`，App/輸入法立即可用
+  （鍵盤正常顯示，全程無白屏、無 crash）；
+- `04:43:25 Rime: background maintenance finished in 94065ms` →
+  `04:43:26 Rime: re-initialized after background maintenance (schema=hakka_jiugong)`，
+  鍵盤自動切回 12 鍵、輸入 nzi 正常出候選（而/二/尔/语/耳…）；
+- 冷啟動（有待做維護）時 `PrefMainActivity` 2 秒內就拿到焦點，不再白屏。
+
+取捨：維護在背景跑的那段時間引擎沒有 session，輸入暫時無候選（鍵盤仍在、UI 可操作）；
+維護完成後自動恢復。比整段白屏假死好得多。

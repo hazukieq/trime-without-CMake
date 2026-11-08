@@ -275,6 +275,15 @@ public class Rime {
 
   private static Rime self;
 
+  /**
+   * 主線程啟動時不在主線程 join 維護：大方案（霧凇拼音 60MB table、melt_eng 8.5MB prism…）
+   * 部署要 1~2 分鐘，主線程 join 會讓 splash/界面整段白屏假死（2026-11-09 用戶反饋）。
+   * 這裡改成：維護丟到背景線程，init 先不建 session；維護完成後在主線程補建 session、
+   * 重讀方案並讓輸入法重綁鍵盤。
+   */
+  private static volatile boolean maintenancePending = false;
+  private static Context appContext;
+
   private static final RimeCommit mCommit = new RimeCommit();
   private static final RimeContext mContext = new RimeContext();
   /**
@@ -373,6 +382,7 @@ public class Rime {
   }
 
   public Rime(Context context, boolean full_check) {
+    appContext = context == null ? null : context.getApplicationContext();
     init(full_check);
     self = this;
   }
@@ -412,6 +422,13 @@ public class Rime {
     check(full_check);
     Timber.d(methodName + "set_notification_handler");
     set_notification_handler();
+    if (maintenancePending) {
+      // 維護在背景跑：先不建 session，避免 librime 在維護模式下建 session 失敗。
+      // UI 側對「無方案」的調用都做了 null/空值的保護（getSchemaId 返回 .default 等）。
+      mSchemaList = java.util.Collections.emptyList();
+      Timber.w("Rime.init: maintenance pending, deferred session creation");
+      return;
+    }
     if (!find_session()) {
       if (create_session() == 0) {
         Timber.wtf("Error creating rime session");
@@ -422,6 +439,38 @@ public class Rime {
     initSchema();
 
     Timber.d(methodName + "finish");
+  }
+
+  /** 背景執行維護，完成後回主線程補建 session / 重讀方案 / 讓輸入法重綁鍵盤。 */
+  private static void runMaintenanceInBackground() {
+    final long t0 = System.nanoTime();
+    try {
+      join_maintenance_thread();
+      Timber.i("Rime: background maintenance finished in %dms",
+          (System.nanoTime() - t0) / 1_000_000);
+    } catch (Throwable e) {
+      Timber.e(e, "Rime: background maintenance failed");
+    }
+    final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+    handler.post(() -> {
+      synchronized (ENGINE_LOCK) {
+        try {
+          if (self == null) return;
+          if (!find_session() && create_session() == 0) {
+            Timber.wtf("Rime: create session failed after maintenance");
+            return;
+          }
+          initSchema();
+          maintenancePending = false;
+          Timber.i("Rime: re-initialized after background maintenance (schema=%s)", getSchemaId());
+        } catch (Throwable e) {
+          Timber.e(e, "Rime: re-init after maintenance failed");
+          return;
+        }
+      }
+      final Trime trime = Trime.getServiceOrNull();
+      if (trime != null) trime.initKeyboard();
+    });
   }
 
   public static void destroy() {
@@ -583,7 +632,10 @@ public class Rime {
   }
 
   public static String getSchemaId() {
-    return get_current_schema();
+    final String schema = get_current_schema();
+    // 維護被延後時還沒有 session，native 返回 null：統一成 .default（= 無方案），
+    // 讓 isEmpty()/UI 走「無方案」分支而不是 NPE。
+    return schema == null ? ".default" : schema;
   }
 
   private static boolean isEmpty(@NonNull String s) {
@@ -595,6 +647,7 @@ public class Rime {
   }
 
   public static String[] getSchemaNames() {
+    if (mSchemaList == null) return new String[0];
     int n = mSchemaList.size();
     String[] names = new String[n];
     int i = 0;
@@ -606,6 +659,7 @@ public class Rime {
   }
 
   public static int getSchemaIndex() {
+    if (mSchemaList == null) return 0;
     String schema_id = getSchemaId();
     int i = 0;
     for (Object o : mSchemaList) {
@@ -802,11 +856,15 @@ public class Rime {
         "Rime.check(%b): start_maintenance=%b(%dms) maintenance_mode=%b",
         full_check, started, (t1 - t0) / 1_000_000, maint);
     if (started && maint) {
-      // 主線程等待維護會讓輸入法/界面「卡住」（大方案如霧凇拼音動輒 1~2 分鐘）。
-      // 先提示用戶，再 join（引擎必須等維護完成才能建立 session）。
       if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
-        Timber.w("Rime.check: maintenance on MAIN thread, UI will freeze until it finishes");
-        com.blankj.utilcode.util.ToastUtils.showLong("正在部署輸入方案，請稍候…");
+        // 主線程不能 join：大方案維護 1~2 分鐘，會讓 UI 直接白屏假死。
+        // 丟到背景線程，等它完成再補初始化（見 runMaintenanceInBackground()）。
+        maintenancePending = true;
+        Timber.w("Rime.check: maintenance pending -> run in background, UI keeps responsive");
+        final Thread worker = new Thread(Rime::runMaintenanceInBackground, "rime-maintenance");
+        worker.setDaemon(true);
+        worker.start();
+        return;
       }
       join_maintenance_thread();
       Timber.i("Rime.check: joined maintenance in %dms", (System.nanoTime() - t1) / 1_000_000);
