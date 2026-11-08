@@ -674,3 +674,20 @@ if (needDeploy) Rime.deploy_config_file(file_name, "config_version");
 
 驗證：刪掉/改舊 `build/hakka_theme.trime.yaml` 後重啟 IME，緩存重建為
 `window: [{composition: "%s"}]`，悬浮窗只剩拼音。
+
+### 15.5 「打長了就停止候選」的真正原因（2026-11-08）
+
+現象：連續打十幾個音節後，候選條只剩一兩個候選，看起來像「候選停了」。
+
+根因**不是主題參數**，而是候選條的數據源：
+`TwelveKeySnapshot.barItems` 取的是 **`groups[0]`（第 0 個讀音組）**。
+短輸入時同一讀音有很多候選（nzin 8 個字），看不出問題；長輸入時引擎為每個候選
+給出的 comment（精確拼音）各不相同，於是「第 0 組」通常只剩 **1 條**，
+候選條就被抽乾了。
+
+修法：快照新增 `barEntries` —— **按選單順序取前 12 條**（`flat.take(12)`，
+index 仍是全局下標，點擊上屏不受影響）；`barItems` 優先讀 `barEntries`，
+沒有時才退回第 0 組（兼容舊快照）。展開面板仍按讀音分組，職責不變。
+
+驗證：連打 48+ 鍵，`twelvekey:latency` 日誌的 `items=12` 保持不變
+（修前同樣輸入是 `items=1`）。

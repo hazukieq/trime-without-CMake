@@ -24,6 +24,9 @@ object TwelveKeySnapshotBuilder {
     /** 剩餘碼超過該長度時，fallback 只保留最後 48 個碼（設計 §8.4）。 */
     private const val MAX_FALLBACK_CODE = 48
 
+    /** 候選條最多顯示的條目數（與選單順序一致；候選條可橫向滾動）。 */
+    private const val BAR_ITEMS = 12
+
     private const val BLANK_READING = "…"
 
     /** UI 線程同步算出的「本地部分」；segmentsKey 用於區分「input 不變但分段變了」。 */
@@ -86,6 +89,11 @@ object TwelveKeySnapshotBuilder {
         }
 
         val groups = group(flat)
+        // 候選條按「選單順序」取前 N 條：長輸入時 reading 各不相同，
+        // 按第 0 組取會只剩 1 條（用戶 2026-11-08 反饋「打到這麼多就停止候選」）。
+        val barEntries = flat.take(BAR_ITEMS).mapIndexedNotNull { index, (text, comment) ->
+            if (text.isEmpty()) null else CandidateItem(text, comment, index)
+        }
         val fallback = if (groups.isEmpty() && remaining.isNotEmpty()) {
             val raw = remaining.takeLast(MAX_FALLBACK_CODE)
             Fallback(rawCode = raw, letters = toLetters(raw))
@@ -103,6 +111,7 @@ object TwelveKeySnapshotBuilder {
             groups = groups,
             fallback = fallback,
             degradedToSinglePage = degraded,
+            barEntries = barEntries,
         )
     }
 

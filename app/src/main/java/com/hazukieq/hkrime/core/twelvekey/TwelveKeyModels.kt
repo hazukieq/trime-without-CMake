@@ -38,6 +38,8 @@ data class Fallback(
  * @param groups 按 comment 分組的候選；順序 = 首次出現順序，不重排
  * @param fallback 無候選但有輸入時的本地兜底
  * @param degradedToSinglePage native 枚舉不可用，已降級為 getContexts 單頁
+ * @param barEntries 候選條專用的「選單順序前 N 條」（不是第 0 組！長輸入時每個候選的
+ *   reading 都不同，按組取會只剩 1 條，看起來像候選停了）
  */
 data class TwelveKeySnapshot(
     val input: String,
@@ -46,12 +48,19 @@ data class TwelveKeySnapshot(
     val groups: List<SyllableGroup>,
     val fallback: Fallback?,
     val degradedToSinglePage: Boolean = false,
+    val barEntries: List<CandidateItem> = emptyList(),
 ) {
     val isEmpty: Boolean get() = input.isEmpty()
     val hasCandidates: Boolean get() = groups.isNotEmpty()
 
-    /** 候選條展示的是第 0 組（設計 §5.4：默認組固定第 0 組）。 */
-    val barItems: List<CandidateItem> get() = groups.firstOrNull()?.items ?: emptyList()
+    /**
+     * 候選條展示的條目：優先「選單順序前 N 條」[barEntries]（長輸入時每個候選
+     * 的 reading/comment 都不同，按第 0 組取會只剩 1 條）；
+     * 舊快照沒有 barEntries 時退回第 0 組，保持兼容。
+     */
+    val barItems: List<CandidateItem>
+        get() = if (barEntries.isNotEmpty()) barEntries
+        else groups.firstOrNull()?.items ?: emptyList()
 
     companion object {
         val EMPTY = TwelveKeySnapshot("", 0, "", emptyList(), null)
