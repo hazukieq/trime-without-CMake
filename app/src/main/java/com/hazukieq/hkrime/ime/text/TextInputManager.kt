@@ -68,7 +68,6 @@ class TextInputManager private constructor() :
     private var activeGroupIndex = -1
     private var activeGroupStartByte = 0
     private var activeGroupText = ""
-    private var pendingGroupText = ""
     private var lastGroupText: String? = null
     private var panelItems: MutableList<CandidatePanelAdapter.Item> = mutableListOf()
     /** 面板一次最多收集的頁數，防止極端情況下卡住 */
@@ -282,7 +281,6 @@ class TextInputManager private constructor() :
 
     private fun pickPanelCandidate(pageOffset: Int, indexInPage: Int) {
         if (pageOffset < 0) {
-            pickLookupWord(indexInPage)
             return
         }
         // 面板展示的是「當前頁之後」的頁，提交時需要先翻到那一頁
@@ -301,7 +299,7 @@ class TextInputManager private constructor() :
         if (!Rime.isComposing()) {
             hideCandidatePanel()
         } else {
-            // 組字還沒結束：回到第一頁並重新收集面板內容
+            // 組字還沒結束：回到第一頁、把 caret 移到末尾，讓剩下的音節繼續顯示/可選
             while (Rime.hasLeft()) {
                 trime.handleKey(KeyEvent.KEYCODE_PAGE_UP, 0)
             }
@@ -510,20 +508,16 @@ class TextInputManager private constructor() :
      */
     private fun selectPinyinGroup(group: CandidateGroupAdapter.PinyinGroupAdapterItem) {
         activeGroupIndex = group.index
-        // 不碰 librime：直接用字典做「快速查找」，右側列這一節的單音節字/詞
-        val words = SyllableLexicon.lookup(trime, group.text)
-        if (words.isEmpty()) {
-            return
-        }
-        activeGroupStartByte = group.startByte
-        activeGroupText = group.text
-        pendingGroupText = group.text
-        panelItems = words.withIndex()
-            .map { (i, w) -> CandidatePanelAdapter.Item(w, "", -1, i) }
-            .toMutableList()
+        // 把 caret 移到「這一節的末尾」（= 下一節的起點），librime 就會把候選切成這一節的
+        val endByte = group.startByte + group.text.toByteArray(Charsets.UTF_8).size
+        moveCaretTo(endByte)
+        Rime.getContexts()
+        trime.updateComposing()
+        rebuildPinyinGroups()
+        // 這一節的候選就是當前頁：不要再做 pageDown 收集，否則 selectCandidate 的 index 會錯
+        panelItems = currentPageItems()
         candidatePanelAdapter?.submit(panelItems)
         candidatePanel?.scrollToPosition(0)
-        rebuildPinyinGroups()
     }
 
     /**
@@ -552,63 +546,6 @@ class TextInputManager private constructor() :
      * 從「字典快速查找」清單裡挑一個字：只有到這一步才動 librime。
      * 先看當前候選頁有沒有它；沒有就把 caret 移到該音節再找一次；仍沒有就提示。
      */
-    private fun pickLookupWord(index: Int) {
-        val word = panelItems.getOrNull(index)?.text ?: return
-        // 只允許從最前面的音節開始消費（左→右），符合「選完前一節只剩後面」的預期
-        if (activeGroupIndex != 0) {
-            android.widget.Toast.makeText(trime, "請先選前面的音節", android.widget.Toast.LENGTH_SHORT).show()
-            return
-        }
-        consumeFirstSyllable(word)
-    }
-
-    /**
-     * 選定左側第一節的字：先把這個字直接上屏，再把該節從 librime 的輸入串裡刪掉，
-     * 剩下的音節重新輸入回去 —— 這樣左列就只剩後面還沒處理的音節。
-     */
-    private fun consumeFirstSyllable(word: String) {
-        val input = Rime.RimeGetInput()
-        val groupText = pendingGroupText
-        if (input.isEmpty() || groupText.isEmpty()) {
-            // 沒有可消費的輸入：直接把字上屏
-            activeEditorInstance.commitText(word, dispatchToRime = false)
-            return
-        }
-        // 1) 這個字直接上屏
-        activeEditorInstance.commitText(word, dispatchToRime = false)
-        // 2) 清掉 librime 目前的輸入串
-        var guard = 0
-        while (Rime.isComposing() && guard++ < 64) {
-            trime.handleKey(KeyEvent.KEYCODE_DEL, 0)
-        }
-        // 3) 把剩下的音節重新打進去
-        val rest = if (input.length >= groupText.length) input.substring(groupText.length) else ""
-        for (ch in rest) {
-            if (ch in 'a'..'z') {
-                trime.handleKey(KeyEvent.KEYCODE_A + (ch - 'a'), 0)
-            } else if (ch in 'A'..'Z') {
-                trime.handleKey(KeyEvent.KEYCODE_A + (ch - 'A'), 0)
-            }
-        }
-        trime.updateComposing()
-        activeGroupIndex = -1
-        rebuildPinyinGroups()
-        refreshPanelItems()
-    }
-
-    private fun selectCandidateByText(word: String): Boolean {
-        val cs = Rime.getCandidatesWithoutSwitch() ?: return false
-        val idx = cs.indexOfFirst { (it.text ?: "") == word }
-        if (idx < 0) return false
-        Rime.selectCandidate(idx)
-        trime.updateComposing()
-        if (!Rime.isComposing()) {
-            activeEditorInstance.commitRimeText()
-            hideCandidatePanel()
-        }
-        return true
-    }
-
     /** 重新收集展開面板內容（保持「面板不影響候選欄」的約定）。 */
     private fun refreshPanelItems() {
         val panel = candidatePanel ?: return
