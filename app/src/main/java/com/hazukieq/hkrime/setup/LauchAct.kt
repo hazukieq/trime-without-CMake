@@ -25,14 +25,62 @@ import java.io.File
 import java.util.zip.ZipInputStream
 
 class LauchAct : AppCompatActivity() {
+    private fun tuneSystemBars() {
+        // 啟動頁：透明狀態欄/導航欄；淺色模式用深色圖標，避免白字看不清。
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            val night = (resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+            var flags = window.decorView.systemUiVisibility or
+                android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            if (!night) flags = flags or android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+            window.decorView.systemUiVisibility = flags
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_lauch)
+        tuneSystemBars()
+        playIntro()
 
-        if(!shouldSetup(this)){
-             requestPermission()
+        // 品牌啟動頁：停留一小段（配合入場動畫），再按是否完成初始化分流。
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            if (shouldSetup(this)) {
+                startActivity(
+                    Intent(this, com.hazukieq.hkrime.settings.PrefMainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                )
+                finish()
+            } else {
+                requestPermission()
+            }
+        }, 520)
+    }
+
+    /** 啟動頁入場：圖標淡入+輕微放大，文字依次淡入（總時長 ~520ms，不打斷原有流程）。 */
+    private fun playIntro() {
+        val icon = findViewById<android.view.View>(R.id.launch_icon)
+        val name = findViewById<android.view.View>(R.id.launch_name)
+        val tagline = findViewById<android.view.View>(R.id.launch_tagline)
+        val version = findViewById<android.view.View>(R.id.launch_version)
+        findViewById<android.widget.TextView>(R.id.launch_version)?.text =
+            "v" + com.hazukieq.hkrime.BuildConfig.VERSION_NAME
+
+        icon.apply {
+            alpha = 0f
+            scaleX = 0.92f
+            scaleY = 0.92f
+            animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(420).setInterpolator(
+                android.view.animation.DecelerateInterpolator(),
+            ).start()
         }
-        else finish()
+        listOf(name to 120L, tagline to 200L, version to 280L).forEach { (view, delay) ->
+            view.alpha = 0f
+            view.animate().alpha(1f).setStartDelay(delay).setDuration(320).start()
+        }
     }
 
     companion object {

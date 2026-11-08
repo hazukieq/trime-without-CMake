@@ -48,16 +48,15 @@ class SetupActivity : FragmentActivity() {
         binding.skipButton.apply {
             text = getString(R.string.setup__skip)
             setOnClickListener {
-                AlertDialog.Builder(this@SetupActivity)
-                    .setMessage(R.string.setup__skip_hint)
-                    .setPositiveButton(R.string.setup__skip_hint_yes) { _, _ ->
-                        if(!permission_isAll){
-                            //startActivity(Intent(this@SetupActivity,LauchAct::class.java))
-                            finish()
-                        }else finish()
-                    }
-                    .setNegativeButton(R.string.setup__skip_hint_no, null)
-                    .show()
+                com.hazukieq.hkrime.ime.dialog.ModernListDialog.confirm(
+                    this@SetupActivity,
+                    getString(R.string.trime_app_name),
+                    getString(R.string.setup__skip_hint),
+                ) {
+                    if (!permission_isAll) {
+                        finish()
+                    } else finish()
+                }.show()
             }
         }
 

@@ -75,11 +75,14 @@ class LogActivity : AppCompatActivity() {
                 } else {
                     supportActionBar!!.setTitle(R.string.crash_logs)
                     clearButton.visibility = View.GONE
-                    AlertDialog.Builder(this@LogActivity)
-                        .setTitle(R.string.app_crash)
-                        .setMessage(R.string.app_crash_message)
-                        .setPositiveButton(android.R.string.ok) { _, _ -> }
-                        .show()
+                    com.hazukieq.hkrime.ime.dialog.ModernListDialog.custom(
+                        this@LogActivity,
+                        getString(R.string.app_crash),
+                        android.widget.TextView(this@LogActivity).apply {
+                            text = getString(R.string.app_crash_message)
+                            setPadding(0, 0, 0, 8)
+                        },
+                    ).show()
                     Logcat(TrimeApplication.getLastPid())
                 }
             )

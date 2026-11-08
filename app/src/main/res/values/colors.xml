@@ -16,4 +16,15 @@
     <color name="toolbarForegroundColor">#FFFFFF</color>  <!-- 工具栏前景色 -->
     
     <color name="windowBackground">#FAFAFA</color>
+
+    <!-- 現代化設計 token（設置頁/啟動頁/對話框共用，類 Apple 語義） -->
+    <color name="modern_bg">#F2F2F7</color>
+    <color name="modern_surface">#FFFFFF</color>
+    <color name="modern_ink">#1C1C1E</color>
+    <color name="modern_ink2">#8E8E93</color>
+    <color name="modern_hairline">#E5E5EA</color>
+    <color name="modern_accent">#007AFF</color>
+    <color name="modern_icon_bg">#EEF3FF</color>
+    <color name="launch_bg_start">#F6F7FA</color>
+    <color name="launch_bg_end">#FFFFFF</color>
 </resources>

@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <style name="PreferenceTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/colorPrimary</item>
-        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
-        <item name="colorAccent">@color/colorAccent</item>
-        <item name="android:colorAccent" tools:targetApi="lollipop">@color/colorAccent</item>
+        <item name="colorPrimary">@color/modern_ink</item>
+        <item name="colorPrimaryDark">@color/modern_bg</item>
+        <item name="colorAccent">@color/modern_accent</item>
+        <item name="android:colorAccent" tools:targetApi="lollipop">@color/modern_accent</item>
 
-        <item name="android:windowBackground">@color/windowBackground</item>
-        <item name="android:colorBackground">@color/windowBackground</item>
+        <item name="android:windowBackground">@color/modern_bg</item>
+        <item name="android:colorBackground">@color/modern_bg</item>
+        <item name="preferenceTheme">@style/ModernPreferenceTheme</item>
+        <item name="alertDialogTheme">@style/AlertDialogTheme</item>
+        <item name="dialogTheme">@style/AlertDialogTheme</item>
     </style>
 
     <style name="AlertDialogTheme" parent="Theme.AppCompat.DayNight.Dialog.Alert">
@@ -18,6 +21,50 @@
 
         <item name="android:windowBackground">@color/windowBackground</item>
         <item name="android:colorBackground">@color/windowBackground</item>
+    </style>
+
+
+    <!-- 現代化 Preference 行/分類（類 Apple inset grouped） -->
+    <style name="ModernPreference" parent="Preference">
+        <item name="android:layout">@layout/pref_modern_row</item>
+    </style>
+
+    <style name="ModernPreferenceCategory" parent="Preference.Category">
+        <item name="android:layout">@layout/pref_modern_category</item>
+    </style>
+
+    <style name="ModernSwitchPreference" parent="Preference.SwitchPreferenceCompat">
+        <item name="android:layout">@layout/pref_modern_row</item>
+    </style>
+
+    <style name="ModernEditTextPreference" parent="Preference.DialogPreference.EditTextPreference">
+        <item name="android:layout">@layout/pref_modern_row</item>
+    </style>
+
+    <style name="ModernDialogPreference" parent="Preference.DialogPreference">
+        <item name="android:layout">@layout/pref_modern_row</item>
+    </style>
+
+    <style name="ModernSeekBarPreference" parent="Preference.SeekBarPreference">
+        <item name="android:layout">@layout/pref_modern_row</item>
+    </style>
+
+    <style name="ModernPreferenceTheme" parent="@style/PreferenceThemeOverlay.v14.Material">
+        <item name="preferenceStyle">@style/ModernPreference</item>
+        <item name="preferenceCategoryStyle">@style/ModernPreferenceCategory</item>
+        <item name="switchPreferenceCompatStyle">@style/ModernSwitchPreference</item>
+        <item name="switchPreferenceStyle">@style/ModernSwitchPreference</item>
+        <item name="editTextPreferenceStyle">@style/ModernEditTextPreference</item>
+        <item name="dialogPreferenceStyle">@style/ModernDialogPreference</item>
+        <item name="seekBarPreferenceStyle">@style/ModernSeekBarPreference</item>
+    </style>
+
+    <!-- 啟動頁：無標題欄、透明狀態欄、漸變底 -->
+    <style name="LaunchTheme" parent="PreferenceTheme">
+        <item name="android:windowBackground">@drawable/launch_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
     </style>
 
     <!--style name="Theme.Launcher" parent="Theme.MaterialComponents.DayNight.Bridge">

@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.inputmethod.InputMethodManager
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.Toolbar
@@ -56,21 +57,35 @@ class PrefMainActivity :
 
         super.onCreate(savedInstanceState)
         binding = PrefActivityBinding.inflate(layoutInflater)
-        if (VERSION.SDK_INT >= VERSION_CODES.M) {
-            BarUtils.setNavBarColor(
-                this,
-                getColor(R.color.windowBackground)
-            )
-        } else
-            BarUtils.setNavBarColor(
-                this,
-                @Suppress("DEPRECATION")
-                resources.getColor(R.color.windowBackground)
-            )
         setContentView(binding.root)
+        if (VERSION.SDK_INT >= VERSION_CODES.M) {
+            BarUtils.setNavBarColor(this, getColor(R.color.modern_bg))
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = window.decorView.systemUiVisibility
+        }
 
-        val toolbar = findViewById<Toolbar>(R.id.toolbar)
-        setSupportActionBar(toolbar)
+        // 狀態欄融入頁面底色：淺色模式用深色圖標，深色模式用淺色圖標。
+        window.statusBarColor = getColor(R.color.modern_bg)
+        if (VERSION.SDK_INT >= VERSION_CODES.M) {
+            val night = (resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+            if (!night) {
+                window.decorView.systemUiVisibility =
+                    window.decorView.systemUiVisibility or
+                        android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+            }
+        }
+
+        // 現代化大標題頭：標題/返回/部署/關於都在頭部，不再用 Material Toolbar。
+        headerTitle = findViewById(R.id.header_title)
+        headerBack = findViewById(R.id.header_back)
+        findViewById<TextView>(R.id.header_subtitle).text = getString(R.string.trime_app_name)
+        headerBack.setOnClickListener { onBackPressed() }
+        findViewById<android.view.View>(R.id.header_deploy).setOnClickListener { deployRime() }
+        findViewById<android.view.View>(R.id.header_about).setOnClickListener {
+            startActivity(Intent(this, AboutActivity::class.java))
+        }
 
         imeManager = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
 
@@ -80,23 +95,59 @@ class PrefMainActivity :
             title = savedInstanceState.getCharSequence(FRAGMENT_TAG)
         }
         supportFragmentManager.addOnBackStackChangedListener {
-            if (supportFragmentManager.backStackEntryCount == 0) {
-                setTitle(R.string.trime_app_name)
-            }
+            updateHeader()
         }
-
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        updateHeader()
         /*if (SetupActivity.shouldSetup()) {
             startActivity(Intent(this, SetupActivity::class.java))
         }*/
 
-        if (!LauchAct.shouldSetup(this)) {
-            startActivity(Intent(this, LauchAct::class.java))
-        }
+        // 啟動頁由 LauncherAlias -> LauchAct 負責，設定頁不再自動打開它，避免閃白。
 
         //requestPermission()
         //requestExternalStoragePermission()
         //requestAlertWindowPermission()
+    }
+
+    private lateinit var headerTitle: android.widget.TextView
+    private lateinit var headerBack: android.view.View
+
+    private fun updateHeader() {
+        val nested = supportFragmentManager.backStackEntryCount > 0
+        headerBack.visibility = if (nested) android.view.View.VISIBLE else android.view.View.GONE
+        if (!nested) headerTitle.text = getString(R.string.pref__title)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() {
+        if (supportFragmentManager.backStackEntryCount > 0) {
+            supportFragmentManager.popBackStackImmediate()
+            updateHeader()
+            return
+        }
+        super.onBackPressed()
+    }
+
+    override fun setTitle(title: CharSequence?) {
+        super.setTitle(title)
+        if (this::headerTitle.isInitialized) {
+            headerTitle.text = title ?: getString(R.string.pref__title)
+        }
+    }
+
+    private fun deployRime() {
+        val progressDialog = createLoadingDialog(this, R.string.deploy_progress)
+        progressDialog.show()
+        Trime.getServiceOrNull()?.initKeyboard()
+        launch {
+            try {
+                RimeUtils.deploy(this@PrefMainActivity)
+            } catch (ex: Exception) {
+                Timber.e(ex, "Deploy Exception")
+            } finally {
+                progressDialog.dismiss()
+            }
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -178,18 +229,7 @@ class PrefMainActivity :
                 true
             }
             R.id.preference__menu_deploy -> {
-                val progressDialog = createLoadingDialog(this, R.string.deploy_progress)
-                progressDialog.show()
-                Trime.getServiceOrNull()?.initKeyboard()
-                launch {
-                    try {
-                        RimeUtils.deploy(this@PrefMainActivity)
-                    } catch (ex: Exception) {
-                        Timber.e(ex, "Deploy Exception")
-                    } finally {
-                        progressDialog.dismiss()
-                    }
-                }
+                deployRime()
                 true
             }
             R.id.preference__menu_about -> {

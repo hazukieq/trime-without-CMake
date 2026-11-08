@@ -25,7 +25,6 @@ class ThemePickerDialog(
     private val themeKeys: Array<String?>
     private val themeNames: Array<String?>
     private var checkedId: Int = 0
-    val pickerDialog: AlertDialog
     @Suppress("DEPRECATION")
     private val progressDialog: ProgressDialog
 
@@ -50,16 +49,6 @@ class ThemePickerDialog(
                 themeNames[i] = themeName
             }
         }
-        // Init picker
-        pickerDialog = AlertDialog.Builder(context, R.style.AlertDialogTheme).apply {
-            setTitle(R.string.looks__selected_theme_title)
-            setCancelable(true)
-            setNegativeButton(android.R.string.cancel, null)
-            setPositiveButton(android.R.string.ok) { _, _ -> execute() }
-            setSingleChoiceItems(
-                themeNames, checkedId
-            ) { _, id -> checkedId = id }
-        }.create()
         // Init progress dialog
         progressDialog = createLoadingDialog(context, R.string.themes_progress)
     }
@@ -78,10 +67,21 @@ class ThemePickerDialog(
 
     private fun setTheme() { config.theme = themeKeys[checkedId]?.replace(".yaml", "") }
 
-    /** 调用该方法显示对话框 **/
+    /** 调用该方法显示对话框（現代類 Apple 單選） **/
     fun show() {
-        appendDialogParams(pickerDialog)
-        pickerDialog.show()
+        val items = themeNames.map { it ?: "" }
+        val checked = if (checkedId in items.indices) checkedId else 0
+        val d = com.hazukieq.hkrime.ime.dialog.ModernListDialog.singleChoice(
+            context,
+            context.getString(R.string.looks__selected_theme_title),
+            items,
+            checked,
+        ) { idx ->
+            checkedId = idx
+            execute()
+        }
+        appendDialogParams(d)
+        d.show()
     }
 
     private fun execute() = launch {

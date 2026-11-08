@@ -32,7 +32,6 @@ class SchemaPickerDialog(
     private lateinit var checkedStatus: BooleanArray
     private var schemaMapList: List<Map<String?, String?>>? = Rime.get_available_schema_list()
     private lateinit var schemaNames: Array<String?>
-    var pickerDialogBuilder: AlertDialog.Builder? = null
 
     private var progressDialog: ProgressDialog
 
@@ -53,39 +52,40 @@ class SchemaPickerDialog(
     }
 
     private fun showPickerDialog() {
-        pickerDialogBuilder = AlertDialog.Builder(context, R.style.AlertDialogTheme).apply {
-            setTitle(R.string.pref_schemas)
-            setCancelable(true)
-            setPositiveButton(android.R.string.ok, null)
+        if (schemaMapList.isNullOrEmpty() || !::schemaNames.isInitialized || schemaNames.isEmpty()) {
+            val d = com.hazukieq.hkrime.ime.dialog.ModernListDialog.confirm(
+                context,
+                context.getString(R.string.pref_schemas),
+                context.getString(R.string.no_schemas),
+            ) {}
+            appendDialogParams(d)
+            d.show()
+            return
         }
-        if (schemaMapList.isNullOrEmpty()) {
-            pickerDialogBuilder!!.setMessage(R.string.no_schemas)
-        } else {
-            pickerDialogBuilder!!.apply {
-                setNegativeButton(android.R.string.cancel, null)
-                setPositiveButton(android.R.string.ok) { _, _ ->
-                    progressDialog = createLoadingDialog(context, R.string.deploy_progress).also {
-                        appendDialogParams(it)
-                        it.show()
-                    }
-                    launch {
-                        try {
-                            setSchema()
-                        } catch (e: Exception) {
-                            Timber.e(e, "Failed to set schema")
-                        } finally {
-                            progressDialog.dismiss()
-                        }
-                    }
+        val items = schemaNames.map { it ?: "" }
+        val d = com.hazukieq.hkrime.ime.dialog.ModernListDialog.multiChoice(
+            context,
+            context.getString(R.string.pref_schemas),
+            items,
+            checkedStatus,
+        ) { flags ->
+            flags.copyInto(checkedStatus)
+            progressDialog = createLoadingDialog(context, R.string.deploy_progress).also {
+                appendDialogParams(it)
+                it.show()
+            }
+            launch {
+                try {
+                    setSchema()
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to set schema")
+                } finally {
+                    progressDialog.dismiss()
                 }
-                setMultiChoiceItems(
-                    schemaNames, checkedStatus
-                ) { _, id, isChecked -> checkedStatus[id] = isChecked }
             }
         }
-        val pickerDialog = pickerDialogBuilder!!.create()
-        appendDialogParams(pickerDialog)
-        pickerDialog.show()
+        appendDialogParams(d)
+        d.show()
     }
 
     private fun appendDialogParams(dialog: Dialog) {

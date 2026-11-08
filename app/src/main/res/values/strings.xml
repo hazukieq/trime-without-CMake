@@ -238,4 +238,8 @@
     <string name="export">Export</string>
     <string name="system">System</string>
     <string name="settings__system_toolkit">Toolkit</string>
+    <string name="pref__title">Settings</string>
+    <string name="back">Back</string>
+    <string name="deploy">Deploy</string>
+    <string name="about">About</string>
 </resources>

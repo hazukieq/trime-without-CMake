@@ -2,9 +2,63 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/launch_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".setup.LauchAct"
-    android:background="@mipmap/launchbg">
+    android:background="@drawable/launch_bg"
+    tools:context=".setup.LauchAct">
+
+    <ImageView
+        android:id="@+id/launch_icon"
+        android:layout_width="96dp"
+        android:layout_height="96dp"
+        android:contentDescription="@string/trime_app_name"
+        android:src="@mipmap/ic_app_icon"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.40" />
+
+    <TextView
+        android:id="@+id/launch_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:fontFamily="sans-serif"
+        android:letterSpacing="0.02"
+        android:text="@string/trime_app_name"
+        android:textColor="@color/modern_ink"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/launch_icon" />
+
+    <TextView
+        android:id="@+id/launch_tagline"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:letterSpacing="0.08"
+        android:text="Hakka Rime · 客語輸入"
+        android:textColor="@color/modern_ink2"
+        android:textSize="12sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/launch_name" />
+
+    <TextView
+        android:id="@+id/launch_version"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="44dp"
+        android:letterSpacing="0.06"
+        android:textColor="@color/modern_ink2"
+        android:textSize="12sp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        tools:text="v3.2.7" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

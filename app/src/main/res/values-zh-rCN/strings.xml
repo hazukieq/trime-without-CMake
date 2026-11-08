@@ -236,4 +236,8 @@
     <string name="app_crash">应用程序崩溃了</string>
     <string name="exception_logcat_created">Logcat 进程已创建</string>
     <string name="app_crash_message">抱歉，但我们提供了日志以供调查。</string>
+    <string name="pref__title">设置</string>
+    <string name="back">返回</string>
+    <string name="deploy">部署</string>
+    <string name="about">关于</string>
 </resources>

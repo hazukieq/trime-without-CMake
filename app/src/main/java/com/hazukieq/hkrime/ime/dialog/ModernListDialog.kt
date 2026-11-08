@@ -34,7 +34,17 @@ class ModernListDialog private constructor(
     private val actionMode: Boolean,
     private val onPick: (Int) -> Unit,
     private val onConfirm: (Int) -> Unit,
+    private val multi: Boolean = false,
+    initialChecked: BooleanArray? = null,
+    private val onConfirmMulti: ((BooleanArray) -> Unit)? = null,
+    private val message: String? = null,
+    private val contentView: View? = null,
+    private val singleOk: Boolean = false,
 ) : Dialog(context) {
+
+    private val checkedFlags: BooleanArray? = initialChecked?.copyOf()
+    private fun isChecked(index: Int): Boolean =
+        if (checkedFlags != null) checkedFlags[index] else index == checkedIndex
 
     private var currentIndex = checkedIndex
     private val checks = ArrayList<View>()
@@ -52,6 +62,7 @@ class ModernListDialog private constructor(
         val root = FrameLayout(context)
         val card = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
+            elevation = 0f
             background = GradientDrawable().apply {
                 cornerRadius = dp(22).toFloat()
                 setColor(surface)
@@ -59,6 +70,16 @@ class ModernListDialog private constructor(
         }
 
         card.addView(buildTitle())
+        if (!message.isNullOrBlank()) card.addView(buildMessage())
+        contentView?.let { v ->
+            card.addView(
+                v,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { leftMargin = dp(20); rightMargin = dp(20); bottomMargin = dp(16) },
+            )
+        }
         items.forEachIndexed { index, _ -> card.addView(buildRow(index)) }
         card.addView(buildButtons())
 
@@ -73,8 +94,10 @@ class ModernListDialog private constructor(
             },
         )
         setContentView(root)
-        window?.setBackgroundDrawableResource(android.R.color.transparent)
+        // 取消一切窗口陰影（含系統默認的 dialog frame），只保留 0.4 dim。
+        window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
         window?.setDimAmount(0.4f)
+        window?.setElevation(0f)
         window?.setGravity(Gravity.CENTER)
         window?.setLayout(
             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -92,6 +115,14 @@ class ModernListDialog private constructor(
         setPadding(0, dp(22), 0, dp(18))
     }
 
+    private fun buildMessage(): View = TextView(context).apply {
+        text = message
+        textSize = 14f
+        setTextColor(ink)
+        setLineSpacing(dp(3).toFloat(), 1f)
+        setPadding(dp(24), 0, dp(24), dp(18))
+    }
+
     private fun buildRow(index: Int): View {
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -107,16 +138,29 @@ class ModernListDialog private constructor(
             setPadding(0, dp(15), 0, dp(15))
         }
         row.addView(label, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        val check = CheckMark(context, accent)
-        check.visibility = if (index == checkedIndex) View.VISIBLE else View.INVISIBLE
+        val check = TextView(context).apply {
+            text = "\u2713"
+            textSize = 17f
+            setTextColor(accent)
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            gravity = Gravity.CENTER
+        }
+        check.visibility = if (isChecked(index)) View.VISIBLE else View.INVISIBLE
         row.addView(check, LinearLayout.LayoutParams(dp(22), dp(22)))
         row.setOnClickListener {
-            if (actionMode) {
-                onPick(index)
-                dismiss()
-            } else {
-                currentIndex = index
-                refreshChecks()
+            when {
+                actionMode -> {
+                    onPick(index)
+                    dismiss()
+                }
+                multi -> {
+                    checkedFlags?.let { it[index] = !it[index] }
+                    refreshChecks()
+                }
+                else -> {
+                    currentIndex = index
+                    refreshChecks()
+                }
             }
         }
         checks.add(check)
@@ -143,7 +187,12 @@ class ModernListDialog private constructor(
         addView(
             LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
-                if (actionMode) {
+                if (singleOk) {
+                    addView(
+                        button(android.R.string.ok, true) { dismiss() },
+                        LinearLayout.LayoutParams(0, dp(48), 1f),
+                    )
+                } else if (actionMode) {
                     // 點行即生效，底部只留「取消」，避免出現一個沒意義的「確定」。
                     addView(
                         button(android.R.string.cancel, false) { dismiss() },
@@ -182,7 +231,7 @@ class ModernListDialog private constructor(
 
     private fun refreshChecks() {
         checks.forEachIndexed { index, view ->
-            view.visibility = if (index == currentIndex) View.VISIBLE else View.INVISIBLE
+            view.visibility = if (isChecked(index)) View.VISIBLE else View.INVISIBLE
         }
     }
 
@@ -237,6 +286,44 @@ class ModernListDialog private constructor(
             onPick = {}, onConfirm = { onConfirm.onIndex(it) },
         )
 
+        /** 多選：勾選多個後按「確定」回調。 */
+        @JvmStatic
+        @JvmOverloads
+        fun multiChoice(
+            context: Context,
+            title: String,
+            items: List<String>,
+            checked: BooleanArray,
+            onConfirm: (BooleanArray) -> Unit,
+        ): ModernListDialog = ModernListDialog(
+            context, title, items, -1, actionMode = false,
+            onPick = {}, onConfirm = {},
+            multi = true, initialChecked = checked, onConfirmMulti = onConfirm,
+        )
+
+        /** 內容型對話框：標題 + 自訂 View（如授權網頁）+ 確定。 */
+        @JvmStatic
+        fun custom(
+            context: Context,
+            title: String,
+            view: View,
+        ): ModernListDialog = ModernListDialog(
+            context, title, emptyList(), -1, actionMode = false,
+            onPick = {}, onConfirm = {}, contentView = view, singleOk = true,
+        )
+
+        /** 確認型對話框：標題 + 說明 + 取消/確定。 */
+        @JvmStatic
+        fun confirm(
+            context: Context,
+            title: String,
+            message: String,
+            onConfirm: OnIndex,
+        ): ModernListDialog = ModernListDialog(
+            context, title, emptyList(), -1, actionMode = false,
+            onPick = {}, onConfirm = { onConfirm.onIndex(it) }, message = message,
+        )
+
         /** 點行立即回調並關閉（方案開關）。 */
         @JvmStatic
         fun actionList(
@@ -244,9 +331,19 @@ class ModernListDialog private constructor(
             title: String,
             items: List<String>,
             onPick: OnIndex,
+        ): ModernListDialog = actionList(context, title, items, null, onPick)
+
+        /** 帶說明文字的 action 列表（如「沒有啟用方案」）。 */
+        @JvmStatic
+        fun actionList(
+            context: Context,
+            title: String,
+            items: List<String>,
+            message: String?,
+            onPick: OnIndex,
         ): ModernListDialog = ModernListDialog(
             context, title, items, -1, actionMode = true,
-            onPick = { onPick.onIndex(it) }, onConfirm = {},
+            onPick = { onPick.onIndex(it) }, onConfirm = {}, message = message,
         )
     }
 }

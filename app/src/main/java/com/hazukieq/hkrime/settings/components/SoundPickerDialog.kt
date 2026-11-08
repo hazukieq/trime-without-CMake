@@ -18,14 +18,13 @@ import kotlinx.coroutines.withContext
 
 // show sound schema list
 class SoundPickerDialog(
-    context: Context
+    private val context: Context
 ) : CoroutineScope by MainScope() {
 
     private val config = Config.get(context)
     private val soundPackageFiles: Array<String?>
     private val soundPackageNames: Array<String?>
     private var checkedId: Int = 0
-    val pickerDialog: AlertDialog
 
     private val progressDialog: ProgressDialog
 
@@ -36,16 +35,6 @@ class SoundPickerDialog(
 
         soundPackageNames = Config.getYamlFileNames(soundPackageFiles)
 
-        // Init picker
-        pickerDialog = AlertDialog.Builder(context, R.style.AlertDialogTheme).apply {
-            setTitle(R.string.keyboard__key_sound_package_title)
-            setCancelable(true)
-            setNegativeButton(android.R.string.cancel, null)
-            setPositiveButton(android.R.string.ok) { _, _ -> execute() }
-            setSingleChoiceItems(
-                soundPackageNames, checkedId
-            ) { _, id -> checkedId = id }
-        }.create()
         // Init progress dialog
         progressDialog = createLoadingDialog(context, R.string.sound_progress)
     }
@@ -68,10 +57,21 @@ class SoundPickerDialog(
             config.soundPackage = soundPackageFiles[checkedId]?.replace(".sound.yaml", "")
     }
 
-    /** 调用该方法显示对话框 **/
+    /** 调用该方法显示对话框（現代類 Apple 單選） **/
     fun show() {
-        appendDialogParams(pickerDialog)
-        pickerDialog.show()
+        val items = soundPackageNames.map { it ?: "" }
+        val checked = if (checkedId in items.indices) checkedId else 0
+        val d = com.hazukieq.hkrime.ime.dialog.ModernListDialog.singleChoice(
+            context,
+            context.getString(R.string.keyboard__key_sound_package_title),
+            items,
+            checked,
+        ) { idx ->
+            checkedId = idx
+            execute()
+        }
+        appendDialogParams(d)
+        d.show()
     }
 
     private fun execute() = launch {

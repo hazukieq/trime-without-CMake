@@ -84,35 +84,94 @@ class DialogSeekBarPreference : Preference {
      * Shows the seek bar dialog.
      */
     private fun showSeekBarDialog() {
-        val dialogView = SeekBarDialogBinding.inflate(LayoutInflater.from(context))
-        val initValue = currentValue
-        dialogView.seekBar.max = actualValueToSeekBarProgress(max)
-        dialogView.seekBar.progress = actualValueToSeekBarProgress(initValue)
-        dialogView.seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+        val ctx = context
+        val density = ctx.resources.displayMetrics.density
+        fun dp(v: Number): Int = (v.toFloat() * density + 0.5f).toInt()
+        val night = (ctx.resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        val surface = if (night) 0xFF1C1C1E.toInt() else android.graphics.Color.WHITE
+        val ink = if (night) 0xFFF2F2F7.toInt() else 0xFF1C1C1E.toInt()
+        val ink2 = 0xFF8E8E93.toInt()
+        val accent = if (night) 0xFF0A84FF.toInt() else 0xFF007AFF.toInt()
+        val hairline = if (night) 0xFF38383A.toInt() else 0xFFE5E5EA.toInt()
+
+        val dialog = android.app.Dialog(ctx)
+        val root = android.widget.FrameLayout(ctx)
+        val card = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(22).toFloat(); setColor(surface)
+            }
+        }
+        card.addView(android.widget.TextView(ctx).apply {
+            text = title; textSize = 17f; setTextColor(ink)
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, dp(22), 0, dp(6))
+        })
+        val valueView = android.widget.TextView(ctx).apply {
+            textSize = 26f; setTextColor(ink); gravity = android.view.Gravity.CENTER
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            setPadding(0, dp(8), 0, dp(4))
+            text = getTextForValue(currentValue)
+        }
+        card.addView(valueView)
+        val seek = androidx.appcompat.widget.AppCompatSeekBar(ctx).apply {
+            max = actualValueToSeekBarProgress(max)
+            progress = actualValueToSeekBarProgress(currentValue)
+            progressTintList = android.content.res.ColorStateList.valueOf(accent)
+            thumbTintList = android.content.res.ColorStateList.valueOf(accent)
+            setPadding(dp(24), dp(12), dp(24), dp(12))
+        }
+        seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                dialogView.value.text = getTextForValue(seekBarProgressToActualValue(progress))
+                valueView.text = getTextForValue(seekBarProgressToActualValue(progress))
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
-        dialogView.value.text = getTextForValue(initValue)
-        AlertDialog.Builder(context).apply {
-            setTitle(this@DialogSeekBarPreference.title)
-            setCancelable(true)
-            setView(dialogView.root)
-            setPositiveButton(android.R.string.ok) { _, _ ->
-                val actualValue = seekBarProgressToActualValue(dialogView.seekBar.progress)
-                if (callChangeListener(actualValue)) {
-                    sharedPreferences?.edit()?.putInt(key, actualValue)?.apply()
-                    summary = getTextForValue(currentValue)
-                }
+        card.addView(seek)
+        card.addView(android.view.View(ctx).apply { setBackgroundColor(hairline) },
+            android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, 1))
+        val buttons = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            minimumHeight = dp(48)
+        }
+        fun button(label: String, bold: Boolean, onClick: () -> Unit) =
+            android.widget.TextView(ctx).apply {
+                text = label; textSize = 17f; setTextColor(accent)
+                gravity = android.view.Gravity.CENTER
+                typeface = android.graphics.Typeface.create(
+                    android.graphics.Typeface.DEFAULT,
+                    if (bold) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+                setOnClickListener { onClick() }
             }
-            setNeutralButton(R.string.pref__default) { _, _ ->
-                sharedPreferences?.edit()?.putInt(key, defaultValue)?.apply()
+        buttons.addView(button(ctx.getString(android.R.string.cancel), false) { dialog.dismiss() },
+            android.widget.LinearLayout.LayoutParams(0, dp(48), 1f))
+        buttons.addView(button(ctx.getString(R.string.pref__default), false) {
+            sharedPreferences?.edit()?.putInt(key, defaultValue)?.apply()
+            summary = getTextForValue(currentValue)
+            dialog.dismiss()
+        }, android.widget.LinearLayout.LayoutParams(0, dp(48), 1f))
+        buttons.addView(button(ctx.getString(android.R.string.ok), true) {
+            val actualValue = seekBarProgressToActualValue(seek.progress)
+            if (callChangeListener(actualValue)) {
+                sharedPreferences?.edit()?.putInt(key, actualValue)?.apply()
                 summary = getTextForValue(currentValue)
             }
-            setNegativeButton(android.R.string.cancel, null)
-        }.show()
+            dialog.dismiss()
+        }, android.widget.LinearLayout.LayoutParams(0, dp(48), 1f))
+        card.addView(buttons)
+
+        root.addView(card, android.widget.FrameLayout.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply { leftMargin = dp(32); rightMargin = dp(32); topMargin = dp(24); bottomMargin = dp(24) })
+        dialog.setContentView(root)
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.window?.setDimAmount(0.4f)
+        dialog.show()
     }
 
     /**

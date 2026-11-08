@@ -1365,46 +1365,23 @@ public class Trime extends LifecycleInputMethodService {
   }
 
   public void showOptionsDialog() {
-    final AlertDialog.Builder dialogBuilder =
-        new AlertDialog.Builder(this, R.style.AlertDialogTheme);
-    dialogBuilder
-        .setTitle(R.string.trime_app_name)
-        .setIcon(R.mipmap.ic_app_icon)
-        .setCancelable(true)
-        .setNegativeButton(
-            R.string.other_ime,
-            (dialog, which) -> {
-              dialog.dismiss();
-              if (imeManager != null) {
+    final String message =
+        Rime.get_current_schema().contentEquals(".default") ? getString(R.string.no_schemas) : null;
+    final com.hazukieq.hkrime.ime.dialog.ModernListDialog dialog =
+        com.hazukieq.hkrime.ime.dialog.ModernListDialog.actionList(
+            this,
+            getString(R.string.trime_app_name),
+            java.util.Arrays.asList(
+                getString(R.string.set_ime), getString(R.string.other_ime)),
+            message,
+            index -> {
+              if (index == 0) {
+                launchSettings();
+              } else if (imeManager != null) {
                 imeManager.showInputMethodPicker();
               }
-            })
-        .setPositiveButton(
-            R.string.set_ime,
-            (dialog, which) -> {
-              launchSettings();
-              dialog.dismiss();
             });
-    if (Rime.get_current_schema().contentEquals(".default")) {
-      dialogBuilder.setMessage(R.string.no_schemas);
-    } else {
-      dialogBuilder
-          .setNegativeButton(
-              R.string.pref_schemas,
-              (dialog, which) -> {
-                showSchemaDialog();
-                dialog.dismiss();
-              })
-          .setSingleChoiceItems(
-              Rime.getSchemaNames(),
-              Rime.getSchemaIndex(),
-              (dialog, id) -> {
-                dialog.dismiss();
-                Rime.selectSchema(id);
-                textInputManager.setShouldUpdateRimeOption(true);
-              });
-    }
-    showDialog(dialogBuilder.create());
+    showDialog(dialog);
   }
 
   /**

@@ -960,3 +960,31 @@ BFS 隊列峰值 766 —— 也就是說 37ms 全是簡拼圖 BFS 的展開成�
 接入：`Trime.showColorDialog()`（單選 + 確定後 `initKeyboard()` 立即生效）、
 `Trime.showSchemaSwitchDialog()`（action 模式，點行 `Rime.toggleOption`）。
 `ColorPickerDialog` 僅 settings 仍在用，IME 內不再走它。
+
+## 15.16 類 Apple 現代化：啟動頁 / 設置頁 / 全部對話框（2026-11-09）
+
+用戶：「所有对话框都是哦…然后IME设置也全面改造，启动页也重新设计。」
+
+- **設計 token**（`values/colors.xml` + `values-night/colors.xml`）：
+  `modern_bg` #F2F2F7/#000000、`modern_surface` #FFFFFF/#1C1C1E、
+  `modern_ink` #1C1C1E/#F2F2F7、`modern_ink2` #8E8E93、
+  `modern_hairline` #E5E5EA/#38383A、`modern_accent` #007AFF/#0A84FF、
+  `modern_icon_bg` #EEF3FF/#1E2A44、`launch_bg_start/end`。
+- **啟動頁**：`drawable/launch_bg.xml`（+ night）豎直漸變；`layout/activity_lauch.xml`
+  96dp 圖標（垂直 bias 0.40）、26sp 粗體應用名、tagline「Hakka Rime · 客語輸入」、
+  底部版本號；`LaunchTheme` 透明系統欄 + 淺色模式深色圖標；`LauchAct.playIntro()`
+  圖標淡入 + 0.92→1 放大 420ms、文字延時淡入；onCreate 統一 520ms 後分流
+  （已初始化 → `PrefMainActivity`，否則權限引導）。launcher alias 的 target
+  改為 `.setup.LauchAct`，`PrefMainActivity` 不再自己再開一次啟動頁。
+- **設置頁**：`layout/pref_activity.xml` 改大標題頭（返回 / 30sp Bold 標題 /
+  副標題 / 右上部署與關於）；`PrefMainActivity` 去掉 Toolbar，header 隨 Fragment
+  堆疊更新、返回鍵走 `popBackStack()`、狀態欄融入 `modern_bg`（淺色模式深色圖標）。
+- **Preference 樣式**：`ModernPreferenceTheme`（PreferenceThemeOverlay.v14.Material）
+  + `ModernPreference*` 六個樣式指向 `pref_modern_row.xml`（58dp、30dp tint 圖標、
+  16sp 標題、13sp summary）與 `pref_modern_category.xml`；卡片 14dp 圓角 + ripple。
+- **全部對話框換成 ModernListDialog**（單選/多選/actionList/confirm/custom 五種模式）：
+  配色、主題、情色方案（SoundPicker）、方案選擇（SchemaPicker，帶初始化進度）、
+  重置資源（ResetAssets）、IME 長按菜單、SeekBar 偏好（26sp 數值 + accent SeekBar）、
+  崩潰提示、開源/庫授權（WebView 320dp）、初始化跳過確認。
+- 對話框**取消一切陰影**（窗口背景透明 + 卡片 elevation 0），只保留 0.4 dim 與
+  選項行的按壓 ripple。

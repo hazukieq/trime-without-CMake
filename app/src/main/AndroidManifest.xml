@@ -25,7 +25,8 @@
         android:enableOnBackInvokedCallback="false"
         tools:targetApi="tiramisu">
         <activity
-            android:name=".setup.LauchAct">
+            android:name=".setup.LauchAct"
+            android:theme="@style/LaunchTheme">
         </activity>
 
         <service
@@ -60,7 +61,7 @@
             android:exported="true"
             android:label="@string/trime_app_name"
             android:launchMode="singleTask"
-            android:targetActivity=".settings.PrefMainActivity">
+            android:targetActivity=".setup.LauchAct">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.DEFAULT" />
