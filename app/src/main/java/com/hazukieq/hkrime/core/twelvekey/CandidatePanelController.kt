@@ -75,6 +75,14 @@ class CandidatePanelController(
             return
         }
         activeGroup = 0
+        showFollowingBar()
+    }
+
+    /** 開面板時跟隨候選條第一條的讀音（而不是永遠第 0 組）。 */
+    private var followBarOnNextSubmit = false
+
+    fun showFollowingBar() {
+        followBarOnNextSubmit = true
         show()
     }
 
@@ -110,9 +118,13 @@ class CandidatePanelController(
         val inputChanged = next.input != lastInput
         if (inputChanged) lastInput = next.input
 
-        if (inputChanged) {
-            // 新按鍵/新輸入：回到第 0 組
-            activeGroup = 0
+        if (followBarOnNextSubmit) {
+            // 剛打開面板：與候選條第一條對齐（避免「條上是 nzin、面板開在 nzi」）。
+            followBarOnNextSubmit = false
+            activeGroup = preferredGroup(next)
+        } else if (inputChanged) {
+            // 新按鍵/新輸入：預設跟隨候選條第一條所在的組。
+            activeGroup = preferredGroup(next)
         } else {
             // 連續消費：input 不變、groups 變了；當前讀音還在就保持，否則回第 0 組。
             val keep = if (previousReading != null) {
@@ -131,6 +143,15 @@ class CandidatePanelController(
         if (!isShown) return
         // 不 scroll：DiffUtil 原地更新，保持用戶當前滾動位置。
         render(scrollGrid = false, scrollGroups = false)
+    }
+
+    /** 候選條第一條所屬的組；找不到就退回第 0 組。 */
+    private fun preferredGroup(next: TwelveKeySnapshot): Int {
+        val first = next.barEntries.firstOrNull() ?: return 0
+        val idx = next.groups.indexOfFirst { group ->
+            group.items.any { it.index == first.index && it.text == first.text }
+        }
+        return if (idx >= 0) idx else 0
     }
 
     /** 舊路徑（非 12 鍵）兼容：直接給已算好的左列/右格。 */

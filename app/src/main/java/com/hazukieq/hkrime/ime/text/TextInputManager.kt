@@ -272,7 +272,7 @@ class TextInputManager private constructor() :
             val snapshot = twelveKeyController?.snapshot
             if (snapshot == null || (!snapshot.hasCandidates && snapshot.fallback == null)) return
         }
-        candidatePanelController?.show()
+        candidatePanelController?.showFollowingBar()
         // 面板要完整分組：開面板時全量枚舉一次
         if (isTwelveKeyMode()) twelveKeyController?.refresh(immediate = true, full = true)
         candidateView?.setPanelOpen(candidatePanelController?.isShown == true)

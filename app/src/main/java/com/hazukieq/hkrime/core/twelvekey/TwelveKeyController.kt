@@ -169,7 +169,12 @@ class TwelveKeyController(
 
     companion object {
         /** 面板關閉時只枚舉候選條需要的條數：避免每次按鍵都全量枚舉 600 條（按鍵卡頓）。 */
-        private const val BAR_CANDIDATES = 16
+        /**
+         * 候選條枚舉上限：必須與面板一致（2026-11-09 用戶反饋「展開面板後固定候選區會變」）。
+         * 之前面板關時只枚舉 16 條，開面板換成 600 條，學習排序在更大的集合裡重排，
+         * 候選條前幾名就跳了。統一成全量枚舉，兩邊永遠同一份數據。
+         */
+        private const val BAR_CANDIDATES = TwelveKeySnapshotBuilder.MAX_CANDIDATES
         /**
          * librime session 非線程安全：後台枚舉與 UI 線程的 process_key / get_context 必須串行。
          * 鍵盤事件入口（TextInputManager.onEvent 等）也持同一把鎖。
