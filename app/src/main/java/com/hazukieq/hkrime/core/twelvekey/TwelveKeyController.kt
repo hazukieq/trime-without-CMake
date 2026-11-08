@@ -60,9 +60,11 @@ class TwelveKeyController(
     fun refresh(immediate: Boolean = false) {
         val gen = ++generation
         refreshJob?.cancel()
-        refreshJob = scope.launch {
+        // 直接派到 Default：避免「先排到 Main 佇列、再 withContext(Default)」多一次主線程來回，
+        // 按鍵到候選條落地可以少 1 幀左右（實測 30ms 級）。
+        refreshJob = scope.launch(Dispatchers.Default) {
             if (!immediate) delay(DEBOUNCE_MS)
-            val result = withContext(Dispatchers.Default) {
+            val result = run {
                 synchronized(ENGINE_LOCK) {
                     runCatching {
                         val local = TwelveKeySnapshotBuilder.local()
@@ -71,7 +73,16 @@ class TwelveKeyController(
                         } else {
                             val key = TwelveKeySnapshotBuilder.cacheKey(local)
                             val cached = cacheLookup(key) { it }
+                            val t0 = System.nanoTime()
                             val built = cached ?: TwelveKeySnapshotBuilder.build(local)
+                            if (com.hazukieq.hkrime.BuildConfig.DEBUG) {
+                                Timber.d(
+                                    "twelvekey:build %s cached=%s ms=%.1f",
+                                    key,
+                                    cached != null,
+                                    (System.nanoTime() - t0) / 1e6,
+                                )
+                            }
                             if (cached == null) cachePut(key, built)
                             Triple(local, built, true)
                         }
@@ -80,11 +91,10 @@ class TwelveKeyController(
             } ?: return@launch
             if (gen != generation) return@launch
             val (local, built, _) = result
-            if (local.isEmpty) {
-                emit(TwelveKeySnapshot.EMPTY)
-                return@launch
+            withContext(Dispatchers.Main.immediate) {
+                if (gen != generation) return@withContext
+                if (local.isEmpty) emit(TwelveKeySnapshot.EMPTY) else emit(built)
             }
-            emit(built)
         }
     }
 

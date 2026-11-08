@@ -7,6 +7,8 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import com.hazukieq.hkrime.core.Rime
 import com.hazukieq.hkrime.core.twelvekey.CandidateBarBinder
+import com.hazukieq.hkrime.core.twelvekey.CandidateItem
+import com.hazukieq.hkrime.core.twelvekey.Fallback
 import com.hazukieq.hkrime.core.twelvekey.CandidatePanelController
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeyController
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshot
@@ -66,6 +68,7 @@ class TextInputManager private constructor() :
     private var twelveKeyController: TwelveKeyController? = null
     private var candidatePanelController: CandidatePanelController? = null
     private var candidateBarBinder: CandidateBarBinder? = null
+
 
     var candidateRoot: ScrollView? = null
     var candidateView: Candidate? = null
@@ -285,8 +288,18 @@ class TextInputManager private constructor() :
 
     /** 12 鍵快照落地：條與面板同源，面板保持打開直到輸入清空。 */
     private fun onTwelveKeySnapshot(snapshot: TwelveKeySnapshot) {
-        // 空快照也走 bind：候選條保持「外部快照」模式，只畫 ☰ / 配色 / ⌄，
-        // 不再回落到 Rime 的方案開關列表。
+        if (lastKeyAtNs != 0L) {
+            // 量「按鍵 → 候選條落地」延遲：debug 版才印，release 不產生字串
+            if (com.hazukieq.hkrime.BuildConfig.DEBUG) {
+                Timber.d(
+                    "twelvekey:latency %.1fms input=[%s] items=%d",
+                    (System.nanoTime() - lastKeyAtNs) / 1e6,
+                    snapshot.input,
+                    snapshot.barItems.size,
+                )
+            }
+            lastKeyAtNs = 0L
+        }
         candidateBarBinder?.bind(snapshot)
         candidatePanelController?.submit(snapshot)
         if (snapshot.isEmpty || (!snapshot.hasCandidates && snapshot.fallback == null)) {
@@ -332,8 +345,9 @@ class TextInputManager private constructor() :
     /** 候選刷新後呼叫：12 鍵重建快照；其它方案只刷新展開面板。 */
     fun onCandidatesRefreshed() {
         if (isTwelveKeyMode()) {
-            // 未組字時 refresh() 會 emit EMPTY，候選條顯示 ☰ / 配色 / ⌄
-            twelveKeyController?.refresh()
+            // 按鍵後立即重建快照（不 debounce）：實測枚舉只要 2–20ms，等 120ms 反而
+            // 讓候選條落後於按鍵（用戶反饋「候選詞顯示有延遲」）。
+            twelveKeyController?.refresh(immediate = true)
             return
         }
         candidateBarBinder?.clear()
@@ -558,7 +572,11 @@ class TextInputManager private constructor() :
     }
 
     // KeyboardEvent 处理软键盘事件
+    /** 最近一次按鍵的時間戳（ns）：用來量「按鍵 → 候選條落地」的延遲。 */
+    private var lastKeyAtNs = 0L
+
     override fun onEvent(event: Event?) {
+        lastKeyAtNs = System.nanoTime()
         withEngineLock { onEventLocked(event) }
     }
 
