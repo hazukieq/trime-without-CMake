@@ -140,6 +140,13 @@ class SchemaPickerDialog(
             checkedIds.toArray(schemaIdList)
             Rime.select_schemas(schemaIdList)
             RimeUtils.deploy(context)
+            // 部署後方案清單可能變了（當前方案被停用時引擎會回退到清單第一項），
+            // 但輸入法的鍵盤/候選 UI 不會自己跟著換：這裡補一次重綁。
+            // 與 SchemaEvent 通知走同一個入口（initKeyboard = reset + bind + updateComposing）。
+            withContext(Dispatchers.Main) {
+                runCatching { Trime.getServiceOrNull()?.initKeyboard() }
+                    .onFailure { Timber.e(it, "Failed to rebind keyboard after schema deploy") }
+            }
         }
     }
 

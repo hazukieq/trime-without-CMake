@@ -1147,3 +1147,25 @@ ni, ni hau 才对。当选了 ni 之后应该剩下 hau，和 12 键逻辑一致
 - 真機驗收：輸入中 `/`、`、` 鍵面分別為 `↑`、`↓`，按任一個都展開面板（左列讀音、
   右格候選、rail 豎線滿高）；面板右下角 ⌫ 可連續刪碼（`nzia` → `nzi` → … → 清空並
   自動收起）；非輸入狀態 `/`、`、` 仍是標點鍵；候選條高度 84px 不變。
+
+## 15.23 「啟用 / 停用方案…」點確定沒反應（2026-11-09）
+
+用戶：「當現在選擇的方案選擇關閉啟用，卻不生效。哪怕啟用其他方案也不生效。」
+
+- 根因在 `ModernListDialog`：多選模式（`multi = true`）的「確定」按鈕只調了
+  `onConfirm(currentIndex)`，**從未調 `onConfirmMulti(checkedFlags)`** —— 勾選狀態
+  收不回調用方。`SchemaPickerDialog` 正是靠 `onConfirmMulti` 去跑
+  `Rime.select_schemas(...)` + `RimeUtils.deploy(...)`，所以整個流程等於空轉：
+  `default.custom.yaml` 不會被改寫、引擎不會重新部署。
+  修法：確定按鈕在 `checkedFlags != null` 時調
+  `onConfirmMulti?.invoke(it.copyOf())`（在 `dismiss()` 之前）。
+- 第二個坑：部署後 `RimeUtils.deploy` 會 destroy + 重建 Rime（full deploy），
+  但輸入法的鍵盤/候選 UI 不會自己跟著換。當前方案被停用時引擎會回退到
+  `schema_list` 第一項，畫面卻還停在舊鍵盤。修法：部署完在 Main 執行緒補一次
+  `Trime.getServiceOrNull()?.initKeyboard()`（= reset + bindKeyboardToInputView +
+  updateComposing，與 SchemaEvent 通知同一入口）。
+- 真機驗收：
+  - 停用當前方案「雲龍國際音標」→ `default.custom.yaml` 的 `schema_list` 立刻少一項，
+    「輸入方案」選單同步只剩已啟用項且「（當前）」自動變成清單第一項「客語12鍵」；
+  - 停用「客語12鍵」同時勾上「朙月拼音」→ 清單變成 `[hakka_qwerty, luna_pinyin]`，
+    鍵盤不等重啟就切到客語 26 鍵，朙月拼音可正常出候選（妮/你/尼…）。

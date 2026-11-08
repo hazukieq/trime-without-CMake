@@ -250,6 +250,9 @@ class ModernListDialog private constructor(
                         button(android.R.string.ok, true) {
                             onConfirmInput?.invoke(inputField?.text?.toString() ?: "")
                             onConfirm(currentIndex)
+                            // 多選確定：把勾選狀態交回調用方（之前漏了這一步，導致
+                            // 「啟用 / 停用方案…」點確定後什麼都不會發生）
+                            checkedFlags?.let { onConfirmMulti?.invoke(it.copyOf()) }
                             dismiss()
                         },
                         LinearLayout.LayoutParams(0, dp(48), 1f),
