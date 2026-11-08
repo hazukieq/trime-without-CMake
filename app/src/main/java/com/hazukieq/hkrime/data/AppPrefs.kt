@@ -365,11 +365,17 @@ class AppPrefs(
             return migrated
         }
 
+        /**
+         * shared 與 user 都放公共存儲（和上游 Trime 的 /sdcard/rime 佈局一致）：
+         * 部署時 assets 會複製到這裡，用戶可以直接改 yaml；舊版默認在私有目錄，
+         * 這裡一併遷到 /sdcard/hkrime，避免「/sdcard/hkrime 裡沒有方案文件」的困惑。
+         */
         var sharedDataDir: String
-            get() = dirPref(SHARED_DATA_DIR, "$EXTERNAL_PATH_PREFIX/$DEFAULT_DIR_NAME")
+            get() = dirPref(SHARED_DATA_DIR, "/sdcard/$DEFAULT_DIR_NAME")
             set(v) = prefs.setPref(SHARED_DATA_DIR, v)
+        /** 用戶數據放公共存儲（和上游一致：/sdcard/<dir>），方便用戶自己改 yaml；shared 才用私有目錄。 */
         var userDataDir: String
-            get() = dirPref(USER_DATA_DIR, "$EXTERNAL_PATH_PREFIX/$DEFAULT_DIR_NAME")
+            get() = dirPref(USER_DATA_DIR, "/sdcard/$DEFAULT_DIR_NAME")
             set(v) = prefs.setPref(USER_DATA_DIR, v)
         var syncBackgroundEnabled: Boolean
             get() = prefs.getPref(SYNC_BACKGROUND_ENABLED, false)
