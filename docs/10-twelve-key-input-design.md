@@ -922,3 +922,11 @@ BFS 隊列峰值 766 —— 也就是說 37ms 全是簡拼圖 BFS 的展開成�
   `toggle()` 與 `showCandidatePanel()` 兩條入口都走這個邏輯。
 
 真機驗證：`nz` → 條 `人肉月年让而`（`nzin`）；點箭頭開面板，條不變、左列選中 `nzin`。
+
+## 15.13 關閉固定候選欄的拼音提示（2026-11-09）
+
+用戶：「关闭固定候选栏的第一个汉字拼音提示，不需要了」。
+
+`CandidateBarBinder.bind()` 綁定前 `candidateView.setShowComment(false)`（`clear()` 時恢復 true），
+固定候選欄只顯示漢字、不再畫第一條的 comment；候選條高度也隨之少一行 comment。
+展開面板的拼音規則不變（多讀音組才顯示）。

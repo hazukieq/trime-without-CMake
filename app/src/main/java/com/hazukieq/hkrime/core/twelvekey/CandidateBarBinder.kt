@@ -21,11 +21,14 @@ class CandidateBarBinder(private val candidateView: Candidate?) {
         if (entries.isEmpty() && fallback != null) {
             entries.add(Candidate.BarEntry(fallback.letters, fallback.rawCode))
         }
+        // 固定候選欄不再顯示拼音提示（用戶 2026-11-09：「关闭固定候选栏的第一个汉字拼音提示」）。
+        view.setShowComment(false)
         view.setCandidates(entries)
     }
 
     /** 離開 12 鍵路徑時恢復「候選條自己找 Rime.getCandidates()」的舊行為。 */
     fun clear() {
+        candidateView?.setShowComment(true)
         candidateView?.clearExternalCandidates()
     }
 }
