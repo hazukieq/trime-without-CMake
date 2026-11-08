@@ -12,6 +12,8 @@ data class CandidateItem(
     val text: String,
     val comment: String,
     val index: Int,
+    /** >=0 表示「分詞後按段選字」的字典候選（index=-1，不來自引擎）；值為段序號。 */
+    val segment: Int = -1,
 )
 
 /** 左列一個音節組：reading 是精確拼音（comment），items 是該讀音下的全部候選。 */
@@ -19,6 +21,8 @@ data class SyllableGroup(
     val reading: String,
     val syllables: List<String>,
     val items: List<CandidateItem>,
+    /** >=0 表示這組是「分詞段」的字典候選（按段選字）而不是引擎候選組。 */
+    val segment: Int = -1,
 ) {
     val size: Int get() = items.size
 }

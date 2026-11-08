@@ -1445,3 +1445,32 @@ BuildConfig.DEBUG 的 D 级打，现场难抓）；`TextInputManager.onCandidate
 20s 卡死而關），加上 librime 簡拼性能補丁在 `has_abbrev` 時跳過句子裝配，
 所以分段後仍然只有第一段的候選；要讓「分詞後的後半段也能出候選」需要 App 側把每段
 當獨立預輸入分別查引擎（待做）。
+
+## 15.33 分詞後按段選字（2026-11-09）
+
+**問題**：12 鍵把 700+ 音節壓進 12 個碼位，碼串到音節的切分天然多義 —— `kl`+`def`
+打出來是碼串 `5e`，而 `5e` 正好是音節 `le` 的編碼，於是引擎按詞頻把兩個鍵合成一個
+音節 `le`，第二段的聯想就沒了。按「分詞」鍵插入 `'` 後引擎確實分段（日誌
+`simulate key sequence = true, input = '`），但 12 鍵方案 `translator/enable_sentence`
+一直是 false（早期為躲 abbreviate 詞庫 DFS 20s 卡死），加上 librime 簡拼性能補丁在
+`has_abbrev` 時跳過句子裝配，所以分段後仍然只有第一段能出候選。
+
+**做法（App 側，完全不動碼表/詞庫）**：
+1. `core/TwelveKeyPreedit.kt` 補兩個索引與接口：
+   - `codeToSyllables`（段碼 → 所有匹配音節，精確優先、其次簡拼前綴，按字典頻次降序）
+   - `syllableToChars`（音節 → 該讀音的字，字典順序去重）
+   - `syllablesForSegment(code, limit)` / `charsForSyllable(syllable, limit)`
+2. `core/twelvekey/TwelveKeySnapshotBuilder.kt`：`remaining` 裡含 `'` 且至少兩段時，
+   為**第一個待選段**生成「段組」並放在 `groups` 最前面（每組 = 一個讀音，組內是該讀音的字，
+   `CandidateItem.segment = 0`、`index = -1`）。段組放最前，否則會被幾十個引擎組淹沒。
+3. `CandidatePanelController.preferredGroup()`：有段組時默認選中第一個段組
+   （否則會按候選條第一條去選引擎組，看起來像「按段選字沒生效」）。
+4. 點擊段組候選 → `TextInputManager.pickSegmentedCandidate()`：`Rime.clearComposition()`
+   → 上屏該字 → 把剩下的段用 `'` 重新餵回引擎（`Rime.onText`）→ `updateComposing()` + 刷新面板，
+   於是下一段繼續出候選（逐段選字，最後一段回到引擎正常候選）。
+
+**真機驗收**：`kl` + 分詞 + `def`（碼串 `5'e`）→ 展開面板默認落在 `ki` 組（區/巨/氣/去…），
+點「區」→ 上屏「區」、預輸入剩 `e`、面板接著列 `da/dai/dak/…` 供第二段選字。
+
+**已知取捨**：段組候選來自 `hakka.dict.yaml`（單字、字典順序），不含用戶詞庫與詞組聯想；
+想要「多字詞」仍需完整拼寫或走 26 鍵方案。

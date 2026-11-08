@@ -38,6 +38,8 @@ class CandidatePanelAdapter(
         val comment: String,
         /** librime menu 全局下標（不是頁內下標） */
         val index: Int,
+        /** >=0 = 分詞段選字（字典候選，index=-1），值為段序號 */
+        val segment: Int = -1,
     )
 
     private val density = context.resources.displayMetrics.density

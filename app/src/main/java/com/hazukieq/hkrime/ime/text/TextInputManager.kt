@@ -345,12 +345,38 @@ class TextInputManager private constructor() :
             pickLegacyPanelCandidate(item)
             return
         }
+        if (item.segment >= 0) {
+            // 分詞段的字典候選：上屏這一段的字，再把後面幾段的碼重新餵回引擎。
+            pickSegmentedCandidate(item)
+            return
+        }
         if (item.index < 0) {
             // fallback：本地原文上屏
             twelveKeyController?.snapshot?.fallback?.let { twelveKeyController?.commitFallback(it) }
             return
         }
         twelveKeyController?.selectCandidate(item.index)
+    }
+
+    /**
+     * 分詞（`'`）後的逐段選字：上屏這一段的字，然後把剩下的段重新餵回引擎，
+     * 讓下一段繼續出候選。只處理第一個待選段（分詞是逐段進行的）。
+     */
+    private fun pickSegmentedCandidate(item: CandidatePanelAdapter.Item) {
+        val input = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
+        if (input.isEmpty()) return
+        val segments = input.split('\'').filter { it.isNotEmpty() }
+        if (segments.size < 2) return
+        val rest = segments.drop(1)
+        runCatching {
+            withEngineLock { Rime.clearComposition() }
+            activeEditorInstance.commitText(item.text, false)
+            if (rest.isNotEmpty()) {
+                withEngineLock { Rime.onText(rest.joinToString("'")) }
+            }
+            trime.updateComposing()
+            twelveKeyController?.refresh(immediate = true)
+        }.onFailure { Timber.e(it, "twelvekey: segmented pick failed") }
     }
 
     /**

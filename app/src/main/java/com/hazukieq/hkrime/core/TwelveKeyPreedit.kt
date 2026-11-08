@@ -18,6 +18,12 @@ object TwelveKeyPreedit {
 
     private val table = HashMap<String, Entry>()
 
+    /** 段碼 → 所有匹配音節（精確 + 簡拼前綴），供「分詞後按段選字」使用。 */
+    private val codeToSyllables = HashMap<String, MutableList<Entry>>()
+
+    /** 音節 → 該讀音的字（字典順序去重）。 */
+    private val syllableToChars = LinkedHashMap<String, MutableList<String>>()
+
     /** 單字 → 音節（取字典裡第一次出現的讀音），用來在歧義時對齊第一個候選字。 */
     private val charTable = HashMap<String, String>()
     private var loaded = false
@@ -38,7 +44,11 @@ object TwelveKeyPreedit {
                 if (tab < 0) return@forEach
                 val ch = raw.substring(0, tab).trim()
                 val syllable = raw.substring(tab + 1).trim()
-                if (ch.length == 1) charTable.putIfAbsent(ch, syllable)
+                if (ch.length == 1) {
+                    charTable.putIfAbsent(ch, syllable)
+                    val chars = syllableToChars.getOrPut(syllable) { ArrayList() }
+                    if (!chars.contains(ch)) chars.add(ch)
+                }
                 if (syllable.isNotEmpty() && syllable.all { it in 'a'..'z' }) {
                     counts[syllable] = (counts[syllable] ?: 0) + 1
                 }
@@ -48,6 +58,7 @@ object TwelveKeyPreedit {
             val code = codeOf(syllable)
             val old = table[code]
             if (old == null || old.freq < freq) table[code] = Entry(syllable, freq)
+            codeToSyllables.getOrPut(code) { ArrayList() }.add(Entry(syllable, freq))
         }
         Timber.i("TwelveKeyPreedit: syllables=%d codes=%d", counts.size, table.size)
     }
@@ -98,6 +109,30 @@ object TwelveKeyPreedit {
         'y' -> "nz"
         else -> c.toString()
     }
+
+    /**
+     * 段碼 → 可能音節（例如 `5` → ke/le/ko…），精確碼優先，其次簡拼前綴；按字典頻次降序。
+     * 給「分詞後按段選字」用（見 [com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder]）。
+     */
+    fun syllablesForSegment(code: String, limit: Int = 12): List<String> {
+        if (code.isEmpty()) return emptyList()
+        val exact = ArrayList<Entry>()
+        val prefix = ArrayList<Entry>()
+        codeToSyllables.forEach { (syllableCode, list) ->
+            when {
+                syllableCode == code -> exact.addAll(list)
+                syllableCode.startsWith(code) -> prefix.addAll(list)
+            }
+        }
+        return (exact.sortedByDescending { it.freq } + prefix.sortedByDescending { it.freq })
+            .map { it.syllable }
+            .distinct()
+            .take(limit)
+    }
+
+    /** 音節 → 該讀音的字（字典順序）。 */
+    fun charsForSyllable(syllable: String, limit: Int = 60): List<String> =
+        syllableToChars[syllable]?.take(limit) ?: emptyList()
 
     /**
      * 把碼串切成音節串；切不出來回傳 null（保持原 preedit）。

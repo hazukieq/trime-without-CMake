@@ -155,8 +155,16 @@ class CandidatePanelController(
         render(scrollGrid = false, scrollGroups = false)
     }
 
-    /** 候選條第一條所屬的組；找不到就退回第 0 組。 */
+    /**
+     * 展開時默認選中的組。
+     *
+     * 分詞（`'`）輸入時 [TwelveKeySnapshot.groups] 前面是「按段選字」的字典組，
+     * 它們才是用戶當下要操作的部分 —— 若按候選條第一條去選，會落到某個引擎組，
+     * 看起來像「按段選字沒生效」。所以有段組時直接選第一個段組。
+     */
     private fun preferredGroup(next: TwelveKeySnapshot): Int {
+        val segmentGroup = next.groups.indexOfFirst { it.segment >= 0 }
+        if (segmentGroup >= 0) return segmentGroup
         val first = next.barEntries.firstOrNull() ?: return 0
         val idx = next.groups.indexOfFirst { group ->
             group.items.any { it.index == first.index && it.text == first.text }
@@ -199,7 +207,12 @@ class CandidatePanelController(
         gridAdapter.setShowComment(groups.size >= 2)
         gridAdapter.submit(
             groups[activeGroup].items.map {
-                CandidatePanelAdapter.Item(text = it.text, comment = it.comment, index = it.index)
+                CandidatePanelAdapter.Item(
+                    text = it.text,
+                    comment = it.comment,
+                    index = it.index,
+                    segment = it.segment,
+                )
             },
         )
         if (scrollGroups) groupList?.scrollToPosition(0)

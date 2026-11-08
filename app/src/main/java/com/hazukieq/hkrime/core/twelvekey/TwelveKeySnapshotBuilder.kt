@@ -1,6 +1,7 @@
 package com.hazukieq.hkrime.core.twelvekey
 
 import com.hazukieq.hkrime.core.Rime
+import com.hazukieq.hkrime.core.TwelveKeyPreedit
 import timber.log.Timber
 
 /**
@@ -122,7 +123,12 @@ object TwelveKeySnapshotBuilder {
         } else {
             flat
         }
-        val groups = group(ranked)
+        // 分詞（theme 的 composing: delimiter → 送出 '）後，引擎只會給第一段候選；
+        // 這裡按「段」補上字典候選：每段列出該碼對應的讀音與字，點擊後上屏該字、
+        // 再把後面幾段的碼重新餵回引擎 —— 讓「分詞」真正能逐段聯想。
+        // 分詞段組放在最前面：它們才是「逐段選字」的操作入口，往後塞會被幾十個引擎組淹沒。
+        val segmentGroups = dictGroupsFor(remaining)
+        val groups = segmentGroups + group(ranked)
         // 候選條按「選單順序」取前 N 條：長輸入時 reading 各不相同，
         // 按第 0 組取會只剩 1 條（用戶 2026-11-08 反饋「打到這麼多就停止候選」）。
         val barEntries = ranked.take(BAR_ITEMS).filter { it.text.isNotEmpty() }
@@ -144,6 +150,30 @@ object TwelveKeySnapshotBuilder {
             degradedToSinglePage = degraded,
             barEntries = barEntries,
         )
+    }
+
+    /**
+     * 分詞段 → 字典候選組。
+     *
+     * 只處理「第一個待選段」（`remaining` 按 `'` 切開後的第一段）：分詞是逐段選字的，
+     * 後面的段要等前面選完、碼被重新餵回引擎之後才有意義。
+     *
+     * 每組 = 一個讀音（例如段碼 `5` → `ke`/`le`/`ko`…），組裡是該讀音的字。
+     */
+    private fun dictGroupsFor(remaining: String): List<SyllableGroup> {
+        if (!remaining.contains('\'')) return emptyList()
+        val segments = remaining.split('\'').filter { it.isNotEmpty() }
+        if (segments.size < 2) return emptyList()
+        val first = segments.first()
+        val result = ArrayList<SyllableGroup>()
+        for (syllable in TwelveKeyPreedit.syllablesForSegment(first)) {
+            val items = TwelveKeyPreedit.charsForSyllable(syllable).map { ch ->
+                CandidateItem(text = ch, comment = syllable, index = -1, segment = 0)
+            }
+            if (items.isEmpty()) continue
+            result.add(SyllableGroup(reading = syllable, syllables = listOf(syllable), items = items, segment = 0))
+        }
+        return result.take(MAX_GROUPS)
     }
 
     /** 兼容舊調用：同步一次做完（UI 線程慎用）。 */
