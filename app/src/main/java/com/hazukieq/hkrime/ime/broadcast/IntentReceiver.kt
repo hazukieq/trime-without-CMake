@@ -19,6 +19,7 @@ package com.hazukieq.hkrime.ime.broadcast
 
 import android.content.BroadcastReceiver
 import android.content.Context
+import com.hazukieq.hkrime.BuildConfig
 import android.content.Intent
 import android.content.IntentFilter
 import com.hazukieq.hkrime.core.Rime

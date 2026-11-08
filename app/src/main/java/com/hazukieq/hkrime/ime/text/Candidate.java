@@ -353,8 +353,8 @@ public class Candidate extends View {
       x += candidateWidth + candidateSpacing;
     }
 
-    // 發生截斷、或還有下一頁候選時，右側固定顯示 ▼
-    boolean hasExButton = truncated || Rime.hasRight();
+    // 只要還有候選就常駐 ▼（展開面板）；截斷/翻頁只是「面板裡會有更多」的附加資訊
+    boolean hasExButton = true;
     if (hasExButton) {
       computedCandidates.add(
           new ComputedCandidate.Symbol(
