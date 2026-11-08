@@ -3,11 +3,11 @@ package com.hazukieq.hkrime.core.twelvekey
 import android.content.Context
 import android.view.View
 import android.widget.FrameLayout
-import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.hazukieq.hkrime.ime.keyboard.KeyboardView
 import com.hazukieq.hkrime.ime.text.CandidateGroupAdapter
+import com.hazukieq.hkrime.ime.text.FlowLayoutManager
 import com.hazukieq.hkrime.ime.text.CandidatePanelAdapter
 
 /**
@@ -54,7 +54,9 @@ class CandidatePanelController(
             itemAnimator = null
         }
         grid?.apply {
-            layoutManager = GridLayoutManager(context, GRID_COLUMNS)
+            layoutManager = FlowLayoutManager(
+                (8 * context.resources.displayMetrics.density).toInt(),
+            )
             adapter = gridAdapter
             itemAnimator = null
         }
@@ -182,7 +184,4 @@ class CandidatePanelController(
         if (scrollGrid) grid?.scrollToPosition(0)
     }
 
-    companion object {
-        private const val GRID_COLUMNS = 4
-    }
 }

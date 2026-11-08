@@ -134,7 +134,7 @@ public class Candidate extends View {
     candidateFont = config.getFont("candidate_font");
     commentFont = config.getFont("comment_font");
     symbolFont = config.getFont("symbol_font");
-    symbolBoxSize = Math.round(20 * getResources().getDisplayMetrics().density);
+    symbolBoxSize = Math.round(48 * getResources().getDisplayMetrics().density);
 
     candidatePaint.setTextSize(candidate_text_size);
     candidatePaint.setTypeface(candidateFont);
@@ -360,8 +360,14 @@ public class Candidate extends View {
    * 這樣 comment_on_top 時候選上方有拼音注釋時，圖標仍與漢字對齊（而不是在整條中間）。
    */
   private Rect symbolRect(int left, int width) {
-    final int top = (shouldShowComment && isCommentOnTop) ? commentHeight : 0;
-    return new Rect(left, top, left + width, getMeasuredHeight());
+    // 觸摸區域整條高（48dp 級別），繪製時再對齊到候選詞那一行
+    return new Rect(left, 0, left + width, getMeasuredHeight());
+  }
+
+  /** 圖標垂直中心 = 候選詞那一行的中心（comment_on_top 時在拼音注釋下方）。 */
+  private float iconCenterY(Rect rect) {
+    final float offset = (shouldShowComment && isCommentOnTop) ? commentHeight / 2f : 0f;
+    return rect.centerY() + offset;
   }
 
   private void addMenuSymbol(int left) {
@@ -375,7 +381,7 @@ public class Candidate extends View {
   }
 
   /** 圖標統一：線寬 2dp、圓頭、光學尺寸 ~16dp，顏色跟候選文字一致。 */
-  private static final float ICON_STROKE_DP = 2.0f;
+  private static final float ICON_STROKE_DP = 2.2f;
 
   private float dp() {
     return getResources().getDisplayMetrics().density;
@@ -383,10 +389,10 @@ public class Candidate extends View {
 
   /** 菜單：三條等長橫線。 */
   private void drawMenuIcon(Canvas canvas, Rect rect) {
-    final float halfW = 8.0f * dp();
-    final float gap = 4.2f * dp();
+    final float halfW = 9.5f * dp();
+    final float gap = 5.4f * dp();
     final float cx = rect.centerX();
-    final float cy = rect.centerY();
+    final float cy = iconCenterY(rect);
     symbolPaint.setStyle(Paint.Style.STROKE);
     symbolPaint.setStrokeWidth(ICON_STROKE_DP * dp());
     symbolPaint.setStrokeCap(Paint.Cap.ROUND);
@@ -399,9 +405,9 @@ public class Candidate extends View {
 
   /** 配色：半填充圓（明暗/主題的通用符號），乾淨且與文字同色。 */
   private void drawPaletteIcon(Canvas canvas, Rect rect) {
-    final float r = 7.2f * dp();
+    final float r = 9.6f * dp();
     final float cx = rect.centerX();
-    final float cy = rect.centerY();
+    final float cy = iconCenterY(rect);
     symbolPaint.setStyle(Paint.Style.FILL);
     symbolPaint.setStrokeWidth(ICON_STROKE_DP * dp());
     // 左半實心 + 整體描邊
@@ -413,10 +419,10 @@ public class Candidate extends View {
 
   /** 展開/收起/收起鍵盤共用同一個「線條箭頭」，與其它圖標同線寬。 */
   private void drawChevron(Canvas canvas, Rect rect, boolean up) {
-    final float halfW = 6.0f * dp();
-    final float halfH = 3.6f * dp();
+    final float halfW = 8.0f * dp();
+    final float halfH = 4.8f * dp();
     final float cx = rect.centerX();
-    final float cy = rect.centerY();
+    final float cy = iconCenterY(rect);
     chevronPath.reset();
     if (up) {
       chevronPath.moveTo(cx - halfW, cy + halfH);
@@ -460,14 +466,13 @@ public class Candidate extends View {
     }
 
     // 圖標只在「沒有候選」時出現：菜單（左）／配色 / 收起鍵盤（右）。
-    // 有候選時候選條只留一個展開箭頭，寬度全部讓給候選詞。
-    // 所有圖標統一 20dp 盒 + 12dp 頁邊距 + 與候選詞同一行垂直居中。
-    final int edge = Math.round(12 * getResources().getDisplayMetrics().density);
+    // Gboard 工具欄規格：24dp 圖標 + 48dp 觸摸盒 + 8dp 頁邊距，盒相鄰即 24dp 視覺間隔。
+    final float density = getResources().getDisplayMetrics().density;
+    final int edge = Math.round(8 * density);
 
     if (numCandidates <= 0 || candidates == null) {
-      final int iconGap = Math.round(14 * getResources().getDisplayMetrics().density);
       final int rightMost = avail - edge - symbolBoxSize;
-      final int themeLeft = rightMost - symbolBoxSize - iconGap;
+      final int themeLeft = rightMost - symbolBoxSize;
       addMenuSymbol(edge);
       addThemeSymbol(themeLeft);
       computedCandidates.add(
@@ -480,7 +485,7 @@ public class Candidate extends View {
     // 有候選時只留右側展開箭頭的位置，其餘寬度全部給候選詞
     final int arrowLeft = avail - edge - symbolBoxSize;
     int limit = arrowLeft - candidateSpacing;
-    int x = edge;
+    int x = edge / 2;
     boolean truncated = false;
     for (int i = 0; i < numCandidates; i++) {
       int n = i + startNum;

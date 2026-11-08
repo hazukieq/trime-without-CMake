@@ -1,12 +1,14 @@
 package com.hazukieq.hkrime.ime.text
 
 import android.content.Context
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
-import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -16,12 +18,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.hazukieq.hkrime.data.Config
 
 /**
- * 展開面板左側的音節組列表：只讀快照，整體替換。
+ * 展開面板左側的音節索引（rail）。
  *
- * 點擊只切換右側網格的視圖，**不調引擎、不動 caret**（設計 §5.2）。
- *
- * 排版：每組一行（[TextView.maxLines]=1 + END 省略），列寬按當前組列表裡最長的 reading
- * 動態測量（上限 [MAX_COLUMN_DP]），避免多音節 reading 被硬換行成兩三行。
+ * 設計：左列是「索引」不是「按鈕」——同樣的字號、只靠顏色與一條 3dp 的高亮豎線
+ * 表示選中，避免整行反白把視線從右側候選上搶走。
  */
 class CandidateGroupAdapter(
     private val context: Context,
@@ -40,21 +40,27 @@ class CandidateGroupAdapter(
 
     private val density = context.resources.displayMetrics.density
     private val cfg = Config.get(context)
-    private val textSize = cfg.getPixel("candidate_text_size", 22).toFloat()
-    private val textColor = cfg.getColor("candidate_text_color") ?: 0xFF37474F.toInt()
-    private val accent = cfg.getColor("hilited_candidate_text_color") ?: textColor
-    private val selectedBg = accent and 0x22FFFFFF.toInt()
+
+    private val textSize = sp(14f)
+    private val ink = cfg.getColor("candidate_text_color") ?: 0xFF37474F.toInt()
+    private val accent = cfg.getColor("hilited_candidate_text_color") ?: ink
+    private val canvas = cfg.getColor("keyboard_back_color") ?: 0xFFF2F0EC.toInt()
+
+    private val selectedText = accent
+    private val normalText = withAlpha(ink, 0.72f)
+    private val selectedBg = withAlpha(accent, 0.10f)
+    private val barColor = accent
     private val typeface: Typeface = Typeface.DEFAULT
 
-    private val rowPaddingH = (12 * density).toInt()
-    private val rowPaddingV = (9 * density).toInt()
-    private val barWidth = (3 * density).toInt()
-    private val maxColumnPx = (200 * density).toInt()
+    private val rowPadStart = dp(14f)
+    private val rowPadEnd = dp(10f)
+    private val rowHeight = dp(40f)
+    private val barWidth = dp(3f)
+    private val barRadius = dp(1.5f)
 
-    /** 由 [submit] 依最長 reading 算出；每項目共用，保證左列不抖動。 */
-    private var columnWidth = (96 * density).toInt()
+    private var columnWidth = dp(100f)
 
-    class VH(val root: LinearLayout, val text: TextView, val bar: TextView) :
+    class VH(val root: LinearLayout, val text: TextView, val bar: android.view.View) :
         RecyclerView.ViewHolder(root)
 
     fun submit(list: List<GroupItem>) {
@@ -62,44 +68,47 @@ class CandidateGroupAdapter(
         submitList(list)
     }
 
-    fun clear() {
-        submitList(emptyList())
-    }
+    fun clear() = submitList(emptyList())
 
     private fun measureColumnWidth(list: List<GroupItem>): Int {
-        if (list.isEmpty()) return (96 * density).toInt()
+        if (list.isEmpty()) return dp(100f)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textSize = this@CandidateGroupAdapter.textSize
             typeface = this@CandidateGroupAdapter.typeface
         }
         var widest = 0f
         list.forEach { widest = maxOf(widest, paint.measureText(it.reading)) }
-        val wanted = widest + rowPaddingH * 2 + barWidth
-        return wanted.toInt().coerceIn((88 * density).toInt(), maxColumnPx)
+        val wanted = widest + rowPadStart + rowPadEnd + barWidth
+        return wanted.toInt().coerceIn(dp(96f), dp(176f))
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            layoutParams = RecyclerView.LayoutParams(columnWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
+            layoutParams = RecyclerView.LayoutParams(columnWidth, rowHeight)
         }
-        val bar = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(barWidth, ViewGroup.LayoutParams.MATCH_PARENT)
-            setBackgroundColor(0x00000000)
+        val bar = android.view.View(context).apply {
+            layoutParams = LinearLayout.LayoutParams(barWidth, (rowHeight * 0.42f).toInt()).apply {
+                marginStart = dp(6f)
+                topMargin = (rowHeight * 0.29f).toInt()
+            }
+            background = GradientDrawable().apply {
+                cornerRadius = barRadius.toFloat()
+                setColor(Color.TRANSPARENT)
+            }
         }
         val tv = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            )
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
             gravity = Gravity.START or Gravity.CENTER_VERTICAL
             setTextSize(TypedValue.COMPLEX_UNIT_PX, textSize)
-            setTextColor(textColor)
+            setPadding(rowPadStart, 0, rowPadEnd, 0)
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             setSingleLine(true)
-            setPadding(rowPaddingH, rowPaddingV, rowPaddingH, rowPaddingV)
+            includeFontPadding = false
+            setTextColor(normalText)
+            typeface = this@CandidateGroupAdapter.typeface
         }
         root.addView(bar)
         root.addView(tv)
@@ -108,27 +117,57 @@ class CandidateGroupAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = getItem(position)
-        holder.root.layoutParams = RecyclerView.LayoutParams(
-            columnWidth,
-            ViewGroup.LayoutParams.WRAP_CONTENT,
+        val lp = holder.root.layoutParams
+        if (lp.width != columnWidth) {
+            lp.width = columnWidth
+            holder.root.layoutParams = lp
+        }
+        holder.root.background = if (item.selected) {
+            GradientDrawable().apply {
+                cornerRadius = dp(10f).toFloat()
+                setColor(selectedBg)
+            }
+        } else {
+            null
+        }
+        (holder.bar.background as GradientDrawable).setColor(
+            if (item.selected) barColor else Color.TRANSPARENT,
         )
-        holder.root.setBackgroundColor(if (item.selected) selectedBg else 0x00000000)
-        holder.bar.setBackgroundColor(if (item.selected) accent else 0x00000000)
         holder.text.text = item.reading
         holder.text.setTextColor(
             when {
-                item.converted -> textColor and 0x66FFFFFF.toInt()
-                item.incomplete -> textColor and 0x99FFFFFF.toInt()
-                else -> textColor
+                item.converted -> withAlpha(ink, 0.38f)
+                item.selected -> selectedText
+                item.incomplete -> withAlpha(ink, 0.58f)
+                else -> normalText
             },
         )
-        // 每次都從默認字重重新設定，避免上一個 selected 的 BOLD 殘留在複用的 TextView 上
-        holder.text.setTypeface(typeface, if (item.selected) Typeface.BOLD else Typeface.NORMAL)
+        // 每輪都從默認字重重設，避免 selected 的 MEDIUM 殘留在複用的 TextView 上
+        holder.text.setTypeface(
+            typeface,
+            if (item.selected) Typeface.BOLD else Typeface.NORMAL,
+        )
         holder.root.setOnClickListener { onPick(item) }
-        holder.root.alpha = if (item.converted) 0.6f else 1f
         holder.root.isClickable = !item.converted
-        holder.root.contentDescription = if (item.count > 0) "${item.reading} ${item.count}" else item.reading
+        holder.root.contentDescription =
+            if (item.count > 0) "${item.reading} ${item.count}" else item.reading
     }
+
+    private fun dp(value: Float): Int = (value * density).toInt()
+
+    private fun sp(value: Float): Float = TypedValue.applyDimension(
+        TypedValue.COMPLEX_UNIT_SP,
+        value,
+        context.resources.displayMetrics,
+    )
+
+    private fun withAlpha(color: Int, alpha: Float): Int =
+        Color.argb(
+            (alpha * 255).toInt().coerceIn(0, 255),
+            Color.red(color),
+            Color.green(color),
+            Color.blue(color),
+        )
 
     companion object {
         private val DIFF = object : DiffUtil.ItemCallback<GroupItem>() {
