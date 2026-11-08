@@ -1,5 +1,14 @@
 # 02 · JNI 与 `librime_jni.so`（定稿）
 
+> ⚠️ **本篇是 1.7.3 时代的事实快照（2026-11-08），已被 `docs/11-librime-upgrade-performance.md` 取代。**
+> 2026-11-09 起 `librime_jni.so` 改为由独立工程 `trime-workspace/rime-jni` 构建：
+> librime **1.17.0** + 三插件，**Release**，修 strip 后 **6,175,752 B**
+> （sha256 `982af48d9e1a4e0dbb93541682da060e2ad97808f6b8e3d9f2d2d982aba2665d`），
+> 符号契约 **75/75**（含 trime 扩展 `RimeGetCompositionSegments` 的内部 API 重写）。
+> 构建/升级/性能补丁请直接看 `docs/11`；本篇保留作历史排障参考（85MB 废库、16KB 对齐等）。
+
+
+
 > 事实快照：`ebb18c1`（当前 HEAD 以 `git log -1` 为准）。
 > **本篇状态：定稿（v4，2026-11-08 第三轮）**。`.so` 未再变动（13,587,744 B）；`loadLibrary` 已统一、符号契约 73/73 通过、真机仪器测试通过。
 > 第三轮的 `726a209` 只增加 rime 数据资产（方案/词典/OpenCC 滤镜），不涉及 JNI，故本篇结论不变。
