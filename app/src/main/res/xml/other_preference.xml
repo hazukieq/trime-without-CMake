@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-    <ListPreference
+    <com.hazukieq.hkrime.settings.components.ModernListPreference
         android:defaultValue="auto"
         app:iconSpaceReserved="false"
         app:entries="@array/other__ui_mode_entries"
@@ -26,7 +26,7 @@
         android:title="@string/other__destroy_on_quit_title" />
 
 
-    <ListPreference
+    <com.hazukieq.hkrime.settings.components.ModernListPreference
         android:defaultValue="100"
         app:iconSpaceReserved="false"
         app:entries="@array/other__clipboard_manager_entries"
@@ -35,19 +35,19 @@
         app:title="@string/other__clipboard_manager_title"
         app:useSimpleSummaryProvider="true" />
 
-    <EditTextPreference android:key="other__clipboard_compare"
+    <com.hazukieq.hkrime.settings.components.ModernEditTextPreference android:key="other__clipboard_compare"
         app:iconSpaceReserved="false"
         android:title="@string/other__clipboard_compare_title"
         android:defaultValue=""
         app:useSimpleSummaryProvider="true"/>
-    <EditTextPreference android:key="other__clipboard_output"
+    <com.hazukieq.hkrime.settings.components.ModernEditTextPreference android:key="other__clipboard_output"
         app:iconSpaceReserved="false"
         android:title="@string/other__clipboard_output_title"
         android:defaultValue=""
         app:useSimpleSummaryProvider="true"/>
 
 
-    <ListPreference
+    <com.hazukieq.hkrime.settings.components.ModernListPreference
         app:iconSpaceReserved="false"
         app:entries="@array/other__clipboard_manager_entries"
         app:entryValues="@array/other__clipboard_manager_values"
@@ -55,7 +55,7 @@
         app:title="@string/other__draft_manager_title"
         app:useSimpleSummaryProvider="true" />
 
-    <EditTextPreference android:key="other__draft_output"
+    <com.hazukieq.hkrime.settings.components.ModernEditTextPreference android:key="other__draft_output"
         app:iconSpaceReserved="false"
         android:title="@string/other__draft_output_title"
         android:defaultValue=""

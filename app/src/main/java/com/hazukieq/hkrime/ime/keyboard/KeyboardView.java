@@ -395,7 +395,7 @@ public class KeyboardView extends View implements View.OnClickListener, Coroutin
     }
     final int mPreviewTextSizeLarge = config.getInt("preview_text_size");
     mPreviewText.setTextSize(mPreviewTextSizeLarge);
-    mShowPreview = getPrefs().getKeyboard().getPopupKeyPressEnabled();
+    mShowPreview = false;
 
     mPaint.setTypeface(config.getFont("key_font"));
     mPaintSymbol.setTypeface(config.getFont("symbol_font"));
@@ -470,12 +470,12 @@ public class KeyboardView extends View implements View.OnClickListener, Coroutin
                 float deltaY = me2.getY() - me1.getY();
                 final int travel =
                     (isFastInput && isClickAtLast)
-                        ? getPrefs().getKeyboard().getSwipeTravelHi()
+                        ? getPrefs().getKeyboard().getSwipeTravel()
                         : getPrefs().getKeyboard().getSwipeTravel();
                 final int velocity =
                     (isFastInput && isClickAtLast)
                         ? getPrefs().getKeyboard().getSwipeVelocity()
-                        : getPrefs().getKeyboard().getSwipeVelocityHi();
+                        : getPrefs().getKeyboard().getSwipeVelocity();
                 mSwipeTracker.computeCurrentVelocity(10);
                 final float endingVelocityX = mSwipeTracker.getXVelocity();
                 final float endingVelocityY = mSwipeTracker.getYVelocity();
@@ -1459,8 +1459,8 @@ public class KeyboardView extends View implements View.OnClickListener, Coroutin
     mComboMode = false;
     if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_CANCEL) {
       mComboCount = 0;
-      if (getPrefs().getKeyboard().getHookFastInput())
-        isFastInput = getPrefs().getKeyboard().getSwipeTimeHi() > me.getEventTime() - mLastUpTime;
+      if (false)
+        isFastInput = 0 > me.getEventTime() - mLastUpTime;
       else isFastInput = false;
     } else if (pointerCount > 1
         || action == MotionEvent.ACTION_POINTER_DOWN
@@ -1646,7 +1646,7 @@ public class KeyboardView extends View implements View.OnClickListener, Coroutin
           int absY = Math.abs(dy);
           final int travel =
               (isFastInput && isClickAtLast)
-                  ? getPrefs().getKeyboard().getSwipeTravelHi()
+                  ? getPrefs().getKeyboard().getSwipeTravel()
                   : getPrefs().getKeyboard().getSwipeTravel();
 
           if (Math.max(absY, absX) > travel && touchOnePoint) {

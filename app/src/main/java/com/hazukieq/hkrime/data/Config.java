@@ -447,8 +447,7 @@ public class Config {
       liquidKeyboard = globalThemeConfig.get("liquid_keyboard");
       initLiquidKeyboard();
       Timber.d("init() initLiquidKeyboard done");
-      Rime.setShowSwitches(appPrefs.getKeyboard().getSwitchesEnabled());
-      Rime.setShowSwitchArrow(appPrefs.getKeyboard().getSwitchArrowEnabled());
+      Rime.setShowSwitches(false);
       reset();
       Timber.d("init() reset done");
       initCurrentColors();

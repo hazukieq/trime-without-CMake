@@ -172,6 +172,11 @@ class DialogSeekBarPreference : Preference {
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.window?.setDimAmount(0.4f)
         dialog.show()
+        dialog.window?.setLayout(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+        )
+        dialog.window?.setGravity(android.view.Gravity.CENTER)
     }
 
     /**

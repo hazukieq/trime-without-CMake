@@ -19,8 +19,11 @@
         <item name="colorAccent">@color/colorAccent</item>
         <item name="android:colorAccent" tools:targetApi="lollipop">@color/colorAccent</item>
 
-        <item name="android:windowBackground">@color/windowBackground</item>
-        <item name="android:colorBackground">@color/windowBackground</item>
+        <!-- 扁平卡片底，去掉系統對話框陰影 -->
+        <item name="android:windowBackground">@drawable/dialog_flat_bg</item>
+        <item name="android:colorBackground">@color/modern_surface</item>
+        <item name="android:windowElevation">0dp</item>
+        <item name="android:backgroundDimAmount">0.4</item>
     </style>
 
 

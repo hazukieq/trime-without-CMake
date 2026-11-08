@@ -40,6 +40,8 @@ class ModernListDialog private constructor(
     private val message: String? = null,
     private val contentView: View? = null,
     private val singleOk: Boolean = false,
+    private val inputField: android.widget.EditText? = null,
+    private val onConfirmInput: ((String) -> Unit)? = null,
 ) : Dialog(context) {
 
     private val checkedFlags: BooleanArray? = initialChecked?.copyOf()
@@ -57,6 +59,16 @@ class ModernListDialog private constructor(
     private val ink: Int get() = if (night) 0xFFF2F2F7.toInt() else 0xFF1C1C1E.toInt()
     private val hairline: Int get() = if (night) 0xFF38383A.toInt() else 0xFFE5E5EA.toInt()
     private val accent: Int get() = 0xFF007AFF.toInt()
+
+    override fun show() {
+        super.show()
+        // show() 之後才算真正掛窗，這裡再定一次尺寸/位置，確保卡片垂直居中且不被裁。
+        window?.setLayout(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT,
+        )
+        window?.setGravity(Gravity.CENTER)
+    }
 
     init {
         val root = FrameLayout(context).apply {
@@ -77,6 +89,15 @@ class ModernListDialog private constructor(
 
         card.addView(buildTitle())
         if (!message.isNullOrBlank()) card.addView(buildMessage())
+        inputField?.let { e ->
+            card.addView(
+                e,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { leftMargin = dp(24); rightMargin = dp(24); bottomMargin = dp(18) },
+            )
+        }
         contentView?.let { v ->
             card.addView(
                 v,
@@ -95,6 +116,7 @@ class ModernListDialog private constructor(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             ).apply {
+                gravity = Gravity.CENTER
                 leftMargin = dp(32); rightMargin = dp(32)
                 topMargin = dp(24); bottomMargin = dp(24)
             },
@@ -109,9 +131,11 @@ class ModernListDialog private constructor(
             it.isHorizontalScrollBarEnabled = false
         }
         window?.setGravity(Gravity.CENTER)
+        // 佔滿整屏，卡片在 FrameLayout 內居中：避免 WRAP_CONTENT 窗口被系統
+        // 壓短導致卡片底部（最後一行/按鈕）被裁掉。
         window?.setLayout(
             ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.MATCH_PARENT,
         )
         setCanceledOnTouchOutside(true)
     }
@@ -222,6 +246,7 @@ class ModernListDialog private constructor(
                     )
                     addView(
                         button(android.R.string.ok, true) {
+                            onConfirmInput?.invoke(inputField?.text?.toString() ?: "")
                             onConfirm(currentIndex)
                             dismiss()
                         },
@@ -317,6 +342,41 @@ class ModernListDialog private constructor(
             onPick = {}, onConfirm = {},
             multi = true, initialChecked = checked, onConfirmMulti = onConfirm,
         )
+
+        /** 輸入型對話框：標題 + 單行輸入框 + 取消/確定。 */
+        @JvmStatic
+        fun input(
+            context: Context,
+            title: String,
+            initial: String,
+            singleLine: Boolean,
+            onConfirm: (String) -> Unit,
+        ): ModernListDialog {
+            val density = context.resources.displayMetrics.density
+            fun dp(v: Number): Int = (v.toFloat() * density + 0.5f).toInt()
+            val night = (context.resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+            val ink = if (night) 0xFFF2F2F7.toInt() else 0xFF1C1C1E.toInt()
+            val field = android.widget.EditText(context).apply {
+                setText(initial)
+                setSelection(text.length)
+                textSize = 17f
+                setTextColor(ink)
+                setHintTextColor(0xFF8E8E93.toInt())
+                isSingleLine = singleLine
+                if (!singleLine) { minLines = 2; maxLines = 6 }
+                setPadding(dp(12), dp(10), dp(12), dp(10))
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    cornerRadius = dp(12).toFloat()
+                    setColor(if (night) 0xFF2C2C2E.toInt() else 0xFFF2F2F7.toInt())
+                }
+            }
+            return ModernListDialog(
+                context, title, emptyList(), -1, actionMode = false,
+                onPick = {}, onConfirm = {}, inputField = field, onConfirmInput = onConfirm,
+            )
+        }
 
         /** 內容型對話框：標題 + 自訂 View（如授權網頁）+ 確定。 */
         @JvmStatic

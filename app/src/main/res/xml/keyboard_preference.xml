@@ -7,7 +7,7 @@
     <PreferenceCategory
         app:iconSpaceReserved="false"
         app:title="@string/pref_keyboard__function">
-        <ListPreference
+        <com.hazukieq.hkrime.settings.components.ModernListPreference
             android:defaultValue="preview"
             android:entries="@array/keyboard__inline_entries"
             android:entryValues="@array/keyboard__inline_values"
@@ -15,7 +15,7 @@
             android:title="@string/keyboard__inline_preedit_title"
             app:iconSpaceReserved="false"
             app:useSimpleSummaryProvider="true" />
-        <ListPreference
+        <com.hazukieq.hkrime.settings.components.ModernListPreference
             android:defaultValue="auto_show"
             android:entries="@array/keyboard__fullscreen_mode_entries"
             android:entryValues="@array/keyboard__fullscreen_mode_values"
@@ -23,11 +23,6 @@
             android:title="@string/keyboard__fullscreen_mode_title"
             app:iconSpaceReserved="false"
             app:useSimpleSummaryProvider="true" />
-        <SwitchPreferenceCompat
-            android:defaultValue="false"
-            android:key="keyboard__show_key_popup"
-            android:title="@string/keyboard__show_key_popup_title"
-            app:iconSpaceReserved="false" />
     </PreferenceCategory>
 
     <PreferenceCategory
@@ -44,25 +39,7 @@
             android:title="@string/keyboard__soft_cursor_title"
             app:iconSpaceReserved="false" />
 
-        <SwitchPreferenceCompat
-            android:defaultValue="true"
-            android:key="keyboard__show_switches"
-            android:title="@string/keyboard__show_switches_title"
-            app:iconSpaceReserved="false" />
-        <SwitchPreferenceCompat
-            android:defaultValue="true"
-            android:key="keyboard__show_switch_arrow"
-            android:title="@string/keyboard__show_switche_arrow_title"
-            app:iconSpaceReserved="false" />
 
-        <ListPreference
-            android:defaultValue="0"
-            android:entries="@array/keyboard__candidate_page_size_entries"
-            android:entryValues="@array/keyboard__candidate_page_size_values"
-            android:key="keyboard__candidate_page_size"
-            android:title="@string/keyboard__candidate_page_size"
-            app:iconSpaceReserved="false"
-            app:useSimpleSummaryProvider="true" />
 
         <SwitchPreferenceCompat
             android:defaultValue="false"
@@ -84,50 +61,6 @@
             app:unit="@string/unit__time_ms" />
     </PreferenceCategory>
 
-    <PreferenceCategory
-        app:iconSpaceReserved="false"
-        app:key="settings__keyboard_hook"
-        app:summary="@string/pref_keyboard__hook_summary"
-        app:title="@string/pref_keyboard__hook">
-
-        <SwitchPreferenceCompat
-            android:key="keyboard__hook_fast_input"
-            android:summary="@string/keyboard__hook_fast_input_summary"
-            android:title="@string/keyboard__hook_fast_input"
-            app:iconSpaceReserved="false" />
-
-        <SwitchPreferenceCompat
-            android:key="keyboard__hook_candidate"
-            android:summaryOff="@string/keyboard__hook_candidate_off"
-            android:summaryOn="@string/keyboard__hook_candidate_on"
-            android:title="@string/keyboard__hook_candidate"
-            app:iconSpaceReserved="false" />
-
-        <SwitchPreferenceCompat
-            android:key="keyboard__hook_candidate_commit"
-            android:title="@string/keyboard__hook_candidate_commit"
-            app:iconSpaceReserved="false" />
-
-        <SwitchPreferenceCompat
-            android:key="keyboard__hook_ctrl_lr"
-            android:title="@string/keyboard__hook_ctrl_lr"
-            app:iconSpaceReserved="false" />
-
-        <SwitchPreferenceCompat
-            android:key="keyboard__hook_ctrl_a"
-            android:title="@string/keyboard__hook_ctrl_a"
-            app:iconSpaceReserved="false" />
-        <SwitchPreferenceCompat
-            android:key="keyboard__hook_ctrl_cv"
-            android:title="@string/keyboard__hook_ctrl_cv"
-            app:iconSpaceReserved="false" />
-
-        <SwitchPreferenceCompat
-            android:key="keyboard__hook_ctrl_zy"
-            android:title="@string/keyboard__hook_ctrl_zy"
-            app:iconSpaceReserved="false" />
-
-    </PreferenceCategory>
 
     <PreferenceCategory
         app:iconSpaceReserved="false"
@@ -218,37 +151,6 @@
             app:min="0"
             app:seekBarIncrement="100"
             app:unit="" />
-        <com.hazukieq.hkrime.settings.components.DialogSeekBarPreference
-            android:defaultValue="240"
-            android:key="keyboard__key_swipe_travel_hi"
-            android:title="@string/keyboard__key_swipe_travel_hi_title"
-            app:allowDividerAbove="false"
-            app:iconSpaceReserved="false"
-            app:max="600"
-            app:min="0"
-            app:seekBarIncrement="10"
-            app:unit="" />
-        <com.hazukieq.hkrime.settings.components.DialogSeekBarPreference
-            android:defaultValue="25000"
-            android:key="keyboard__key_swipe_velocity_hi"
-            android:title="@string/keyboard__key_swipe_velocity_hi"
-            app:allowDividerAbove="false"
-            app:iconSpaceReserved="false"
-            app:max="30000"
-            app:min="0"
-            app:seekBarIncrement="100"
-            app:unit="" />
-        <com.hazukieq.hkrime.settings.components.DialogSeekBarPreference
-            android:defaultValue="50"
-            android:key="keyboard__key_swipe_time_hi"
-            android:title="@string/keyboard__key_swipe_time_hi_title"
-            android:widgetLayout="@layout/seek_bar_dialog"
-            app:allowDividerAbove="false"
-            app:iconSpaceReserved="false"
-            app:max="500"
-            app:min="0"
-            app:seekBarIncrement="10"
-            app:unit="@string/unit__time_ms" />
         <com.hazukieq.hkrime.settings.components.DialogSeekBarPreference
             android:defaultValue="20"
             android:key="keyboard__key_long_press_timeout"

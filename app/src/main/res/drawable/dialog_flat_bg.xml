@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 類 Apple 扁平對話框底：22dp 圓角純色卡，無陰影/描邊 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/modern_surface" />
+    <corners android:radius="22dp" />
+</shape>

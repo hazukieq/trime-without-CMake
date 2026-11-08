@@ -4,12 +4,12 @@
     android:key="settings__configuration_title"
     android:title="@string/settings__configuration_title">
 
-    <EditTextPreference android:key="conf__shared_data_dir"
+    <com.hazukieq.hkrime.settings.components.ModernEditTextPreference android:key="conf__shared_data_dir"
         app:iconSpaceReserved="false"
         android:title="@string/conf__shared_data_dir_title"
         app:useSimpleSummaryProvider="true"/>
 
-    <EditTextPreference android:key="conf__user_data_dir"
+    <com.hazukieq.hkrime.settings.components.ModernEditTextPreference android:key="conf__user_data_dir"
         app:iconSpaceReserved="false"
         android:title="@string/conf__user_data_dir_title"
         android:defaultValue="@string/conf__default_user_data_dir"

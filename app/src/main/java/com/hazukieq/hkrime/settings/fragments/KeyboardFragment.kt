@@ -33,8 +33,7 @@ class KeyboardFragment :
         prefs.sync()
         when (key) {
             "keyboard__key_long_press_timeout",
-            "keyboard__key_repeat_interval",
-            "keyboard__show_key_popup" -> {
+            "keyboard__key_repeat_interval" -> {
                 trime?.resetKeyboard()
             }
             "keyboard__show_window" -> {
@@ -42,12 +41,6 @@ class KeyboardFragment :
             }
             "keyboard__inline_preedit", "keyboard__soft_cursor" -> {
                 trime?.loadConfig()
-            }
-            "keyboard__show_switches" -> {
-                Rime.setShowSwitches(prefs.keyboard.switchesEnabled)
-            }
-            "keyboard__candidate_page_size" -> {
-                Rime.applySchemaChange()
             }
         }
     }

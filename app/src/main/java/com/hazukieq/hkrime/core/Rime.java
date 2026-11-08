@@ -644,7 +644,7 @@ public class Rime {
   // 另外实际上jni读入yaml、修改、导出的效率并不高
   private static boolean overWriteSchema(String schema_id) {
     Map<String, String> map = new HashMap<>();
-    String page_size = AppPrefs.defaultInstance().getKeyboard().getCandidatePageSize();
+    String page_size = "0";
     Timber.d("overWriteSchema() page_size=" + page_size);
     if (!page_size.equals("0")) {
       map.put("page_size", page_size);

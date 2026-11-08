@@ -170,19 +170,8 @@ class AppPrefs(
             const val INLINE_PREEDIT_MODE = "keyboard__inline_preedit"
             const val SOFT_CURSOR_ENABLED = "keyboard__soft_cursor"
             const val FLOATING_WINDOW_ENABLED = "keyboard__show_window"
-            const val POPUP_KEY_PRESS_ENABLED = "keyboard__show_key_popup"
-            const val SWITCHES_ENABLED = "keyboard__show_switches"
-            const val SWITCH_ARROW_ENABLED = "keyboard__show_switch_arrow"
             const val FULLSCREEN_MODE = "keyboard__fullscreen_mode"
-            const val CANDIDATE_PAGE_SIZE = "keyboard__candidate_page_size"
 
-            const val HOOK_FAST_INPUT = "keyboard__hook_fast_input"
-            const val HOOK_CANDIDATE = "keyboard__hook_candidate"
-            const val HOOK_CANDIDATE_COMMIT = "keyboard__hook_candidate_commit"
-            const val HOOK_CTRL_A = "keyboard__hook_ctrl_a"
-            const val HOOK_CTRL_CV = "keyboard__hook_ctrl_cv"
-            const val HOOK_CTRL_LR = "keyboard__hook_ctrl_lr"
-            const val HOOK_CTRL_ZY = "keyboard__hook_ctrl_zy"
 
             const val SOUND_ENABLED = "keyboard__key_sound"
             const val SOUND_VOLUME = "keyboard__key_sound_volume"
@@ -197,10 +186,7 @@ class AppPrefs(
 
             const val SWIPE_ENABLED = "keyboard__swipe_enabled"
             const val SWIPE_TRAVEL = "keyboard__key_swipe_travel"
-            const val SWIPE_TRAVEL_HI = "keyboard__key_swipe_travel_hi"
             const val SWIPE_VELOCITY = "keyboard__key_swipe_velocity"
-            const val SWIPE_VELOCITY_HI = "keyboard__key_swipe_velocity_hi"
-            const val SWIPE_TIME_HI = "keyboard__key_swipe_time_hi"
             const val LONG_PRESS_TIMEOUT = "keyboard__key_long_press_timeout"
             const val REPEAT_INTERVAL = "keyboard__key_repeat_interval"
             const val DELETE_CANDIDATE_TIMEOUT = "keyboard__key_delete_candidate_timeout"
@@ -218,40 +204,7 @@ class AppPrefs(
         var popupWindowEnabled: Boolean = false
             get() = prefs.getPref(FLOATING_WINDOW_ENABLED, true)
             private set
-        var popupKeyPressEnabled: Boolean = false
-            get() = prefs.getPref(POPUP_KEY_PRESS_ENABLED, false)
-            private set
-        var switchesEnabled: Boolean = false
-            get() = prefs.getPref(SWITCHES_ENABLED, true)
-            private set
-        var switchArrowEnabled: Boolean = false
-            get() = prefs.getPref(SWITCH_ARROW_ENABLED, true)
-            private set
-        var candidatePageSize: String = "0"
-            get() = prefs.getPref(CANDIDATE_PAGE_SIZE, "0")
-            private set
 
-        var hookFastInput: Boolean = false
-            get() = prefs.getPref(HOOK_FAST_INPUT, false)
-            private set
-        var hookCandidate: Boolean = false
-            get() = prefs.getPref(HOOK_CANDIDATE, false)
-            private set
-        var hookCandidateCommit: Boolean = false
-            get() = prefs.getPref(HOOK_CANDIDATE_COMMIT, false)
-            private set
-        var hookCtrlA: Boolean = false
-            get() = prefs.getPref(HOOK_CTRL_A, false)
-            private set
-        var hookCtrlCV: Boolean = false
-            get() = prefs.getPref(HOOK_CTRL_CV, false)
-            private set
-        var hookCtrlLR: Boolean = false
-            get() = prefs.getPref(HOOK_CTRL_LR, false)
-            private set
-        var hookCtrlZY: Boolean = false
-            get() = prefs.getPref(HOOK_CTRL_ZY, false)
-            private set
 
         var soundEnabled: Boolean = false
             get() = prefs.getPref(SOUND_ENABLED, false)
@@ -277,17 +230,8 @@ class AppPrefs(
         var swipeTravel: Int = 0
             get() = prefs.getPref(SWIPE_TRAVEL, 80)
             private set
-        var swipeTravelHi: Int = 0
-            get() = prefs.getPref(SWIPE_TRAVEL_HI, 200)
-            private set
         var swipeVelocity: Int = 0
             get() = prefs.getPref(SWIPE_VELOCITY, 800)
-            private set
-        var swipeVelocityHi: Int = 0
-            get() = prefs.getPref(SWIPE_VELOCITY_HI, 25000)
-            private set
-        var swipeTimeHi: Int = 0
-            get() = prefs.getPref(SWIPE_TIME_HI, 80)
             private set
         var longPressTimeout: Int = 0
             get() = prefs.getPref(LONG_PRESS_TIMEOUT, 20)
