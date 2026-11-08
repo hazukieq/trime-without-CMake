@@ -143,7 +143,17 @@ object TwelveKeySnapshotBuilder {
         // 分詞輸入（`5'e`）時，候選條直接列「這一段能選的字」：用戶點一個字就上屏，
         // 再把剩下的碼餵回引擎，於是第二段接著在候選條出現 —— 全程不開面板（用戶 2026-11-09 指示）。
         // 有 segmentAnchor（剛上屏的前一個字）時，與它關聯度高的字排前面。
-        val barEntries = if (segmentGroups.isNotEmpty()) {
+        // 只剩最後一段時，用引擎候選（引擎本身按詞頻/用戶詞庫排序）再疊用戶關聯度，
+        // 而不是繼續用字典順序 —— 否則「最後一個字」看起來完全不受詞頻影響（用戶 2026-11-09 反饋）。
+        val lastSegmentMode = segmentGroups.isEmpty() && segmented && segmentAnchor != null
+        val barEntries = if (lastSegmentMode) {
+            ranked.sortedWith(
+                compareByDescending<CandidateItem> {
+                    SegmentMemory.bigramScore(segmentAnchor, it.text)
+                }.thenByDescending { SegmentMemory.charScore(it.text) }
+                    .thenBy { it.index },
+            ).take(BAR_ITEMS).filter { it.text.isNotEmpty() }
+        } else if (segmentGroups.isNotEmpty()) {
             // 全域排序：先把所有音節組的字攤平，再統一按「與前一字的組詞關聯度 → 字頻」排。
             // 不能按組取（組順序是字典音節順序）—— 否則關聯度最高的字仍可能被擠到後面。
             segmentGroups.flatMap { it.items }
@@ -195,7 +205,8 @@ object TwelveKeySnapshotBuilder {
         if (!segmented && !remaining.contains('\'')) return emptyList()
         val segments = remaining.split('\'').filter { it.isNotEmpty() }
         if (segments.isEmpty()) return emptyList()
-        if (!segmented && segments.size < 2) return emptyList()
+        // 只有「還有兩段以上要選」時才給字典段組；最後一段交給引擎（詞頻 + 用戶詞庫）排序。
+        if (segments.size < 2) return emptyList()
         val first = segments.first()
         val result = ArrayList<SyllableGroup>()
         for (syllable in TwelveKeyPreedit.syllablesForSegment(first)) {
