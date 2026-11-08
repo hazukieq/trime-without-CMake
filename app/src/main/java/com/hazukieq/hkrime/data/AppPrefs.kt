@@ -320,7 +320,7 @@ class AppPrefs(
             const val USE_MINI_KEYBOARD = "looks__use_mini_keyboard"
         }
         var selectedTheme: String
-            get() = prefs.getPref(SELECTED_THEME, "trime")
+            get() = prefs.getPref(SELECTED_THEME, "hakka_theme.trime")
             set(v) = prefs.setPref(SELECTED_THEME, v)
         var selectedColor: String
             get() = prefs.getPref(SELECTED_COLOR, "default")

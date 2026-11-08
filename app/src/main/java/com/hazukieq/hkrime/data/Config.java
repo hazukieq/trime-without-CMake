@@ -80,7 +80,7 @@ public class Config {
 
   private Map<?, ?> mStyle, mDefaultStyle;
   private String themeName, soundPackageName, currentSound;
-  private static final String defaultName = "trime";
+  private static final String defaultName = "hakka_theme.trime";
   private String schema_id, colorID;
 
   private Map<?, ?> fallbackColors;
@@ -181,7 +181,7 @@ public class Config {
     Timber.d(methodName);
     boolean isExist = new File(sharedDataDir).exists();
     boolean isOverwrite = AppVersionUtils.INSTANCE.isDifferentVersion(appPrefs);
-    String defaultFile = "trime.yaml";
+    String defaultFile = "hakka_theme.trime.yaml";
     Timber.d("%scopy", methodName);
     if (isOverwrite) {
       copyFileOrDir("", true);
@@ -206,9 +206,62 @@ public class Config {
         e.printStackTrace();
       }
     }
+    // 從舊版 hkrime（/sdcard/rime）把「用戶詞庫」搬過來：舊目錄只讀不寫。
+    // 詞典 yaml 本倉庫已自帶並逐字節一致，這裡只補用戶學習到的詞（userdb）。
+    migrateLegacyUserDict(methodName);
     Timber.d("%sRime.get", methodName);
     Rime.get(context, !isExist); // 覆蓋時不強制部署
     Timber.d("%sfinish", methodName);
+  }
+
+  /**
+   * 舊版 hkrime 的數據在 /sdcard/rime；新版默認 /sdcard/hkrime。
+   * 把舊的 *.userdb（用戶學習詞）與 custom_phrase.txt 一次性搬到新目錄，
+   * 不刪也不改舊目錄，避免影響舊輸入法。
+   */
+  private void migrateLegacyUserDict(String methodName) {
+    try {
+      final String legacyDir = "/sdcard/rime";
+      if (userDataDir.equals(legacyDir) || sharedDataDir.equals(legacyDir)) return;
+      File legacy = new File(legacyDir);
+      if (!legacy.isDirectory()) return;
+      File userDir = new File(userDataDir);
+      if (!userDir.exists() && !userDir.mkdirs()) return;
+
+      File[] items = legacy.listFiles();
+      if (items == null) return;
+      for (File src : items) {
+        String n = src.getName();
+        if (!n.endsWith(".userdb") && !n.equals("custom_phrase.txt")) continue;
+        File dst = new File(userDir, n);
+        if (dst.exists()) continue;
+        if (src.isDirectory()) copyDir(src, dst);
+        else copyFile(src, dst);
+        Timber.d("%slegacy: copied %s", methodName, n);
+      }
+    } catch (Exception e) {
+      Timber.e(e, "%slegacy migrate failed", methodName);
+    }
+  }
+
+  private static void copyFile(File src, File dst) throws IOException {
+    try (java.io.FileInputStream in = new java.io.FileInputStream(src);
+        java.io.FileOutputStream out = new java.io.FileOutputStream(dst)) {
+      byte[] buf = new byte[8192];
+      int n;
+      while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+    }
+  }
+
+  private static void copyDir(File src, File dst) throws IOException {
+    if (!dst.exists() && !dst.mkdirs()) return;
+    File[] children = src.listFiles();
+    if (children == null) return;
+    for (File c : children) {
+      File t = new File(dst, c.getName());
+      if (c.isDirectory()) copyDir(c, t);
+      else copyFile(c, t);
+    }
   }
 
   public static String[] getThemeKeys(boolean isUser) {
