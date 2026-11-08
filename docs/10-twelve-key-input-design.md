@@ -623,3 +623,18 @@ P1（2026-11-08 已做，commit `0cfcd30` / `618b75c`）：
 `tools/tap_text.py`：截图 → dca 常驻带 OCR（`dca.ocr_client`，CUDA，~0.7s/张，坐标 1:1）→
 按文字坐标 `adb tap`。彻底替代「截图后肉眼估键盘坐标」，验证脚本可以按 `nz`/`ghi`/`退格` 这种
 键面文字直接点。遵守 `desktop-chain` 规范：不另起 PaddleOCR，全部走 dca 常驻服务。
+
+### 15.3 「漢字混進 preedit」的真正原因（2026-11-08）
+
+現象：連續打很多音節後，鍵盤上方出現多行漢字（`1.幾句幾句…`），看起來像 preedit 裡冒出漢字。
+
+原因不是 preedit 被寫成漢字，而是主題的 **懸浮窗口**：
+`hakka_theme.trime.yaml` 的 `style/window` 有兩個 `windows_comps` 組件——
+
+1. `composition: '%s'`（編碼/拼音）；
+2. `'\n' + label: '%s.' + candidate: '%s'`（**帶編號的候選列表**）。
+
+12 鍵輸入很長時，懸浮窗把 `composition + 整個候選列表` 一起畫出來，看起來就是「漢字上屏到 preedit」。
+12 鍵本身已有候選條 + 展開面板，懸浮窗純屬重複，因此在 `Trime.updateComposing()` 裡對
+`hakka_jiugong` 直接停用懸浮窗（`isPopupWindowEnabled && !isTwelveKeySchema()`）。
+其它方案（qwerty / luna_pinyin）行為不變。

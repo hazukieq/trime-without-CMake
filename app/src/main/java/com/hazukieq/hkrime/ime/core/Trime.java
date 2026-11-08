@@ -1224,6 +1224,15 @@ public class Trime extends LifecycleInputMethodService {
     return s;
   } */
 
+  /**
+   * 12 鍵方案不需要「懸浮窗口」：主題的 style/window 會在 composition 後面
+   * 追加帶編號的候選列表（'1.幾句 2.…'），看起來就像「漢字混進了 preedit」。
+   * 12 鍵已經有候選條 + 展開面板，所以這個方案直接停用懸浮窗。
+   */
+  private boolean isTwelveKeySchema() {
+    return "hakka_jiugong".equals(Rime.getSchemaId());
+  }
+
   /** 更新Rime的中西文狀態、編輯區文本 */
   public int updateComposing() {
     final @Nullable InputConnection ic = getCurrentInputConnection();
@@ -1231,7 +1240,7 @@ public class Trime extends LifecycleInputMethodService {
     if (ic != null && !isWinFixed()) isCursorUpdated = ic.requestCursorUpdates(1);
     int startNum = 0;
     if (mCandidateRoot != null) {
-      if (isPopupWindowEnabled) {
+      if (isPopupWindowEnabled && !isTwelveKeySchema()) {
         Timber.d("updateComposing() SymbolKeyboardType=%s", symbolKeyboardType.toString());
         if (symbolKeyboardType != SymbolKeyboardType.NO_KEY
             && symbolKeyboardType != SymbolKeyboardType.CANDIDATE) {
