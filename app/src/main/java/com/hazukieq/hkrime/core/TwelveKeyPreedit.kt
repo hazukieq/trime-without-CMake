@@ -99,10 +99,42 @@ object TwelveKeyPreedit {
         else -> c.toString()
     }
 
-    /** 把碼串切成音節串；切不出來回傳 null（保持原 preedit）。 */
+    /**
+     * 把碼串切成音節串；切不出來回傳 null（保持原 preedit）。
+     *
+     * 用戶按下「分詞」鍵（theme 的 `composing: delimiter`）會在碼串裡插入 `'`：
+     * 那是用戶**明確表達的音節邊界**，不能像以前那樣直接濾掉再重新合併
+     * （否則 `5'e` 會顯示成 `le`，看起來像分隔沒生效）。這裡按 `'`/空白分段，
+     * 每段各自切音節，切不出來的段保留原碼（如 `5`）。
+     */
     fun decode(preedit: String?, hint: String? = null): String? {
         if (preedit.isNullOrBlank() || table.isEmpty()) return null
-        val input = preedit.filter { !it.isWhitespace() && it != '\'' && it.code < 128 }
+        val raw = preedit.filter { it.code < 128 }
+        if (raw.any { it == '\'' || it.isWhitespace() }) {
+            val parts = raw.split(MULTI_DELIMITER).filter { it.isNotEmpty() }
+            if (parts.size <= 1) return null
+            val segs = ArrayList<String>()
+            for (part in parts) {
+                val decoded = decodeSingle(part)
+                if (decoded != null) segs.addAll(decoded) else segs.add(part)
+            }
+            return if (segs.isEmpty()) null else segs.joinToString(" ")
+        }
+        val single = decodeSingle(raw) ?: return null
+        // 歧義時對齊「第一條候選字」的讀音：凝好 → ngin hau，而不是 ngin gau
+        if (hint.isNullOrEmpty() || hint.length != single.size) return single.joinToString(" ")
+        val aligned = single.toMutableList()
+        for (i in aligned.indices) {
+            val s = charTable[hint.substring(i, i + 1)] ?: continue
+            if (codeOf(s) == codeOf(aligned[i])) aligned[i] = s
+        }
+        return aligned.joinToString(" ")
+    }
+
+    private val MULTI_DELIMITER = Regex("[\u0027\\s]+")
+
+    /** 單段碼串 → 音節列表；切不出完整音節回傳 null。 */
+    private fun decodeSingle(input: String): List<String>? {
         if (input.isEmpty()) return null
         val n = input.length
         // 先比「音節數量少」，再比「詞頻高」：避免被 ngh/mi 這類高頻短音節切碎
@@ -142,13 +174,6 @@ object TwelveKeyPreedit {
             p = q
         }
         out.reverse()
-        // 歧義時對齊「第一個候選字」的讀音：凝好 → ngin hau，而不是 ngin gau
-        if (!hint.isNullOrEmpty() && hint.length == out.size) {
-            for (i in out.indices) {
-                val s = charTable[hint.substring(i, i + 1)] ?: continue
-                if (codeOf(s) == codeOf(out[i])) out[i] = s
-            }
-        }
-        return out.joinToString(" ")
+        return out
     }
 }

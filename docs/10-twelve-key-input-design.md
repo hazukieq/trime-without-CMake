@@ -1429,3 +1429,19 @@ BuildConfig.DEBUG 的 D 级打，现场难抓）；`TextInputManager.onCandidate
 `keep_comments` 再全量部署 1.5s）→ 重启 IME → 雾凇拼音输 `nihao` 展开面板：
 左列出现 `ni / ni ji / ni jia / ni jian / ni jiang / ni jiao …`，
 右格候选下面显示 `ni jiu` 等读音（截图 /tmp/r4_panel.png）。
+
+## 15.32 preedit 吃掉「分詞」`'`：decode 需按分隔符分段（2026-11-09）
+
+12 鍵的 preedit 由 `TwelveKeyPreedit.decode()` 把碼串反查成音節串顯示。它原本先把
+`'` 和空白全部濾掉再重新切音節，導致用戶按「分詞」鍵（theme 的
+`{click: Keyboard_en, composing: delimiter}` → 送出 `'`）之後仍然顯示合併結果：
+`5'e` 被濾成 `5e` → 反查成 `le`，看起來「分詞沒生效」。
+
+修法：`decode()` 先按 `'`/空白分段，每段各自 `decodeSingle()`，切不出完整音節的段
+保留原碼（如 `5`）；單段輸入仍走「音節數少優先 + 詞頻次之」的 DP，並保留原本
+「用第一條候選字對齊讀音」的 hint 邏輯。效果：`kl` + 分詞 + `def` 現在顯示 `5 e`。
+
+注意：**這只修顯示**。12 鍵方案 `enable_sentence: false`（早期為躲 abbreviate 詞典 DFS
+20s 卡死而關），加上 librime 簡拼性能補丁在 `has_abbrev` 時跳過句子裝配，
+所以分段後仍然只有第一段的候選；要讓「分詞後的後半段也能出候選」需要 App 側把每段
+當獨立預輸入分別查引擎（待做）。
