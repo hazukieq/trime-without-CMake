@@ -25,8 +25,8 @@
 
 | 项 | 实测值 |
 |---|---|
-| 大小 | **13,608,480 B**（2026-11-08 簡拼 ANR 修補後；舊版 13,587,744 B） |
-| sha256 | **`97e7b716b2113f9abb9753cc7f17c38a3f399118967e7f8911c30b2382338c51`**（簡拼 ANR 修補版） |
+| 大小 | **13,624,480 B**（2026-11-08 簡拼 ANR 修補後；舊版 13,587,744 B） |
+| sha256 | **`eedc5a4edd403e2a1504cbb75918f8504c9ecf6b20a06d33ed133762c85565ce`**（簡拼 ANR 修補版） |
 | 格式 | `ELF 64-bit LSB shared object, ARM aarch64, version 1 (SYSV), dynamically linked, stripped` |
 | 页对齐 | **4 个 LOAD 段全部 `Align=0x4000`（16 KB）**，见 §7 |
 | 构建类型 | **Debug（`-O0`）**，刻意与旧 13.5 MB 库同构（默认即此；`--build-type Release` 可出 `-O2` 版） |

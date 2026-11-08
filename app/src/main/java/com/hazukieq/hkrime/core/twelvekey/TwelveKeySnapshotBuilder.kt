@@ -181,6 +181,11 @@ object TwelveKeySnapshotBuilder {
                 },
                 items = items,
             )
-        }.sortedBy { if (it.syllables.isEmpty()) 1 else it.syllables.size }
+        }.sortedWith(
+            compareBy(
+                { if (it.syllables.isEmpty()) 1 else it.syllables.size },
+                { it.reading.lowercase() },
+            ),
+        )
     }
 }
