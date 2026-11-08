@@ -236,6 +236,7 @@ class TextInputManager private constructor() :
         if (isTwelveKeyMode()) {
             twelveKeyController?.refresh()
             candidatePanelController?.toggle()
+            candidateView?.setPanelOpen(candidatePanelController?.isShown == true)
             return
         }
         if (isCandidatePanelShown()) {
@@ -257,10 +258,12 @@ class TextInputManager private constructor() :
             if (snapshot == null || (!snapshot.hasCandidates && snapshot.fallback == null)) return
         }
         candidatePanelController?.show()
+        candidateView?.setPanelOpen(candidatePanelController?.isShown == true)
     }
 
     fun hideCandidatePanel() {
         candidatePanelController?.hide()
+        candidateView?.setPanelOpen(false)
         if (Rime.isComposing()) {
             runCatching { trime.updateComposing() }
                 .onFailure { Timber.e(it, "twelvekey: hide updateComposing failed") }
@@ -269,7 +272,12 @@ class TextInputManager private constructor() :
 
     /** 12 鍵快照落地：條與面板同源，面板保持打開直到輸入清空。 */
     private fun onTwelveKeySnapshot(snapshot: TwelveKeySnapshot) {
-        candidateBarBinder?.bind(snapshot)
+        if (snapshot.isEmpty) {
+            // 空候選區：交還給 Candidate 顯示方案開關（简/繁、情、联、▽）
+            candidateBarBinder?.showSwitches()
+        } else {
+            candidateBarBinder?.bind(snapshot)
+        }
         candidatePanelController?.submit(snapshot)
         if (snapshot.isEmpty || (!snapshot.hasCandidates && snapshot.fallback == null)) {
             if (candidatePanelController?.isShown == true) candidatePanelController?.hide()
@@ -312,6 +320,11 @@ class TextInputManager private constructor() :
     /** 候選刷新後呼叫：12 鍵重建快照；其它方案只刷新展開面板。 */
     fun onCandidatesRefreshed() {
         if (isTwelveKeyMode()) {
+            if (!Rime.isComposing()) {
+                // 未組字：候選條顯示方案開關（而不是空的 ⌄）
+                candidateBarBinder?.showSwitches()
+                return
+            }
             twelveKeyController?.refresh()
             return
         }
@@ -666,8 +679,16 @@ class TextInputManager private constructor() :
      */
     override fun onCandidatePressed(index: Int) {
         onPress(0)
-        if (isTwelveKeyMode()) {
+        if (isTwelveKeyMode() && Rime.isComposing()) {
             onTwelveKeyCandidatePressed(index)
+            return
+        }
+        if (isTwelveKeyMode()) {
+            // 未組字：候選條上的條目是方案開關
+            if (index >= 0) {
+                Rime.toggleOption(index)
+                trime.updateComposing()
+            }
             return
         }
         if (!Rime.isComposing()) {

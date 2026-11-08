@@ -23,6 +23,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.PaintDrawable;
@@ -73,11 +74,18 @@ public class Candidate extends View {
   public static final String PAGE_EX_BUTTON = "▼";
   /** 候選為空時的按鈕：點它收起輸入法鍵盤 */
   public static final String HIDE_KEYBOARD_BUTTON = "⌄";
+
+  /** 面板展開時，▼ 反向繪製成 ▲（同一個路徑，僅方向不同），保證展開/收起圖標同尺寸。 */
+  private static final String PANEL_OPEN_ARROW = "▲";
   private int expectWidth = 0;
 
   private WeakReference<EventListener> listener = new WeakReference<>(null);
   private final GraphicUtils graphicUtils;
   private int highlightIndex = -1;
+  /** 展開面板是否處於打開狀態（影響 ▼ 的繪製方向）。 */
+  private boolean panelOpen = false;
+  private int symbolBoxSize;
+  private final Path chevronPath = new Path();
   private BarEntry[] candidates;
   /** 非 null 時候選條只讀這份外部快照（12 鍵路徑），不再回讀 Rime。 */
   private BarEntry[] externalCandidates;
@@ -120,6 +128,7 @@ public class Candidate extends View {
     candidateFont = config.getFont("candidate_font");
     commentFont = config.getFont("comment_font");
     symbolFont = config.getFont("symbol_font");
+    symbolBoxSize = Math.round(20 * getResources().getDisplayMetrics().density);
 
     candidatePaint.setTextSize(candidate_text_size);
     candidatePaint.setTypeface(candidateFont);
@@ -184,10 +193,16 @@ public class Candidate extends View {
 
   /** 離開 12 鍵路徑：恢復「候選條自己回讀 Rime.getCandidates()」的舊行為。 */
   public void clearExternalCandidates() {
-    if (!useExternalCandidates) return;
     useExternalCandidates = false;
     externalCandidates = null;
     setText(0);
+  }
+
+  /** 展開面板開/關：讓右側箭頭在 ▼ / ▲ 之間切換（尺寸不變）。 */
+  public void setPanelOpen(boolean open) {
+    if (panelOpen == open) return;
+    panelOpen = open;
+    invalidate();
   }
 
   /**
@@ -301,16 +316,21 @@ public class Candidate extends View {
         candidatePaint.setColor(isHighlighted(i) ? hilitedCandidateTextColor : candidateTextColor);
         graphicUtils.drawText(canvas, word, wordX, wordY, candidatePaint, candidateFont);
       } else if (computedCandidate instanceof ComputedCandidate.Symbol) {
-        // Draw page up / down buttons
         String arrow = ((ComputedCandidate.Symbol) computedCandidate).getArrow();
-        float arrowX =
-            computedCandidate.getGeometry().centerX()
-                - graphicUtils.measureText(symbolPaint, arrow, symbolFont) / 2;
-        float arrowY =
-            computedCandidates.get(0).getGeometry().centerY()
-                - (candidatePaint.ascent() + candidatePaint.descent()) / 2;
         symbolPaint.setColor(isHighlighted(i) ? hilitedCommentTextColor : commentTextColor);
-        canvas.drawText(arrow, arrowX, arrowY, symbolPaint);
+        if (PAGE_EX_BUTTON.equals(arrow) || HIDE_KEYBOARD_BUTTON.equals(arrow)) {
+          // ▼ / ⌄ 統一用路徑繪製：同尺寸、同線寬；面板打開時 ▼ 反向成 ▲
+          boolean up = PAGE_EX_BUTTON.equals(arrow) && panelOpen;
+          drawChevron(canvas, computedCandidate.getGeometry(), up);
+        } else {
+          float arrowX =
+              computedCandidate.getGeometry().centerX()
+                  - graphicUtils.measureText(symbolPaint, arrow, symbolFont) / 2;
+          float arrowY =
+              computedCandidates.get(0).getGeometry().centerY()
+                  - (candidatePaint.ascent() + candidatePaint.descent()) / 2;
+          canvas.drawText(arrow, arrowX, arrowY, symbolPaint);
+        }
       }
       // Draw separators
       if (i + 1 < computedCandidates.size()) {
@@ -322,6 +342,26 @@ public class Candidate extends View {
             separatorPaint);
       }
     }
+  }
+
+  /** 繪製固定尺寸的實心箭頭（展開/收起/收起鍵盤共用，避免字形大小不一致）。 */
+  private void drawChevron(Canvas canvas, Rect rect, boolean up) {
+    final float cx = rect.centerX();
+    final float cy = rect.centerY();
+    final float halfW = 5.0f * getResources().getDisplayMetrics().density;
+    final float halfH = 3.6f * getResources().getDisplayMetrics().density;
+    chevronPath.reset();
+    if (up) {
+      chevronPath.moveTo(cx - halfW, cy + halfH);
+      chevronPath.lineTo(cx + halfW, cy + halfH);
+      chevronPath.lineTo(cx, cy - halfH);
+    } else {
+      chevronPath.moveTo(cx - halfW, cy - halfH);
+      chevronPath.lineTo(cx + halfW, cy - halfH);
+      chevronPath.lineTo(cx, cy + halfH);
+    }
+    chevronPath.close();
+    canvas.drawPath(chevronPath, symbolPaint);
   }
 
   /**
@@ -347,11 +387,8 @@ public class Candidate extends View {
     } else {
     }
 
-    final int arrowWidth =
-        (int)
-            (candidateSpacing
-                + graphicUtils.measureText(symbolPaint, PAGE_EX_BUTTON, symbolFont)
-                + 2 * candidatePadding);
+    // 右側箭頭固定佔位：不用字體量寬，避免 ▼(U+25BC) 與 ⌄(U+2304) 字形墨跡差造成大小不一。
+    final int arrowWidth = candidateSpacing + symbolBoxSize;
 
     if (numCandidates <= 0 || candidates == null) {
       // 沒有候選：右側只留「收起鍵盤」，點它隱藏輸入法
