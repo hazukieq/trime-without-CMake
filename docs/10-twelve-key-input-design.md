@@ -805,3 +805,34 @@ librime 1.7.3 的 `script_translator` **根本不讀 `enable_sentence`**（源�
 合計：按鍵→候選條落地 **270ms → ~70ms**（p90 250ms → 73ms），不再 ANR。
 剩餘 40ms 在 librime 的主詞典 Lookup（簡拼每個位置仍有幾十條分支），要再快就得限制
 簡拼分支或給 Lookup 加 limit，屬下一步可選項。
+
+
+## 15.8 簡拼再提速：給 Table::Query 加展開預算（2026-11-08）
+
+用 `evgraph`/`evtable` 打點量出真相（連按 `kl`）：
+
+| 階段 | len=1 | len=3 | len=12 |
+|---|---|---|---|
+| `BuildSyllableGraph` | 0.3ms | 1.2ms | 3.8ms |
+| `dict->Lookup` | 0.4ms | 35ms | 38ms |
+
+`Table::Query` 的計數器顯示：**一次 Query 有 ~75,970 次 `Access` + 75,828 次 `Advance`**、
+BFS 隊列峰值 766 —— 也就是說 37ms 全是簡拼圖 BFS 的展開成本，且長度到 3 音節就飽和
+（2–3 音節詞最多）。
+
+修法（`src/rime/dict/table.cc`，`Table::Query`）：
+
+- `kMaxExpansions = 6000`：`Access+Advance` 次數超過就停，保留已收集結果；
+- `kMaxChunksPerEnd = 48`：每個 end_pos 的 chunk 上限（詞典按 by_weight 排序，先到即高頻）。
+
+效果（同機、連按 20 次 `kl`）：
+
+| 指標 | 修前 | 修後 |
+|---|---|---|
+| `dict->Lookup` | 37ms | **4ms** |
+| 按鍵→候選條 | 70ms | **33ms** |
+| gfx p90 | 73ms | **31ms** |
+| gfx p50 | 6ms | 5ms |
+
+代價：簡拼時候選召回被截斷（低頻長詞可能不進候選），面板分組仍正常（實測 `55` 出 5 組）。
+完整拼音路徑分支少，預算遠未觸頂，不受影響。
