@@ -988,3 +988,17 @@ BFS 隊列峰值 766 —— 也就是說 37ms 全是簡拼圖 BFS 的展開成�
   崩潰提示、開源/庫授權（WebView 320dp）、初始化跳過確認。
 - 對話框**取消一切陰影**（窗口背景透明 + 卡片 elevation 0），只保留 0.4 dim 與
   選項行的按壓 ripple。
+
+## 15.17 關於頁現代化（2026-11-09）
+
+用戶：「关于界面格格不入呀，关于界面中的应用市场版块、用户社区版块挪出，支持版块挪出捐赠、PRIME」。
+
+- `AboutActivity` 丟掉舊 `AboutActivityBinding` + `Toolbar`，改成與設置頁同款外殼：
+  inflate `layout/pref_activity.xml`，隱藏右上部署/更多，標題「关于」+ 副標題「客语输入法」，
+  左上返回鍵 `onBackPressedDispatcher`；狀態欄同 `modern_bg`（淺色模式深色圖標）。
+- `AndroidManifest.xml` 給 `.settings.AboutActivity` 指定 `@style/PreferenceTheme`，
+  偏好行自動套用 `ModernPreference*` 樣式（卡片、髮絲線、圖標底色）。
+- `res/xml/about_preference.xml` 刪除：
+  `pref_help__user_community`（QQ 群整組）、`pref_help__marketplace`（Google Play / Coolapk 整組）、
+  `about__donation`（支付寶捐贈）、`about__product_prime`（PRIME）。
+  保留：應用信息、開源許可、尋求幫助（wiki/issues）、支持（貢獻代碼）。

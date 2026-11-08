@@ -71,6 +71,7 @@
 
         <activity
             android:name=".settings.AboutActivity"
+            android:theme="@style/PreferenceTheme"
             android:label="@string/settings__about_title" />
         <activity
             android:name=".setup.SetupActivity"

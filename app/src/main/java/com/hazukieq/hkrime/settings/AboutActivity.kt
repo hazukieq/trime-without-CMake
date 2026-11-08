@@ -2,76 +2,55 @@ package com.hazukieq.hkrime.settings
 
 import android.content.ClipboardManager
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
-import android.view.MenuItem
+import android.view.View
 import android.webkit.WebView
+import android.widget.ImageButton
+import android.widget.TextView
 import android.widget.Toast
-import android.window.OnBackInvokedCallback
-import android.window.OnBackInvokedDispatcher
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.Toolbar
-import androidx.core.os.BuildCompat
-import androidx.fragment.app.Fragment
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
+import com.hazukieq.hkrime.BuildConfig
 import com.hazukieq.hkrime.R
 import com.hazukieq.hkrime.core.Rime
-import com.hazukieq.hkrime.databinding.AboutActivityBinding
 import com.hazukieq.hkrime.util.AppVersionUtils.writeLibraryVersionToSummary
-import com.hazukieq.hkrime.BuildConfig
 
+/**
+ * 關於頁：與設置頁同一套「大標題 + 卡片列表」外殼。
+ * 純展示，不再有 Toolbar，返回鍵在標題左側。
+ */
 class AboutActivity : AppCompatActivity() {
-    lateinit var binding: AboutActivityBinding
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = AboutActivityBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        setContentView(R.layout.pref_activity)
 
-        val toolbar = findViewById<Toolbar>(R.id.toolbar)
-        setSupportActionBar(toolbar)
+        window.statusBarColor = getColor(R.color.modern_bg)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val night = (resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+            if (!night) {
+                window.decorView.systemUiVisibility =
+                    window.decorView.systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+            }
+        }
+
+        findViewById<View>(R.id.header_deploy).visibility = View.GONE
+        findViewById<View>(R.id.header_about).visibility = View.GONE
+        findViewById<TextView>(R.id.header_title).setText(R.string.settings__about_title)
+        findViewById<TextView>(R.id.header_subtitle).setText(R.string.trime_app_name)
+        findViewById<ImageButton>(R.id.header_back).apply {
+            visibility = View.VISIBLE
+            setOnClickListener { onBackPressedDispatcher.onBackPressed() }
+        }
 
         if (savedInstanceState == null) {
-            loadFragment(AboutFragment())
-        } else {
-            title = savedInstanceState.getCharSequence(FRAGMENT_TAG)
-        }
-        supportFragmentManager.addOnBackStackChangedListener {
-            if (supportFragmentManager.backStackEntryCount == 0) {
-                setTitle(R.string.settings__about_title)
-            }
-        }
-
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        outState.putCharSequence(FRAGMENT_TAG, title)
-    }
-
-    override fun onSupportNavigateUp(): Boolean {
-        if (supportFragmentManager.popBackStackImmediate()) {
-            return true
-        }
-        return super.onSupportNavigateUp()
-    }
-
-    private fun loadFragment(fragment: Fragment) {
-        supportFragmentManager
-            .beginTransaction()
-            .replace(binding.about.id, fragment, FRAGMENT_TAG)
-            .commit()
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            android.R.id.home -> {
-                // this method is deprecated but still useful for any android system.
-                onBackPressed()
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.preference, AboutFragment(), FRAGMENT_TAG)
+                .commit()
         }
     }
 
@@ -80,18 +59,12 @@ class AboutActivity : AppCompatActivity() {
             setPreferencesFromResource(R.xml.about_preference, rootKey)
             findPreference<Preference>("about__changelog")
                 ?.writeLibraryVersionToSummary(BuildConfig.BUILD_VERSION)
-
             findPreference<Preference>("about__buildinfo")
                 ?.writeLibraryVersionToSummary(BuildConfig.BUILD_INFO)
-
             findPreference<Preference>("about__librime_version")
                 ?.writeLibraryVersionToSummary(Rime.get_librime_version())
-
             findPreference<Preference>("about__opencc_version")
                 ?.writeLibraryVersionToSummary(Rime.get_opencc_version())
-
-            findPreference<Preference>("pref_trime_custom_qq")
-                ?.hidden()
         }
 
         override fun onPreferenceTreeClick(preference: Preference): Boolean {
@@ -124,7 +97,6 @@ class AboutActivity : AppCompatActivity() {
                     ).show()
                     true
                 }
-
                 "about__buildinfo" -> {
                     val cbm = context?.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     cbm.text = BuildConfig.BUILD_INFO
@@ -135,10 +107,8 @@ class AboutActivity : AppCompatActivity() {
             }
         }
     }
-}
 
-private fun Preference.hidden() {
-    if (this.summary?.isBlank() ?:  this.intent?.data.toString().isBlank()) {
-        this.setVisible(false)
+    companion object {
+        private const val FRAGMENT_TAG = "about"
     }
 }
