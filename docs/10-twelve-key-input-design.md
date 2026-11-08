@@ -1169,3 +1169,34 @@ ni, ni hau 才对。当选了 ni 之后应该剩下 hau，和 12 键逻辑一致
     「輸入方案」選單同步只剩已啟用項且「（當前）」自動變成清單第一項「客語12鍵」；
   - 停用「客語12鍵」同時勾上「朙月拼音」→ 清單變成 `[hakka_qwerty, luna_pinyin]`，
     鍵盤不等重啟就切到客語 26 鍵，朙月拼音可正常出候選（妮/你/尼…）。
+
+## 15.24 全字母方案自動適配 patch（2026-11-09）
+
+用戶：「針對全拼音方案（用到全字母鍵盤的），為了適配當前 app，都要自動在方案加載時
+patch（xxx.custom.yaml 裡面加）」。
+
+- 為什麼：面板左列的音節索引靠候選 `comment` 分組（`TwelveKeySnapshotBuilder` 按
+  comment 分組）。librime 的 script_translator 默認只在「詞典拼寫 ≠ 用戶 preedit」
+  時才填 comment；全字母方案原樣敲拼寫（`nihao`）時 comment 為空 → 左列只剩「…」。
+  另外 comment 內容還要求 `spelling_hints` 夠大（否則 `GetOriginalSpelling` 拿不到
+  完整拼寫）。這兩點以前是給 `hakka_qwerty.schema.yaml` 手動加的，新加的任何全拼音
+  方案都會重踩。
+- 實現：新增 `util/SchemaCompat.kt`，在 `RimeUtils.deploy()` 最前面調用
+  `SchemaCompat.ensureForEnabledSchemas()`：
+  - 讀 `user_data_dir/default.custom.yaml` 的 `schema_list`，對每個方案（跳過 12 鍵族
+    `hakka_jiugong / hakka_giugiung / hakka_tung`），確保
+    `user_data_dir/<schema_id>.custom.yaml` 裡有：
+    ```yaml
+    patch:
+      "translator/spelling_hints": 100
+      "translator/always_show_comments": true
+    ```
+  - 已有 `always_show_comments` 就跳過（冪等）；已有 `patch:` 段就插到它下面，沒有就追加；
+    文件不存在則新建並帶一行說明註釋。
+  - custom.yaml 的 patch 由 librime 在**部署時**合併，所以掛在 deploy 入口；
+    「啟用 / 停用方案…」這條路徑本來就 `select_schemas` + deploy，新啟用的方案會被
+    立刻補上並生效。
+- 真機驗收（朙月拼音，之前從沒手動改過）：啟用後走一次部署 → 自動生成
+  `/sdcard/hkrime/luna_pinyin.custom.yaml`（同一輪還生成了 `hakka_qwerty.custom.yaml`），
+  輸入 `ni hao` 展開面板 → 左列出現 `ni` / `ni hao` 兩組、右格候選帶 `ni hao` 註腳，
+  與客語 26 鍵表現一致；logcat 可見 `SchemaCompat: patched app-adaptation for ...`。

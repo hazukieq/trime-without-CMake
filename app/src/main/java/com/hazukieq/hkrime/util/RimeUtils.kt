@@ -7,6 +7,7 @@ import com.hazukieq.hkrime.core.Rime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.system.exitProcess
+import timber.log.Timber
 
 /**
  * Wrapper of often-used native methods in [Rime].
@@ -20,6 +21,10 @@ object RimeUtils {
 
     /** Deploy means reset Rime instance. **/
     suspend fun deploy(context: Context) = withContext(Dispatchers.IO) {
+        // 全字母方案（客語 26 鍵、朙月拼音…）先補 App 適配 patch，再部署讓 patch 生效。
+        // 見 SchemaCompat：面板左列的音節分組靠候選 comment = 精確拼寫。
+        runCatching { SchemaCompat.ensureForEnabledSchemas() }
+            .onFailure { Timber.e(it, "SchemaCompat failed before deploy") }
         Rime.destroy()
         Rime.get(context, true)
         ToastUtils.showLong(R.string.deploy_finish)
