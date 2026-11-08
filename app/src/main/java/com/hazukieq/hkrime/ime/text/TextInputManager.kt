@@ -301,6 +301,7 @@ class TextInputManager private constructor() :
             if (panelItems.isEmpty()) panelItems = currentPageItems()
             candidatePanelAdapter?.submit(panelItems)
             candidatePanel?.scrollToPosition(0)
+            rebuildPinyinGroups()
         }
     }
 
@@ -350,7 +351,12 @@ class TextInputManager private constructor() :
     /** 候選刷新後呼叫：組字結束（無候選）時自動收起展開面板，避免留下空白面板 */
     fun onCandidatesRefreshed() {
         if (!isCandidatePanelShown()) return
-        if (Rime.getCandidatesWithoutSwitch().isNullOrEmpty()) hideCandidatePanel()
+        if (Rime.getCandidatesWithoutSwitch().isNullOrEmpty()) {
+            hideCandidatePanel()
+            return
+        }
+        // 組字內容變了（例如剛轉換掉一段）：左側音節組跟著更新
+        rebuildPinyinGroups()
     }
 
     // ---------- 左側拼音音節組（方案 2：自切音節，僅顯示/導航） ----------
@@ -360,10 +366,56 @@ class TextInputManager private constructor() :
 
     private fun utf8Len(s: String): Int = s.toByteArray(Charsets.UTF_8).size
 
+    private var cachedGroups: List<Triple<String, Int, Boolean>> = emptyList()
+
+    /** 探測 librime 的音節邊界，返回 (文本, 起始字節, 是否已轉換)；不改動最終 caret。 */
+    private fun probeGroups(bytes: ByteArray): List<Triple<String, Int, Boolean>> {
+        val savedCaret = Rime.RimeGetCaretPos()
+        val boundSet = sortedSetOf<Int>(bytes.size)
+        Rime.RimeSetCaretPos(bytes.size)
+        Rime.getContexts()
+        var guard = 0
+        var lastPos = bytes.size
+        while (guard++ < 64) {
+            Rime.process_key(0xff51, 0) // XK_Left
+            Rime.getContexts()
+            val c = Rime.RimeGetCaretPos()
+            if (c <= 0) { boundSet.add(0); break }
+            if (c >= lastPos) break
+            boundSet.add(c)
+            lastPos = c
+        }
+
+        Rime.RimeSetCaretPos(savedCaret)
+        Rime.getContexts()
+        if (boundSet.isEmpty()) boundSet.add(0)
+        if (boundSet.first() != 0) boundSet.add(0)
+        boundSet.add(bytes.size)
+
+        val out = ArrayList<Triple<String, Int, Boolean>>()
+        val bounds = boundSet.toList()
+        for (i in 0 until bounds.size - 1) {
+            var sb = bounds[i]
+            var eb = bounds[i + 1]
+            while (sb < eb && (bytes[sb] == ' '.code.toByte() || bytes[sb] == '\''.code.toByte())) sb++
+            while (eb > sb && (bytes[eb - 1] == ' '.code.toByte() || bytes[eb - 1] == '\''.code.toByte())) eb--
+            if (eb <= sb) continue
+            val segText = String(bytes, sb, eb - sb, Charsets.UTF_8).trim()
+            if (segText.isBlank()) continue
+            val pureLatin = segText.all { it in 'a'..'z' || it == '\'' }
+            val pureCjk = segText.all { isCjk(it) }
+            if (!pureLatin && !pureCjk) continue
+            out.add(Triple(segText, sb, pureCjk))
+        }
+        return out
+    }
+
     /** 由 preedit 重建左側音節組：已轉換前綴 + 自切音節。 */
     private fun rebuildPinyinGroups() {
         val adapter = candidateGroupAdapter ?: return
-        val text = Rime.getCompositionText() ?: run { adapter.clear(); return }
+        // preedit 裡可能帶 librime 的 caret 佔位符（默認 "‸"），它不是輸入內容，先去掉
+        val text = Rime.getCompositionText()?.replace("\u2038", "")?.replace("\u2040", "")
+            ?: run { adapter.clear(); return }
         if (text.isEmpty()) {
             adapter.clear()
             candidateGroupList?.visibility = View.GONE
@@ -373,50 +425,27 @@ class TextInputManager private constructor() :
             activeGroupIndex = -1
             lastGroupText = text
         }
-        // 用 librime 自己的切分：按左方向键（XK_Left）它会把光標按音節往左跳，
-        // 收集跳到的所有位置就是音節邊界；探測完把 caret 還原。
-        val savedCaret = Rime.RimeGetCaretPos()
         val bytes = text.toByteArray(Charsets.UTF_8)
-        val boundSet = sortedSetOf<Int>(bytes.size)
-        Rime.RimeSetCaretPos(bytes.size)
-        Rime.getContexts()
-        var guard = 0
-        var last = bytes.size
-        while (guard++ < 64) {
-            Rime.process_key(0xff51, 0) // XK_Left
-            Rime.getContexts()
-            val c = Rime.RimeGetCaretPos()
-            if (c <= 0) {
-                boundSet.add(0)
-                break
+        // 用 librime 自己的切分：把 caret 放到末尾，反覆按 XK_Left，它會按音節往左跳；
+        // 跳到的位置就是真實音節邊界。這裡只為「拿分組」，探測完把 caret 還原，
+        // 左側選中不影響 caret；caret 只由右側挑中漢字時被消費。
+        val groups = if (text == lastGroupText && cachedGroups.isNotEmpty()) {
+            cachedGroups
+        } else {
+            probeGroups(bytes).also {
+                cachedGroups = it
+                lastGroupText = text
+                activeGroupIndex = -1
             }
-            if (c >= last) break // 繞回末尾，探測結束
-            boundSet.add(c)
-            last = c
         }
-        if (boundSet.isEmpty()) boundSet.add(0)
-        if (boundSet.first() != 0) boundSet.add(0)
-        boundSet.add(bytes.size)
-        Rime.RimeSetCaretPos(savedCaret)
-        Rime.getContexts()
-
-        val bounds = boundSet.toList()
+        val caretNow = Rime.RimeGetCaretPos()
         val items = ArrayList<CandidateGroupAdapter.PinyinGroupAdapterItem>()
         var nextIndex = 0
-        for (i in 0 until bounds.size - 1) {
-            var startByte = bounds[i]
-            var endByte = bounds[i + 1]
-            // 去掉分隔符（空格、') 之類的間隔符）
-            while (startByte < endByte && (bytes[startByte] == ' '.code.toByte() || bytes[startByte] == '\''.code.toByte())) startByte++
-            while (endByte > startByte && (bytes[endByte - 1] == ' '.code.toByte() || bytes[endByte - 1] == '\''.code.toByte())) endByte--
-            if (endByte <= startByte) continue
-            val segText = String(bytes, startByte, endByte - startByte, Charsets.UTF_8)
-            if (segText.isBlank()) continue
-            val converted = segText.any { isCjk(it) }
+        for ((segText, startByte, converted) in groups) {
             val selected = if (activeGroupIndex >= 0) {
                 activeGroupIndex == nextIndex
             } else {
-                savedCaret > startByte && savedCaret <= endByte
+                caretNow > startByte && caretNow <= startByte + utf8Len(segText)
             }
             items.add(
                 CandidateGroupAdapter.PinyinGroupAdapterItem(
@@ -429,20 +458,14 @@ class TextInputManager private constructor() :
         candidateGroupList?.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
     }
 
-    /** 點擊左側音節組：把 caret 移到該組起點（librime 無「按段取候選」，候選可能不變）。 */
+    /**
+     * 點擊左側音節組：**只更新選中態，不動 caret**。
+     *
+     * 光標只在右側挑中漢字（真正上屏/轉換一段）時才由 librime 自己消費。
+     */
     private fun selectPinyinGroup(group: CandidateGroupAdapter.PinyinGroupAdapterItem) {
-        if (group.converted) return
         activeGroupIndex = group.index
-        Rime.RimeSetCaretPos(group.startByte)
-        Rime.getContexts()
-        trime.updateComposing()
         rebuildPinyinGroups()
-        if (isCandidatePanelShown()) {
-            panelItems = collectCandidatePanelItems()
-            if (panelItems.isEmpty()) panelItems = currentPageItems()
-            candidatePanelAdapter?.submit(panelItems)
-            candidatePanel?.scrollToPosition(0)
-        }
     }
 
     /**
