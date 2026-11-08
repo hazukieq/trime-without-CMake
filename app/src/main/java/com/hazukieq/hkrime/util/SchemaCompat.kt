@@ -1,5 +1,6 @@
 package com.hazukieq.hkrime.util
 
+import android.content.Context
 import com.hazukieq.hkrime.data.AppPrefs
 import java.io.File
 import timber.log.Timber
@@ -24,6 +25,8 @@ object SchemaCompat {
     /** 12 鍵方案：它們本來就有 spelling_hints/always_show_comments，不需要（也不該）被改寫。 */
     private val TWELVE_KEY_SCHEMAS = setOf("hakka_jiugong", "hakka_giugiung", "hakka_tung")
 
+    private const val RIME_LUA = "rime.lua"
+
     private val SCHEMA_ITEM = Regex("""schema:\s*[-A-Za-z0-9_.]+""")
     private val PATCH_LINE = Regex("""(?m)^patch:\s*$""")
 
@@ -33,6 +36,31 @@ object SchemaCompat {
     private const val PATCH_BLOCK =
         "  \"translator/spelling_hints\": 100\n" +
             "  \"translator/always_show_comments\": true"
+
+    /**
+     * 確保 user_data_dir 裡有 rime.lua。
+     *
+     * librime-lua 的 `lua_translator@*xxx` / `lua_filter@*xxx` 是去全局環境找同名變量，
+     * 而 rime-ice 這類方案依賴 rime.lua 把 lua/ 下的模塊 require 出來掛到全局；
+     * 沒有這個前置文件時只是 Lua 增強（日期/農曆/UUID/糾錯…）靜默失效。
+     * 這裡在部署前從 assets 補一份（已存在則不動，留給用戶自定義）。
+     *
+     * @return true = 本次從 assets 補了 rime.lua
+     */
+    fun ensureRimeLua(context: Context): Boolean {
+        val userDir = runCatching { File(AppPrefs.defaultInstance().conf.userDataDir) }
+            .getOrNull() ?: return false
+        val target = File(userDir, RIME_LUA)
+        if (target.isFile && target.length() > 0L) return false
+        return runCatching {
+            target.parentFile?.mkdirs()
+            context.assets.open("rime/$RIME_LUA").use { input ->
+                target.outputStream().use { output -> input.copyTo(output) }
+            }
+            Timber.i("SchemaCompat: installed %s from assets", target.absolutePath)
+            true
+        }.onFailure { Timber.e(it, "SchemaCompat: install rime.lua failed") }.getOrDefault(false)
+    }
 
     /**
      * 給當前 schema_list 裡所有「全字母」方案補上適配 patch。

@@ -1403,8 +1403,10 @@ public class Trime extends LifecycleInputMethodService {
   }
 
   public void showOptionsDialog() {
+    // 維護被延後 / 引擎剛 destroy 時 get_current_schema() 會是 null，這裡走 getSchemaId()
+    // （已把 null 統一成 ".default"），避免 ☰ 點擊在無 session 時 NPE。
     final String message =
-        Rime.get_current_schema().contentEquals(".default") ? getString(R.string.no_schemas) : null;
+        Rime.getSchemaId().contentEquals(".default") ? getString(R.string.no_schemas) : null;
     final com.hazukieq.hkrime.ime.dialog.ModernListDialog dialog =
         com.hazukieq.hkrime.ime.dialog.ModernListDialog.actionList(
             this,

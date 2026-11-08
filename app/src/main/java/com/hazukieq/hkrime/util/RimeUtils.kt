@@ -31,6 +31,8 @@ object RimeUtils {
     suspend fun deploy(context: Context, full: Boolean = false) = withContext(Dispatchers.IO) {
         // 全字母方案（客語 26 鍵、朙月拼音…）先補 App 適配 patch，再部署讓 patch 生效。
         // 見 SchemaCompat：面板左列的音節分組靠候選 comment = 精確拼寫。
+        runCatching { SchemaCompat.ensureRimeLua(context) }
+            .onFailure { Timber.e(it, "SchemaCompat: rime.lua failed") }
         runCatching { SchemaCompat.ensureForEnabledSchemas() }
             .onFailure { Timber.e(it, "SchemaCompat failed before deploy") }
         val t0 = System.nanoTime()

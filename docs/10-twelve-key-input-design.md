@@ -1312,3 +1312,29 @@ librime 1.11+ 的 API 兼容（关键坑）：
   （生成 `hakka.prism.bin`、`rime_ice.prism.bin` 等），期间设置页可用。
 - 12 键：键盘 23 键、候选条 84px，输入 nzia → 惹/喏/偌/汝/茹/若/菇，▼ 面板左列 nzia + 右格正常。
 - 雾凇拼音（rime_ice）：启用并部署后输入 ni… → 候选 你就死/你就/你将/你家/你叫（**此前为空候选，已修复**）。
+
+## 15.28 rime.lua 隨包發布 + 無 session 時的 NPE 保護（2026-11-09）
+
+**問題**：升 librime 1.17 後霧凇拼音（rime-ice）能出候選，但日期/農曆/UUID/糾錯等 Lua 增強全部無效。
+根因：librime-lua 的 `lua_translator@*xxx`、`lua_filter@*xxx` 是去 **全局環境** 找同名變量，
+而 rime-ice 依賴數據根目錄的 `rime.lua` 把 `lua/` 下的腳本 require 出來掛到 `_G`。
+本機 `/sdcard/hkrime/lua/` 有 23 個腳本（date_translator、lunar、corrector…），但根目錄缺 `rime.lua`。
+
+**修法**：
+- 新增 `app/src/main/assets/rime/rime.lua`（33 行）：按 rime-ice 實際用到的 15 個模塊循環
+  `pcall(require, name)`，成功才 `_G[name] = mod`；缺哪個就跳過，不影響其它模塊、也不影響非 Lua 方案。
+- `SchemaCompat.ensureRimeLua(context)`：部署前若 `user_data_dir/rime.lua` 不存在或為空，
+  從 assets 複製一份（已存在則不動，留給用戶自定義），`Timber.i("SchemaCompat: installed %s from assets")`。
+- `RimeUtils.deploy()` 裡在 `ensureForEnabledSchemas()` 之前調用，因此「啟用方案 → 確定」就會補上。
+
+**真機驗證**：`/sdcard/hkrime/rime.lua` 891 字節、日誌 `SchemaCompat: installed /sdcard/hkrime/rime.lua from assets`；
+霧凇拼音中文模式下輸入 `rq` → 候選條出現「2026-11-09」「2026/11/09」（date_translator 生效），
+證明 rime.lua 掛載 + librime-lua 全鏈路正常。
+
+**順帶修的兩處 NPE**（librime 升級後「延後維護」期間 session/schema 尚未建立就來按鍵）：
+1. `Trime.showOptionsDialog()`：`Rime.get_current_schema()` 在無 session 時返回 null →
+   `String.contentEquals` NPE（`Trime.java:1407`，點 ☰ 崩）。改用 `Rime.getSchemaId()`（null 已統一成 `.default`）。
+2. `Rime.getStatus()` 的 `mSchema.getValue()` 為 null → `getContexts()/onKey()` 崩（`Rime.java:402`）。
+   新增 `Rime.isEngineReady()`（`mSchema != null && mSchemaList != null`），在
+   `getStatus()`、`onKey(int,int)`、`onText(CharSequence)`、`toggleOption(int)` 入口保護：
+   引擎未就緒時丟棄按鍵，等後台維護完成 `initSchema()` 後自動恢復。

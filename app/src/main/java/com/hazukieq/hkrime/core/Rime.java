@@ -294,6 +294,17 @@ public class Rime {
 
   private static final RimeStatus mStatus = new RimeStatus();
   private static RimeSchema mSchema;
+
+  /**
+   * 引擎是否可用于 UI 交互。
+   *
+   * 維護被延後（{@code maintenancePending}）時 init() 直接 return，session/schema 都還沒建；
+   * 這期間輸入法 UI 已經顯示、用戶可能已經在敲鍵，native 調用會拿到 null schema。
+   * 所有入口先看這個，未就緒就當作「無輸入」丟棄，等後台維護完成 initSchema() 後自然恢復。
+   */
+  private static boolean isEngineReady() {
+    return mSchema != null && mSchemaList != null;
+  }
   private static List<?> mSchemaList;
   private static boolean mOnMessage;
 
@@ -399,6 +410,7 @@ public class Rime {
 
   @SuppressWarnings("UnusedReturnValue")
   private static boolean getStatus() {
+    if (!isEngineReady()) return false;
     mSchema.getValue();
     return get_status(mStatus);
   }
@@ -508,6 +520,7 @@ public class Rime {
   // KeyProcess 调用JNI方法发送keycode和mask
   private static boolean onKey(int keycode, int mask) {
     synchronized (ENGINE_LOCK) {
+      if (!isEngineReady()) return false; // 延後維護期間丟棄按鍵
       Timber.i("\t<TrimeInput>\tonkey()\tkeycode=%s, mask=%s", keycode, mask);
       if (isVoidKeycode(keycode)) return false;
       // 此处调用native方法是耗时操作
@@ -534,6 +547,7 @@ public class Rime {
   }
 
   public static boolean onText(CharSequence text) {
+    if (!isEngineReady()) return false; // 延後維護期間丟棄
     if (!isValidText(text)) return false;
     boolean b = simulate_key_sequence(text.toString().replace("{}", "{braceleft}{braceright}"));
     Timber.i("simulate key sequence = %s, input = %s", b, text);
@@ -614,6 +628,7 @@ public class Rime {
   }
 
   public static void toggleOption(int i) {
+    if (mSchema == null) return; // 延後維護期間沒有 schema
     mSchema.toggleOption(i);
   }
 
