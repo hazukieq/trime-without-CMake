@@ -210,7 +210,16 @@ class TextInputManager private constructor() :
 
     /** 切換展開面板；關閉鍵盤由候選欄的 ⌄ 負責 */
     fun toggleCandidatePanel() {
-        if (isCandidatePanelShown()) hideCandidatePanel() else showCandidatePanel()
+        if (isCandidatePanelShown()) {
+            hideCandidatePanel()
+            return
+        }
+        // 沒有在組字（候選為空）時，▼ 的語義是「收起鍵盤」，不是展開面板
+        if (!Rime.isComposing()) {
+            Trime.getService().requestHideSelf(0)
+            return
+        }
+        showCandidatePanel()
     }
 
     fun showCandidatePanel() {
