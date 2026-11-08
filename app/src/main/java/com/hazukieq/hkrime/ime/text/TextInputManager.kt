@@ -285,12 +285,13 @@ class TextInputManager private constructor() :
         Rime.selectCandidate(indexInPage)
         activeEditorInstance.commitRimeText()
         trime.updateComposing()
-        if (!Rime.isComposing()) {
-            hideCandidatePanel()
-            return
-        }
-        // 等這一幀的組字狀態落定後再刷新左列/面板（否則拿到還是上一輪的 preedit）
+        // 等這一幀的組字狀態落定後再判斷：librime 選完一節會 Forward 到下一節，
+        // 這裡可能瞬時 isComposing()==false，不能立刻收面板。
         candidatePanel?.postDelayed({
+            if (!Rime.isComposing()) {
+                hideCandidatePanel()
+                return@postDelayed
+            }
             Rime.getContexts()
             trime.updateComposing()
             activeGroupIndex = -1
@@ -352,10 +353,12 @@ class TextInputManager private constructor() :
     /** 候選刷新後呼叫：組字結束（無候選）時自動收起展開面板，避免留下空白面板 */
     fun onCandidatesRefreshed() {
         if (!isCandidatePanelShown()) return
-        if (Rime.getCandidatesWithoutSwitch().isNullOrEmpty()) {
+        if (!Rime.isComposing()) {
             hideCandidatePanel()
             return
         }
+        // 還在組字但這一節暫時沒有候選（例如只剩一個 u）時，面板留著、右側可以空，
+        // 這樣左列還能看到「剩下的音節」，符合「選 ha 後剩 u」的預期。
         // 組字內容變了（例如剛轉換掉一段）：左側音節組與面板一起跟著更新
         lastGroupText = ""
         activeGroupIndex = -1
@@ -406,17 +409,24 @@ class TextInputManager private constructor() :
         // 若編譯結果正好是一段 [start, p) 且該段文本是字典裡的合法音節，就認為 p 是一個切分點。
         val input = Rime.RimeGetInput() ?: ""
         val ib = input.toByteArray(Charsets.UTF_8)
+        // 已轉換前綴：用 librime 的分段（字節偏移是 input 的，不是 preedit 的）取最後一個已確認段的 end
         val nativeSegs = Rime.getRimeCompositionSegments()
         var startByte = 0
         for (i in 0 until nativeSegs.size / 3) {
-            val st = nativeSegs[i * 3]
-            val en = nativeSegs[i * 3 + 1]
+            val end = nativeSegs[i * 3 + 1]
             val status = nativeSegs[i * 3 + 2]
-            if (status >= 2 && en > startByte) startByte = maxOf(startByte, en)
-            if (status >= 2 && st > startByte) startByte = st
+            if (status >= 2) startByte = maxOf(startByte, end)
         }
+        // 若沒有已確認段但 preedit 已經是漢字開頭，退回用 preedit 的 CJK 前綴長度
+        val preeditClean = raw.replace("\u2038", "")
+        if (startByte == 0 && preeditClean.isNotEmpty() && isCjk(preeditClean[0])) {
+            var n = 0
+            for (ch in preeditClean) { if (isCjk(ch)) n += ch.toString().toByteArray(Charsets.UTF_8).size else break }
+            startByte = n
+        }
+        var convertedPrefix = ""
         val syllables = SyllableLexicon.syllables(trime)
-        val slices = ArrayList<Triple<String, Int, Boolean>>()
+        val slices = ArrayList<Triple<String, Int, Int>>()
         val savedCaret = Rime.RimeGetCaretPos()
         var p = startByte + 1
         while (p <= ib.size && slices.size < 6) {
@@ -428,17 +438,39 @@ class TextInputManager private constructor() :
             val text = String(ib, startByte, p - startByte, Charsets.UTF_8)
                 .replace(" ", "").replace("'", "").trim()
             if (lastEnd == p && candCount > 0 && text.isNotEmpty() && text in syllables) {
-                slices.add(Triple(text, startByte, false))
+                slices.add(Triple(text, startByte, p))
             }
             p++
         }
+        // 最後再補一個「整個剩下的輸入」選項（例如 nginhau 的 ngin hau），標籤用 preedit 的寫法
+        if (slices.isEmpty() || slices.last().third < ib.size) {
+            Rime.RimeSetCaretPos(ib.size)
+            Rime.getContexts()
+            val rest = String(ib, startByte, ib.size - startByte, Charsets.UTF_8)
+                .replace(" ", "").replace("'", "")
+            val pieces = SyllableLexicon.split(trime, rest)
+            val full = if (pieces.isNotEmpty() && pieces.joinToString("") { it.first } == rest)
+                pieces.joinToString(" ") { it.first } else rest
+            if (full.isNotEmpty()) slices.add(Triple(full, startByte, ib.size))
+        }
         Rime.RimeSetCaretPos(savedCaret)
         Rime.getContexts()
-        val groups = if (slices.isNotEmpty()) {
-            cachedGroups = slices
-            lastGroupText = raw
-            slices
-        } else if (raw == lastGroupText && cachedGroups.isNotEmpty()) {
+        if (slices.isNotEmpty()) {
+            val items = ArrayList<CandidateGroupAdapter.PinyinGroupAdapterItem>()
+            var idx = 0
+            for ((text, st, en) in slices) {
+                items.add(
+                    CandidateGroupAdapter.PinyinGroupAdapterItem(
+                        idx++, text, st, en, converted = false, incomplete = false,
+                        selected = savedCaret == en,
+                    )
+                )
+            }
+            adapter.submit(items)
+            candidateGroupList?.visibility = View.VISIBLE
+            return
+        }
+        val groups = if (raw == lastGroupText && cachedGroups.isNotEmpty()) {
             cachedGroups
         } else {
             probeGroups(raw).also {
@@ -468,7 +500,7 @@ class TextInputManager private constructor() :
             }
             items.add(
                 CandidateGroupAdapter.PinyinGroupAdapterItem(
-                    nextIndex++, segText, startByte, converted = converted,
+                    nextIndex++, segText, startByte, startByte + utf8Len(segText), converted = converted,
                     incomplete = false, selected = selected
                 )
             )
@@ -542,7 +574,7 @@ class TextInputManager private constructor() :
     private fun selectPinyinGroup(group: CandidateGroupAdapter.PinyinGroupAdapterItem) {
         activeGroupIndex = group.index
         // 把 caret 移到「這一節的末尾」（= 下一節的起點），librime 就會把候選切成這一節的
-        val endByte = group.startByte + group.text.toByteArray(Charsets.UTF_8).size
+        val endByte = group.endByte
         moveCaretTo(endByte)
         Rime.getContexts()
         trime.updateComposing()

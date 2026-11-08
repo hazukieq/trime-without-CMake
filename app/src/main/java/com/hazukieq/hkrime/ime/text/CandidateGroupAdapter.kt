@@ -26,6 +26,8 @@ class CandidateGroupAdapter(
     val text: String,
     /** 該組在 preedit 中的起始字節偏移（用於 RimeSetCaretPos） */
     val startByte: Int,
+    /** 該切分的結束字節偏移（= 點擊後 caret 要去的「這一節末尾」） */
+    val endByte: Int,
     /** 已經轉換成漢字的前綴（點擊無意義，置灰） */
     val converted: Boolean,
     val incomplete: Boolean,
