@@ -1264,3 +1264,51 @@ build 出來的 `rime_ice.table.bin` 60MB）：
 
 取捨：維護在背景跑的那段時間引擎沒有 session，輸入暫時無候選（鍵盤仍在、UI 可操作）；
 維護完成後自動恢復。比整段白屏假死好得多。
+
+## 15.27 librime 升级到 1.17.0 + rime_jni 构建独立化（2026-11-09）
+
+背景：rime-ice（雾凇拼音）要求 librime > 1.11.2（其 schema 注释 `enable_word_completion` / `max_sentences`），
+旧库是 librime 1.7.3（commit 43023e1，2022-06），部署完成的 rime_ice 输入后候选为空。
+用户要求：① 先建立存档点；② 直接升级 librime；③ rime_jni 构建 detach from trime repo、自己定制化。
+
+存档点：
+- hkrime git tag `snapshot/pre-librime-upgrade-20261109`（= 1959dbb）。
+- 旧 .so 备份 `trime-workspace/backups/librime_jni-1.7.3-arm64-v8a-20261109.so`
+  （sha256 22f2c518…，附 .sha256 与 pins-librime-1.7.3.txt）。
+
+新独立工程 `trime-workspace/rime-jni/`（不再 clone osfans/trime）：
+- `librime/`：1.17.0（tags 最新；submodule deps: leveldb / yaml-cpp / marisa-trie / glog / opencc 已初始化）
+- `plugins/librime-lua`（master + `thirdparty` 分支的 lua5.4 源码）、`librime-charcode`（rime org）、
+  `librime-octagram`（注意 URL 是 `lotem/librime-octagram`，rime 组织下 404）；
+  三者拷贝进 `librime/plugins/` 由 librime 的 `BUILD_MERGED_PLUGINS` 合并。
+- `third_party/`：boost 1.79 / capnproto / libiconv / snappy（从旧 jni 树 cp -a；OpenCC 改用 librime/deps/opencc 1.1.9）
+- `glue/`：旧 trime 的 `librime_jni/{rime_jni.cc,key_table.cc,levers.cc,opencc.cc,jni-utils.h}`，
+  包名常量已固定为 `com.hazukieq.hkrime`（不再做 patch 步骤）。
+- `cmake/`：`Iconv.cmake` 改指 third_party/libiconv；`CapnprotoWorkarounds` 改指 third_party/capnproto；
+  `FindMarisa` 指向 OpenCC 自带 marisa-0.2.6；`FindOpencc` 指 libopencc + `opencc-staging` 软链；
+  `FindBoost` 把 `BOOST_EXCLUDE_LIBRARIES` 扩到 `context;coroutine;fiber;log;log_setup`（Boost 1.79 的 log 依赖 coroutine）。
+- 顶层 `CMakeLists.txt`：CXX17、`BUILD_SHARED_LIBS=OFF`（出 rime-static）、`ENABLE_LOGGING=OFF`、
+  顶层统一 `include_directories(third_party/boost/libs/*/include)`（否则 librime / 插件拿不到 Boost 头）。
+
+librime 1.11+ 的 API 兼容（关键坑）：
+- 旧全局 C 包装（`RimeSetup` / `RimeInitialize` / `RimeProcessKey` …）在 1.17 只剩 `rime_api.h` 里的
+  `RimeApi` 结构体成员；`rime_api_deprecated.h` 里虽有声明，但静态库构建下 `RIME_API` 为空 → 实现是 C++ 链接，
+  glue 链接不到。解法：`glue/rime_api_compat.h` 用 `static inline` 逐个转发到 `rime_get_api()->xxx`（59 个），
+  另有 `RimeFindModule` 走 `->find_module`、`RimeGetKeycodeByName/RimeGetModifierByName` 引 `rime/key_table.h`。
+- `RimeGetCompositionSegments`（trime 扩展）1.17 已删，`glue/rime_compat.cc` 用内部 API
+  （`Service::instance().GetSession()` + `Context::composition()` 的 Segment 迭代）重新实现。
+- 注意 `RimeApp` 的 traits 结构与 1.7.3 兼容（`RIME_STRUCT_INIT` 版本号匹配），JNI 契约不变（75 个导出符号）。
+
+构建（实际使用的命令，脚本后续补）：
+- NDK 24.0.8215888 / cmake 3.22.1 / ninja，arm64-v8a / android-21 / Debug：
+  `cmake -S . -B build-arm64 -G Ninja -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-21 -DCMAKE_BUILD_TYPE=Debug -DBUILD_SHARED_LIBS=OFF -DBUILD_TEST=OFF -DENABLE_LOGGING=OFF`
+- `ninja -C build-arm64 -j20 rime_jni` → `build-arm64/glue/librime_jni.so`（未 strip 92.8MB）；
+  `llvm-strip --strip-unneeded` 后 13.9MB（旧 1.7.3 库 13.6MB）。
+- `script/verify-jni-symbols.sh --so …` 通过：75 个声明全部导出、无旧包名残留。
+
+真机验收（vivo V2520A）：
+- 装新 APK 后启动：`Rime.check(false)` → 后台维护 888ms → `re-initialized (schema=hakka_jiugong)`，UI 不冻结；
+  因升级版本号（rime_version 1.7.3 → 1.17.0）触发一次全量重建，本次 `joined maintenance in 90122ms`
+  （生成 `hakka.prism.bin`、`rime_ice.prism.bin` 等），期间设置页可用。
+- 12 键：键盘 23 键、候选条 84px，输入 nzia → 惹/喏/偌/汝/茹/若/菇，▼ 面板左列 nzia + 右格正常。
+- 雾凇拼音（rime_ice）：启用并部署后输入 ni… → 候选 你就死/你就/你将/你家/你叫（**此前为空候选，已修复**）。
