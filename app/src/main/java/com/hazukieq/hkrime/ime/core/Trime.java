@@ -1240,13 +1240,15 @@ public class Trime extends LifecycleInputMethodService {
     if (ic != null && !isWinFixed()) isCursorUpdated = ic.requestCursorUpdates(1);
     int startNum = 0;
     if (mCandidateRoot != null) {
-      if (isPopupWindowEnabled && !isTwelveKeySchema()) {
+      if (isPopupWindowEnabled) {
         Timber.d("updateComposing() SymbolKeyboardType=%s", symbolKeyboardType.toString());
         if (symbolKeyboardType != SymbolKeyboardType.NO_KEY
             && symbolKeyboardType != SymbolKeyboardType.CANDIDATE) {
           mComposition.getRootView().setVisibility(View.GONE);
         } else {
           mComposition.getRootView().setVisibility(View.VISIBLE);
+          // 12 鍵：悬浮窗只顯示 composition（編碼/拼音），不顯示帶編號的候選列表
+          mComposition.setSkipCandidates(isTwelveKeySchema());
           startNum = mComposition.setWindow(minPopupSize, minPopupCheckSize, Integer.MAX_VALUE);
           mCandidate.setText(startNum);
           // if isCursorUpdated, showCompositionView will be called in onUpdateCursorAnchorInfo
