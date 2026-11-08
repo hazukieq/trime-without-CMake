@@ -35,6 +35,21 @@ class TwelveKeyController(
     var snapshot: TwelveKeySnapshot = TwelveKeySnapshot.EMPTY
         private set
 
+    /**
+     * 「按段選字」剛上屏的前一個字：分詞輸入時，下一段候選條要按與它的關聯度排序
+     * （例如打完「區」，下一段「域」排最前）。由 TextInputManager 在選字後設置/清空。
+     */
+    var segmentAnchor: Char? = null
+
+    /**
+     * 用戶是否按過「分詞」鍵（本輪組字期間 sticky）。
+     *
+     * 分詞後剩餘段會被重新餵回引擎，餵回去的碼串已經沒有分隔符了；
+     * 但候選條仍應繼續按段列字，所以不能只看 remaining 裡有沒有分隔符，
+     * 要由 TextInputManager 記住「這一輪是分段輸入」。
+     */
+    var segmentMode: Boolean = false
+
     /** 最近 8 條快照（按 input+segments），退格/重打直接命中，不再枚舉。線程安全。 */
     private val snapshots = object :
         LinkedHashMap<String, TwelveKeySnapshot>(CACHE_CAPACITY, 0.75f, true) {
@@ -71,12 +86,19 @@ class TwelveKeyController(
                         if (local.isEmpty) {
                             Triple(local, TwelveKeySnapshot.EMPTY, false)
                         } else {
-                            val key = TwelveKeySnapshotBuilder.cacheKey(local, full)
+                            val key = TwelveKeySnapshotBuilder.cacheKey(
+                                local,
+                                full,
+                                segmentAnchor,
+                                segmentMode,
+                            )
                             val cached = cacheLookup(key) { it }
                             val t0 = System.nanoTime()
                             val built = cached ?: TwelveKeySnapshotBuilder.build(
                                 local,
                                 if (full) TwelveKeySnapshotBuilder.MAX_CANDIDATES else BAR_CANDIDATES,
+                                segmentAnchor = segmentAnchor,
+                                segmented = segmentMode,
                             )
                             // 性能排查用：INFO 级别，真機 logcat 可直接統計每鍵快照耗時
                             Timber.i(
@@ -117,9 +139,18 @@ class TwelveKeyController(
                 if (local.isEmpty) {
                     TwelveKeySnapshot.EMPTY
                 } else {
-                    val k = TwelveKeySnapshotBuilder.cacheKey(local, true)
+                    val k = TwelveKeySnapshotBuilder.cacheKey(
+                        local,
+                        true,
+                        segmentAnchor,
+                        segmentMode,
+                    )
                     key = k
-                    cacheLookup(k) { it } ?: TwelveKeySnapshotBuilder.build(local)
+                    cacheLookup(k) { it } ?: TwelveKeySnapshotBuilder.build(
+                        local,
+                        segmentAnchor = segmentAnchor,
+                        segmented = segmentMode,
+                    )
                 }
             }.getOrNull()
         } ?: TwelveKeySnapshot.EMPTY

@@ -69,9 +69,16 @@ object TwelveKeySnapshotBuilder {
     }
 
     /** 快照緩存鍵：input + 分段（status 也會影響 consumedEnd）。 */
-    fun cacheKey(local: Local, full: Boolean): String =
+    fun cacheKey(
+        local: Local,
+        full: Boolean,
+        segmentAnchor: Char? = null,
+        segmented: Boolean = false,
+    ): String =
         local.input + "|" + local.segmentsKey +
-            (if (full) "|full" else "|bar") + "|m" + SelectionMemory.version
+            (if (full) "|full" else "|bar") + "|m" + SelectionMemory.version +
+            (if (segmentAnchor == null) "" else "|a" + segmentAnchor.code) +
+            (if (segmented) "|seg" else "")
 
     /**
      * 全量枚舉 + 分組；不讀引擎以外的東西。調用方需持引擎鎖（可在後台線程）。
@@ -86,6 +93,8 @@ object TwelveKeySnapshotBuilder {
         maxCandidates: Int = MAX_CANDIDATES,
         applyLearning: Boolean = true,
         mapFallbackLetters: Boolean = true,
+        segmentAnchor: Char? = null,
+        segmented: Boolean = false,
     ): TwelveKeySnapshot {
         if (local.isEmpty) return TwelveKeySnapshot.EMPTY
         val input = local.input
@@ -127,11 +136,18 @@ object TwelveKeySnapshotBuilder {
         // 這裡按「段」補上字典候選：每段列出該碼對應的讀音與字，點擊後上屏該字、
         // 再把後面幾段的碼重新餵回引擎 —— 讓「分詞」真正能逐段聯想。
         // 分詞段組放在最前面：它們才是「逐段選字」的操作入口，往後塞會被幾十個引擎組淹沒。
-        val segmentGroups = dictGroupsFor(remaining)
+        val segmentGroups = dictGroupsFor(remaining, segmentAnchor, segmented)
         val groups = segmentGroups + group(ranked)
         // 候選條按「選單順序」取前 N 條：長輸入時 reading 各不相同，
         // 按第 0 組取會只剩 1 條（用戶 2026-11-08 反饋「打到這麼多就停止候選」）。
-        val barEntries = ranked.take(BAR_ITEMS).filter { it.text.isNotEmpty() }
+        // 分詞輸入（`5'e`）時，候選條直接列「這一段能選的字」：用戶點一個字就上屏，
+        // 再把剩下的碼餵回引擎，於是第二段接著在候選條出現 —— 全程不開面板（用戶 2026-11-09 指示）。
+        // 有 segmentAnchor（剛上屏的前一個字）時，與它關聯度高的字排前面。
+        val barEntries = if (segmentGroups.isNotEmpty()) {
+            segmentGroups.flatMap { it.items }.take(BAR_ITEMS)
+        } else {
+            ranked.take(BAR_ITEMS).filter { it.text.isNotEmpty() }
+        }
         val fallback = if (groups.isEmpty() && remaining.isNotEmpty()) {
             val raw = remaining.takeLast(MAX_FALLBACK_CODE)
             Fallback(rawCode = raw, letters = if (mapFallbackLetters) toLetters(raw) else raw)
@@ -160,18 +176,38 @@ object TwelveKeySnapshotBuilder {
      *
      * 每組 = 一個讀音（例如段碼 `5` → `ke`/`le`/`ko`…），組裡是該讀音的字。
      */
-    private fun dictGroupsFor(remaining: String): List<SyllableGroup> {
-        if (!remaining.contains('\'')) return emptyList()
+    private fun dictGroupsFor(
+        remaining: String,
+        anchor: Char?,
+        segmented: Boolean,
+    ): List<SyllableGroup> {
+        if (remaining.isEmpty()) return emptyList()
+        // 分段輸入（按過分詞鍵）時，即使只剩一段（重新餵回引擎後分隔符已消失）
+        // 也照樣按段列字，否則第二段又跳回引擎候選，用戶沒法逐段選。
+        if (!segmented && !remaining.contains('\'')) return emptyList()
         val segments = remaining.split('\'').filter { it.isNotEmpty() }
-        if (segments.size < 2) return emptyList()
+        if (segments.isEmpty()) return emptyList()
+        if (!segmented && segments.size < 2) return emptyList()
         val first = segments.first()
         val result = ArrayList<SyllableGroup>()
         for (syllable in TwelveKeyPreedit.syllablesForSegment(first)) {
-            val items = TwelveKeyPreedit.charsForSyllable(syllable).map { ch ->
+            val chars = TwelveKeyPreedit.rankChars(
+                TwelveKeyPreedit.charsForSyllable(syllable),
+                anchor,
+            )
+            val items = chars.map { ch ->
                 CandidateItem(text = ch, comment = syllable, index = -1, segment = 0)
             }
             if (items.isEmpty()) continue
             result.add(SyllableGroup(reading = syllable, syllables = listOf(syllable), items = items, segment = 0))
+        }
+        // 組之間也按「組內第一字與前一字的關聯度」排：打完「區」後，含「域」的那組排最前。
+        if (anchor != null) {
+            result.sortWith(
+                compareByDescending { g ->
+                    TwelveKeyPreedit.association(anchor, g.items.first().text)
+                },
+            )
         }
         return result.take(MAX_GROUPS)
     }

@@ -347,7 +347,7 @@ class TextInputManager private constructor() :
         }
         if (item.segment >= 0) {
             // 分詞段的字典候選：上屏這一段的字，再把後面幾段的碼重新餵回引擎。
-            pickSegmentedCandidate(item)
+            pickSegmentedCandidate(item.text)
             return
         }
         if (item.index < 0) {
@@ -362,21 +362,32 @@ class TextInputManager private constructor() :
      * 分詞（`'`）後的逐段選字：上屏這一段的字，然後把剩下的段重新餵回引擎，
      * 讓下一段繼續出候選。只處理第一個待選段（分詞是逐段進行的）。
      */
-    private fun pickSegmentedCandidate(item: CandidatePanelAdapter.Item) {
+    private fun pickSegmentedCandidate(text: String) {
         val input = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
         if (input.isEmpty()) return
         val segments = input.split('\'').filter { it.isNotEmpty() }
-        if (segments.size < 2) return
+        // 只剩最後一段（重新餵回引擎後分隔符已消失）：直接上屏該字，不再回填。
+        // 大於等於兩段時才把剩下的段餵回去。
+        if (segments.isEmpty()) return
         val rest = segments.drop(1)
         runCatching {
             withEngineLock { Rime.clearComposition() }
-            activeEditorInstance.commitText(item.text, false)
+            activeEditorInstance.commitText(text, false)
+            // 記住剛上屏的字：下一段的候選條按「與它的關聯度」排序（區 → 域）。
+            setSegmentAnchor(text.firstOrNull())
             if (rest.isNotEmpty()) {
                 withEngineLock { Rime.onText(rest.joinToString("'")) }
             }
             trime.updateComposing()
             twelveKeyController?.refresh(immediate = true)
         }.onFailure { Timber.e(it, "twelvekey: segmented pick failed") }
+    }
+
+    /** 更新「按段選字」的關聯度錨點（前一個上屏的字）；變化時讓快照緩存失效。 */
+    private fun setSegmentAnchor(anchor: Char?) {
+        val controller = twelveKeyController ?: return
+        if (controller.segmentAnchor == anchor) return
+        controller.segmentAnchor = anchor
     }
 
     /**
@@ -440,6 +451,15 @@ class TextInputManager private constructor() :
     }
 
     private fun doOnCandidatesRefreshed() {
+        // 組字結束（上屏/清空）→ 清掉「按段選字」的錨點與分段模式，下一輪重新記。
+        if (!Rime.isComposing()) {
+            setSegmentAnchor(null)
+            twelveKeyController?.segmentMode = false
+        } else if (isTwelveKeyMode()) {
+            // 用戶按過「分詞」→ 碼串裡出現分隔符；之後即便分隔符被吃掉，本輪也一直按段列字。
+            val input = runCatching { Rime.RimeGetInput() }.getOrNull().orEmpty()
+            if (input.contains('\'')) twelveKeyController?.segmentMode = true
+        }
         if (isTwelveKeyMode()) {
             // 按鍵後立即重建快照（不 debounce）；面板關閉時只枚舉候選條需要的 16 條，
             // 面板打開才全量枚舉（按鍵卡頓的另一半原因：每鍵 600 條枚舉）。
@@ -834,6 +854,12 @@ class TextInputManager private constructor() :
         val list = if (boundBarItems.isNotEmpty()) boundBarItems else snapshot.barItems
         val item = list.getOrNull(index)
         if (item != null) {
+            // 分詞輸入時候選條列的是「這一段能選的字」（index = -1）：
+            // 直接上屏、把剩餘段餵回引擎，不進引擎選詞（用戶 2026-11-09 指示）。
+            if (item.segment >= 0) {
+                pickSegmentedCandidate(item.text)
+                return
+            }
             twelveKeyController?.selectCandidate(item.index)
             return
         }

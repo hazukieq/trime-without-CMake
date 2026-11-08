@@ -1474,3 +1474,41 @@ BuildConfig.DEBUG 的 D 级打，现场难抓）；`TextInputManager.onCandidate
 
 **已知取捨**：段組候選來自 `hakka.dict.yaml`（單字、字典順序），不含用戶詞庫與詞組聯想；
 想要「多字詞」仍需完整拼寫或走 26 鍵方案。
+
+## 15.34 按段選字搬到候選條 + 與上一字的關聯度排序（2026-11-09）
+
+**需求**（用戶 m04035）：「只在固定候選欄上做改變 —— 當第一個字被選上屏後，第二個分段列出
+將在固定候選區顯示的漢字組，按照和第一個字的關聯度再排序，以此類推」。
+
+**做法**（只動候選條，展開面板保持原樣）：
+
+1. `core/TwelveKeyPreedit.kt` 新增「相鄰字關聯度」：
+   - 讀 `rime/hakka_sougou_words.dict.yaml`、`hakka_mobilewords`、`hakka_oftenwords`、
+     `hakka_places`（純詞條、無拼音列，取 tab 前的詞）→ 統計相鄰兩字 bigram 次數
+     （`bigrams[(前字.code shl 16) or 後字.code]`）。
+   - `association(prev, text)` 取共現次數；`rankChars(chars, prev)` 按關聯度穩定降序。
+2. `core/twelvekey/TwelveKeySnapshotBuilder.kt`：
+   - `build(..., segmentAnchor, segmented)`：分段輸入時 `barEntries` 不再取引擎候選，
+     而是 `dictGroupsFor()` 生成的「這一整段能選的字」展開取前 12 條
+     （`CandidateItem(segment = 0, index = -1)`）。
+   - `dictGroupsFor(remaining, anchor, segmented)`：組內的字先按 `rankChars(anchor)` 排，
+     組之間再按「組內第一字與 anchor 的關聯度」排 —— 打完「區」，下一段含「域」的組排前面。
+   - `segmented` flag 讓「重新餵回引擎、分隔符已消失」的後續段也繼續按段列字。
+3. `core/twelvekey/TwelveKeyController.kt`：新增 `segmentAnchor: Char?`、`segmentMode: Boolean`
+   兩個狀態，進 `cacheKey`（否則快取會吃到舊排序）。
+4. `ime/text/TextInputManager.kt`：
+   - `doOnCandidatesRefreshed()`：組字中若碼串含分隔符 → `segmentMode = true`；
+     組字結束 → `segmentAnchor = null`、`segmentMode = false`。
+   - 候選條點擊 `onTwelveKeyCandidatePressed()`：條目 `segment >= 0` → `pickSegmentedCandidate(text)`，
+     否則照舊 `selectCandidate(globalIndex)`。
+   - `pickSegmentedCandidate(text)`：清組合 → 上屏該字 → `setSegmentAnchor(該字)` →
+     把剩餘段用分隔符重新餵回引擎（只剩最後一段時直接上屏，不再回填）→ 刷新。
+     面板點段組走同一個函數（`item.text`），兩條入口行為一致。
+
+**真機驗收**（12 鍵，`kl` + 分詞 + `def` = 碼串 `5'e`）：
+- 候選條直接列出第一段可選字：`区 巨 气 去 岂 企 技 拒 岖 …`（不開面板）；
+- 點「区」→ 上屏、預輸入剩 `e`，候選條換成第二段可選字，且排序隨錨點變化
+  （錨點「巨」時是 `呼 夫 互 父 户 …`，錨點「区」時是 `长 订 叮 盯 钉 …`）；
+- 再點一個字 → 上屏（實測得到「区长」），組字結束、錨點清除。
+
+**取捨**：關聯度只有 bigram，不含詞長/詞頻加權；段組候選仍只來自單字字典（不含用戶詞庫）。
