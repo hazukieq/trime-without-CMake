@@ -161,7 +161,8 @@ class TwelveKeyController(
          * librime session 非線程安全：後台枚舉與 UI 線程的 process_key / get_context 必須串行。
          * 鍵盤事件入口（TextInputManager.onEvent 等）也持同一把鎖。
          */
-        val ENGINE_LOCK = Any()
+        /** 與 [Rime.ENGINE_LOCK] 是同一顆鎖（Java 側 onKey/getContexts 也用它）。 */
+        val ENGINE_LOCK: Any = Rime.ENGINE_LOCK
 
         private const val CACHE_CAPACITY = 8
 

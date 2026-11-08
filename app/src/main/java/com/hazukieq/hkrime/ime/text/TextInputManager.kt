@@ -559,14 +559,18 @@ class TextInputManager private constructor() :
                 ", Event.getRimeEvent=" + Event.getRimeEvent(keyEventCode, Rime.META_RELEASE_ON)
         )
         if (needSendUpRimeKey) {
-            if (shouldUpdateRimeOption) {
-                Rime.setOption("soft_cursors", prefs.keyboard.softCursorEnabled)
-                Rime.setOption("_horizontal", trime.imeConfig.getBoolean("horizontal"))
-                shouldUpdateRimeOption = false
+            // 釋放事件同樣會 process_key + getContexts，必須和後台枚舉共用引擎鎖，
+            // 否則 60 鍵連打時會 native SIGSEGV（RimeGetContext 空指針，2026-11-08 崩潰日誌）。
+            withEngineLock {
+                if (shouldUpdateRimeOption) {
+                    Rime.setOption("soft_cursors", prefs.keyboard.softCursorEnabled)
+                    Rime.setOption("_horizontal", trime.imeConfig.getBoolean("horizontal"))
+                    shouldUpdateRimeOption = false
+                }
+                // todo 释放按键可能不对
+                Rime.onKey(Event.getRimeEvent(keyEventCode, Rime.META_RELEASE_ON))
+                activeEditorInstance.commitRimeText()
             }
-            // todo 释放按键可能不对
-            Rime.onKey(Event.getRimeEvent(keyEventCode, Rime.META_RELEASE_ON))
-            activeEditorInstance.commitRimeText()
         }
         Timber.d("\t<TrimeInput>\tonRelease() finish")
     }

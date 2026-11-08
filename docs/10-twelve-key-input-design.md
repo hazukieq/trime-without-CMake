@@ -691,3 +691,31 @@ index 仍是全局下標，點擊上屏不受影響）；`barItems` 優先讀 `b
 
 驗證：連打 48+ 鍵，`twelvekey:latency` 日誌的 `items=12` 保持不變
 （修前同樣輸入是 `items=1`）。
+
+### 15.6 native crash：release 事件沒持引擎鎖（2026-11-08）
+
+真機連續輸入時 `com.hazukieq.hkrime` 進程 SIGSEGV 崩潰，tombstone：
+
+```
+signal 11 (SIGSEGV), Cause: null pointer dereference
+#00 librime_jni.so
+#01 librime_jni.so (RimeGetContext+1252)
+#02 librime_jni.so (Java_..._get_1context)
+#08 Rime.getContexts
+#12 Rime.onKey
+#20 TextInputManager.onRelease
+#24 KeyboardView.releaseKey
+```
+
+根因：`TextInputManager.onRelease()` 直接調 `Rime.onKey(RELEASE)`（內部 `process_key` + `getContexts`），
+**沒有** `ENGINE_LOCK`；而按鍵後的快照重建在 `Dispatchers.Default` 線程持鎖枚舉候選。
+兩者同時碰同一個 librime session → context 被寫壞 → 空指針。
+
+修法（雙保險）：
+1. `onRelease` 的 Rime 調用整體放進 `withEngineLock { }`；
+2. `Rime.java` 暴露 `public static final Object ENGINE_LOCK`，`onKey()`（含 `process_key` +
+   `getContexts`）整段 `synchronized (ENGINE_LOCK)`；Kotlin 的
+   `TwelveKeyController.ENGINE_LOCK` 直接引用同一顆鎖（不再是兩把各管各的）。
+
+驗證：`adb` 併發猛點 200 次（80 次 + 120 次並行 tap）後進程 PID 不變、
+logcat 中 `FATAL / signal 11 / ANR in com.hazukieq.hkrime` 計數為 0。

@@ -277,6 +277,12 @@ public class Rime {
 
   private static final RimeCommit mCommit = new RimeCommit();
   private static final RimeContext mContext = new RimeContext();
+  /**
+   * librime session 非線程安全：後台枚舉、UI 按鍵、release 事件都必須串行。
+   * Kotlin 側 TwelveKeyController.ENGINE_LOCK 直接引用這一顆鎖。
+   */
+  public static final Object ENGINE_LOCK = new Object();
+
   private static final RimeStatus mStatus = new RimeStatus();
   private static RimeSchema mSchema;
   private static List<?> mSchemaList;
@@ -447,15 +453,18 @@ public class Rime {
 
   // KeyProcess 调用JNI方法发送keycode和mask
   private static boolean onKey(int keycode, int mask) {
-    Timber.i("\t<TrimeInput>\tonkey()\tkeycode=%s, mask=%s", keycode, mask);
-    if (isVoidKeycode(keycode)) return false;
-    // 此处调用native方法是耗时操作
-    final boolean b = process_key(keycode, mask);
-    Timber.i(
-        "\t<TrimeInput>\tonkey()\tkeycode=%s, mask=%s, process_key result=%s", keycode, mask, b);
-    getContexts();
-    Timber.i("\t<TrimeInput>\tonkey()\tfinish");
-    return b;
+    synchronized (ENGINE_LOCK) {
+      Timber.i("\t<TrimeInput>\tonkey()\tkeycode=%s, mask=%s", keycode, mask);
+      if (isVoidKeycode(keycode)) return false;
+      // 此处调用native方法是耗时操作
+      final boolean b = process_key(keycode, mask);
+      Timber.i(
+          "\t<TrimeInput>\tonkey()\tkeycode=%s, mask=%s, process_key result=%s",
+          keycode, mask, b);
+      getContexts();
+      Timber.i("\t<TrimeInput>\tonkey()\tfinish");
+      return b;
+    }
   }
 
   // KeyProcess 调用JNI方法发送keycode和mask
