@@ -1120,22 +1120,23 @@ ni, ni hau 才对。当选了 ni 之后应该剩下 hau，和 12 键逻辑一致
 用戶（附截圖）：「框起来的竖条占满高亮左边呀，不要竖线一半，太难看了。然后呢，
 去除掉 12 键的 `/`、`、` 的翻页」。随后澄清：「`/`、`、` 这两个键不是不要，是将其在
 输入状态下的按键改为打开/关闭展开面板。——没有打开/关闭展开面板的 api，就创建」。
+再后来：「`、` 不要 composing 了，`/` 有就可以了」。
 
 - **rail 选中竖线满高**：`CandidateGroupAdapter` 里那条 3dp accent 竖线原本写死
   `height = rowHeight*0.42`、`topMargin = rowHeight*0.29`（居中短横线，上下留白）。
   改为 `LinearLayout.LayoutParams(barWidth, rowHeight)`、去掉 topMargin：竖线从高亮
   行顶部贯到底部（左缘 6dp 内缩不变），与选中底色等高。
-- **`/`、`、` 改造成面板开关（不再翻页）**：这两枚键原来靠 `composing: Up/Down`
-  在输入中当翻页键（面板展开后本来就是全量候选 `MAX_CANDIDATES=600` 流式滚动，
-  翻页无意义）。现在：
-  - 主题 `preset_keys` 新增 `Panel_toggle_slash` / `Panel_toggle_dun`
-    = `{send: function, command: candidate_panel}`（沿用 `KEYCODE_FUNCTION` 的
-    「trime 命令」通道：`TextInputManager.onEventLocked` 里新增
+- **`/` 改造成面板开关（不再翻页）**：原来靠 `composing: Up` 在输入中当翻页键
+  （面板展开后本来就是全量候选 `MAX_CANDIDATES=600` 流式滚动，翻页无意义）。现在：
+  - 主题 `preset_keys` 新增 `Panel_toggle_slash`
+    = `{label: /, send: function, command: candidate_panel}`（复用 `KEYCODE_FUNCTION`
+    的「trime 命令」通道：`TextInputManager.onEventLocked` 里新增
     `event.command == "candidate_panel" -> toggleCandidatePanel()`）；
-  - `jiugong_simp` 两枚键恢复为 `{click: '/', composing: Panel_toggle_slash, width: 16}`
-    与 `{click: '、', composing: Panel_toggle_dun, width: 16}` —— `composing:` 事件
-    只在 `Rime.isComposing()` 时生效（`Key.getEvent()`），所以**输入中按一下开面板、
-    再按（或点候选条 ▲）收起**；非输入状态仍是原来的标点行为。
+  - `jiugong_simp` 的键恢复为 `{click: '/', composing: Panel_toggle_slash, width: 16}`
+    —— `composing:` 事件只在 `Rime.isComposing()` 時生效（`Key.getEvent()`），
+    所以**输入中按 `/` 开面板**（面板展开时键盘被面板盖住，收起用候选条 ▲ 或选字）；
+    非输入状态仍是原来的标点行为。
+- **`、` 不再挂 composing**：回到普通 `{click: '、', width: 16}`——输入中按它就是
+  上屏「、」（並先提交當前候選），不做面板開關（用戶：`、` 不要 composing，`/` 有就可以）。
 - 真機驗收：12 键输入 `nzia` 后按 `/` → 展开分组面板（左列 `nzia` + 右格候选，
-  竖线满高）；点 ▲ 收起后再按 `、` → 再次展开；未输入时按 `/` 仍走标点候选。
-  候選條高度 84px 不变（12 键 / 26 键 / 英文全键盘一致）。
+  竖线满高）；输入中按 `、` → 不出面板、正常上屏標點；候選條高度 84px 不变。

@@ -645,7 +645,7 @@ preset_keyboards:
       - {click: letter_7, long_click: paste}
       - {click: letter_3, long_click: cut}
       - {click: letter_8, long_click: "[]{Left}"}
-      - {click: '、', composing: Panel_toggle_dun, width: 16}
+      - {click: '、', width: 16}
 
       #第四行
       - {key_back_color: 0x00, width: 100, height: 7}
@@ -3922,9 +3922,8 @@ preset_keys:
   Zdic: {label: 漢典, send: function, command: run, option: "http://www.zdic.net/sousuo/?q=%1$s"} #搜索網頁: %s或者%1$s爲當前字符
   Zdic2: {label: 漢典, send: function, command: run, option: "http://www.zdic.net/sousuo/?q=%2$s"} #搜索網頁: %2$s爲當前輸入的編碼
   WebSearch: {label: 搜索, send: function, command: web_search, option: "%4$s"} #搜索，其他view、dial、edit、search等intent，參考安卓的intent文檔：https://developer.android.com/reference/android/content/Intent.html
-  # 12 鍵的 / 與 、：非輸入狀態打標點，輸入中改為開關展開面板（面板已是全量候選，不需要翻頁）
+  # 12 鍵的 /：非輸入狀態打標點，輸入中改為開關展開面板（面板已是全量候選，不需要翻頁）
   Panel_toggle_slash: {label: /, send: function, command: candidate_panel}
-  Panel_toggle_dun: {label: 、, send: function, command: candidate_panel}
 
   Left1: {label: '⇦', send: Control+Left, repeatable: true, functional: false}
   Right1: {label: '⇨', send: Control+Right, repeatable: true, functional: false}
