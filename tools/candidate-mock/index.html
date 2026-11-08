@@ -63,17 +63,19 @@
   .compose .sp{color:#9aa6b2}
 
   /* 候选区（单行） */
-  .candbar{background:var(--back);display:flex;align-items:stretch;min-height:40px;overflow:hidden;position:relative}
+  .candbar{background:var(--back);display:flex;align-items:stretch;min-height:40px;overflow:hidden;position:relative;flex-wrap:nowrap}
+  .candbar::after{content:"";position:absolute;right:40px;top:0;bottom:0;width:22px;pointer-events:none;background:linear-gradient(to right,transparent,var(--back));display:none}
+  .candbar.truncated::after{display:block}
   .cand{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 9px;cursor:pointer;min-width:0}
   .cand .w{font-size:22px;line-height:1.05;color:var(--ctext);white-space:nowrap}
   .cand .c{font-size:12px;line-height:1;color:var(--ccomment);white-space:nowrap;margin-bottom:2px}
   .cand.hl{background:var(--hback)}
   .cand.hl .w{color:var(--htext)}
   .cand:hover{background:#dfe3e6}
-  .arrows{display:flex;align-items:center;margin-left:auto;background:var(--back)}
-  .arrows button{background:transparent;border:0;color:var(--ccomment);font-size:15px;padding:0 8px;height:100%;border-radius:0}
-  .arrows button:hover{background:var(--hback);color:var(--htext)}
-  .exbtn{color:var(--ctext)!important;font-size:14px!important}
+  .exwrap{margin-left:auto;display:flex;align-items:stretch;background:var(--back);flex:none}
+  .exwrap button{background:transparent;border:0;border-left:1px solid var(--border);color:var(--ctext);font-size:15px;padding:0 12px;height:auto;border-radius:0}
+  .exwrap button:hover{background:var(--hback);color:var(--htext)}
+  .exwrap button.hide{font-size:16px}
 
   /* 键盘占位 */
   .kbwrap{flex:none;background:var(--kb);padding:6px}
@@ -206,6 +208,7 @@ const S = {
   typed:'',            // 已上屏
   activeSeg:0,         // B 面板里选中/正在输入的组
   page:0,
+  kbHidden:false,
   expandOpen:false,
   gridOpen:false,
 };
@@ -245,6 +248,10 @@ function renderEditor(){
 }
 function renderCompose(){
   const c = $('#compose'); c.innerHTML='';
+  // 组字结束（所有组都选完）后预编辑行消失
+  const finished = S.activeSeg >= DATA.segs.length;
+  c.style.display = finished ? 'none' : '';
+  if (finished) return;
   DATA.segs.forEach((s,i)=>{
     const d=document.createElement('span');
     d.className='seg'+(i===S.activeSeg?' active':'')+(i<S.activeSeg?' done':'');
@@ -256,16 +263,32 @@ function renderCompose(){
   });
 }
 function candBarCands(){
+  // 整句选完 => 组字结束，候选为空（此时按钮行为变成收起键盘）
+  if (S.activeSeg >= DATA.segs.length) return {list: [], per: 5};
   const seg = DATA.segs[S.activeSeg];
-  const list = S.activeSeg < DATA.segs.length ? seg.cands : DATA.sentence;
-  const per = S.variant==='b' ? 5 : 8;
+  const list = seg.cands;
+  const per = S.variant==='b' ? 6 : 9;
   return {list, per};
 }
 function renderCandBar(){
   const bar=$('#candbar'); bar.innerHTML='';
+  bar.classList.remove('truncated');
   const {list, per} = candBarCands();
+
+  if (list.length === 0) {
+    // 候选为空：只留一个按钮，行为是「隐藏键盘」
+    const wrap=document.createElement('div'); wrap.className='exwrap';
+    const btn=document.createElement('button'); btn.className='hide'; btn.textContent='⌄';
+    btn.title='候选为空：收起键盘';
+    btn.onclick=()=>hideKeyboard();
+    wrap.appendChild(btn); bar.appendChild(wrap);
+    return;
+  }
+
   const start = S.page*per;
   const slice = list.slice(start, start+per);
+
+  // 单行、不换行：放不下的候选直接截断（展开后能看到剩下的）
   slice.forEach((w,i)=>{
     const d=document.createElement('div');
     d.className='cand'+(i===0?' hl':'');
@@ -273,14 +296,37 @@ function renderCandBar(){
     d.onclick=()=>commit(w);
     bar.appendChild(d);
   });
-  const arrows=document.createElement('div'); arrows.className='arrows';
-  const prev=document.createElement('button'); prev.textContent='◀'; prev.onclick=()=>{S.page=Math.max(0,S.page-1);render();};
-  const next=document.createElement('button'); next.textContent='▶'; next.onclick=()=>{S.page++;render();};
+
+  const wrap=document.createElement('div'); wrap.className='exwrap';
   const ex=document.createElement('button'); ex.className='exbtn'; ex.textContent='▼';
+  ex.title='展开候选面板';
   ex.onclick=()=>{ if(S.variant==='c'){S.gridOpen=!S.gridOpen;S.expandOpen=false;} else {S.expandOpen=!S.expandOpen;S.gridOpen=false;} render(); };
-  arrows.append(prev,next,ex);
-  bar.appendChild(arrows);
+  wrap.appendChild(ex);
+  bar.appendChild(wrap);
+
+  // 判断是否真的被截断（超出可视宽度）
+  requestAnimationFrame(()=>{
+    const overflow = bar.scrollWidth > bar.clientWidth + 1;
+    bar.classList.toggle('truncated', overflow && !(S.variant==='b'&&S.expandOpen));
+  });
 }
+function hideKeyboard(){
+  S.kbHidden = true;
+  const kb = document.getElementById('kbwrap');
+  kb.style.display = 'none';
+  // 键盘收起后候选栏也一起消失，点编辑区可恢复
+  document.getElementById('candbar').style.display = 'none';
+  const ed = document.getElementById('editor');
+  ed.onclick = ()=>restoreKeyboard();
+}
+function restoreKeyboard(){
+  S.kbHidden = false;
+  document.getElementById('kbwrap').style.display = '';
+  document.getElementById('candbar').style.display = '';
+  document.getElementById('editor').onclick = null;
+  render();
+}
+
 function renderExpand(){
   const e=$('#expand');
   e.classList.toggle('show', S.expandOpen && S.variant==='b');
@@ -316,8 +362,8 @@ function render(){
   renderEditor(); renderCompose(); renderCandBar(); renderExpand(); renderGrid();
   const desc = {
     a:'现状：候选栏是一整条 Canvas，宽度不够就出 ◀ ▶；▼ 打开 liquid 的候选网格页。',
-    b:'推荐：单行只放 5 个 + ▼；展开后左侧拼音组、右侧网格，点组切候选，点词上屏该组。',
-    c:'九宫格：点 ▼ 全屏铺候选网格（相当于把现有 liquid CANDIDATE 页做成正式候选页）。'
+    b:'推荐：单行候选放不下就截断（不再有 ◀ ▶），右侧只有 ▼；展开后左侧拼音组、右侧网格，点组切候选，点词上屏该组；候选为空时 ▼ 变成收起键盘。',
+    c:'九宫格：点 ▼ 全屏铺候选网格（相当于把现有 liquid CANDIDATE 页做成正式候选页）；候选同样单行截断、候选为空时按钮收起键盘。'
   };
   $('#vdesc').textContent = desc[S.variant];
 }
@@ -343,7 +389,9 @@ document.getElementById('input').oninput=(e)=>{
 document.getElementById('btnCollapse').onclick=()=>{S.expandOpen=false;render();};
 document.getElementById('btnGridClose').onclick=()=>{S.gridOpen=false;render();};
 document.querySelectorAll('.variant').forEach(v=>{
-  v.onclick=()=>{ S.variant=v.dataset.v; S.page=0; S.expandOpen=(S.variant==='b'); S.gridOpen=(S.variant==='c'); render(); };
+  v.onclick=()=>{ S.variant=v.dataset.v; S.page=0; S.expandOpen=(S.variant==='b'); S.gridOpen=(S.variant==='c'); S.kbHidden=false;
+    document.getElementById('kbwrap').style.display=''; document.getElementById('candbar').style.display='';
+    document.getElementById('editor').onclick=null; render(); };
 });
 
 buildKeyboard();
