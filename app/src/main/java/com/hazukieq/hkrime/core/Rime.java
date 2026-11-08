@@ -794,8 +794,22 @@ public class Rime {
   }
 
   public static void check(boolean full_check) {
-    if (start_maintenance(full_check) && is_maintenance_mode()) {
+    final long t0 = System.nanoTime();
+    final boolean started = start_maintenance(full_check);
+    final long t1 = System.nanoTime();
+    final boolean maint = is_maintenance_mode();
+    Timber.i(
+        "Rime.check(%b): start_maintenance=%b(%dms) maintenance_mode=%b",
+        full_check, started, (t1 - t0) / 1_000_000, maint);
+    if (started && maint) {
+      // 主線程等待維護會讓輸入法/界面「卡住」（大方案如霧凇拼音動輒 1~2 分鐘）。
+      // 先提示用戶，再 join（引擎必須等維護完成才能建立 session）。
+      if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+        Timber.w("Rime.check: maintenance on MAIN thread, UI will freeze until it finishes");
+        com.blankj.utilcode.util.ToastUtils.showLong("正在部署輸入方案，請稍候…");
+      }
       join_maintenance_thread();
+      Timber.i("Rime.check: joined maintenance in %dms", (System.nanoTime() - t1) / 1_000_000);
     }
   }
 

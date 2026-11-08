@@ -1200,3 +1200,35 @@ patch（xxx.custom.yaml 裡面加）」。
   `/sdcard/hkrime/luna_pinyin.custom.yaml`（同一輪還生成了 `hakka_qwerty.custom.yaml`），
   輸入 `ni hao` 展開面板 → 左列出現 `ni` / `ni hao` 兩組、右格候選帶 `ni hao` 註腳，
   與客語 26 鍵表現一致；logcat 可見 `SchemaCompat: patched app-adaptation for ...`。
+
+## 15.25 大方案部署「卡住」的排查與增量部署（2026-11-09）
+
+用戶：「查看日誌，加載大輸入方案後卡住了」。
+
+logcat 證據（本機 vivo，霧凇拼音 rime_ice：cn_dicts base 16.6MB + ext 11.9MB …，
+build 出來的 `rime_ice.table.bin` 60MB）：
+1. 從對話框啟用霧凇拼音 → `RimeUtils.deploy` 走的是
+   `Rime.get(context, true)`（**full_check=true = 全量重建**）：
+   `04:21:23 Rime-JNI: finalize...` → `04:23:20 Trime: update KeyboardPadding…`，
+   即 **117 秒** 全量部署（期間鍵盤引擎已 destroy，輸入法不可用，看起來像卡死）。
+2. 更糟的是「中斷後的下一次啟動」：若上一次維護被殺進程打斷，下次進程啟動時
+   `Rime.init` → `check(false)` 會重新跑一次維護，而 init 是在**主線程**被調用的
+   （`Config.prepareRime` / `TextInputManager.onInitializeInputUi` 都是主線程）：
+   `04:31:40 Rime.check(false): start_maintenance=true(10ms) maintenance_mode=true`
+   → `04:33:16 Rime.check: joined maintenance in 95977ms`（tid 與 pid 相同 = 主線程），
+   於是 splash / 輸入法界面整整凍結 **96 秒**，表現就是「卡住」。
+3. 另外 `start_maintenance(false)`（增量）之前從沒被用過：`RimeUtils.deploy` 一直是
+   full_check=true，所以**每次**啟用/停用方案都會把全部詞典重編譯一遍
+   （melt_eng.prism 8.5MB、radical_pinyin.prism 2.5MB…），這也是慢的主因。
+
+修法：
+- `RimeUtils.deploy(context, full: Boolean = false)` —— 默認**增量部署**
+  （`Rime.get(context, false)` → librime `detect_modifications`，只重建改動過的文件）；
+  只有 adb 調試廣播 `com.hazukieq.hkrime.deploy` 傳 `full = true` 做強制全量重建。
+- `Rime.check` 加耗時日誌（`start_maintenance` 耗時 / 維護模式 / join 耗時），
+  主線程等待維護時打 WARN 並 Toast「正在部署輸入方案，請稍候…」，不再靜默假死。
+- `RimeUtils.deploy` 加 `deploy: full=… destroy=…ms reinit=…ms total=…ms` 日誌。
+
+已知取捨：首次載入一個大方案（如霧凇拼音 60MB table）仍需一次 1~2 分鐘的構建，
+這是 librime 編譯詞典的成本；**中途殺進程會讓它下次啟動重跑**（見證據 2）。
+建議：首次啟用後就讓它跑完，期間不要強殺輸入法。

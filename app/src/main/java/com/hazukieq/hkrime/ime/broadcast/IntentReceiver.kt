@@ -38,7 +38,8 @@ class IntentReceiver : BroadcastReceiver(), CoroutineScope by MainScope() {
         Timber.d("Received Command = %s", command)
         when (command) {
             COMMAND_DEPLOY -> launch {
-                deploy(context)
+                // 廣播部署是開發/排查用的「強制全量重建」，普通 UI 路徑走增量部署
+                deploy(context, full = true)
             }
             COMMAND_SYNC -> async {
                 sync(context)
