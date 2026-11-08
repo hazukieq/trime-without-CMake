@@ -1096,3 +1096,21 @@ BFS 隊列峰值 766 —— 也就是說 37ms 全是簡拼圖 BFS 的展開成�
 - 真機驗收：12 鍵 ⌘ 長按彈出「输入方案：客语12键（当前）/ 客语26键 / 雲龍國際音標 /
   启用 / 停用方案…」；點「客语26键」鍵盤立刻變全字母並可展開分組面板；再從 26 鍵鍵盤
   長按「中文」鍵（`long_click: Menu`）切回 12 鍵；「启用 / 停用方案…」打開多選（三项已勾選）。
+
+## 15.21 全字母方案的左列分組：always_show_comments（2026-11-09）
+
+用戶：「26键走的是同一套了，但有个瑕疵：nihau，为啥展开面板显示的是 `...`，应该是
+ni, ni hau 才对。当选了 ni 之后应该剩下 hau，和 12 键逻辑一致」。
+
+- 根因在 librime：`ScriptTranslation::Peek()` 只在
+  `spelling != candidate->preedit()` 時才把拼寫寫進 `candidate.comment`
+  （`script_translator.cc:492-497`）。12 鍵的輸入是碼串（`nzia` 之類），preedit 與詞典
+  拼寫永遠不同 → comment 一定有；而全字母方案常常原樣敲出拼寫（`ni hau`），
+  preedit == spelling → comment 為空 → App 端按 comment 分組時整批候選都落在
+  `BLANK_READING`「…」組，左列只剩一個 `...`。
+- 修法：`hakka_qwerty.schema.yaml` 的 translator 加 `always_show_comments: true`
+  （librime 原生開關，`script_translator.cc:162`），comment 一律 = 詞典精確拼寫。
+  候選條照舊不顯示（App 端 setShowComment(false)），只給面板左列分組。
+- 真機驗收（客語 26 鍵，輸入 `nihau`）：左列 = `ni` / `ni hau`，右格候選帶 `ni`、
+  `ni hau` 註腳；點「ni」組再點「你」→ 上屏「你」、preedit 剩 `你 hau`，左列變 `hau`、
+  右格 好/号/耗/豪…（與 12 鍵的空格/選字行為一致）。

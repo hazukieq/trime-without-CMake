@@ -103,6 +103,10 @@ translator:
   # 「左列音节索引对全字母也有意义的，所以改成一样来」）。
   # 固定候選欄本身不顯示這些 comment（CandidateBarBinder 關掉了），只給面板用。
   spelling_hints: 100
+  # 必須開：librime 默認只在「詞典拼寫 ≠ 用戶輸入的 preedit」時才填 comment。
+  # 全字母方案常常原樣敲出拼寫（如 ni hau），preedit 與拼寫相同 → comment 為空 →
+  # 面板左列只剩一個「…」分組（用戶 2026-11-09 反饋「nihau 展開面板顯示 ...」）。
+  always_show_comments: true
   enable_user_dict: true
   enable_sentence: true
 
