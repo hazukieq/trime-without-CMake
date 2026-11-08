@@ -745,12 +745,13 @@ logcat 中 `FATAL / signal 11 / ANR in com.hazukieq.hkrime` 計數為 0。
 修法（只動 schema，不動 App）：
 
 ```yaml
-    - abbrev/^(th).+$/$1/
-    - abbrev/^(nz).+$/$1/
-    - abbrev/^(ng).+$/$1/
-    # 除上述三者，其餘音節再取首字母做縮寫 → 兩鍵即出聯想組詞
-    - abbrev/^(?!(th|nz|ng))(.).+$/$2/
+    # 簡拼：統一的「取聲母」規則（不再逐個手寫）
+    # th / nz / ng 取兩字母，其餘取首字母；之後經 xform/xlit 落到 12 鍵上
+    - abbrev/^(th|nz|ng|[a-z]).*$/$1/
 ```
+
+（最初是手寫 `abbrev/^(th)…`、`^(nz)…`、`^(ng)…` 三條；2026-11-08 改成上面這一條，
+長聲母優先匹配、其餘取首字母，所有聲母統一覆蓋，避免漏掉某個聲母。）
 
 驗證（vivo 真機）：`55` → 考慮 / 看看 / 來看 / 理論 / 起來；`55555555` → 可口可樂。
 注意 preedit 仍會把 `55` 猜成 `ko keu` 之類的完整音節（TwelveKeyPreedit 的 DP 限制），

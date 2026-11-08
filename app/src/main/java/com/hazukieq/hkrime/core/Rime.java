@@ -438,12 +438,16 @@ public class Rime {
   }
 
   public static void getContexts() {
-    Timber.i("\t<TrimeInput>\tgetContexts() get_context");
-    // get_context() 是耗时操作
-    get_context(mContext);
-    Timber.i("\t<TrimeInput>\tgetContexts() getStatus");
-    getStatus();
-    Timber.i("\t<TrimeInput>\tgetContexts() finish");
+    // librime session 非線程安全：所有讀寫都要串到同一顆鎖上，否則「後台枚舉候選」
+    // 與「UI 線程 getContexts」並發會 SIGSEGV（RimeGetContext 空指針，2026-11-08 真機 crash）。
+    synchronized (ENGINE_LOCK) {
+      Timber.i("\t<TrimeInput>\tgetContexts() get_context");
+      // get_context() 是耗时操作
+      get_context(mContext);
+      Timber.i("\t<TrimeInput>\tgetContexts() getStatus");
+      getStatus();
+      Timber.i("\t<TrimeInput>\tgetContexts() finish");
+    }
   }
 
   public static boolean isVoidKeycode(int keycode) {
@@ -525,14 +529,18 @@ public class Rime {
   }
 
   public static void clearComposition() {
-    clear_composition();
-    getContexts();
+    synchronized (ENGINE_LOCK) {
+      clear_composition();
+      getContexts();
+    }
   }
 
   public static boolean selectCandidate(int index) {
-    boolean b = select_candidate_on_current_page(index);
-    getContexts();
-    return b;
+    synchronized (ENGINE_LOCK) {
+      boolean b = select_candidate_on_current_page(index);
+      getContexts();
+      return b;
+    }
   }
 
   public static boolean deleteCandidate(int index) {
@@ -703,8 +711,10 @@ public class Rime {
   }
 
   public static String RimeGetInput() {
-    String s = get_input();
-    return s == null ? "" : s;
+    synchronized (ENGINE_LOCK) {
+      String s = get_input();
+      return s == null ? "" : s;
+    }
   }
 
   /**
@@ -714,8 +724,10 @@ public class Rime {
    * status 0..3 = void/guess/selected/confirmed
    */
   public static int[] getRimeCompositionSegments() {
-    int[] arr = getCompositionSegments();
-    return arr == null ? new int[0] : arr;
+    synchronized (ENGINE_LOCK) {
+      int[] arr = getCompositionSegments();
+      return arr == null ? new int[0] : arr;
+    }
   }
 
   /**
@@ -741,7 +753,9 @@ public class Rime {
   }
 
   public static int RimeGetCaretPos() {
-    return get_caret_pos();
+    synchronized (ENGINE_LOCK) {
+      return get_caret_pos();
+    }
   }
 
   public static void RimeSetCaretPos(int caret_pos) {
