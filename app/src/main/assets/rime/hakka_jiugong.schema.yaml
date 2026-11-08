@@ -101,7 +101,10 @@ translator:
   dictionary: hakka
   prism: hakka
   enable_user_dict: true
-  enable_sentence: true
+  # 簡拼（all-initial abbrev）讓每個位置的分支爆炸，句子模式（MakeSentence）會對
+  # 用戶詞庫做 DFS，長輸入時主線程卡死 20s+（真機 ANR，2026-11-08）。
+  # 關掉句子裝配；詞庫裡的詞/多音節詞仍可透過 abbrev 拼寫直接命中。
+  enable_sentence: false
 
   # 12 鍵的核心開關：讓每條候選的 comment = 詞典原始精確拼音（如 人→nzin、任教→nzim gau）。
   # App 端據此把候選按「實際讀音」分組（左列音節組），不再自己 DP 切分。

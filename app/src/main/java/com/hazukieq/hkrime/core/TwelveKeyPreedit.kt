@@ -82,6 +82,45 @@ object TwelveKeyPreedit {
         return sb.toString()
     }
 
+    /** 單鍵碼 → 該鍵覆蓋的字母（與鍵盤 12 鍵的分組一致）。 */
+    private fun keyLetters(c: Char): String = when (c) {
+        'a' -> "abc"
+        'e' -> "def"
+        'i' -> "ghi"
+        '5' -> "kl"
+        '4' -> "mn"
+        '7' -> "ps"
+        '9' -> "qt"
+        '3' -> "vur"
+        '8' -> "zj"
+        '1' -> "ng"
+        'w' -> "th"
+        'y' -> "nz"
+        else -> c.toString()
+    }
+
+    /** 逐鍵的簡拼 preedit：每個碼字顯示聲母；有 hint 時用候選字的聲母對齊。 */
+    private fun abbrevPreedit(input: String, hint: String?): String {
+        val chars = input.filter { it.isLetterOrDigit() }
+        if (chars.isEmpty()) return input
+        val hintOk = !hint.isNullOrEmpty() && hint.length == chars.length
+        val parts = ArrayList<String>(chars.length)
+        for (i in chars.indices) {
+            val hintedSyllable = if (hintOk) charTable[hint!!.substring(i, i + 1)] else null
+            parts.add(if (hintedSyllable != null) initialOf(hintedSyllable) else keyLetters(chars[i]))
+        }
+        return parts.joinToString(" ")
+    }
+
+    /** 音節的聲母部分：th/nz/ng 取兩字母，其餘取首字母。 */
+    private fun initialOf(syllable: String): String = when {
+        syllable.startsWith("th") -> "th"
+        syllable.startsWith("nz") -> "nz"
+        syllable.startsWith("ng") -> "ng"
+        syllable.isEmpty() -> syllable
+        else -> syllable.substring(0, 1)
+    }
+
     /** 把碼串切成音節串；切不出來回傳 null（保持原 preedit）。 */
     fun decode(preedit: String?, hint: String? = null): String? {
         if (preedit.isNullOrBlank() || table.isEmpty()) return null
@@ -92,6 +131,8 @@ object TwelveKeyPreedit {
         val bestSeg = IntArray(n + 1) { Int.MAX_VALUE }
         val bestFreq = IntArray(n + 1) { 0 }
         val prev = IntArray(n + 1) { -1 }
+        // 每個轉移消耗的碼長，用於判斷「單字符碼」→ preedit 只顯示聲母
+        val stepLen = IntArray(n + 1) { 0 }
         val pick = arrayOfNulls<String>(n + 1)
         bestSeg[0] = 0
         for (i in 0 until n) {
@@ -108,19 +149,36 @@ object TwelveKeyPreedit {
                     bestFreq[i + len] = freq
                     prev[i + len] = i
                     pick[i + len] = entry.syllable
+                    stepLen[i + len] = len
                 }
             }
         }
-        if (bestSeg[n] == Int.MAX_VALUE) return null
+        // 整串切不出完整音節：多半是「只按了聲母鍵」的簡拼輸入（如 kl → "5"、kl kl → "55"）。
+        // 這種情況 preedit 只顯示聲母字母，並用第一個候選字對齊（和第一個字保持一致）。
+        if (bestSeg[n] == Int.MAX_VALUE) {
+            return abbrevPreedit(input, hint)
+        }
         val out = ArrayList<String>()
+        val lens = ArrayList<Int>()
         var p = n
         while (p > 0) {
             val q = prev[p]
             if (q < 0) return null
             out.add(pick[p] ?: return null)
+            lens.add(stepLen[p])
             p = q
         }
         out.reverse()
+        lens.reverse()
+        // 單字符碼（只按了一個鍵，如 kl→5）只能確定聲母：preedit 顯示聲母字母，
+        // 且與第一個候選字對齊（hint 對得上就用它的聲母），不再假裝拼出完整音節。
+        for (i in out.indices) {
+            if (lens.getOrNull(i) != 1) continue
+            val hinted = hint?.takeIf { hint.length == out.size }?.let { h ->
+                charTable[h.substring(i, i + 1)]
+            }
+            out[i] = initialOf(hinted ?: out[i])
+        }
         // 歧義時對齊「第一個候選字」的讀音：凝好 → ngin hau，而不是 ngin gau
         if (!hint.isNullOrEmpty() && hint.length == out.size) {
             for (i in out.indices) {

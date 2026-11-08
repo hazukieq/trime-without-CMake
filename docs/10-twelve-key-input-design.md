@@ -756,3 +756,30 @@ logcat 中 `FATAL / signal 11 / ANR in com.hazukieq.hkrime` 計數為 0。
 驗證（vivo 真機）：`55` → 考慮 / 看看 / 來看 / 理論 / 起來；`55555555` → 可口可樂。
 注意 preedit 仍會把 `55` 猜成 `ko keu` 之類的完整音節（TwelveKeyPreedit 的 DP 限制），
 但候選是正確的；要更準可在後續讓 decode 對「單字符碼」只顯示首字母。
+
+
+## 15.6 簡拼引發的 ANR 與 librime 修補（2026-11-08）
+
+真機症狀：連打 `kl`（碼 `5`）十幾次後輸入法卡死，`am_anr`：
+`Input dispatching timed out (InputMethod is not responding)`，主線程 99% CPU 20s+。
+
+ANR 棧（dropbox data_app_anr）：
+
+```
+ScriptTranslator::Query → ScriptTranslation::Evaluate
+  → MakeSentence → UserDictionary::Lookup → DfsLookup → LevelDbAccessor::Jump (DFS)
+```
+
+根因：簡拼讓每個位置的候選拼寫有幾十個分支，`translated_len < consumed` 時
+`script_translator` 會做句子裝配，句子裝配要對**用戶詞庫**做 DFS，長輸入是指數爆炸。
+librime 1.7.3 的 `script_translator` **根本不讀 `enable_sentence`**（源碼裡沒有這個配置），
+所以 schema 裡關掉沒用。
+
+修法（改 librime，重編 `.so`）：`src/rime/gear/script_translator.cc` 的 `Evaluate()`：
+
+1. 掃 `syllable_graph.edges` 的 `EdgeProperties.type`，只要出現 `kAbbreviation`
+   （即輸入用了簡拼）就**不做 MakeSentence**——簡拼詞仍可由詞典直接命中；
+2. 另加硬上限 `kMaxSentenceSyllables = 12`，完整拼音的極長輸入也不爆。
+
+重編後 `.so`：13,603,168 B，sha256 `de94aeba7fed7ecb7122c0187e5940cd7e19e5973761404cbde3778386e4bded`，75 個 JNI 導出。
+壓測：連按 `kl` 40 次，PID 不變、無新 ANR；候選仍為 可口可樂 等，preedit 顯示 `k l k l …`（聲母）。

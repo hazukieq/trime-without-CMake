@@ -353,6 +353,7 @@ public class Rime {
         hint = cs[0].text;
       }
       String decoded = TwelveKeyPreedit.INSTANCE.decode(composition.preedit, hint);
+      Timber.d("dbgpre: raw=[%s] hint=[%s] decoded=[%s]", composition.preedit, hint, decoded);
       if (decoded != null) {
         composition.preedit = decoded;
         composition.normalizeAfterRewrite();
