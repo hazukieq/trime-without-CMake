@@ -217,3 +217,21 @@ Mock 只验证**交互形态**；像素级细节（字号/间距/圆角/阴影�
 - 再點「好」→ 上屏 `凝好`、組字結束、面板自動收起。
 
 截圖：`artifacts/candidate-syllable-1.png`（初始 ngin/hau）、`candidate-syllable-2.png`（選完凝、只剩 hau）、`candidate-syllable-3.png`（上屏凝好）。
+## 十、左列列出「下一個音節」的所有可行切分
+
+`hau` 在客家話音節表裡有兩種切法：`hau`（好/号/豪…）與 `ha + u`（哈 + u）。librime 本身允許用 caret 選切點，
+所以左列現在不是「一個音節一格」，而是**列出所有可行的下一音節切分**：
+
+- `rebuildPinyinGroups()`：先由 `RimeCompositionSegments` 求已轉換前綴的 `startByte`；
+  再逐字節 `p = startByte+1..len` 做 `RimeSetCaretPos(p)` + `getContexts()`，
+  當「最後一段 end == p」且該段候選非空、且 `input[startByte..p)` 是 `SyllableLexicon` 裡的合法音節時，就記為一個切分點（最多 6 個）；
+  探完 `RimeSetCaretPos(savedCaret)` + `getContexts()` 還原。
+- 點某個切分（例：`ha`）＝ 把 caret 移到該切片末尾 → `getContexts()` → 候選欄/面板就是 `ha` 的候選；
+  選字後 librime 的 `OnSelect` 會 `Forward()`，剩下的 `u` 成為新的待處理音節，左列只剩 `u`。
+
+真機驗證（Keep 記事，輸入 `hau`）：
+1. 左列 `ha` / `hau`；
+2. 點 `ha` → 預編輯 `ha u`、候選 `下/哈/夏/霞/蝦`；
+3. 選「下」→ 預編輯 `下u`、左列只剩 `u`。
+
+截圖：`artifacts/candidate-splits-1.png`、`-2.png`、`-3.png`。

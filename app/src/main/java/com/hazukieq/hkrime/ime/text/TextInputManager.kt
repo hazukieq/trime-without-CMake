@@ -401,31 +401,43 @@ class TextInputManager private constructor() :
             candidateGroupList?.visibility = View.GONE
             return
         }
-        // 已經轉換過的段（status >= kSelected）不再顯示在左列；左列只留「還沒處理的音節」。
-        // 有轉換段時直接讀 librime 的原生分段（不按光標、避免把已轉換的段重新打開）。
+        // 左列列出「下一個音節」的所有可行切分（例如 hau 可以切 ha | hau，選 ha 後剩 u）。
+        // 判斷方式：把 caret 放到每個字節位置 p，讓 librime 只編譯 input[0..p]；
+        // 若編譯結果正好是一段 [start, p) 且該段文本是字典裡的合法音節，就認為 p 是一個切分點。
+        val input = Rime.RimeGetInput() ?: ""
+        val ib = input.toByteArray(Charsets.UTF_8)
         val nativeSegs = Rime.getRimeCompositionSegments()
-        val nativeGroups = ArrayList<Triple<String, Int, Boolean>>()
-        if (nativeSegs.size >= 3) {
-            val inputBytes = (Rime.RimeGetInput() ?: "").toByteArray(Charsets.UTF_8)
-            var converted = false
-            for (i in 0 until nativeSegs.size / 3) {
-                val st = nativeSegs[i * 3]
-                val en = nativeSegs[i * 3 + 1]
-                val status = nativeSegs[i * 3 + 2]
-                if (en <= st || st >= inputBytes.size) continue
-                val end = minOf(en, inputBytes.size)
-                val text = String(inputBytes, st, end - st, Charsets.UTF_8)
-                    .replace(" ", "").replace("'", "").trim()
-                if (text.isEmpty()) continue
-                if (status >= 2) { converted = true; continue }
-                nativeGroups.add(Triple(text, st, false))
-            }
-            if (!converted) nativeGroups.clear()
+        var startByte = 0
+        for (i in 0 until nativeSegs.size / 3) {
+            val st = nativeSegs[i * 3]
+            val en = nativeSegs[i * 3 + 1]
+            val status = nativeSegs[i * 3 + 2]
+            if (status >= 2 && en > startByte) startByte = maxOf(startByte, en)
+            if (status >= 2 && st > startByte) startByte = st
         }
-        val groups = if (nativeGroups.isNotEmpty()) {
-            cachedGroups = nativeGroups
+        val syllables = SyllableLexicon.syllables(trime)
+        val slices = ArrayList<Triple<String, Int, Boolean>>()
+        val savedCaret = Rime.RimeGetCaretPos()
+        var p = startByte + 1
+        while (p <= ib.size && slices.size < 6) {
+            Rime.RimeSetCaretPos(p)
+            Rime.getContexts()
+            val segs = Rime.getRimeCompositionSegments()
+            val lastEnd = if (segs.size >= 3) segs[segs.size - 2] else -1
+            val candCount = Rime.getCandidatesWithoutSwitch()?.size ?: 0
+            val text = String(ib, startByte, p - startByte, Charsets.UTF_8)
+                .replace(" ", "").replace("'", "").trim()
+            if (lastEnd == p && candCount > 0 && text.isNotEmpty() && text in syllables) {
+                slices.add(Triple(text, startByte, false))
+            }
+            p++
+        }
+        Rime.RimeSetCaretPos(savedCaret)
+        Rime.getContexts()
+        val groups = if (slices.isNotEmpty()) {
+            cachedGroups = slices
             lastGroupText = raw
-            nativeGroups
+            slices
         } else if (raw == lastGroupText && cachedGroups.isNotEmpty()) {
             cachedGroups
         } else {
