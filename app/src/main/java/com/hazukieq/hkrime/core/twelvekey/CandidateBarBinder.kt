@@ -28,12 +28,4 @@ class CandidateBarBinder(private val candidateView: Candidate?) {
     fun clear() {
         candidateView?.clearExternalCandidates()
     }
-
-    /**
-     * 空候選（未組字）時顯示方案開關：把候選條交還給 [Candidate]，
-     * 它會走 Rime.getCandidates() → RimeSchema.getCandidates()（简/繁、情、联、▽ 等）。
-     */
-    fun showSwitches() {
-        candidateView?.clearExternalCandidates()
-    }
 }

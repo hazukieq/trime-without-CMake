@@ -1282,6 +1282,31 @@ public class Trime extends LifecycleInputMethodService {
     new ColorPickerDialog(this).show();
   }
 
+  /**
+   * 12 鍵候選條左側 ☰ 菜單：列出當前方案的開關（简/繁、情、联…），點一下即切換。
+   * 沒有開關時退回方案選擇對話框。
+   */
+  public void showSchemaSwitchDialog() {
+    final String[] labels = Rime.getSchemaSwitchLabels();
+    if (labels.length == 0) {
+      showOptionsDialog();
+      return;
+    }
+    final AlertDialog dialog =
+        new AlertDialog.Builder(this, R.style.AlertDialogTheme)
+            .setTitle("方案开关")
+            .setItems(
+                labels,
+                (d, index) -> {
+                  Rime.toggleOption(index);
+                  updateComposing();
+                  d.dismiss();
+                })
+            .setNegativeButton(android.R.string.cancel, (d, which) -> d.dismiss())
+            .create();
+    showDialog(dialog);
+  }
+
   /** 彈出{@link SchemaPickerDialog 輸入法方案對話框} */
   public void showSchemaDialog() {
     new SchemaPickerDialog(this).show();

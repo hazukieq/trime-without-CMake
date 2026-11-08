@@ -214,6 +214,26 @@ public class Rime {
       return candidates;
     }
 
+    /** 方案開關的「當前 → 下一個」標籤，供 ☰ 菜單列表使用。 */
+    public String[] getSwitchLabels() {
+      if (switches.isEmpty()) return new String[0];
+      String[] out = new String[switches.size()];
+      for (int i = 0; i < switches.size(); i++) {
+        Map<String, Object> o = switches.get(i);
+        List<?> states = (List<?>) o.get("states");
+        if (states == null || states.isEmpty()) {
+          out[i] = "";
+          continue;
+        }
+        Integer value = (Integer) o.get("value");
+        if (value == null) value = 0;
+        String cur = states.get(value % states.size()).toString().trim();
+        String next = states.get((value + 1) % states.size()).toString().trim();
+        out[i] = cur + "  →  " + next;
+      }
+      return out;
+    }
+
     public void getValue() {
       if (switches.isEmpty()) return; // 無方案
       for (int j = 0; j < switches.size(); j++) {
@@ -458,8 +478,11 @@ public class Rime {
     return b;
   }
 
+  /**
+   * 候選條數據源。方案開關不再渲染到候選區（改由候選條左側 ☰ 菜單提供），
+   * 因此這裡永遠返回真正的候選；未組字時為空，候選條顯示 ☰ / 配色 / ⌄。
+   */
   public static RimeCandidate[] getCandidates() {
-    if (!isComposing() && showSwitches) return mSchema.getCandidates();
     return mContext.getCandidates();
   }
 
@@ -525,6 +548,11 @@ public class Rime {
 
   public static void toggleOption(int i) {
     mSchema.toggleOption(i);
+  }
+
+  /** ☰ 菜單：方案開關的「當前 → 下一個」列表；沒有開關時返回空數組。 */
+  public static String[] getSchemaSwitchLabels() {
+    return mSchema == null ? new String[0] : mSchema.getSwitchLabels();
   }
 
   public static void setProperty(String prop, String value) {

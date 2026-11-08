@@ -77,6 +77,12 @@ public class Candidate extends View {
 
   /** 面板展開時，▼ 反向繪製成 ▲（同一個路徑，僅方向不同），保證展開/收起圖標同尺寸。 */
   private static final String PANEL_OPEN_ARROW = "▲";
+
+  /** 左側菜單鍵（Gboard 式）：列出方案開關。 */
+  public static final String MENU_BUTTON = "☰";
+
+  /** 右側配色鍵（展開箭頭左邊）：打開配色對話框。 */
+  public static final String THEME_BUTTON = "◑";
   private int expectWidth = 0;
 
   private WeakReference<EventListener> listener = new WeakReference<>(null);
@@ -322,6 +328,10 @@ public class Candidate extends View {
           // ▼ / ⌄ 統一用路徑繪製：同尺寸、同線寬；面板打開時 ▼ 反向成 ▲
           boolean up = PAGE_EX_BUTTON.equals(arrow) && panelOpen;
           drawChevron(canvas, computedCandidate.getGeometry(), up);
+        } else if (MENU_BUTTON.equals(arrow)) {
+          drawMenuIcon(canvas, computedCandidate.getGeometry());
+        } else if (THEME_BUTTON.equals(arrow)) {
+          drawPaletteIcon(canvas, computedCandidate.getGeometry());
         } else {
           float arrowX =
               computedCandidate.getGeometry().centerX()
@@ -342,6 +352,56 @@ public class Candidate extends View {
             separatorPaint);
       }
     }
+  }
+
+  private void addMenuSymbol(int left) {
+    computedCandidates.add(
+        new ComputedCandidate.Symbol(
+            MENU_BUTTON, new Rect(left, 0, left + symbolBoxSize, getMeasuredHeight())));
+  }
+
+  private void addThemeSymbol(int left) {
+    computedCandidates.add(
+        new ComputedCandidate.Symbol(
+            THEME_BUTTON, new Rect(left, 0, left + symbolBoxSize, getMeasuredHeight())));
+  }
+
+  /** 菜單圖標：三條等長橫線（漢堡菜單），線寬/間距固定，與其他圖標同視覺重量。 */
+  private void drawMenuIcon(Canvas canvas, Rect rect) {
+    final float dp = getResources().getDisplayMetrics().density;
+    final float cx = rect.centerX();
+    final float cy = rect.centerY();
+    final float halfW = 6.2f * dp;
+    final float gap = 3.3f * dp;
+    final float stroke = 1.7f * dp;
+
+    symbolPaint.setStyle(Paint.Style.STROKE);
+    symbolPaint.setStrokeWidth(stroke);
+    symbolPaint.setStrokeCap(Paint.Cap.ROUND);
+    canvas.drawLine(cx - halfW, cy - gap, cx + halfW, cy - gap, symbolPaint);
+    canvas.drawLine(cx - halfW, cy, cx + halfW, cy, symbolPaint);
+    canvas.drawLine(cx - halfW, cy + gap, cx + halfW, cy + gap, symbolPaint);
+    symbolPaint.setStrokeCap(Paint.Cap.BUTT);
+    symbolPaint.setStyle(Paint.Style.FILL);
+  }
+
+  /** 配色圖標：調色盤（外圈 + 拇指孔 + 三個顏料點），與字體無關。 */
+  private void drawPaletteIcon(Canvas canvas, Rect rect) {
+    final float dp = getResources().getDisplayMetrics().density;
+    final float r = 6.0f * dp;
+    final float cx = rect.centerX();
+    final float cy = rect.centerY() - 0.3f * dp;
+    symbolPaint.setStyle(Paint.Style.STROKE);
+    symbolPaint.setStrokeWidth(1.5f * dp);
+    canvas.drawCircle(cx, cy, r, symbolPaint);
+    symbolPaint.setStyle(Paint.Style.FILL);
+    // 拇指孔（右下）
+    canvas.drawCircle(cx + 2.9f * dp, cy + 2.4f * dp, 1.7f * dp, symbolPaint);
+    // 左上三點顏料
+    final float dot = 1.0f * dp;
+    canvas.drawCircle(cx - 2.9f * dp, cy - 1.7f * dp, dot, symbolPaint);
+    canvas.drawCircle(cx, cy - 3.4f * dp, dot, symbolPaint);
+    canvas.drawCircle(cx - 3.4f * dp, cy + 0.6f * dp, dot, symbolPaint);
   }
 
   /** 繪製固定尺寸的實心箭頭（展開/收起/收起鍵盤共用，避免字形大小不一致）。 */
@@ -387,20 +447,22 @@ public class Candidate extends View {
     } else {
     }
 
-    // 右側箭頭固定佔位：不用字體量寬，避免 ▼(U+25BC) 與 ⌄(U+2304) 字形墨跡差造成大小不一。
-    final int arrowWidth = candidateSpacing + symbolBoxSize;
-
+    // 圖標只在「沒有候選」時出現：☰（菜單）／配色／收起鍵盤。
+    // 有候選時候選條只留一個 ▼（展開/收起），把寬度全部讓給候選詞。
+    // 全部按 20dp 盒佔位，不用字體量寬 → 三個圖標尺寸一致。
     if (numCandidates <= 0 || candidates == null) {
-      // 沒有候選：右側只留「收起鍵盤」，點它隱藏輸入法
+      addMenuSymbol(0);
+      addThemeSymbol(avail - symbolBoxSize * 2);
       computedCandidates.add(
           new ComputedCandidate.Symbol(
-              HIDE_KEYBOARD_BUTTON, new Rect(avail - arrowWidth, 0, avail, getMeasuredHeight())));
+              HIDE_KEYBOARD_BUTTON, new Rect(avail - symbolBoxSize, 0, avail, getMeasuredHeight())));
       applyLayoutParams(avail);
       Trime.getService().setCandidateExPage(false);
       return;
     }
 
-    // 留出右側固定 ▼ 的寬度，放不下的候選直接不畫（面板裡能看到全部）
+    // 有候選時只留右側展開箭頭的位置，其餘寬度全部給候選詞
+    final int arrowWidth = candidateSpacing + symbolBoxSize;
     int limit = avail - arrowWidth;
     int x = 0;
     boolean truncated = false;
@@ -431,15 +493,12 @@ public class Candidate extends View {
     }
 
     // 只要還有候選就常駐 ▼（展開面板）；截斷/翻頁只是「面板裡會有更多」的附加資訊
-    boolean hasExButton = true;
-    if (hasExButton) {
-      computedCandidates.add(
-          new ComputedCandidate.Symbol(
-              PAGE_EX_BUTTON, new Rect(avail - arrowWidth, 0, avail, getMeasuredHeight())));
-    }
+    computedCandidates.add(
+        new ComputedCandidate.Symbol(
+            PAGE_EX_BUTTON, new Rect(avail - symbolBoxSize, 0, avail, getMeasuredHeight())));
 
     applyLayoutParams(avail);
-    Trime.getService().setCandidateExPage(hasExButton);
+    Trime.getService().setCandidateExPage(true);
   }
 
   private void applyLayoutParams(int width) {

@@ -285,12 +285,9 @@ class TextInputManager private constructor() :
 
     /** 12 鍵快照落地：條與面板同源，面板保持打開直到輸入清空。 */
     private fun onTwelveKeySnapshot(snapshot: TwelveKeySnapshot) {
-        if (snapshot.isEmpty) {
-            // 空候選區：交還給 Candidate 顯示方案開關（简/繁、情、联、▽）
-            candidateBarBinder?.showSwitches()
-        } else {
-            candidateBarBinder?.bind(snapshot)
-        }
+        // 空快照也走 bind：候選條保持「外部快照」模式，只畫 ☰ / 配色 / ⌄，
+        // 不再回落到 Rime 的方案開關列表。
+        candidateBarBinder?.bind(snapshot)
         candidatePanelController?.submit(snapshot)
         if (snapshot.isEmpty || (!snapshot.hasCandidates && snapshot.fallback == null)) {
             if (candidatePanelController?.isShown == true) candidatePanelController?.hide()
@@ -335,11 +332,7 @@ class TextInputManager private constructor() :
     /** 候選刷新後呼叫：12 鍵重建快照；其它方案只刷新展開面板。 */
     fun onCandidatesRefreshed() {
         if (isTwelveKeyMode()) {
-            if (!Rime.isComposing()) {
-                // 未組字：候選條顯示方案開關（而不是空的 ⌄）
-                candidateBarBinder?.showSwitches()
-                return
-            }
+            // 未組字時 refresh() 會 emit EMPTY，候選條顯示 ☰ / 配色 / ⌄
             twelveKeyController?.refresh()
             return
         }
@@ -764,6 +757,10 @@ class TextInputManager private constructor() :
             Candidate.PAGE_EX_BUTTON -> toggleCandidatePanel()
             // 候選為空時，右側按鈕的行為是收起鍵盤
             Candidate.HIDE_KEYBOARD_BUTTON -> Trime.getService().requestHideSelf(0)
+            // Gboard 式左側菜單：方案開關（简/繁、情、联）
+            Candidate.MENU_BUTTON -> trime.showSchemaSwitchDialog()
+            // 展開箭頭左側：配色
+            Candidate.THEME_BUTTON -> trime.showColorDialog()
         }
     }
 
