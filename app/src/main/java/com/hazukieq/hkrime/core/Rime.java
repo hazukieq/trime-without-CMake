@@ -630,6 +630,17 @@ public class Rime {
     return s == null ? "" : s;
   }
 
+  /**
+   * 取 librime Composition 的分段（比 caret 猜測可靠）。
+   *
+   * @return 每個 segment 三個 int：[start, end, status]；start/end 是 input 的字節偏移，
+   * status 0..3 = void/guess/selected/confirmed
+   */
+  public static int[] getRimeCompositionSegments() {
+    int[] arr = getCompositionSegments();
+    return arr == null ? new int[0] : arr;
+  }
+
   public static int RimeGetCaretPos() {
     return get_caret_pos();
   }
@@ -807,6 +818,8 @@ public class Rime {
   public static native String get_input();
 
   public static native int get_caret_pos();
+
+  public static native int[] getCompositionSegments();
 
   public static native void set_caret_pos(int caret_pos);
 

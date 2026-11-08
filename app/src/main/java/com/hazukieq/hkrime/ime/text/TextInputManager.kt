@@ -285,7 +285,10 @@ class TextInputManager private constructor() :
             if (!Rime.hasRight()) break
             delta--
         }
-        if (Rime.selectCandidate(indexInPage)) {
+        // 只選中這一段，不強制上屏：模擬數字鍵讓 Rime 自己決定（還有未轉換段時繼續組字）
+        if (indexInPage in 0..8) {
+            trime.handleKey(KeyEvent.KEYCODE_1 + indexInPage, 0)
+        } else if (Rime.selectCandidate(indexInPage) && !Rime.isComposing()) {
             activeEditorInstance.commitRimeText()
         }
         trime.updateComposing()
@@ -340,6 +343,10 @@ class TextInputManager private constructor() :
             val cs = Rime.getCandidatesWithoutSwitch()
             val head = cs.take(2).joinToString("|") { (it.text ?: "") }
             Timber.i(
+                "caretProbe segsAfterLeft=%s",
+                Rime.getRimeCompositionSegments().joinToString(",")
+            )
+            Timber.i(
                 "caretProbe left ok=%s caret=%s sel=%s-%s cands=%s",
                 ok, Rime.RimeGetCaretPos(), c.getSelStart(), c.getSelEnd(), head
             )
@@ -366,77 +373,49 @@ class TextInputManager private constructor() :
 
     private fun utf8Len(s: String): Int = s.toByteArray(Charsets.UTF_8).size
 
-    private var cachedGroups: List<Triple<String, Int, Boolean>> = emptyList()
-
-    /** 探測 librime 的音節邊界，返回 (文本, 起始字節, 是否已轉換)；不改動最終 caret。 */
-    private fun probeGroups(bytes: ByteArray): List<Triple<String, Int, Boolean>> {
-        val savedCaret = Rime.RimeGetCaretPos()
-        val boundSet = sortedSetOf<Int>(bytes.size)
-        Rime.RimeSetCaretPos(bytes.size)
-        Rime.getContexts()
-        var guard = 0
-        var lastPos = bytes.size
-        while (guard++ < 64) {
-            Rime.process_key(0xff51, 0) // XK_Left
-            Rime.getContexts()
-            val c = Rime.RimeGetCaretPos()
-            if (c <= 0) { boundSet.add(0); break }
-            if (c >= lastPos) break
-            boundSet.add(c)
-            lastPos = c
-        }
-
-        Rime.RimeSetCaretPos(savedCaret)
-        Rime.getContexts()
-        if (boundSet.isEmpty()) boundSet.add(0)
-        if (boundSet.first() != 0) boundSet.add(0)
-        boundSet.add(bytes.size)
-
+    private fun buildGroupsFromSegments(
+        bytes: ByteArray,
+        segs: IntArray,
+    ): List<Triple<String, Int, Boolean>> {
         val out = ArrayList<Triple<String, Int, Boolean>>()
-        val bounds = boundSet.toList()
-        for (i in 0 until bounds.size - 1) {
-            var sb = bounds[i]
-            var eb = bounds[i + 1]
-            while (sb < eb && (bytes[sb] == ' '.code.toByte() || bytes[sb] == '\''.code.toByte())) sb++
-            while (eb > sb && (bytes[eb - 1] == ' '.code.toByte() || bytes[eb - 1] == '\''.code.toByte())) eb--
-            if (eb <= sb) continue
-            val segText = String(bytes, sb, eb - sb, Charsets.UTF_8).trim()
+        var i = 0
+        while (i + 2 < segs.size) {
+            val startByte = segs[i]
+            val endByte = segs[i + 1]
+            val status = segs[i + 2]
+            i += 3
+            if (startByte < 0 || endByte <= startByte || endByte > bytes.size) continue
+            val segText = String(bytes, startByte, endByte - startByte, Charsets.UTF_8)
+                .trim().trim('\'', ' ')
             if (segText.isBlank()) continue
-            val pureLatin = segText.all { it in 'a'..'z' || it == '\'' }
-            val pureCjk = segText.all { isCjk(it) }
-            if (!pureLatin && !pureCjk) continue
-            out.add(Triple(segText, sb, pureCjk))
+            val converted = status >= 2
+            out.add(Triple(segText, startByte, converted))
         }
         return out
     }
 
-    /** 由 preedit 重建左側音節組：已轉換前綴 + 自切音節。 */
+    /** 由 preedit 重建左側音節組：邊界由 librime 的光標切分（XK_Left）取得。 */
     private fun rebuildPinyinGroups() {
         val adapter = candidateGroupAdapter ?: return
-        // preedit 裡可能帶 librime 的 caret 佔位符（默認 "‸"），它不是輸入內容，先去掉
-        val text = Rime.getCompositionText()?.replace("\u2038", "")?.replace("\u2040", "")
-            ?: run { adapter.clear(); return }
-        if (text.isEmpty()) {
+        val raw = Rime.getCompositionText() ?: run { adapter.clear(); return }
+        if (raw.isEmpty()) {
             adapter.clear()
             candidateGroupList?.visibility = View.GONE
             return
         }
-        if (text != lastGroupText) {
-            activeGroupIndex = -1
-            lastGroupText = text
-        }
-        val bytes = text.toByteArray(Charsets.UTF_8)
-        // 用 librime 自己的切分：把 caret 放到末尾，反覆按 XK_Left，它會按音節往左跳；
-        // 跳到的位置就是真實音節邊界。這裡只為「拿分組」，探測完把 caret 還原，
-        // 左側選中不影響 caret；caret 只由右側挑中漢字時被消費。
-        val groups = if (text == lastGroupText && cachedGroups.isNotEmpty()) {
+        val groups = if (raw == lastGroupText && cachedGroups.isNotEmpty()) {
             cachedGroups
         } else {
-            probeGroups(bytes).also {
+            probeGroups(raw).also {
                 cachedGroups = it
-                lastGroupText = text
+                lastGroupText = raw
                 activeGroupIndex = -1
             }
+        }
+        if (groups.isEmpty()) {
+            adapter.clear()
+            candidateGroupList?.visibility = View.GONE
+            return
         }
         val caretNow = Rime.RimeGetCaretPos()
         val items = ArrayList<CandidateGroupAdapter.PinyinGroupAdapterItem>()
@@ -455,7 +434,59 @@ class TextInputManager private constructor() :
             )
         }
         adapter.submit(items)
-        candidateGroupList?.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
+        candidateGroupList?.visibility = View.VISIBLE
+    }
+
+    private var cachedGroups: List<Triple<String, Int, Boolean>> = emptyList()
+
+    /**
+     * 用 librime 自己的光標切分拿邊界：把 caret 放到末尾，反覆按 XK_Left，
+     * 它會按音節往左跳；跳到的位置就是音節邊界。探測完把 caret 還原。
+     *
+     * 注意：preedit 裡可能帶 caret 佔位符（"‸"），這裡直接在 preedit 的字節上切片，
+     * 所以不需要做任何偏移補償，最後再把佔位符從組文本裡去掉。
+     */
+    private fun probeGroups(raw: String): List<Triple<String, Int, Boolean>> {
+        val savedCaret = Rime.RimeGetCaretPos()
+        val bytes = raw.toByteArray(Charsets.UTF_8)
+        val boundSet = sortedSetOf<Int>(bytes.size)
+        Rime.RimeSetCaretPos(bytes.size)
+        Rime.getContexts()
+        var guard = 0
+        var lastPos = Int.MAX_VALUE
+        while (guard++ < 64) {
+            Rime.process_key(0xff51, 0) // XK_Left
+            Rime.getContexts()
+            val c = Rime.RimeGetCaretPos()
+            if (c <= 0) { boundSet.add(0); break }
+            if (c >= lastPos) break
+            boundSet.add(c)
+            lastPos = c
+            if (boundSet.size > 32) break
+        }
+        Rime.RimeSetCaretPos(savedCaret)
+        Rime.getContexts()
+        if (boundSet.isEmpty()) return emptyList()
+        if (boundSet.first() != 0) boundSet.add(0)
+        boundSet.add(bytes.size)
+
+        val out = ArrayList<Triple<String, Int, Boolean>>()
+        val bounds = boundSet.toList()
+        for (i in 0 until bounds.size - 1) {
+            var sb = bounds[i]
+            var eb = bounds[i + 1]
+            while (sb < eb && (bytes[sb] == ' '.code.toByte() || bytes[sb] == '\''.code.toByte())) sb++
+            while (eb > sb && (bytes[eb - 1] == ' '.code.toByte() || bytes[eb - 1] == '\''.code.toByte())) eb--
+            if (eb <= sb) continue
+            var segText = String(bytes, sb, eb - sb, Charsets.UTF_8)
+                .replace("\u2038", "").replace("\u2040", "").trim()
+            if (segText.isBlank()) continue
+            val pureLatin = segText.all { it in 'a'..'z' || it == '\'' }
+            val pureCjk = segText.all { isCjk(it) }
+            if (!pureLatin && !pureCjk) continue
+            out.add(Triple(segText, sb, pureCjk))
+        }
+        return out
     }
 
     /**

@@ -61,7 +61,7 @@ WORK_DIR="$REPO_ROOT/../jni-build"
 BUILD_DIR_NAME=""
 OUT_DIR=""
 CLEAN=0
-EXPECT_SYMBOLS=73     # v3.2.7 的 librime_jni 源文件里恰好 73 个 Java_* 入口；0 = 不检查
+EXPECT_SYMBOLS=74     # v3.2.7 的 73 个 Java_* 入口 + 我们新增的 getCompositionSegments；0 = 不检查
 LOG_FILE=""
 
 die()  { echo "ERROR: $*" >&2; exit 1; }
@@ -321,6 +321,98 @@ done
 patch_file "$JNI_DIR/jni-utils.h"       "$OLD_PKG_PATH"  "$NEW_PKG_PATH"  "jni-utils.h (FindClass/GetFieldID)"
 patch_file "$JNI_DIR/rime_jni.cc"       "$OLD_PKG"       "$NEW_PKG"       "rime_jni.cc (traits.app_name)"
 patch_file "$JNI_DIR/CMakeLists.txt"    "$OLD_PKG_PATH/core/Rime" "$NEW_PKG_PATH/core/Rime" "CMakeLists.txt (CLASSNAME)"
+
+# ---- 新增 JNI：暴露 librime Composition 的分段（左侧音节组用）----
+LIB_DIR="$SRC/$JNI_REL/librime"
+[ -d "$LIB_DIR" ] || die "缺 $LIB_DIR"
+NEW_UNDER_ESC="$NEW_UNDER" JNI_DIR_ESC="$JNI_DIR" LIB_DIR_ESC="$LIB_DIR" python3 - <<'PYEOF'
+import os, pathlib
+new_under = os.environ["NEW_UNDER_ESC"]
+jni_dir = pathlib.Path(os.environ["JNI_DIR_ESC"])
+lib_dir = pathlib.Path(os.environ["LIB_DIR_ESC"])
+
+# 1) librime 头文件：加声明
+h = lib_dir / "src/rime_api.h"
+hs = h.read_text(encoding="utf-8")
+if "RimeGetCompositionSegments" not in hs:
+    anchor = "RIME_API Bool RimeGetContext(RimeSessionId session_id, RimeContext* context);"
+    hs = hs.replace(anchor, anchor + """
+
+// [hkrime] 暴露 Composition 的分段（start/end 为 input 的字节偏移，status 0..3）
+RIME_API int RimeGetCompositionSegments(RimeSessionId session_id,
+                                        int* starts, int* ends, int* statuses,
+                                        int max_count);""")
+    h.write_text(hs, encoding="utf-8")
+    print("  patched  librime/rime_api.h: RimeGetCompositionSegments 声明")
+else:
+    print("  already  librime/rime_api.h: RimeGetCompositionSegments")
+
+# 2) librime 实现
+c = lib_dir / "src/rime_api.cc"
+cs = c.read_text(encoding="utf-8")
+if "RimeGetCompositionSegments" not in cs:
+    anchor = "RIME_API Bool RimeGetContext(RimeSessionId session_id, RimeContext* context) {"
+    impl = """RIME_API int RimeGetCompositionSegments(RimeSessionId session_id,
+                                        int* starts, int* ends, int* statuses,
+                                        int max_count) {
+  an<Session> session(Service::instance().GetSession(session_id));
+  if (!session)
+    return 0;
+  Context* ctx = session->context();
+  if (!ctx || !ctx->IsComposing())
+    return 0;
+  const Composition& composition = ctx->composition();
+  int n = 0;
+  for (const Segment& seg : composition) {
+    if (n >= max_count)
+      break;
+    if (starts)
+      starts[n] = static_cast<int>(seg.start);
+    if (ends)
+      ends[n] = static_cast<int>(seg.end);
+    if (statuses)
+      statuses[n] = static_cast<int>(seg.status);
+    ++n;
+  }
+  return n;
+}
+
+"""
+    cs = cs.replace(anchor, impl + anchor)
+    c.write_text(cs, encoding="utf-8")
+    print("  patched  librime/rime_api.cc: RimeGetCompositionSegments 实现")
+else:
+    print("  already  librime/rime_api.cc: RimeGetCompositionSegments")
+
+# 3) JNI 入口（包名用当前 NEW_UNDER）
+jni = jni_dir / "rime_jni.cc"
+js = jni.read_text(encoding="utf-8")
+if "getCompositionSegments" not in js:
+    js += """
+extern "C" JNIEXPORT jintArray JNICALL
+Java_%s_core_Rime_getCompositionSegments(JNIEnv* env, jclass) {
+  const int kMax = 64;
+  int starts[kMax], ends[kMax], statuses[kMax];
+  int n = RimeGetCompositionSegments((RimeSessionId)activated_session_id, starts,
+                                     ends, statuses, kMax);
+  jintArray result = env->NewIntArray(n * 3);
+  if (result == nullptr)
+    return nullptr;
+  jint buf[kMax * 3];
+  for (int i = 0; i < n; ++i) {
+    buf[i * 3] = starts[i];
+    buf[i * 3 + 1] = ends[i];
+    buf[i * 3 + 2] = statuses[i];
+  }
+  env->SetIntArrayRegion(result, 0, n * 3, buf);
+  return result;
+}
+""" % new_under.replace("/", "_")
+    jni.write_text(js, encoding="utf-8")
+    print("  patched  librime_jni/rime_jni.cc: getCompositionSegments 入口")
+else:
+    print("  already  librime_jni/rime_jni.cc: getCompositionSegments")
+PYEOF
 
 # 兜底：不允许任何旧包名残留
 LEFTOVER="$(grep -rnE "(com[./]osfans[./]trime|Java_${OLD_UNDER}_)" "$JNI_DIR" 2>/dev/null || true)"
