@@ -61,6 +61,11 @@ public class Rime {
       return preedit;
     }
 
+    public int getLength() { return length; }
+    public int getCursorPos() { return cursor_pos; }
+    public int getSelStart() { return sel_start; }
+    public int getSelEnd() { return sel_end; }
+
     public int getStart() {
       if (length == 0) return 0;
       return new String(bytes, 0, sel_start).length();

@@ -20,6 +20,8 @@ import com.hazukieq.hkrime.ime.keyboard.Keyboard.printModifierKeyState
 import com.hazukieq.hkrime.ime.keyboard.KeyboardSwitcher
 import com.hazukieq.hkrime.ime.keyboard.KeyboardView
 import com.hazukieq.hkrime.util.ShortcutUtils
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.hazukieq.hkrime.util.startsWithAsciiChar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
@@ -55,6 +57,13 @@ class TextInputManager private constructor() :
     private var intentReceiver: IntentReceiver? = null
 
     private var mainKeyboardView: KeyboardView? = null
+    private var inputArea: android.widget.FrameLayout? = null
+    private var candidatePanel: RecyclerView? = null
+    private var candidatePanelAdapter: CandidatePanelAdapter? = null
+    private var candidatePanelRoot: android.view.View? = null
+    private var panelItems: MutableList<CandidatePanelAdapter.Item> = mutableListOf()
+    /** 面板一次最多收集的頁數，防止極端情況下卡住 */
+    private val panelMaxPages = 20
     var candidateRoot: ScrollView? = null
     var candidateView: Candidate? = null
 
@@ -147,7 +156,7 @@ class TextInputManager private constructor() :
             it.setPageStr(
                 Runnable { trime.handleKey(KeyEvent.KEYCODE_PAGE_DOWN, 0) },
                 Runnable { trime.handleKey(KeyEvent.KEYCODE_PAGE_UP, 0) },
-                Runnable { trime.selectLiquidKeyboard(SymbolKeyboardType.CANDIDATE) }
+                Runnable { toggleCandidatePanel() }
             )
             it.visibility = if (Rime.getOption("_hide_candidate")) View.GONE else View.VISIBLE
         }
@@ -156,6 +165,123 @@ class TextInputManager private constructor() :
             it.setCandidateListener(this)
             it.setShowComment(!Rime.getOption("_hide_comment"))
             it.reset(trime)
+        }
+
+        // 候選展開面板（自繪網格，不復用 liquidKeyboard）
+        inputArea = uiBinding.main.inputArea
+        candidatePanelRoot = uiBinding.main.candidatePanelRoot
+        candidatePanel = uiBinding.main.candidatePanel.also { panel ->
+            panel.layoutManager = GridLayoutManager(trime, 4)
+            candidatePanelAdapter = CandidatePanelAdapter(
+                trime,
+                onPick = { pageOffset, indexInPage -> pickPanelCandidate(pageOffset, indexInPage) },
+            )
+            panel.adapter = candidatePanelAdapter
+        }
+    }
+
+    // ---------- 候選展開面板 ----------
+
+    fun isCandidatePanelShown(): Boolean = candidatePanelRoot?.visibility == android.view.View.VISIBLE
+
+    /** 切換展開面板；關閉鍵盤由候選欄的 ⌄ 負責 */
+    fun toggleCandidatePanel() {
+        Timber.i("toggleCandidatePanel: shown=%s", isCandidatePanelShown())
+        if (isCandidatePanelShown()) hideCandidatePanel() else showCandidatePanel()
+    }
+
+    fun showCandidatePanel() {
+        val panel = candidatePanel ?: return
+        val root = candidatePanelRoot ?: return
+        // 面板只展示「候選欄這一頁之外」的候選；收集後立刻把 Rime 還原到原頁，
+        // 因此展開/滾動都不會改動候選欄（第一行）的內容。
+        panelItems = collectCandidatePanelItems()
+        if (panelItems.isEmpty()) {
+            Timber.i("showCandidatePanel: no extra candidates")
+            panelItems = currentPageItems() // 只有截斷、沒有下一頁時，退化成展示當前頁完整內容
+        }
+        candidatePanelAdapter?.submit(panelItems)
+        inputArea?.layoutParams?.height = mainKeyboardView?.height
+            ?: android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+        inputArea?.requestLayout()
+        mainKeyboardView?.visibility = View.GONE
+        root.visibility = View.VISIBLE
+        panel.scrollToPosition(0)
+        Timber.i("showCandidatePanel: items=%s", panelItems.size)
+    }
+
+    /** 收集「當前頁之後」的所有候選；結束後用 pageUp 還原，候選欄狀態不變。 */
+    private fun collectCandidatePanelItems(): MutableList<CandidatePanelAdapter.Item> {
+        val items = mutableListOf<CandidatePanelAdapter.Item>()
+        if (!Rime.hasRight()) return items
+        var offset = 1
+        var moved = 0
+        while (Rime.hasRight() && offset <= panelMaxPages) {
+            trime.handleKey(KeyEvent.KEYCODE_PAGE_DOWN, 0)
+            moved++
+            val cs = Rime.getCandidatesWithoutSwitch() ?: break
+            for (i in cs.indices) {
+                items.add(
+                    CandidatePanelAdapter.Item(
+                        cs[i].text ?: "", cs[i].comment ?: "", offset, i
+                    )
+                )
+            }
+            offset++
+        }
+        // 還原到第一頁（候選欄所顯示的頁），候選欄內容與 caret 都不受影響
+        repeat(moved) { trime.handleKey(KeyEvent.KEYCODE_PAGE_UP, 0) }
+        trime.updateComposing()
+        return items
+    }
+
+    /** 當前頁的完整候選（候選欄被截斷時，面板用來展示被截斷的部分）。 */
+    private fun currentPageItems(): MutableList<CandidatePanelAdapter.Item> {
+        val items = mutableListOf<CandidatePanelAdapter.Item>()
+        val cs = Rime.getCandidatesWithoutSwitch() ?: return items
+        for (i in cs.indices) {
+            items.add(CandidatePanelAdapter.Item(cs[i].text ?: "", cs[i].comment ?: "", 0, i))
+        }
+        return items
+    }
+
+    fun hideCandidatePanel() {
+        Timber.i("hideCandidatePanel")
+        val root = candidatePanelRoot ?: return
+        if (!isCandidatePanelShown()) return
+        // 打開時已把 Rime 還原到原頁，這裡不需要再翻頁
+        root.visibility = View.GONE
+        mainKeyboardView?.visibility = View.VISIBLE
+        inputArea?.layoutParams?.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+        inputArea?.requestLayout()
+        candidatePanelAdapter?.clear()
+        trime.updateComposing()
+    }
+
+    private fun pickPanelCandidate(pageOffset: Int, indexInPage: Int) {
+        // 面板展示的是「當前頁之後」的頁，提交時需要先翻到那一頁
+        var delta = pageOffset
+        while (delta > 0) {
+            trime.handleKey(KeyEvent.KEYCODE_PAGE_DOWN, 0)
+            if (!Rime.hasRight()) break
+            delta--
+        }
+        if (Rime.selectCandidate(indexInPage)) {
+            activeEditorInstance.commitRimeText()
+        }
+        trime.updateComposing()
+        if (!Rime.isComposing()) {
+            hideCandidatePanel()
+        } else {
+            // 組字還沒結束：回到第一頁並重新收集面板內容
+            while (Rime.hasLeft()) {
+                trime.handleKey(KeyEvent.KEYCODE_PAGE_UP, 0)
+            }
+            trime.updateComposing()
+            panelItems = collectCandidatePanelItems()
+            if (panelItems.isEmpty()) panelItems = currentPageItems()
+            candidatePanelAdapter?.submit(panelItems)
+            candidatePanel?.scrollToPosition(0)
         }
     }
 
@@ -181,6 +307,8 @@ class TextInputManager private constructor() :
     override fun onStartInputView(instance: EditorInstance, restarting: Boolean) {
         super.onStartInputView(instance, restarting)
         Trime.getService().selectLiquidKeyboard(-1)
+        panelItems.clear()
+        candidatePanelRoot?.visibility = android.view.View.GONE
         isComposable = false
         performEnterAsLineBreak = false
         var tempAsciiMode = if (shouldResetAsciiMode) false else null
@@ -466,7 +594,9 @@ class TextInputManager private constructor() :
         when (arrow) {
             Candidate.PAGE_UP_BUTTON -> onKey(KeyEvent.KEYCODE_PAGE_UP, 0)
             Candidate.PAGE_DOWN_BUTTON -> onKey(KeyEvent.KEYCODE_PAGE_DOWN, 0)
-            Candidate.PAGE_EX_BUTTON -> Trime.getService().selectLiquidKeyboard(SymbolKeyboardType.CANDIDATE)
+            Candidate.PAGE_EX_BUTTON -> toggleCandidatePanel()
+            // 候選為空時，右側按鈕的行為是收起鍵盤
+            Candidate.HIDE_KEYBOARD_BUTTON -> Trime.getService().requestHideSelf(0)
         }
     }
 

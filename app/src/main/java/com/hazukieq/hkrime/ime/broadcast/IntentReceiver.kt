@@ -42,6 +42,11 @@ class IntentReceiver : BroadcastReceiver(), CoroutineScope by MainScope() {
             COMMAND_SYNC -> async {
                 sync(context)
             }
+            COMMAND_DEBUG_TOGGLE_PANEL -> {
+                // 測試用：adb shell am broadcast -a com.hazukieq.hkrime.debug.togglepanel
+                com.hazukieq.hkrime.ime.core.Trime.getService()
+                    ?.textInputManager?.toggleCandidatePanel()
+            }
             Intent.ACTION_SHUTDOWN -> Rime.destroy()
             else -> return
         }
@@ -51,6 +56,7 @@ class IntentReceiver : BroadcastReceiver(), CoroutineScope by MainScope() {
         context.registerReceiver(this, IntentFilter(COMMAND_DEPLOY))
         context.registerReceiver(this, IntentFilter(COMMAND_SYNC))
         context.registerReceiver(this, IntentFilter(Intent.ACTION_SHUTDOWN))
+        context.registerReceiver(this, IntentFilter(COMMAND_DEBUG_TOGGLE_PANEL))
     }
 
     fun unregisterReceiver(context: Context) {
@@ -60,5 +66,6 @@ class IntentReceiver : BroadcastReceiver(), CoroutineScope by MainScope() {
     companion object {
         private const val COMMAND_DEPLOY = "com.hazukieq.hkrime.deploy"
         private const val COMMAND_SYNC = "com.hazukieq.hkrime.sync"
+        private const val COMMAND_DEBUG_TOGGLE_PANEL = "com.hazukieq.hkrime.debug.togglepanel"
     }
 }

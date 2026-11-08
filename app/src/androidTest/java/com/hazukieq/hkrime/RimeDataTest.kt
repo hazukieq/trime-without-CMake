@@ -144,4 +144,6 @@ class RimeDataTest {
         Log.i(tag, "lenth(qq)=$lenth")
         assertTrue("lenth.json failed to load (conversion returned null)", lenth != null)
     }
+
+
 }

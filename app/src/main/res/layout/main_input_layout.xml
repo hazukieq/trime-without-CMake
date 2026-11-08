@@ -7,9 +7,34 @@
 
     <include android:id="@+id/candidate_view" layout="@layout/candidate_bar" />
 
-    <com.hazukieq.hkrime.ime.keyboard.KeyboardView
-        android:id="@+id/main_keyboard_view"
+    <FrameLayout
+        android:id="@+id/input_area"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content">
+
+        <com.hazukieq.hkrime.ime.keyboard.KeyboardView
+            android:id="@+id/main_keyboard_view"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <!-- 展開面板：只覆蓋鍵盤區，候選欄（第一行）保持可見 -->
+        <LinearLayout
+            android:id="@+id/candidate_panel_root"
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#FFFFFFFF"
+            android:visibility="gone">
+
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/candidate_panel"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:padding="6dp" />
+        </LinearLayout>
+    </FrameLayout>
 
 </LinearLayout>

@@ -57,6 +57,8 @@ public class Candidate extends View {
   public static final String PAGE_UP_BUTTON = "◀";
   public static final String PAGE_DOWN_BUTTON = "▶";
   public static final String PAGE_EX_BUTTON = "▼";
+  /** 候選為空時的按鈕：點它收起輸入法鍵盤 */
+  public static final String HIDE_KEYBOARD_BUTTON = "⌄";
   private int expectWidth = 0;
 
   private WeakReference<EventListener> listener = new WeakReference<>(null);
@@ -157,9 +159,8 @@ public class Candidate extends View {
     startNum = start;
     removeHighlight();
     updateCandidateWidth();
-    if (updateCandidates() > 0) {
-      invalidate();
-    }
+    // 候選為空時也要重繪，否則「收起鍵盤」按鈕不會出現（舊狀態會殘留在 Canvas 上）
+    invalidate();
   }
 
   public void setExpectWidth(int expectWidth) {
@@ -221,8 +222,9 @@ public class Candidate extends View {
   @Override
   protected void onDraw(Canvas canvas) {
     if (canvas == null) return;
-    if (candidates == null) return;
+    // 先画背景：候選為空時也要擦掉舊像素，並畫出「收起鍵盤」按鈕
     super.onDraw(canvas);
+    if (computedCandidates.isEmpty()) return;
 
     for (ComputedCandidate computedCandidate : computedCandidates) {
       int i = computedCandidates.indexOf(computedCandidate);
@@ -282,41 +284,55 @@ public class Candidate extends View {
     }
   }
 
+  /**
+   * 單行候選欄：超寬直接截斷，右側固定一個「▼」；候選為空時右側變成「收起鍵盤」按鈕。
+   * 翻頁箭頭（◀ ▶）已移除，上一頁/下一頁統一在展開面板裡操作。
+   */
   private void updateCandidateWidth() {
-    boolean hasExButton = false;
-    Integer pageEx =
-        Integer.parseInt(AppPrefs.defaultInstance().getKeyboard().getCandidatePageSize()) - 10000;
-    int pageBottonWidth =
-        (int)
-            (candidateSpacing
-                + graphicUtils.measureText(symbolPaint, PAGE_DOWN_BUTTON, symbolFont)
-                + 2 * candidatePadding);
-    int minWidth;
-    if (pageEx > 2) minWidth = (int) (expectWidth * (pageEx / 10f + 1) - pageBottonWidth);
-    else if (pageEx == 2) minWidth = (expectWidth - pageBottonWidth * 2);
-    else minWidth = expectWidth - pageBottonWidth;
-
     computedCandidates.clear();
     updateCandidates();
-    int x = (!Rime.hasLeft()) ? 0 : pageBottonWidth;
+
+    int avail = expectWidth > 0 ? expectWidth : getMeasuredWidth();
+    if (avail <= 0) avail = getResources().getDisplayMetrics().widthPixels;
+
+    if (numCandidates > 0) {
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < Math.min(5, numCandidates); i++) {
+        sb.append('[')
+            .append(candidates[i + startNum].text)
+            .append('/')
+            .append(candidates[i + startNum].comment)
+            .append(']');
+      }
+    } else {
+    }
+
+    final int arrowWidth =
+        (int)
+            (candidateSpacing
+                + graphicUtils.measureText(symbolPaint, PAGE_EX_BUTTON, symbolFont)
+                + 2 * candidatePadding);
+
+    if (numCandidates <= 0 || candidates == null) {
+      // 沒有候選：右側只留「收起鍵盤」，點它隱藏輸入法
+      computedCandidates.add(
+          new ComputedCandidate.Symbol(
+              HIDE_KEYBOARD_BUTTON, new Rect(avail - arrowWidth, 0, avail, getMeasuredHeight())));
+      applyLayoutParams(avail);
+      Trime.getService().setCandidateExPage(false);
+      return;
+    }
+
+    // 留出右側固定 ▼ 的寬度，放不下的候選直接不畫（面板裡能看到全部）
+    int limit = avail - arrowWidth;
+    int x = 0;
+    boolean truncated = false;
     for (int i = 0; i < numCandidates; i++) {
       int n = i + startNum;
-
-      if (pageEx >= 0) {
-        if (x >= minWidth) {
-          computedCandidates.add(
-              new ComputedCandidate.Symbol(
-                  PAGE_EX_BUTTON,
-                  new Rect(x, 0, ((int) x + pageBottonWidth), getMeasuredHeight())));
-          x += pageBottonWidth;
-          hasExButton = true;
-          break;
-        }
-      }
-      String comment = null, text = candidates[n].text;
+      String text = candidates[n].text;
+      String comment = null;
       float candidateWidth =
           graphicUtils.measureText(candidatePaint, text, candidateFont) + 2 * candidatePadding;
-
       if (shouldShowComment) {
         comment = candidates[n].comment;
         if (!TextUtils.isEmpty(comment)) {
@@ -327,43 +343,36 @@ public class Candidate extends View {
                   : candidateWidth + commentWidth;
         }
       }
-
-      // 自动填满候选栏，并保障展开候选按钮显示出来
-      if (pageEx == 0 && x + candidateWidth + candidateSpacing > minWidth) {
-        computedCandidates.add(
-            new ComputedCandidate.Symbol(
-                PAGE_EX_BUTTON, new Rect(x, 0, ((int) x + pageBottonWidth), getMeasuredHeight())));
-        x += pageBottonWidth;
-        hasExButton = true;
+      if (x + candidateWidth > limit) {
+        truncated = true;
         break;
       }
-
       computedCandidates.add(
           new ComputedCandidate.Word(
               text, comment, new Rect(x, 0, (int) (x + candidateWidth), getMeasuredHeight())));
       x += candidateWidth + candidateSpacing;
     }
-    if (Rime.hasLeft()) {
+
+    // 發生截斷、或還有下一頁候選時，右側固定顯示 ▼
+    boolean hasExButton = truncated || Rime.hasRight();
+    if (hasExButton) {
       computedCandidates.add(
           new ComputedCandidate.Symbol(
-              PAGE_UP_BUTTON, new Rect(0, 0, pageBottonWidth, getMeasuredHeight())));
-    }
-    if (Rime.hasRight()) {
-      computedCandidates.add(
-          new ComputedCandidate.Symbol(
-              PAGE_DOWN_BUTTON, new Rect(x, 0, ((int) x + pageBottonWidth), getMeasuredHeight())));
-      x += pageBottonWidth;
+              PAGE_EX_BUTTON, new Rect(avail - arrowWidth, 0, avail, getMeasuredHeight())));
     }
 
+    applyLayoutParams(avail);
+    Trime.getService().setCandidateExPage(hasExButton);
+  }
+
+  private void applyLayoutParams(int width) {
     LayoutParams params = getLayoutParams();
-    params.width = x;
+    params.width = width;
     params.height =
         (shouldShowComment && isCommentOnTop)
             ? candidateViewHeight + commentHeight
             : candidateViewHeight;
     setLayoutParams(params);
-
-    Trime.getService().setCandidateExPage(hasExButton);
   }
 
   @Override

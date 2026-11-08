@@ -230,10 +230,19 @@ public class Trime extends LifecycleInputMethodService {
           }
           y -= BarUtils.getStatusBarHeight(); // 不包含狀態欄
 
-          if (!mPopupWindow.isShowing()) {
-            mPopupWindow.showAtLocation(mCandidateRoot, Gravity.START | Gravity.TOP, x, y);
-          } else {
-            mPopupWindow.update(x, y, mPopupWindow.getWidth(), mPopupWindow.getHeight());
+          try {
+            if (!mPopupWindow.isShowing()) {
+              mPopupWindow.showAtLocation(mCandidateRoot, Gravity.START | Gravity.TOP, x, y);
+            } else {
+              mPopupWindow.update(x, y, mPopupWindow.getWidth(), mPopupWindow.getHeight());
+            }
+          } catch (WindowManager.BadTokenException e) {
+            // Android 15+/16：IME 進程沒有 TYPE_APPLICATION_PANEL 的窗口權限，懸浮窗會拋
+            // BadTokenException 並直接讓輸入法進程崩潰。這裡降級為本次會話不再顯示懸浮窗。
+            isPopupWindowEnabled = false;
+            Timber.w(
+                e, "無法顯示候選懸浮窗（Android 16 window type 限制），本次會話已停用懸浮窗");
+            if (mPopupWindow.isShowing()) mPopupWindow.dismiss();
           }
         }
       };
@@ -963,6 +972,13 @@ public class Trime extends LifecycleInputMethodService {
   @Override
   public boolean onKeyDown(int keyCode, KeyEvent event) {
     Timber.i("\t<TrimeInput>\tonKeyDown()\tkeycode=%d, event=%s", keyCode, event.toString());
+    // 候選展開面板打開時，返回鍵先收起面板而不是直接收起鍵盤
+    if (keyCode == KeyEvent.KEYCODE_BACK
+        && textInputManager != null
+        && textInputManager.isCandidatePanelShown()) {
+      textInputManager.hideCandidatePanel();
+      return true;
+    }
     if (composeEvent(event) && onKeyEvent(event)) return true;
     return super.onKeyDown(keyCode, event);
   }
