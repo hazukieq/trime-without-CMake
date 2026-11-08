@@ -43,7 +43,7 @@
                 android:layout_weight="1"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
-                android:paddingStart="8dp"
+                android:paddingStart="14dp"
                 android:paddingEnd="2dp"
                 android:paddingTop="6dp"
                 android:paddingBottom="6dp" />
