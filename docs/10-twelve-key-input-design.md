@@ -1129,14 +1129,15 @@ ni, ni hau 才对。当选了 ni 之后应该剩下 hau，和 12 键逻辑一致
 - **`/` 改造成面板开关（不再翻页）**：原来靠 `composing: Up` 在输入中当翻页键
   （面板展开后本来就是全量候选 `MAX_CANDIDATES=600` 流式滚动，翻页无意义）。现在：
   - 主题 `preset_keys` 新增 `Panel_toggle_slash`
-    = `{label: /, send: function, command: candidate_panel}`（复用 `KEYCODE_FUNCTION`
+    = `{label: ↓, send: function, command: candidate_panel}`（复用 `KEYCODE_FUNCTION`
     的「trime 命令」通道：`TextInputManager.onEventLocked` 里新增
     `event.command == "candidate_panel" -> toggleCandidatePanel()`）；
   - `jiugong_simp` 的键恢复为 `{click: '/', composing: Panel_toggle_slash, width: 16}`
-    —— `composing:` 事件只在 `Rime.isComposing()` 時生效（`Key.getEvent()`），
-    所以**输入中按 `/` 开面板**（面板展开时键盘被面板盖住，收起用候选条 ▲ 或选字）；
-    非输入状态仍是原来的标点行为。
+    —— `composing:` 事件只在 `Rime.isComposing()` 時生效（`Key.getEvent()`）：
+    非输入状态键面仍是 `/`（打标点）；**输入中键面变成 `↓` 箭头**（提示此时按它是
+    展开面板），按一下展开分组面板（面板展开时键盘被面板盖住，收起用候选条 ▲ 或选字）。
 - **`、` 不再挂 composing**：回到普通 `{click: '、', width: 16}`——输入中按它就是
   上屏「、」（並先提交當前候選），不做面板開關（用戶：`、` 不要 composing，`/` 有就可以）。
-- 真機驗收：12 键输入 `nzia` 后按 `/` → 展开分组面板（左列 `nzia` + 右格候选，
-  竖线满高）；输入中按 `、` → 不出面板、正常上屏標點；候選條高度 84px 不变。
+- 真機驗收：12 键未输入时 `/` 键面为 `/`；输入后键面变 `↓`，按它 → 展开分组面板
+  （左列读音 + 右格候选，竖线满高）；输入中按 `、` → 不出面板、正常上屏標點；
+  候選條高度 84px 不变（12 键 / 26 键 / 英文全键盘一致）。
