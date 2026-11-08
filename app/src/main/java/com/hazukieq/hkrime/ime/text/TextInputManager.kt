@@ -70,6 +70,8 @@ class TextInputManager private constructor() :
     private var activeGroupText = ""
     private var lastGroupText: String? = null
     private var panelItems: MutableList<CandidatePanelAdapter.Item> = mutableListOf()
+    /** 已進面板的候選（text+comment），避免分批補頁時重複收集。 */
+    private val panelSeen = HashSet<String>()
     /** 面板一次最多收集的頁數，防止極端情況下卡住 */
     private val panelMaxPages = 20
     /** 分批收集的世代號：面板關閉/重開就作廢還沒跑完的分批任務 */
@@ -231,6 +233,8 @@ class TextInputManager private constructor() :
                 panelItems = mutableListOf(CandidatePanelAdapter.Item(rest, "", -1, -1))
             }
         }
+        panelSeen.clear()
+        panelItems.forEach { panelSeen.add(it.text + "\u0001" + it.comment) }
         candidatePanelAdapter?.submit(panelItems)
         inputArea?.layoutParams?.height = mainKeyboardView?.height
             ?: android.view.ViewGroup.LayoutParams.WRAP_CONTENT
@@ -251,9 +255,11 @@ class TextInputManager private constructor() :
             if (gen != collectionGen || !isCandidatePanelShown()) { collecting = false; return@post }
             val more = collectCandidatePanelItems(fromPage, 3)
             if (more.isEmpty()) { collecting = false; return@post }
+            val fresh = more.filter { panelSeen.add(it.text + "\u0001" + it.comment) }
+            if (fresh.isEmpty()) { collectRest(gen, fromPage + 3); return@post }
             // 只追加、不整表刷新：RecyclerView 的滾動位置才不會被拉回頂部
-            panelItems.addAll(more)
-            candidatePanelAdapter?.addItems(more)
+            panelItems.addAll(fresh)
+            candidatePanelAdapter?.addItems(fresh)
             collectRest(gen, fromPage + 3)
         }
     }
@@ -535,25 +541,24 @@ class TextInputManager private constructor() :
         }
         // 12 鍵這類「一鍵 = 一個碼」的方案：input 每個字節就是一按鍵，
         // 左列按「按鍵」分組，標籤用 preedit 的顯示寫法（例如 1→ng、4→o），而不是碼串。
-        run {
-            val dispTokens = preeditDisplayTokens()
-            if (dispTokens.size == ib.size && ib.size > 1) {
-                val caret = Rime.RimeGetCaretPos()
-                val items = ArrayList<CandidateGroupAdapter.PinyinGroupAdapterItem>()
-                for (i in dispTokens.indices) {
-                    val code = String(ib, i, 1, Charsets.UTF_8)
-                    val label = keyLabelForCode(code) ?: dispTokens[i]
-                    items.add(
-                        CandidateGroupAdapter.PinyinGroupAdapterItem(
-                            i, label, i, i + 1, converted = false, incomplete = false,
-                            selected = caret == i + 1,
-                        )
+        // 12 鍵（hakka_jiugong）按方案 id 判斷最穩：一鍵 = 一個碼，
+        // 左列就按 input 的每個字節分組，標籤取鍵帽（preset_keys 的 label），不猜拼音。
+        if (Rime.getSchemaId() == "hakka_jiugong" && ib.isNotEmpty()) {
+            val caret = Rime.RimeGetCaretPos()
+            val items = ArrayList<CandidateGroupAdapter.PinyinGroupAdapterItem>()
+            for (i in ib.indices) {
+                val code = String(ib, i, 1, Charsets.UTF_8)
+                val label = keyLabelForCode(code) ?: code
+                items.add(
+                    CandidateGroupAdapter.PinyinGroupAdapterItem(
+                        i, label, i, i + 1, converted = false, incomplete = false,
+                        selected = caret == i + 1,
                     )
-                }
-                adapter.submit(items)
-                candidateGroupList?.visibility = View.VISIBLE
-                return
+                )
             }
+            adapter.submit(items)
+            candidateGroupList?.visibility = View.VISIBLE
+            return
         }
 
         var convertedPrefix = ""
@@ -758,6 +763,7 @@ class TextInputManager private constructor() :
         if (!isCandidatePanelShown()) return
         if (collecting) return // 分批收集進行中：別把它重置成「同步全收」
         collectionGen++
+        panelSeen.clear()
         panelItems = collectCandidatePanelItems(1, panelMaxPages)
         if (panelItems.isEmpty()) panelItems = currentPageItems()
         if (panelItems.isEmpty() && Rime.isComposing()) {

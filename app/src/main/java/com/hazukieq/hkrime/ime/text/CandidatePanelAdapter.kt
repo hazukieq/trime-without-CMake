@@ -46,16 +46,24 @@ class CandidatePanelAdapter(
 
     fun submit(list: List<Item>) {
         items.clear()
-        items.addAll(list)
+        items.addAll(dedupe(list))
         notifyDataSetChanged()
     }
 
-    /** 追加一批（保留當前滾動位置，不整表刷新）。 */
+    /** 追加一批（保留當前滾動位置，不整表刷新）；同字只留第一次出現，避免分批補頁重收時重複。 */
     fun addItems(list: List<Item>) {
         if (list.isEmpty()) return
+        val seen = items.mapTo(HashSet()) { it.text }
+        val fresh = list.filter { seen.add(it.text) }
+        if (fresh.isEmpty()) return
         val start = items.size
-        items.addAll(list)
-        notifyItemRangeInserted(start, list.size)
+        items.addAll(fresh)
+        notifyItemRangeInserted(start, fresh.size)
+    }
+
+    private fun dedupe(list: List<Item>): List<Item> {
+        val seen = HashSet<String>()
+        return list.filter { seen.add(it.text) }
     }
 
     fun clear() {
