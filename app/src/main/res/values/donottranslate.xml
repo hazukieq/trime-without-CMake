@@ -49,8 +49,8 @@
         <item>always_show</item>
         <item>never_show</item>
     </string-array>
-    <string name="default_shared_data_dir" translatable="false">/sdcard/rime</string>
-    <string name="conf__default_user_data_dir" translatable="false">/sdcard/rime</string>
+    <string name="default_shared_data_dir" translatable="false">/sdcard/hkrime</string>
+    <string name="conf__default_user_data_dir" translatable="false">/sdcard/hkrime</string>
     <string-array name="keyboard__candidate_page_size_values">
         <item>10000</item>
         <item>10001</item>

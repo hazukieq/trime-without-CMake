@@ -719,3 +719,19 @@ signal 11 (SIGSEGV), Cause: null pointer dereference
 
 驗證：`adb` 併發猛點 200 次（80 次 + 120 次並行 tap）後進程 PID 不變、
 logcat 中 `FATAL / signal 11 / ANR in com.hazukieq.hkrime` 計數為 0。
+
+### 15.7 數據目錄 `rime` → `hkrime`（2026-11-08）
+
+默認用戶數據目錄從 `/sdcard/rime` 改為 `/sdcard/hkrime`（避免和官方 Trime / 其他
+輸入法共用目錄互相覆蓋）。
+
+- `AppPrefs.Configuration`：新增 `DEFAULT_DIR_NAME = "hkrime"`；
+  `sharedDataDir` / `userDataDir` 的默認值改為 `$EXTERNAL_PATH_PREFIX/hkrime`；
+- 一次性遷移：pref 裡若是舊默認（以 `/rime` 結尾）就改寫成 `/hkrime`，
+  不覆蓋用戶自定義路徑；
+- `res/values/donottranslate.xml` 的 `default_shared_data_dir`、`conf__default_user_data_dir`
+  同步改成 `/sdcard/hkrime`。
+
+真機遷移：`cp -a /sdcard/rime /sdcard/hkrime`（100MB，含 userdb/build），
+啟動後 pref 自動改成 `/sdcard/hkrime`，日誌確認 `conf__user_data_dir=/sdcard/hkrime`，
+輸入正常。舊的 `/sdcard/rime` 與 `Android/data/.../files/rime` 保留作備份（未刪）。

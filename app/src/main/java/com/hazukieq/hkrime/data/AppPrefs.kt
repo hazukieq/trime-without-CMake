@@ -344,12 +344,32 @@ class AppPrefs(
             const val LAST_SYNC_STATUS = "conf__last_sync_status"
             const val LAST_BACKGROUND_SYNC = "conf__last_background_sync"
             val EXTERNAL_PATH_PREFIX: String = appContext.getExternalFilesDir(null)!!.absolutePath
+
+            /** 默認數據目錄名（舊版是 rime，2026-11-08 起改為 hkrime）。 */
+            const val DEFAULT_DIR_NAME = "hkrime"
         }
+
+        /**
+         * 舊版默認目錄 `.../rime` 一次性遷移到 `.../hkrime`：
+         * 用戶沒自定義過路徑時直接改寫 pref，避免升級後繼續寫舊目錄。
+         */
+        private fun migrateLegacyDefaultDir(raw: String): String {
+            if (!raw.endsWith("/rime")) return raw
+            return raw.substringBeforeLast("/rime") + "/" + DEFAULT_DIR_NAME
+        }
+
+        private fun dirPref(key: String, default_: String): String {
+            val raw = prefs.getPref(key, default_)
+            val migrated = migrateLegacyDefaultDir(raw)
+            if (migrated != raw) prefs.setPref(key, migrated)
+            return migrated
+        }
+
         var sharedDataDir: String
-            get() = prefs.getPref(SHARED_DATA_DIR, "$EXTERNAL_PATH_PREFIX/rime")
+            get() = dirPref(SHARED_DATA_DIR, "$EXTERNAL_PATH_PREFIX/$DEFAULT_DIR_NAME")
             set(v) = prefs.setPref(SHARED_DATA_DIR, v)
         var userDataDir: String
-            get() = prefs.getPref(USER_DATA_DIR, "$EXTERNAL_PATH_PREFIX/rime")
+            get() = dirPref(USER_DATA_DIR, "$EXTERNAL_PATH_PREFIX/$DEFAULT_DIR_NAME")
             set(v) = prefs.setPref(USER_DATA_DIR, v)
         var syncBackgroundEnabled: Boolean
             get() = prefs.getPref(SYNC_BACKGROUND_ENABLED, false)
