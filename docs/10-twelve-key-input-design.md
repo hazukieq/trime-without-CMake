@@ -1541,3 +1541,14 @@ BuildConfig.DEBUG 的 D 级打，现场难抓）；`TextInputManager.onCandidate
 
 **取捨**：只統計「在本 IME 上屏過的字」，全新用戶第一輪仍是字典順序；
 rime 用戶詞庫（userdb）沒有查詢 API，其權重只能透過引擎候選順序間接體現。
+
+### 15.35.1 面板上屏也計入用字記憶（2026-11-09）
+
+用戶指出：展開面板選的字也要記錄，否則固定候選區永遠不更新。
+
+排查：`EditorInstance` 有兩個 `commitText` 重載——
+`commitText(text, dispatchToRime = true)`（有 bump）與 `commitText(text: CharSequence)`（無 bump）。
+Kotlin 解析 `commitText(Rime.getCommitText())` 時優先選**無默認參數**的單參重載，
+而 `commitRimeText()` 正是走它 → 引擎上屏（含展開面板選詞、空格上屏）全部漏記。
+
+修法：單參重載也 `SegmentMemory.bump(text)`（兩條路徑都記），面板/引擎上屏即時反映到固定候選區排序。

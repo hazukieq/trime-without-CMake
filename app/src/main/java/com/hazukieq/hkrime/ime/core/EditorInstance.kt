@@ -51,6 +51,9 @@ class EditorInstance(private val ims: InputMethodService) {
     fun commitText(text: CharSequence): Boolean {
         val ic = inputConnection ?: return false
         ic.commitText(text, 1)
+        // 這個重載被 commitRimeText()/面板上屏等路徑用到 —— 一樣要記用字記憶，
+        // 否則「展開面板選的字」永遠不會更新固定候選區的排序（用戶 2026-11-09 指出）。
+        runCatching { com.hazukieq.hkrime.core.twelvekey.SegmentMemory.bump(text) }
         return true
     }
 
