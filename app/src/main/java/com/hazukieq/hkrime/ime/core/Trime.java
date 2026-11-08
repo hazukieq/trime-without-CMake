@@ -1247,8 +1247,6 @@ public class Trime extends LifecycleInputMethodService {
           mComposition.getRootView().setVisibility(View.GONE);
         } else {
           mComposition.getRootView().setVisibility(View.VISIBLE);
-          // 12 鍵：悬浮窗只顯示 composition（編碼/拼音），不顯示帶編號的候選列表
-          mComposition.setSkipCandidates(isTwelveKeySchema());
           startNum = mComposition.setWindow(minPopupSize, minPopupCheckSize, Integer.MAX_VALUE);
           mCandidate.setText(startNum);
           // if isCursorUpdated, showCompositionView will be called in onUpdateCursorAnchorInfo

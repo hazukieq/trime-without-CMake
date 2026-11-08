@@ -635,6 +635,19 @@ P1（2026-11-08 已做，commit `0cfcd30` / `618b75c`）：
 2. `'\n' + label: '%s.' + candidate: '%s'`（**帶編號的候選列表**）。
 
 12 鍵輸入很長時，懸浮窗把 `composition + 整個候選列表` 一起畫出來，看起來就是「漢字上屏到 preedit」。
-12 鍵本身已有候選條 + 展開面板，懸浮窗純屬重複，因此在 `Trime.updateComposing()` 裡對
-`hakka_jiugong` 直接停用懸浮窗（`isPopupWindowEnabled && !isTwelveKeySchema()`）。
-其它方案（qwerty / luna_pinyin）行為不變。
+12 鍵本身已有候選條 + 展開面板，懸浮窗裡的候選列表純屬重複。
+
+**修法（2026-11-08 用戶定調：改主題、不改代碼，避免傷主題參數可配置性）**：
+直接改 `assets/rime/hakka_theme.trime.yaml` 的 `style/window`，把第二個
+`candidate` 組件註釋掉，只保留 `composition`：
+
+```yaml
+window: #悬浮窗口组件：12 鍵只顯示編碼/拼音（候選交给候选条 + 展開面板）
+  - {start: '', composition: '%s', end: '', letter_spacing: 0.12}
+  # - {start: "\n", label: '%s.', candidate: '%s', comment: '%s', end: '', sep: ' '}
+```
+
+這樣 12 鍵懸浮窗只畫編碼/拼音，候選在候選條與展開面板；其它方案若也要這個行為，
+改自己的主題即可（代碼裡不寫死方案名）。
+
+> 歷史：曾用代碼（`Composition.setSkipCandidates` + `isTwelveKeySchema()`）實現，已回退。

@@ -73,8 +73,6 @@ public class Composition extends AppCompatTextView {
   private int mCurrentX, mCurrentY;
   private int candidate_num;
   private boolean all_phrases;
-  /** 12 鍵：悬浮窗只畫編碼/拼音，不畫帶編號的候選列表。 */
-  private boolean skipCandidates = false;
   // private View mInputRoot;
   // 候选高亮序号颜色
   private Integer hilited_label_color;
@@ -520,10 +518,6 @@ public class Composition extends AppCompatTextView {
    * @param maxPopup 最多在悬浮窗显示多少个候选词
    * @return 悬浮窗显示的候选词数量
    */
-  public void setSkipCandidates(boolean value) {
-    skipCandidates = value;
-  }
-
   public int setWindow(int charLength, int minCheck, int maxPopup) {
     return setWindow(charLength, minCheck);
   }

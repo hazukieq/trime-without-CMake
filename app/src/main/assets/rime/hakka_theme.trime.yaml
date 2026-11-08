@@ -66,9 +66,10 @@ style:
     background: background.png #颜色或者backgrounds目录下的图片文档名
     movable: false #是否可移动窗口，或仅移动一次 true|false|once
     all_phrases: false #显示所有长词
-  window: #悬浮窗口组件
+  window: #悬浮窗口组件：12 鍵只顯示編碼/拼音（候選交给候选条 + 展開面板）
     - {start: '', composition: '%s', end: '', letter_spacing: 0.12} #letter_spacing需要Android5.0
-    - {start: "\n", label: '%s.', candidate: '%s', comment: '%s', end: '', sep: ' '}
+    # 下面这条是「悬浮窗里的带编号候选列表」，12 键不需要；注释掉以免看起来像汉字混进 preedit
+    # - {start: "\n", label: '%s.', candidate: '%s', comment: '%s', end: '', sep: ' '}
   key_font: symbol.ttf #键盘字体
   key_height: *jpgd4 #键高
   key_long_text_size: 18 #长标签字号
