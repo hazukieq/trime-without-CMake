@@ -191,6 +191,7 @@ class TextInputManager private constructor() :
         }
         candidateBarBinder = CandidateBarBinder(candidateView)
         twelveKeyController = TwelveKeyController(
+            scope = this,
             onSnapshot = { snapshot -> onTwelveKeySnapshot(snapshot) },
             // 12 鍵的 preedit 由 TwelveKeyPreedit 改寫，長度與 librime 的 sel_start/sel_end 不一致，
             // Composition.setWindow() 會在 updateComposing() 內拋 StringIndexOutOfBoundsException。
@@ -207,7 +208,7 @@ class TextInputManager private constructor() :
                 }
                 runCatching { trime.updateComposing() }
                     .onFailure { Timber.e(it, "twelvekey: updateComposing failed") }
-                twelveKeyController?.refresh()
+                twelveKeyController?.refresh(immediate = true)
             },
             onCommitText = { text ->
                 runCatching {
@@ -217,6 +218,13 @@ class TextInputManager private constructor() :
             },
         )
     }
+
+    /**
+     * librime session 非線程安全：與 [TwelveKeyController] 的後台枚舉共用同一把鎖，
+     * 保證「UI 線程 process_key」與「Default 線程 enumerate_candidates」不會並發。
+     */
+    private inline fun <T> withEngineLock(block: () -> T): T =
+        synchronized(TwelveKeyController.ENGINE_LOCK, block)
 
     // ---------- 候選展開面板 ----------
 
@@ -234,8 +242,12 @@ class TextInputManager private constructor() :
     /** 切換展開面板；空候選時 ▼ 的語義是「收起鍵盤」。 */
     fun toggleCandidatePanel() {
         if (isTwelveKeyMode()) {
-            twelveKeyController?.refresh()
+            // 快照通常在按鍵後 120ms 內就位；只有完全沒快照時才同步算一次（首開面板）
+            if (twelveKeyController?.snapshot?.isEmpty != false && Rime.isComposing()) {
+                twelveKeyController?.refreshSync()
+            }
             candidatePanelController?.toggle()
+            twelveKeyController?.refresh(immediate = true)
             candidateView?.setPanelOpen(candidatePanelController?.isShown == true)
             return
         }
@@ -253,11 +265,12 @@ class TextInputManager private constructor() :
     fun showCandidatePanel() {
         if (!Rime.isComposing()) return
         if (isTwelveKeyMode()) {
-            twelveKeyController?.refresh()
+            if (twelveKeyController?.snapshot?.isEmpty != false) twelveKeyController?.refreshSync()
             val snapshot = twelveKeyController?.snapshot
             if (snapshot == null || (!snapshot.hasCandidates && snapshot.fallback == null)) return
         }
         candidatePanelController?.show()
+        twelveKeyController?.refresh(immediate = true)
         candidateView?.setPanelOpen(candidatePanelController?.isShown == true)
     }
 
@@ -282,6 +295,8 @@ class TextInputManager private constructor() :
         if (snapshot.isEmpty || (!snapshot.hasCandidates && snapshot.fallback == null)) {
             if (candidatePanelController?.isShown == true) candidatePanelController?.hide()
         }
+        // 面板可能被 submit() 自動收起（上屏後無剩餘碼），箭頭方向要跟著回到 ▼
+        candidateView?.setPanelOpen(candidatePanelController?.isShown == true)
     }
 
     private fun onPickPanelCandidate(item: CandidatePanelAdapter.Item) {
@@ -551,6 +566,10 @@ class TextInputManager private constructor() :
 
     // KeyboardEvent 处理软键盘事件
     override fun onEvent(event: Event?) {
+        withEngineLock { onEventLocked(event) }
+    }
+
+    private fun onEventLocked(event: Event?) {
         event ?: return
         if (!event.commit.isNullOrEmpty()) {
             // Directly commit the text and don't dispatch to Rime
@@ -641,6 +660,10 @@ class TextInputManager private constructor() :
     }
 
     override fun onText(text: CharSequence?) {
+        withEngineLock { onTextLocked(text) }
+    }
+
+    private fun onTextLocked(text: CharSequence?) {
         text ?: return
         if (!text.startsWithAsciiChar() && Rime.isComposing()) {
             Rime.commitComposition()
@@ -678,6 +701,10 @@ class TextInputManager private constructor() :
      * Commits the pressed candidate and suggest the following words.
      */
     override fun onCandidatePressed(index: Int) {
+        withEngineLock { onCandidatePressedLocked(index) }
+    }
+
+    private fun onCandidatePressedLocked(index: Int) {
         onPress(0)
         if (isTwelveKeyMode() && Rime.isComposing()) {
             onTwelveKeyCandidatePressed(index)
@@ -727,6 +754,10 @@ class TextInputManager private constructor() :
     }
 
     override fun onCandidateSymbolPressed(arrow: String) {
+        withEngineLock { onCandidateSymbolPressedLocked(arrow) }
+    }
+
+    private fun onCandidateSymbolPressedLocked(arrow: String) {
         when (arrow) {
             Candidate.PAGE_UP_BUTTON -> onKey(KeyEvent.KEYCODE_PAGE_UP, 0)
             Candidate.PAGE_DOWN_BUTTON -> onKey(KeyEvent.KEYCODE_PAGE_DOWN, 0)
