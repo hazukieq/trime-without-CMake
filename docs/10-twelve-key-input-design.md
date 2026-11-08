@@ -930,3 +930,16 @@ BFS 隊列峰值 766 —— 也就是說 37ms 全是簡拼圖 BFS 的展開成�
 `CandidateBarBinder.bind()` 綁定前 `candidateView.setShowComment(false)`（`clear()` 時恢復 true），
 固定候選欄只顯示漢字、不再畫第一條的 comment；候選條高度也隨之少一行 comment。
 展開面板的拼音規則不變（多讀音組才顯示）。
+
+## 15.14 空格上屏「看到的第一個」（2026-11-09）
+
+用戶反饋：按空格上屏的是第二個組詞，不是條上第一個。
+
+原因：引擎的「高亮候選」始終是引擎順序的第 0 個；App 側學習重排後，條上第一個
+已經不是引擎第 0 個，空格走引擎選高亮 → 上屏的是另一個候選。
+
+修法：`Trime.handleKey()` 最前面攔 `KEYCODE_SPACE`（僅 12 鍵 composing 時）：
+`TextInputManager.commitTopCandidateIfTwelveKey()` 取 `boundBarItems.first()`
+（沒有則取當前快照的 `barItems.first()`）→ `selectCandidate(item.index)`。
+
+驗證：`nz` → 條首「年」→ 空格 → 上屏「年」。

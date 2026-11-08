@@ -238,6 +238,20 @@ class TextInputManager private constructor() :
             (keyboard == "hakka_jiugong" || keyboard == "jiugong_simp")
     }.getOrDefault(false)
 
+    /**
+     * 12 鍵下按空格：上屏「候選條第一條」而不是引擎高亮條（引擎高亮仍是引擎順序第 0 個，
+     * 學習重排後它已經不是用戶看到的第一個）。
+     */
+    fun commitTopCandidateIfTwelveKey(keyCode: Int): Boolean {
+        if (keyCode != android.view.KeyEvent.KEYCODE_SPACE) return false
+        if (!isTwelveKeyMode() || !Rime.isComposing()) return false
+        val item = boundBarItems.firstOrNull()
+            ?: twelveKeyController?.snapshot?.barItems?.firstOrNull()
+            ?: return false
+        withEngineLock { twelveKeyController?.selectCandidate(item.index) }
+        return true
+    }
+
     fun isCandidatePanelShown(): Boolean =
         candidatePanelController?.isShown == true ||
             candidatePanelRoot?.visibility == android.view.View.VISIBLE
