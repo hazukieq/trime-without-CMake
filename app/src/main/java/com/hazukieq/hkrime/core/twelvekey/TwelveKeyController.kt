@@ -129,6 +129,14 @@ class TwelveKeyController(
     /** 點候選：全局下標；引擎自己決定消費幾個音節，剩餘碼由引擎重算。 */
     fun selectCandidate(globalIndex: Int) {
         if (globalIndex < 0) return
+        // 先把選中的詞記到本地記憶（候選條/面板下次把同詞排前）——必須在 select 之前拿快照。
+        runCatching {
+            val snap = snapshot
+            val item = snap.barEntries.firstOrNull { it.index == globalIndex }
+                ?: snap.groups.asSequence().flatMap { it.items.asSequence() }
+                    .firstOrNull { it.index == globalIndex }
+            if (item != null) SelectionMemory.bump(item.text, item.comment)
+        }
         val ok = runCatching { Rime.select_candidate(globalIndex) }.getOrDefault(false)
         if (!ok) {
             Timber.w("twelvekey: select_candidate(%d) failed", globalIndex)

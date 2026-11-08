@@ -89,10 +89,20 @@ object TwelveKeySnapshotBuilder {
             flat = singlePageFallback()
         }
 
-        val groups = group(flat)
+        // App 側學習排序：選過的詞（同讀音+同詞）排前，候選條與面板都吃這個順序。
+        val ranked = if (SelectionMemory.hasAny()) {
+            flat.withIndex().sortedWith(
+                compareByDescending<IndexedValue<Pair<String, String>>> {
+                    SelectionMemory.score(it.value.first, it.value.second)
+                }.thenBy { it.index },
+            ).map { it.value }
+        } else {
+            flat
+        }
+        val groups = group(ranked)
         // 候選條按「選單順序」取前 N 條：長輸入時 reading 各不相同，
         // 按第 0 組取會只剩 1 條（用戶 2026-11-08 反饋「打到這麼多就停止候選」）。
-        val barEntries = flat.take(BAR_ITEMS).mapIndexedNotNull { index, (text, comment) ->
+        val barEntries = ranked.take(BAR_ITEMS).mapIndexedNotNull { index, (text, comment) ->
             if (text.isEmpty()) null else CandidateItem(text, comment, index)
         }
         val fallback = if (groups.isEmpty() && remaining.isNotEmpty()) {
