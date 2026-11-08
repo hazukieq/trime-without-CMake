@@ -651,3 +651,26 @@ window: #悬浮窗口组件：12 鍵只顯示編碼/拼音（候選交给候选�
 改自己的主題即可（代碼裡不寫死方案名）。
 
 > 歷史：曾用代碼（`Composition.setSkipCandidates` + `isTwelveKeySchema()`）實現，已回退。
+
+### 15.4 為甚麼「改了主題沒生效」（2026-11-08）
+
+主題是先在編譯期被 `rime_deployer` 編成 `build/<theme>.yaml` 緩存，運行時
+`Config.init()` 走 `Rime.deploy_config_file(name, "config_version")` 並**只在緩存不存在時**才重建。
+結果是：改了 `hakka_theme.trime.yaml`（甚至 push 到 `/sdcard/rime` 再 deploy），
+`build/hakka_theme.trime.yaml` 仍是舊的，`windows_comps` 還是「composition + 候選」，
+悬浮窗照樣把帶編號的候選畫出來 —— 看起來就是「改主題沒用」。
+
+修法（代碼契合主題參數變化）：`Config.init()` 比較**源文件 mtime 與 build 緩存 mtime**，
+源文件更新就重新 `deploy_config_file`，不再只看「緩存存在與否」。
+
+```java
+File build = new File(Rime.get_user_data_dir() + "/build", file_name);
+File source = new File(Rime.get_user_data_dir(), file_name);
+if (!source.exists()) source = new File(Rime.get_shared_data_dir(), file_name);
+boolean needDeploy = !build.exists()
+    || (source.exists() && source.lastModified() > build.lastModified());
+if (needDeploy) Rime.deploy_config_file(file_name, "config_version");
+```
+
+驗證：刪掉/改舊 `build/hakka_theme.trime.yaml` 後重啟 IME，緩存重建為
+`window: [{composition: "%s"}]`，悬浮窗只剩拼音。

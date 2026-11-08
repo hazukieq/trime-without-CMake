@@ -356,14 +356,25 @@ public class Config {
     Timber.d("init() themeName=%s schema_id=%s", themeName, schema_id);
     try {
       String file_name = themeName + ".yaml";
+      // build/ 裡是 rime 編譯後的緩存；只判斷「存在」會導致用戶改了主題源文件後
+      // 仍然讀到舊緩存（2026-11-08 實測：改 hakka_theme 的 window 不生效）。
+      // 這裡比較源文件與緩存的 mtime，源文件更新就重新部署這一張主題。
+      boolean needDeploy = !skip_delopy;
       if (skip_delopy) {
-        File f = new File(Rime.get_user_data_dir() + File.separator + "build", file_name);
-        if (f.exists()) {
-          Timber.d("init() deploy_config_file skip");
-        } else {
-          Rime.deploy_config_file(file_name, "config_version");
+        File build = new File(
+            Rime.get_user_data_dir() + File.separator + "build", file_name);
+        File source = new File(Rime.get_user_data_dir(), file_name);
+        if (!source.exists()) {
+          source = new File(Rime.get_shared_data_dir(), file_name);
         }
-      } else {
+        needDeploy = !build.exists()
+            || (source.exists() && source.lastModified() > build.lastModified());
+        Timber.d(
+            "init() theme build=%s stale=%s needDeploy=%s",
+            build.exists(), build.exists() && source.exists()
+                && source.lastModified() > build.lastModified(), needDeploy);
+      }
+      if (needDeploy) {
         Rime.deploy_config_file(file_name, "config_version");
       }
       Timber.d("init() deploy_config_file done");
