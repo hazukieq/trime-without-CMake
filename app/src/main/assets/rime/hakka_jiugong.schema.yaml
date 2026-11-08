@@ -97,39 +97,7 @@ translator:
   enable_sentence: true
 
   #spelling_hints: 5 # ～字以內候選標註完整帶調拼音
-  preedit_format:
-    - xform/(\w)a4/$1an/
-    - xform/(\w)ani/$1ang/
-    - xform/(\w)a9/$1at/
-    - xform/(\w)a7/$1ap/
-    - xform/(\w)a5/$1ak/
-    - xform/(\w)i4/$1in/
-    - xform/(\w)in5/$1iok/
-    - xform/(\w)i9/$1it/
-    - xform/(\w)i7/$1ip/
-    - xform/(\w)i34/$1iun/
-    - xform/(\w)iuni/$1iung/
-    - xform/(\w)34/$1un/
-    - xform/(\w)uni/$1ung/
-    - xform/(\w)39/$1ut/
-    - xform/(\w)37/$1up/
-    - xform/(\w)35/$1uk/
-    - xform/(\w)e4/$1en/
-    - xform/(\w)e9/$1et/
-    - xform/(\w)e7/$1ep/
-    - xform/(\w)e5/$1ek/
-    - xform/(\w)44/$1on/
-    - xform/(\w)oni/$1ong/
-    - xform/(\w)in9/$1iot/
-    - xform/(\w)in4/$1ion/
-    - xform/(\w)ioni/$1iong/
-    - xform/(\w)49/$1ot/
-    - xform/(\w)45/$1ok/
-    - xform/3/u/
-    - xform/4/o/
-    - xform/y/$1nz/
-    - xform/1/$1ng/
-    - xform/w/$1th/
+  # preedit_format 由 App 端 TwelveKeyPreedit 依 hakka.dict.yaml 反查（鍵碼→音節）
 
 ywz:
   opencc_config: ywz.json

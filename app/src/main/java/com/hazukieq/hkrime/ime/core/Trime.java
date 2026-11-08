@@ -372,6 +372,7 @@ public class Trime extends LifecycleInputMethodService {
 
   @Override
   public void onCreate() {
+    com.hazukieq.hkrime.core.TwelveKeyPreedit.INSTANCE.init(this);
 
     StrictMode.setVmPolicy(
         new StrictMode.VmPolicy.Builder(StrictMode.getVmPolicy())

@@ -292,7 +292,21 @@ public class Rime {
 
   public static RimeComposition getComposition() {
     if (mContext == null) return null;
-    return mContext.composition;
+    RimeComposition composition = mContext.composition;
+    // 12 鍵方案的 preedit 是「鍵碼」，schema 的 preedit_format 反推拼音不可靠
+    // （一個碼對應多個字母），這裡改用字典反查音節，切不出來就維持原樣。
+    if (composition != null
+        && composition.preedit != null
+        && "hakka_jiugong".equals(getSchemaId())) {
+      String hint = null;
+      RimeCandidate[] cs = mContext.getCandidates();
+      if (cs != null && cs.length > 0) {
+        hint = cs[0].text;
+      }
+      String decoded = TwelveKeyPreedit.INSTANCE.decode(composition.preedit, hint);
+      if (decoded != null) composition.preedit = decoded;
+    }
+    return composition;
   }
 
   public static String getCompositionText() {
