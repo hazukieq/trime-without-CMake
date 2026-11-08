@@ -59,8 +59,14 @@ class ModernListDialog private constructor(
     private val accent: Int get() = 0xFF007AFF.toInt()
 
     init {
-        val root = FrameLayout(context)
+        val root = FrameLayout(context).apply {
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
+            isScrollbarFadingEnabled = true
+        }
         val card = LinearLayout(context).apply {
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
             orientation = LinearLayout.VERTICAL
             elevation = 0f
             background = GradientDrawable().apply {
@@ -98,6 +104,10 @@ class ModernListDialog private constructor(
         window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
         window?.setDimAmount(0.4f)
         window?.setElevation(0f)
+        window?.decorView?.let {
+            it.isVerticalScrollBarEnabled = false
+            it.isHorizontalScrollBarEnabled = false
+        }
         window?.setGravity(Gravity.CENTER)
         window?.setLayout(
             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -132,13 +142,19 @@ class ModernListDialog private constructor(
             isClickable = true
         }
         val label = TextView(context).apply {
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
             text = items[index]
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
             textSize = 17f
             setTextColor(ink)
             setPadding(0, dp(15), 0, dp(15))
         }
         row.addView(label, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         val check = TextView(context).apply {
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
             text = "\u2713"
             textSize = 17f
             setTextColor(accent)
@@ -167,7 +183,8 @@ class ModernListDialog private constructor(
 
         return LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)))
+            row.minimumHeight = dp(48)
+            addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
             if (index != items.lastIndex) {
                 addView(
                     View(context).apply { setBackgroundColor(hairline) },
