@@ -18,36 +18,58 @@
             android:layout_height="wrap_content" />
 
         <!-- 展開面板：只覆蓋鍵盤區，候選欄（第一行）保持可見 -->
-        <LinearLayout
+        <FrameLayout
             android:id="@+id/candidate_panel_root"
-            android:orientation="horizontal"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="#FFFFFFFF"
             android:visibility="gone">
 
-
-            <!-- 左側：拼音音節組（自切音節，僅顯示/導航） -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/candidate_group_list"
-                android:layout_width="88dp"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="#FFEDF0F2"
-                android:paddingTop="6dp"
-                android:paddingBottom="6dp"
-                android:clipToPadding="false" />
+                android:orientation="horizontal">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/candidate_panel"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="match_parent"
-                android:clipToPadding="false"
-                android:paddingStart="14dp"
-                android:paddingEnd="2dp"
-                android:paddingTop="6dp"
-                android:paddingBottom="6dp" />
-        </LinearLayout>
+                <!-- 左側：拼音音節組（自切音節，僅顯示/導航） -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/candidate_group_list"
+                    android:layout_width="88dp"
+                    android:layout_height="match_parent"
+                    android:background="#FFEDF0F2"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="6dp"
+                    android:clipToPadding="false" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/candidate_panel"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="2dp"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="64dp" />
+            </LinearLayout>
+
+            <!-- 面板右下角：退格鍵（面板展開時鍵盤被蓋住，刪除不必先收起面板） -->
+            <TextView
+                android:id="@+id/panel_backspace"
+                android:layout_width="60dp"
+                android:layout_height="48dp"
+                android:layout_gravity="bottom|end"
+                android:layout_marginEnd="14dp"
+                android:layout_marginBottom="14dp"
+                android:background="@drawable/panel_backspace_bg"
+                android:clickable="true"
+                android:contentDescription="退格"
+                android:elevation="6dp"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="⌫"
+                android:textColor="#FF3C4043"
+                android:textSize="22sp" />
+        </FrameLayout>
     </FrameLayout>
 
 </LinearLayout>

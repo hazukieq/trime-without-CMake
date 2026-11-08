@@ -31,6 +31,7 @@ class CandidatePanelController(
     private val panelRoot: View?,
     groupListView: RecyclerView?,
     private val grid: RecyclerView?,
+    backspaceView: View? = null,
 ) {
 
     val groupAdapter = CandidateGroupAdapter(context) { group -> pickGroup(group) }
@@ -41,6 +42,9 @@ class CandidatePanelController(
 
     /** 沒有任何候選時點 ▼：收起鍵盤。 */
     var onHideKeyboard: (() -> Unit)? = null
+
+    /** 面板右下角的退格鍵（面板展開時鍵盤被蓋住，不收起面板也能刪）。 */
+    var onBackspace: (() -> Unit)? = null
 
     private val groupList = groupListView
     private var snapshot: TwelveKeySnapshot = TwelveKeySnapshot.EMPTY
@@ -65,6 +69,7 @@ class CandidatePanelController(
             adapter = gridAdapter
             itemAnimator = null
         }
+        backspaceView?.setOnClickListener { onBackspace?.invoke() }
     }
 
     val isShown: Boolean get() = panelRoot?.visibility == View.VISIBLE

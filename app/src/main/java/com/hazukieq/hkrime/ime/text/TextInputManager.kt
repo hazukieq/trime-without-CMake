@@ -191,9 +191,12 @@ class TextInputManager private constructor() :
             panelRoot = candidatePanelRoot,
             groupListView = uiBinding.main.candidateGroupList,
             grid = uiBinding.main.candidatePanel,
+            backspaceView = uiBinding.main.panelBackspace,
         ).also { controller ->
             controller.onPickCandidate = { item -> onPickPanelCandidate(item) }
             controller.onHideKeyboard = { trime.requestHideSelf(0) }
+            // 面板右下的退格鍵：與鍵盤退格走同一條鏈路（引擎刪除 + 通知刷新面板）
+            controller.onBackspace = { onKey(KeyEvent.KEYCODE_DEL, 0) }
         }
         candidateBarBinder = CandidateBarBinder(candidateView)
         twelveKeyController = TwelveKeyController(

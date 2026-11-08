@@ -1115,29 +1115,35 @@ ni, ni hau 才对。当选了 ni 之后应该剩下 hau，和 12 键逻辑一致
   `ni hau` 註腳；點「ni」組再點「你」→ 上屏「你」、preedit 剩 `你 hau`，左列變 `hau`、
   右格 好/号/耗/豪…（與 12 鍵的空格/選字行為一致）。
 
-## 15.22 面板 rail 竖线与 12 键 `/`、`、` 键（2026-11-09）
+## 15.22 面板 rail 竖线、12 键箭头键与面板退格（2026-11-09）
 
 用戶（附截圖）：「框起来的竖条占满高亮左边呀，不要竖线一半，太难看了。然后呢，
 去除掉 12 键的 `/`、`、` 的翻页」。随后澄清：「`/`、`、` 这两个键不是不要，是将其在
 输入状态下的按键改为打开/关闭展开面板。——没有打开/关闭展开面板的 api，就创建」。
-再后来：「`、` 不要 composing 了，`/` 有就可以了」。
+再后来：「composing 的 label 就和原来一样，`/` 是上，`、` 是下，行为都是展开面板」，
+並要求「展开面板的右下角增加退格键」。
 
 - **rail 选中竖线满高**：`CandidateGroupAdapter` 里那条 3dp accent 竖线原本写死
   `height = rowHeight*0.42`、`topMargin = rowHeight*0.29`（居中短横线，上下留白）。
   改为 `LinearLayout.LayoutParams(barWidth, rowHeight)`、去掉 topMargin：竖线从高亮
   行顶部贯到底部（左缘 6dp 内缩不变），与选中底色等高。
-- **`/` 改造成面板开关（不再翻页）**：原来靠 `composing: Up` 在输入中当翻页键
-  （面板展开后本来就是全量候选 `MAX_CANDIDATES=600` 流式滚动，翻页无意义）。现在：
-  - 主题 `preset_keys` 新增 `Panel_toggle_slash`
-    = `{label: ↓, send: function, command: candidate_panel}`（复用 `KEYCODE_FUNCTION`
-    的「trime 命令」通道：`TextInputManager.onEventLocked` 里新增
-    `event.command == "candidate_panel" -> toggleCandidatePanel()`）；
-  - `jiugong_simp` 的键恢复为 `{click: '/', composing: Panel_toggle_slash, width: 16}`
-    —— `composing:` 事件只在 `Rime.isComposing()` 時生效（`Key.getEvent()`）：
-    非输入状态键面仍是 `/`（打标点）；**输入中键面变成 `↓` 箭头**（提示此时按它是
-    展开面板），按一下展开分组面板（面板展开时键盘被面板盖住，收起用候选条 ▲ 或选字）。
-- **`、` 不再挂 composing**：回到普通 `{click: '、', width: 16}`——输入中按它就是
-  上屏「、」（並先提交當前候選），不做面板開關（用戶：`、` 不要 composing，`/` 有就可以）。
-- 真機驗收：12 键未输入时 `/` 键面为 `/`；输入后键面变 `↓`，按它 → 展开分组面板
-  （左列读音 + 右格候选，竖线满高）；输入中按 `、` → 不出面板、正常上屏標點；
-  候選條高度 84px 不变（12 键 / 26 键 / 英文全键盘一致）。
+- **`/`、`、` 在输入中变成面板展开键（箭頭鍵面沿用原語義）**：
+  - 主题 `preset_keys` 新增 `Panel_toggle_slash`（label `↑`）与 `Panel_toggle_dun`
+    （label `↓`），都是 `{send: function, command: candidate_panel}`——复用
+    `KEYCODE_FUNCTION` 的「trime 命令」通道：`TextInputManager.onEventLocked` 里新增
+    `event.command == "candidate_panel" -> toggleCandidatePanel()`；
+  - `jiugong_simp`：`{click: '/', composing: Panel_toggle_slash, width: 16}`、
+    `{click: '、', composing: Panel_toggle_dun, width: 16}`。`composing:` 事件只在
+    `Rime.isComposing()` 時生效（`Key.getEvent()`）：非輸入狀態鍵面是 `/`、`、`（打標點）；
+    輸入中鍵面變成 `↑`、`↓`（沿用原本 `composing: Up/Down` 的視覺語義），按任一個都是
+    **展開分組面板**，不用糾結按哪個。
+- **面板右下角退格鍵**：`main_input_layout.xml` 的 `candidate_panel_root` 由 LinearLayout
+  改成 FrameLayout（內容仍是左音節列 + 右候選格），右下角疊一枚 60×48dp 圓角鍵
+  （`@drawable/panel_backspace_bg`，⌫ 字形，`layout_gravity="bottom|end"`）；右格
+  `paddingBottom` 加到 64dp，讓最後一行能滾到按鈕上方不被遮住。
+  `CandidatePanelController` 新增 `backspaceView` 參數與 `onBackspace` 回調，
+  `TextInputManager` 把它接到 `onKey(KEYCODE_DEL, 0)`——與鍵盤退格同一條鏈路
+  （引擎刪碼 → Rime 通知 → 面板原地刷新），刪到輸入清空時面板自動收起。
+- 真機驗收：輸入中 `/`、`、` 鍵面分別為 `↑`、`↓`，按任一個都展開面板（左列讀音、
+  右格候選、rail 豎線滿高）；面板右下角 ⌫ 可連續刪碼（`nzia` → `nzi` → … → 清空並
+  自動收起）；非輸入狀態 `/`、`、` 仍是標點鍵；候選條高度 84px 不變。
