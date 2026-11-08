@@ -200,3 +200,20 @@ Mock 只验证**交互形态**；像素级细节（字号/间距/圆角/阴影�
 4. 主题零破坏：新增键一律可选、有默认值；面板颜色全部走 `fallback_colors` 链。
 
 参考：搜狗帮助 <https://shouji.sogou.com/bangzhu.php?pid=5&cid=53>；搜狗候选展开专利报道 <https://m.techweb.com.cn/article/2015-11-02/2220123.shtml>；ATOK 文節/候補一覧 <https://docs.oracle.com/cd/E19253-01/819-7844/819-7844.pdf>。
+## 九、左列音節的最終語義（librime 原生分段）
+
+點左列不是「自己切、自己查字典」，而是借 librime 自己的光標分段：
+
+1. `TextInputManager.selectPinyinGroup()`：`moveCaretTo(該音節末尾)`（用 `XK_Left/Right` 走 librime 的 `Navigator::Rewind`）+ `Rime.getContexts()`；
+   - `librime/src/rime/engine.cc` 的 `ConcreteEngine::Compose()` 只把 `input.substr(0, caret_pos)` 放進 `Composition` 再分段翻譯，
+     所以 caret 停在 `ngin^hau` 時，菜單就是 `ngin` 這一節的候選（實測 `凝|垠`）；
+2. 點右側候選時 `Rime.selectCandidate(index)`：`ConcreteEngine::OnSelect()` 會 `Forward()` 到下一段、把 caret 移回末尾，
+   所以 **只轉換前一節，剩下的 `hau` 仍在組字**（實測 preedit `凝hau`）；
+3. 左列只顯示「還沒轉換的音節」：轉換過的 segment（`status >= 2`）不再列出，靠 `getCompositionSegments()` 的原生 start/end/status 判斷；
+   沒有轉換段時才用光標探測（`XK_Left` 逐個跳）。
+
+真機驗證（Keep 記事，`nginhau`）：
+- 點 `ngin` → 選「凝」→ 預編輯 `凝hau`、左列只剩 `hau`、候選欄變 `好/号/豪/毫/孝`（`hau` 的多種切分都由 librime 給）；
+- 再點「好」→ 上屏 `凝好`、組字結束、面板自動收起。
+
+截圖：`artifacts/candidate-syllable-1.png`（初始 ngin/hau）、`candidate-syllable-2.png`（選完凝、只剩 hau）、`candidate-syllable-3.png`（上屏凝好）。

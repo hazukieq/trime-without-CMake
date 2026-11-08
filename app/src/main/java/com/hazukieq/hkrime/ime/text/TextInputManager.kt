@@ -280,34 +280,26 @@ class TextInputManager private constructor() :
     }
 
     private fun pickPanelCandidate(pageOffset: Int, indexInPage: Int) {
-        if (pageOffset < 0) {
-            return
-        }
-        // 面板展示的是「當前頁之後」的頁，提交時需要先翻到那一頁
-        var delta = pageOffset
-        while (delta > 0) {
-            trime.handleKey(KeyEvent.KEYCODE_PAGE_DOWN, 0)
-            if (!Rime.hasRight()) break
-            delta--
-        }
-        // 直接讓 librime 選這一項：還有未轉換段時它會保留組字，全部處理完才上屏
+        if (pageOffset < 0) return
+        // 面板只展示「當前頁」，index 直接對應 librime 的候選序號（不再預先翻頁收集）
         Rime.selectCandidate(indexInPage)
+        activeEditorInstance.commitRimeText()
         trime.updateComposing()
         if (!Rime.isComposing()) {
-            activeEditorInstance.commitRimeText()
-        }
-        if (!Rime.isComposing()) {
             hideCandidatePanel()
-        } else {
-            // 組字還沒結束：回到第一頁、把 caret 移到末尾，讓剩下的音節繼續顯示/可選
-            while (Rime.hasLeft()) {
-                trime.handleKey(KeyEvent.KEYCODE_PAGE_UP, 0)
-            }
+            return
+        }
+        // 等這一幀的組字狀態落定後再刷新左列/面板（否則拿到還是上一輪的 preedit）
+        candidatePanel?.postDelayed({
+            Rime.getContexts()
             trime.updateComposing()
             activeGroupIndex = -1
+            lastGroupText = ""
             rebuildPinyinGroups()
-            refreshPanelItems()
-        }
+            panelItems = currentPageItems()
+            candidatePanelAdapter?.submit(panelItems)
+            candidatePanel?.scrollToPosition(0)
+        }, 80)
     }
 
     /** 除錯：逐個 caret 位置印出 librime 的分段/候選，用於確認引擎切割行為 */
@@ -364,8 +356,12 @@ class TextInputManager private constructor() :
             hideCandidatePanel()
             return
         }
-        // 組字內容變了（例如剛轉換掉一段）：左側音節組跟著更新
+        // 組字內容變了（例如剛轉換掉一段）：左側音節組與面板一起跟著更新
+        lastGroupText = ""
+        activeGroupIndex = -1
         rebuildPinyinGroups()
+        panelItems = currentPageItems()
+        candidatePanelAdapter?.submit(panelItems)
     }
 
     // ---------- 左側拼音音節組（方案 2：自切音節，僅顯示/導航） ----------
@@ -405,7 +401,32 @@ class TextInputManager private constructor() :
             candidateGroupList?.visibility = View.GONE
             return
         }
-        val groups = if (raw == lastGroupText && cachedGroups.isNotEmpty()) {
+        // 已經轉換過的段（status >= kSelected）不再顯示在左列；左列只留「還沒處理的音節」。
+        // 有轉換段時直接讀 librime 的原生分段（不按光標、避免把已轉換的段重新打開）。
+        val nativeSegs = Rime.getRimeCompositionSegments()
+        val nativeGroups = ArrayList<Triple<String, Int, Boolean>>()
+        if (nativeSegs.size >= 3) {
+            val inputBytes = (Rime.RimeGetInput() ?: "").toByteArray(Charsets.UTF_8)
+            var converted = false
+            for (i in 0 until nativeSegs.size / 3) {
+                val st = nativeSegs[i * 3]
+                val en = nativeSegs[i * 3 + 1]
+                val status = nativeSegs[i * 3 + 2]
+                if (en <= st || st >= inputBytes.size) continue
+                val end = minOf(en, inputBytes.size)
+                val text = String(inputBytes, st, end - st, Charsets.UTF_8)
+                    .replace(" ", "").replace("'", "").trim()
+                if (text.isEmpty()) continue
+                if (status >= 2) { converted = true; continue }
+                nativeGroups.add(Triple(text, st, false))
+            }
+            if (!converted) nativeGroups.clear()
+        }
+        val groups = if (nativeGroups.isNotEmpty()) {
+            cachedGroups = nativeGroups
+            lastGroupText = raw
+            nativeGroups
+        } else if (raw == lastGroupText && cachedGroups.isNotEmpty()) {
             cachedGroups
         } else {
             probeGroups(raw).also {
