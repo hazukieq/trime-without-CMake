@@ -2549,6 +2549,17 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
 - 單測：`TwelveKeyCoverageTest.afterPickingFirstSegmentRemainingTwoCodesCoverBothReadings`
   斷言 `we` 必須同時含 `the`（整段）與 `than`（拆段），且不能只有 the 系列。
 
+### 15.59.2.2 ng / nz 這類「單碼位鍵」的覆蓋（2026-11-10）
+
+用戶追問「另外同樣特殊的 ng、nz 測過沒有」。兩鍵結構和 `th` 相同：一個鍵位碼 → 一整個音節族
+（`ng→1` 出 ng*，`nz→y` 出 nz*），必須和 `we` 一樣既能出本族音節、又能把剩餘碼交給 `restCode` 遞歸。
+
+- 新增 `TwelveKeyCoverageTest.singleLetterKeysNgNzSplitLikeOtherKeys`：
+  `1e` 只能出 `ng*`、`ye` 只能出 `nz*`，且都要有真實字組（不是只有兜底行）；
+  單字組的 `restCode` 只允許 `""`（整段解讀）或 `e`（拆段解讀），且必須存在 `e` 這一種；
+  `1i`/`yi` 同理非空。
+- 加上既有的 12×12=144 組合矩陣，`ng`/`nz` 與其餘 10 鍵的兩兩組合都已覆蓋。
+
 ### 15.59.3 12 鍵全鍵位測試 + `initialsForPrefix` 精確碼漏洞（2026-11-10）
 
 用戶：「你確定測試完整 12 鍵了？比如 ng、nz 呢？」

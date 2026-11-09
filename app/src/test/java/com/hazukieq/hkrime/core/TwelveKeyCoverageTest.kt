@@ -134,6 +134,30 @@ class TwelveKeyCoverageTest {
     }
 
     @Test
+    fun singleLetterKeysNgNzSplitLikeOtherKeys() {
+        // ng→1、nz→y 是「單碼位 = 音節前綴」特的兩個鍵（nz 的 y 碼、ng 的 1 碼）。
+        // 用戶 2026-11-10 追問「ng、nz 你測過嗎」：這裡釘住它們與 we 同構 ——
+        // 首碼出本鍵音節族，剩餘碼交給 restCode 遞歸。
+        val ngGroups = TwelveKeySnapshotBuilder.debugSegmentGroups("1e")
+        val nzGroups = TwelveKeySnapshotBuilder.debugSegmentGroups("ye")
+        assertTrue("1e 應出 ng* 音節，實際 ${ngGroups.map { it.reading }}",
+            ngGroups.isNotEmpty() && ngGroups.all { it.reading.startsWith("ng") })
+        assertTrue("ye 應出 nz* 音節，實際 ${nzGroups.map { it.reading }}",
+            nzGroups.isNotEmpty() && nzGroups.all { it.reading.startsWith("nz") })
+        // 同樣要能給出「第一段音節組」而不是只有兜底
+        assertTrue(ngGroups.any { it.segment == 0 && it.items.isNotEmpty() })
+        assertTrue(nzGroups.any { it.segment == 0 && it.items.isNotEmpty() })
+        // 剩餘碼要麼是整段（""）、要麼是拆段剩下的 e —— 都要能遞歸回引擎
+        val restCodes = ngGroups.filter { it.segment == 0 }
+            .flatMap { g -> g.items.map { it.restCode } }.toSet()
+        assertTrue("restCode 只應為 \"\" 或 \"e\"，實際 $restCodes", restCodes.all { it == "" || it == "e" })
+        assertTrue("應有拆段項（restCode=e）", restCodes.contains("e"))
+        // 1i / yi 同理（i 介音 / nz-i）
+        assertTrue(TwelveKeySnapshotBuilder.debugSegmentGroups("1i").isNotEmpty())
+        assertTrue(TwelveKeySnapshotBuilder.debugSegmentGroups("yi").isNotEmpty())
+    }
+
+    @Test
     fun twoLetterKeyCombinationsKeepItems() {
         // 兩個「多字母鍵」相連（如 abc+def、ghi+mno）最容易出「整串是一個音節」的邊界
         val multiLetterCodes = setOf('a', 'e', 'i', '5', '4', '7', '3', '8', '9')
