@@ -75,6 +75,26 @@ class AssociatedWordsTest {
     }
 
     @Test
+    fun associatedByReadingUsesExactSecondSyllable() {
+        val rows = preedit.associatedByReading("song", setOf('h'), limitPerReading = 6, maxReadings = 4)
+        assertTrue("song + h 開頭應有讀音行，實際 ${rows.size}", rows.isNotEmpty())
+        assertTrue("最多 4 行，實際 ${rows.size}", rows.size <= 4)
+        for ((second, words) in rows) {
+            assertTrue("第二音節必須是 h 開頭：$second", second.startsWith("h"))
+            assertTrue("每行最多 6 條", words.size <= 6)
+            assertTrue("必須是兩字詞：$words", words.all { it.length == 2 })
+        }
+    }
+
+    @Test
+    fun associatedByReadingHonoursInitialFilter() {
+        val onlyG = preedit.associatedByReading("song", setOf('g'), maxReadings = 8)
+        assertTrue("song + g 應有讀音行", onlyG.isNotEmpty())
+        assertTrue("只保留 g 開頭", onlyG.all { it.first.startsWith("g") })
+        assertTrue("空 initials 應返回空", preedit.associatedByReading("song", emptySet()).isEmpty())
+    }
+
+    @Test
     fun initialsRespectLimit() {
         assertEquals(1, preedit.initialsForPrefix("i", limit = 1).size)
         assertFalse(preedit.initialsForPrefix("", limit = 2).isNotEmpty())

@@ -109,9 +109,10 @@ class CandidateGroupAdapter(
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             setSingleLine(true)
-            marqueeRepeatLimit = -1
-            isFocusable = true
-            isFocusableInTouchMode = true
+            // 不跑馬燈：聯想詞行的標題是完整讀音（如 `song gong`），跑馬燈會讓它看起來像亂碼。
+            marqueeRepeatLimit = 0
+            isFocusable = false
+            isFocusableInTouchMode = false
             includeFontPadding = false
             setTextColor(normalText)
             typeface = this@CandidateGroupAdapter.typeface
@@ -123,14 +124,16 @@ class CandidateGroupAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = getItem(position)
-        // 跑馬燈：多音節讀音一定滾動（未選中也滾，否則 rail 放不下看不懂），
-        // 單音節只在選中時滾動、其餘省略號（用戶 2026-11-08 指示）
+        // 多音節讀音（`son gi`、聯想詞行的 `song gong`）用小一號字 + 省略號，
+        // 不用跑馬燈：跑馬燈滾起來像亂碼，而且會讓「左列這行到底是什麼」更難讀（用戶 2026-11-10）。
         val multiSyllable = item.reading.count { it == ' ' } >= 1
-        val marquee = item.selected || multiSyllable
-        holder.text.isSelected = marquee
-        holder.text.ellipsize =
-            if (marquee) TextUtils.TruncateAt.MARQUEE else TextUtils.TruncateAt.END
-        holder.text.marqueeRepeatLimit = if (multiSyllable) -1 else 0
+        holder.text.isSelected = false
+        holder.text.ellipsize = TextUtils.TruncateAt.END
+        holder.text.marqueeRepeatLimit = 0
+        holder.text.setTextSize(
+            TypedValue.COMPLEX_UNIT_PX,
+            if (multiSyllable) textSize * 0.86f else textSize,
+        )
         holder.root.background = if (item.selected) {
             GradientDrawable().apply {
                 cornerRadius = dp(10f).toFloat()

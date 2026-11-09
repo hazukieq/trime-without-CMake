@@ -2361,3 +2361,21 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
 - 讀音用「單字首讀音」，多音字（如「香」）可能歸錯桶 → 少量詞排到意料外的行；
 - 熱度是「跨詞表出現次數」，不是語料詞頻（詞表本身沒有權重）；
 - 只處理兩字詞；三字以上的聯想（`song g** *`）暫不做。
+
+### 15.57.1 修正：行標題用確切讀音，並與引擎組合併（2026-11-10，用戶糾正）
+
+用戶：「`song h**` 是我便於溝通說的，實際應該和 engine 給出的確切讀音一樣，
+然後把你得到的聯想詞組和 engine 給的進行合併（engine 不足時你的是補集，engine 夠時你的是它集合內的）」。
+
+- 索引鍵由 `(第一音節, 第二音節首字母)` 改為 **`(第一音節, 第二音節)`**：
+  `TwelveKeyPreedit.associatedByReading(syllable, initials, limitPerReading=6, maxReadings=4)`
+  返回 `(第二音節, 詞列表)`，行標題寫 `"$syllable $second"`（如 `song gong`、`song ga`、`song han`）。
+- 新增 `CandidateRanking.mergeAssociationGroups(base, associations)`：
+  - 同 `reading` 的組 → 併進引擎組：**引擎候選在前，聯想詞去重後補在後面**（組的 `segment` 保持引擎值）；
+  - 引擎沒有該讀音 → 新建一組（補集，`segment = 1`，點擊整詞上屏）。
+- 左列字體：多音節讀音（`son gi`、`song gong`）改用 0.86× 字號 + `END` 省略號，
+  關掉跑馬燈（跑起來像亂碼，用戶反饋「看不懂這行是什麼」）。
+- 真機（`744ii`）：左列 `song / pong / son gi / song gong / song ga / song han / song hoi …`，
+  `song gong` 行內容 `香港 上光 上崗 上講 商港 賞光`。
+- 單測：`AssociatedWordsTest` +2（確切第二音節、initials 過濾）、`CandidateRankingTest` +1（合併語義），
+  全量 41 tests / 0 failures。

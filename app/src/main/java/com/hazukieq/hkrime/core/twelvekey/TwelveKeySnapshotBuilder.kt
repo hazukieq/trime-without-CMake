@@ -158,7 +158,11 @@ object TwelveKeySnapshotBuilder {
         )
         // 有段組時只保留引擎的詞組組，否則左列會被引擎的幾十個單音節讀音灌滿
         // （段組本身已按「每個首字母 8 個」限量）；單音節輸入沒有段組，引擎組照舊。
-        val groups = CandidateRanking.panelGroups(segmentGroups, engineGroups)
+        // 段組 = 單字組；另抽出的聯想詞組按「確切讀音」與引擎組合併（引擎優先、聯想詞去重補在後面）。
+        val assocGroups = segmentGroups.filter { it.segment == 1 }
+        val baseSegmentGroups = segmentGroups.filter { it.segment != 1 }
+        val merged = CandidateRanking.panelGroups(baseSegmentGroups, engineGroups)
+        val groups = CandidateRanking.mergeAssociationGroups(merged, assocGroups)
         // 候選條按「選單順序」取前 N 條：長輸入時 reading 各不相同，
         // 按第 0 組取會只剩 1 條（用戶 2026-11-08 反饋「打到這麼多就停止候選」）。
         // 分詞輸入（`5'e`）時，候選條直接列「這一段能選的字」：用戶點一個字就上屏，
@@ -237,31 +241,33 @@ object TwelveKeySnapshotBuilder {
             )
         }
 
-        // ---- 聯想詞組：`song g**` / `song h**`（每行 ≤6 條）----
-        // 只對「第一段的高頻音節」×「其餘碼能展開出的首字母」建行；詞的讀音由單字首讀音反推。
+        // ---- 聯想詞組（用戶 2026-11-10）----
+        // 行標題用**確切第二音節**（`song hau`、`song heu`…，與引擎組同一種寫法），
+        // 稍後再與引擎組按讀音合併：引擎有就併進去，沒有才新建（補集）。
         val initials = TwelveKeyPreedit.initialsForPrefix(rest, ASSOC_INITIALS)
         if (initials.isNotEmpty()) {
             for (syllable in syllables.take(ASSOC_HEAD_SYLLABLES)) {
-                for (initial in initials) {
-                    val words = TwelveKeyPreedit.associatedWords(syllable, initial, ASSOC_WORDS)
-                    if (words.isEmpty()) continue
-                    val items = words.map { word ->
-                        CandidateItem(
-                            text = word,
-                            comment = "$syllable ${initial}**",
-                            index = -1,
-                            segment = 1, // 1 = 聯想詞：整詞上屏
+                TwelveKeyPreedit.associatedByReading(syllable, initials, ASSOC_WORDS, ASSOC_READINGS)
+                    .forEach { (second, words) ->
+                        if (words.isEmpty()) return@forEach
+                        val reading = "$syllable $second"
+                        val items = words.map { word ->
+                            CandidateItem(
+                                text = word,
+                                comment = reading,
+                                index = -1,
+                                segment = 1, // 1 = 聯想詞：整詞上屏
+                            )
+                        }
+                        result.add(
+                            SyllableGroup(
+                                reading = reading,
+                                syllables = listOf(syllable, second),
+                                items = items,
+                                segment = 1,
+                            ),
                         )
                     }
-                    result.add(
-                        SyllableGroup(
-                            reading = "$syllable ${initial}**",
-                            syllables = listOf(syllable),
-                            items = items,
-                            segment = 1,
-                        ),
-                    )
-                }
             }
         }
 
@@ -284,6 +290,9 @@ object TwelveKeySnapshotBuilder {
 
     /** 聯想詞行最多列幾個「下一個音節首字母」（`song g**` / `song h**`）。 */
     private const val ASSOC_INITIALS = 2
+
+    /** 每個第一段音節最多列幾個「第二段讀音」的聯想行。 */
+    private const val ASSOC_READINGS = 4
 
     /** 兼容舊調用：同步一次做完（UI 線程慎用）。 */
     fun build(): TwelveKeySnapshot = build(local())

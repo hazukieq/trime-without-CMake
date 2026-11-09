@@ -172,7 +172,7 @@ object TwelveKeyPreedit {
             val r1 = charTable[word.substring(0, 1)] ?: return@forEach
             val r2 = charTable[word.substring(1, 2)] ?: return@forEach
             if (r1.isEmpty() || r2.isEmpty()) return@forEach
-            val key = "$r1|${r2[0]}"
+            val key = "$r1|$r2"
             val bucket = assocWords.getOrPut(key) { LinkedHashMap() }
             bucket[word] = (bucket[word] ?: 0) + 1
         }
@@ -198,8 +198,43 @@ object TwelveKeyPreedit {
      * 用戶 2026-11-10：面板要列 `song g**` / `song h**` 這種聯想詞，而不是另一種切法標籤。
      */
     fun associatedWords(syllable: String, initial: Char, limit: Int = 6): List<String> {
-        val bucket = assocWords["$syllable|$initial"] ?: return emptyList()
-        return bucket.keys.take(limit)
+        val merged = LinkedHashSet<String>()
+        assocWords.forEach { (key, bucket) ->
+            val parts = key.split('|')
+            if (parts.size != 2 || parts[0] != syllable) return@forEach
+            val second = parts[1]
+            if (second.isEmpty() || second[0] != initial) return@forEach
+            for (word in bucket.keys) {
+                merged.add(word)
+                if (merged.size >= limit) return merged.toList()
+            }
+        }
+        return merged.toList()
+    }
+
+    /**
+     * 以 [syllable] 為第一段、**第二段是確切音節**的聯想詞（用戶 2026-11-10：
+     * 行標題要跟引擎一樣是完整讀音，不是 `h**` 這種通配）。
+     *
+     * 只保留第二音節首字母在 [initials] 裡的組合；每個讀音最多 [limitPerReading] 條，
+     * 讀音行最多 [maxReadings] 個（按整桶熱度降序）。
+     */
+    fun associatedByReading(
+        syllable: String,
+        initials: Collection<Char>,
+        limitPerReading: Int = 6,
+        maxReadings: Int = 4,
+    ): List<Pair<String, List<String>>> {
+        if (initials.isEmpty()) return emptyList()
+        val rows = ArrayList<Pair<String, List<String>>>()
+        assocWords.forEach { (key, bucket) ->
+            val parts = key.split('|')
+            if (parts.size != 2 || parts[0] != syllable) return@forEach
+            val second = parts[1]
+            if (second.isEmpty() || second[0] !in initials) return@forEach
+            rows.add(second to bucket.keys.take(limitPerReading))
+        }
+        return rows.sortedByDescending { it.second.size }.take(maxReadings)
     }
 
     /** 碼段的所有可能「下一個音節首字母」（去重、保持輪轉順序），用於決定列哪幾行聯想詞。 */

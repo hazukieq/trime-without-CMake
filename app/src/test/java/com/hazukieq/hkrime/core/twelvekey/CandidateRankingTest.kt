@@ -261,6 +261,33 @@ class CandidateRankingTest {
         assertEquals(engine, CandidateRanking.panelGroups(emptyList(), engine))
     }
 
+    // ── mergeAssociationGroups：聯想詞按讀音併進引擎組（用戶 2026-11-10）────────
+    @Test
+    fun mergeAssociationGroupsMergesSameReadingAndAppendsNewOnes() {
+        fun eng(reading: String, vararg texts: String) = SyllableGroup(
+            reading = reading,
+            syllables = reading.split(' '),
+            items = texts.mapIndexed { i, t -> item(t, reading, i) },
+        )
+        fun assoc(reading: String, vararg texts: String) = SyllableGroup(
+            reading = reading,
+            syllables = reading.split(' '),
+            items = texts.map { t -> item(t, reading, -1).copy(segment = 1) },
+            segment = 1,
+        )
+        val engine = listOf(eng("song hau", "上號", "上好"), eng("son gi", "船記", "船"))
+        val assocRows = listOf(assoc("song hau", "上好", "上光"), assoc("song heu", "上下", "上學"))
+        val merged = CandidateRanking.mergeAssociationGroups(engine, assocRows)
+        assertEquals(3, merged.size)
+        // 同讀音：引擎在前，聯想詞去重後補在後面；組標記保留引擎組的（segment=0）
+        assertEquals(listOf("上號", "上好", "上光"), merged[0].items.map { it.text })
+        assertEquals(-1, merged[0].segment) // 引擎組原樣，只是補了詞
+        // 引擎沒有這個讀音 → 新建一組（補集，segment=1 整詞上屏）
+        assertEquals("song heu", merged[2].reading)
+        assertEquals(listOf("上下", "上學"), merged[2].items.map { it.text })
+        assertEquals(1, merged[2].segment)
+    }
+
     // ── orderGroups：單音節輸入時左列按常用度排（用戶 2026-11-10）───────────────
     @Test
     fun orderGroupsSortsSingleSyllableGroupsByFrequency() {

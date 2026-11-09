@@ -124,6 +124,36 @@ object CandidateRanking {
     }
 
     /**
+     * 把「聯想詞組」並進面板分組（用戶 2026-11-10）。
+     *
+     * 規則：**同讀音就合併進引擎那一組**（引擎候選在前，聯想詞補在後面、按詞去重）；
+     * 引擎沒有這個讀音的組時，才新建一組（此時它就是補集）。
+     * 這樣行標題與引擎完全一致（`song hau`、`song heu`…），不會出現 `h**` 這種通配寫法。
+     */
+    fun mergeAssociationGroups(
+        base: List<SyllableGroup>,
+        associations: List<SyllableGroup>,
+    ): List<SyllableGroup> {
+        if (associations.isEmpty()) return base
+        val result = base.toMutableList()
+        associations.forEach { assoc ->
+            val idx = result.indexOfFirst { it.reading == assoc.reading }
+            if (idx < 0) {
+                result.add(assoc)
+            } else {
+                val existing = result[idx]
+                val extra = assoc.items.filter { candidate ->
+                    existing.items.none { it.text == candidate.text }
+                }
+                if (extra.isNotEmpty()) {
+                    result[idx] = existing.copy(items = existing.items + extra)
+                }
+            }
+        }
+        return result
+    }
+
+    /**
      * 左列的最終顯示順序（用戶 2026-11-10）：
      * 單音節輸入時左列全是「同一批音節」的組，必須按常用度排（常用音節在前），
      * 不能按讀音字母序 —— 否則找想要的音節要找半天。
