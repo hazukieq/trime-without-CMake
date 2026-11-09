@@ -54,6 +54,8 @@ object PerfGate {
                 measureRankAndMerge()
                 measureEngine()
                 Timber.i("perfgate: done total=%.1fms", msSince(started))
+                // 立即落盤：門禁的用途是「跑完馬上判定」，不能等收鍵盤才 flush。
+                runCatching { com.hazukieq.hkrime.util.LogFileTree.flushNow() }
             } catch (t: Throwable) {
                 Timber.w(t, "perfgate: failed")
             } finally {

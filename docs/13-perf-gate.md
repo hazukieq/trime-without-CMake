@@ -15,7 +15,8 @@ python3 tools/perf-gate.py --log /tmp/hkrime.log --no-trigger   # 离线复算
 
 - 脚本先广播 `com.hazukieq.hkrime.debug.perfgate`，App 在后台线程跑固定微基准并写日志；
 - 再拉 `/sdcard/hkrime/logs/hkrime-<今天>.log` 解析 `perfgate:` / `twelvekey:latency` 行；
-- 退出码：`0` 通过 / `1` 超阈值 / `2` 没数据。
+- 退出码：`0` 通过 / `1` 超阈值 / `2` 没数据；
+- 门禁跑完会主动 `LogFileTree.flushNow()`，不需要先收键盘。
 
 ## 门禁测什么
 
@@ -26,11 +27,14 @@ python3 tools/perf-gate.py --log /tmp/hkrime.log --no-trigger   # 离线复算
 | `op=assoc` | 联想词查询（面板展开时每键） | 0.29ms | 2.0ms |
 | `op=merge` | 分组合并/排序（面板展开时每键） | 0.08ms | 1.0ms |
 | `op=engine` | 引擎候选枚举（每键） | 设备相关 | 60ms |
-| `latency_p90` | 最近 200 条按键快照耗时 90 分位 | 30–35ms | 45ms |
-| `latency_max` | 最慢一次 | — | 250ms |
+| `build_p90` | **快照真实构建耗时**（cache miss）90 分位 | 4–17ms | 40ms |
+| `build_max` | 最慢一次构建 | — | 120ms |
+| `latency_p90` | 按键到快照就绪的总耗时 90 分位（含引擎与 UI 排队，adb 连点会偏高） | 35–80ms | 80ms |
+| `latency_max` | 最慢一次 | — | 300ms |
 | `assoc_load` | 联想词索引导入（后台线程） | 0.6–0.8s | 1.5s |
 
-阈值给约 5 倍余量：容忍设备差异，但能抓住「实现退化成 O(n) 全表扫描」这类回归。
+`build_*` 是排查主指标（只看 App 侧排序/分组成本，不受 adb 连点影响）；
+`latency_*` 是端到端体感指标，作为兜底。阈值给约 5 倍余量：容忍设备差异，但能抓住「实现退化成 O(n) 全表扫描」这类回归。
 按需覆盖：`--thr op=assoc=3 --thr latency_p90=60`。
 
 ## App 侧实现
