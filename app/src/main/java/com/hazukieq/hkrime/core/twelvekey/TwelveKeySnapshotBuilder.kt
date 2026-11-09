@@ -292,10 +292,32 @@ object TwelveKeySnapshotBuilder {
             // ---- 聯想詞組：按這一種切法的剩餘碼推第二段首字母 ----
             val initials = TwelveKeyPreedit.initialsForPrefix(rest, ASSOC_INITIALS)
             if (initials.isNotEmpty()) {
+                var assocAdded = 0
                 for (syllable in syllables.take(ASSOC_HEAD_SYLLABLES)) {
+                    if (assocAdded >= ASSOC_MAX_ROWS) break
+                    // 寬鬆行（第二段只按首字母匹配）：先算，數量受 ASSOC_INITIAL_ROWS 限制，
+                    // 用戶 2026-11-10「散一點沒關係，但增補聯想組不要給太多」。
+                    TwelveKeyPreedit.associatedByInitial(
+                        syllable, initials, ASSOC_WORDS, ASSOC_INITIAL_ROWS,
+                    ).forEach { (reading, words) ->
+                        if (words.isEmpty() || assocAdded >= ASSOC_MAX_ROWS) return@forEach
+                        if (!seen.add("$reading|assoc")) return@forEach
+                        val items = words.map { word ->
+                            CandidateItem(text = word, comment = reading, index = -1, segment = 1)
+                        }
+                        result.add(
+                            SyllableGroup(
+                                reading = reading,
+                                syllables = listOf(syllable),
+                                items = items,
+                                segment = 1,
+                            ),
+                        )
+                        assocAdded++
+                    }
                     TwelveKeyPreedit.associatedByReading(syllable, initials, ASSOC_WORDS, ASSOC_READINGS)
                         .forEach { (second, words) ->
-                            if (words.isEmpty()) return@forEach
+                            if (words.isEmpty() || assocAdded >= ASSOC_MAX_ROWS) return@forEach
                             val reading = "$syllable $second"
                             if (!seen.add("$reading|assoc")) return@forEach
                             val items = words.map { word ->
@@ -314,6 +336,7 @@ object TwelveKeySnapshotBuilder {
                                     segment = 1,
                                 ),
                             )
+                            assocAdded++
                         }
                 }
             }
@@ -335,6 +358,10 @@ object TwelveKeySnapshotBuilder {
 
     /** 聯想詞行只對前幾個高頻音節建（避免左列被灌滿）。 */
     private const val ASSOC_HEAD_SYLLABLES = 4
+    /** 首字母級（寬鬆）聯想行：每個音節最多 2 行，避免面板被灌滿。 */
+    private const val ASSOC_INITIAL_ROWS = 2
+    /** 每次最多給幾行聯想詞：多了面板被灌滿，也增加每鍵成本（用戶 2026-11-10）。 */
+    private const val ASSOC_MAX_ROWS = 4
 
     /** 聯想詞行最多列幾個「下一個音節首字母」（`song g**` / `song h**`）。 */
     private const val ASSOC_INITIALS = 2

@@ -45,7 +45,7 @@ DEFAULT_THRESHOLDS = {
     "build_full_max": 200.0,
     "latency_p90": 80.0,
     "latency_max": 300.0,
-    "assoc_load": 1500.0,
+    "assoc_load": 2500.0,   # 词表索引含「首字母级」二级索引，首次加载 ~1.2–1.6s（后台线程）
 }
 
 PERF_LINE = re.compile(

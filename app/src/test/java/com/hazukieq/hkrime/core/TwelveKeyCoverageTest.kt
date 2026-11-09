@@ -42,6 +42,16 @@ class TwelveKeyCoverageTest {
             val lines = dict.asSequence().filter { it.contains('\t') }
             preedit.loadDictLines(lines)
             preedit.finishLoading(counts)
+            // 聯想詞也要一起覆蓋：詞表只有詞條沒有讀音，索引靠 charTable 反推。
+            listOf(
+                "hakka_sougou_words", "hakka_mobilewords", "hakka_oftenwords",
+                "hakka_places", "hakka_poems", "hakka_website", "hakka_zon", "hakka_cn_en",
+            ).forEach { name ->
+                preedit.loadWordLines(
+                    File("src/main/assets/rime/$name.dict.yaml").readLines().asSequence()
+                )
+            }
+            preedit.finishWordIndex()
             val byCode = HashMap<Char, MutableSet<Char>>()
             counts.keys.forEach { syllable ->
                 val code = preedit.codeOf(syllable)
@@ -131,6 +141,12 @@ class TwelveKeyCoverageTest {
         assertTrue("應含 thu/thi 等同族音節：$readings", readings.any { it == "thu" || it == "thi" })
         // 反例：不能只出 the 系列
         assertTrue("不能只有 the 系列：$readings", readings.any { it != "the" && !it.startsWith("the") })
+        // 聯想行：第二段只按首字母匹配（th* + d/e/f），行標題形如 `than d`
+        val assoc = groups.filter { it.segment == 1 }
+        assertTrue("we 應有首字母級聯想行（如 than d），實際 ${assoc.map { it.reading }}", assoc.isNotEmpty())
+        assertTrue("聯想行詞數應 ≤ 6，實際 ${assoc.first().items.size}", assoc.first().items.size <= 6)
+        // 總行數要收斂（用戶 2026-11-10：增補聯想組不要給太多，影響性能就截斷）
+        assertTrue("聯想行總數應 ≤4，實際 ${assoc.size}：${assoc.map { it.reading }}", assoc.size <= 4)
     }
 
     @Test

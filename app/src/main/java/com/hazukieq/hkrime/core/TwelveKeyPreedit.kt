@@ -44,6 +44,8 @@ object TwelveKeyPreedit {
      */
     @Volatile
     private var assocByFirst: Map<String, Map<String, List<String>>> = emptyMap()
+    /** 第一音節 → 第二音節首字母 → 詞列表（按熱度降序）。用於「第二段只按首字母匹配」的寬鬆聯想行。 */
+    private var assocByFirstInitial: Map<String, Map<Char, List<String>>> = emptyMap()
 
     // ---- 只讀診斷（性能門禁 PerfGate / 單測用）----
     fun debugSyllableCount(): Int = table.size
@@ -241,6 +243,22 @@ object TwelveKeyPreedit {
             if (second.isEmpty()) return@forEach
             index.getOrPut(first) { LinkedHashMap() }[second] = bucket.keys.toList()
         }
+        // 首字母級索引：同一「第一音節 + 第二音節首字母」的詞按熱度合併，
+        // 供面板出 `than d` 這種寬鬆行（用戶 2026-11-10：第二段只按首字母匹配，散一點沒關係）。
+        val byInitial = HashMap<String, LinkedHashMap<Char, MutableList<String>>>()
+        assocWords.forEach { (key, bucket) ->
+            val sep = key.indexOf('|')
+            if (sep <= 0 || sep >= key.length - 1) return@forEach
+            val first = key.substring(0, sep)
+            val second = key.substring(sep + 1)
+            val initial = second.firstOrNull() ?: return@forEach
+            val list = byInitial.getOrPut(first) { LinkedHashMap() }
+                .getOrPut(initial) { ArrayList() }
+            list.addAll(bucket.keys)   // bucket 已按熱度降序
+        }
+        assocByFirstInitial = byInitial.mapValues { (_, byInit) ->
+            byInit.mapValues { (_, words) -> words.distinct() }
+        }
         assocByFirst = index
         assocReady = index.isNotEmpty()
         assocGeneration++
@@ -296,6 +314,34 @@ object TwelveKeyPreedit {
         // display：選出來的行再按讀音字典序排（用戶 2026-11-10）。
         // 注意順序：必須先截斷再排序，否則高熱度行會被字母序擠掉（`than` 就這麼丟過）。
         val chosen = rows.sortedByDescending { it.second.size }.take(maxReadings)
+        return chosen.sortedBy { it.first }
+    }
+
+    /**
+     * 寬鬆版聯想行：第二段只按**首字母**匹配（第一音節 × 第二音節首字母），
+     * 行標題是 `"$syllable $initial"`（例如 `than d`）。
+     *
+     * 用戶 2026-11-10：「第二段只按首字母匹配（th* + d/e/f 任意音節，可能較散，沒關係）；
+     * 增補聯想組不要給太多」。所以這裡每行只取 [perRow] 個詞、最多 [maxRows] 行，
+     * 行內按熱度取前 N 再按詞面字典序顯示。
+     */
+    fun associatedByInitial(
+        syllable: String,
+        initials: Collection<Char>,
+        perRow: Int = 6,
+        maxRows: Int = 2,
+    ): List<Pair<String, List<String>>> {
+        if (initials.isEmpty() || !assocReady) return emptyList()
+        val byInit = assocByFirstInitial[syllable] ?: return emptyList()
+        val rows = ArrayList<Pair<String, List<String>>>(byInit.size)
+        byInit.forEach { (initial, words) ->
+            if (initial !in initials) return@forEach
+            if (words.isEmpty()) return@forEach
+            rows.add("$syllable $initial" to words.take(perRow).sorted())
+        }
+        if (rows.isEmpty()) return emptyList()
+        // 先按熱度（詞條數多的行更常用）取前 maxRows，再按行標題字典序顯示
+        val chosen = rows.sortedByDescending { it.second.size }.take(maxRows)
         return chosen.sortedBy { it.first }
     }
 

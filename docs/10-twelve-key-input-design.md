@@ -2560,6 +2560,25 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
   `1i`/`yi` 同理非空。
 - 加上既有的 12×12=144 組合矩陣，`ng`/`nz` 與其餘 10 鍵的兩兩組合都已覆蓋。
 
+### 15.59.2.3 聯想行放寬：第二段只按首字母匹配 + 行數上限（2026-11-10）
+
+用戶定案（m10992）：「C 保持現狀（不讀用戶詞庫），但繼續：第二段只按「首字母」匹配
+（th* + d/e/f 任意音節，可能較散，沒關係）；增補聯想組不要給太多（影響性能就截斷）」。
+
+- `TwelveKeyPreedit` 新增 **首字母級二級索引** `assocByFirstInitial`（第一音節 → 第二音節首字母 → 詞列表，
+  組內按熱度降序），建索引時與既有的「確切第二音節」索引一起建；查詢只剩兩次 HashMap 查找。
+- 新 API `associatedByInitial(syllable, initials, perRow = 6, maxRows = 2)`：行標題 `than d` 這種，
+  每行先按熱度取 6 條再按詞面字典序顯示；同音節最多 2 行。
+- `segmentGroupsFor` 每個第一段音節先出「首字母級」寬鬆行、再出「確切音節」行；
+  整輪聯想行總數上限 `ASSOC_MAX_ROWS = 4`（超出直接不再加），避免面板被灌滿、也壓住每鍵成本。
+- 真機前的單測證據（`we` = 選完「共」剩 th+d）：
+  單字組 `than the them then thep thet theu thi thu`（than 回來了）；
+  聯想行首批 `than d / than f / than dung / than fo`（正好 4 行封頂）。
+- 效能：`op=assoc 0.29ms`（新索引沒有讓查詢變慢）；`assoc_load` 因多建一層索引升到 1.2–1.6s
+  （後台線程），門禁閾值由 1.5s 調到 2.5s 並在 docs/13 註明原因。
+- 單測：`afterPickingFirstSegmentRemainingTwoCodesCoverBothReadings` 追加「必須有聯想行、每行 ≤6 條、
+  總行數 ≤4」；全量 **55 tests / 0 failures**。
+
 ### 15.59.3 12 鍵全鍵位測試 + `initialsForPrefix` 精確碼漏洞（2026-11-10）
 
 用戶：「你確定測試完整 12 鍵了？比如 ng、nz 呢？」

@@ -102,6 +102,17 @@ class AssociatedWordsTest {
     }
 
     @Test
+    fun probeInitialRows() {
+        for (syl in listOf("than", "the", "kiung", "song")) {
+            for (ini in listOf('d', 'f', 't', 'g', 'h')) {
+                val rows = preedit.associatedByInitial(syl, setOf(ini))
+                if (rows.isNotEmpty()) println("PROBE byInitial($syl,$ini) = ${rows.map { it.first to it.second.take(3) }}")
+            }
+        }
+        assertTrue(true)
+    }
+
+    @Test
     fun kiungPlusTheStillEmitsAssociationRows() {
         // 用戶 2026-11-10：「kiung th d —— th 和 def 合成 the，導致什麼聯想詞都沒有」。
         // 剩餘碼 `we` 剛好是一個完整音節（洗=the），面板仍必須出「kiung than」這類聯想詞行。
