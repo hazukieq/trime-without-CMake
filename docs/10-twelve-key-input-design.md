@@ -2266,3 +2266,45 @@ onPickPanelCandidate / onTwelveKeyCandidatePressed（段組分支）
 
 真機取色驗證（12 鍵 → 展開面板）：候選區背景 `#F1F3F4`、候選卡片 `#F8F9FA`、退格條區域 `#F1F3F4`，
 退格條與右側面板同色、無色帶。
+
+## 15.56 修復：一個鍵覆蓋多字母時，單音節組被其中一個字母整批佔滿（2026-11-10）
+
+用戶反饋：「ghi 鍵（碼位 `i`，覆蓋 g/h/i）給出的單音節怎麼只有 g 開頭的？」
+
+### 原因
+
+`syllablesForSegment(code)` 對「前綴命中」的排序只有一個鍵：**該音節在 `hakka.dict.yaml` 裡的字數**。
+而客家話詞典裡 g 系音節的字特別多（gi 71 字、gau 51、gin 44…），h 系最多只有 hai 29，
+所以 `i` 鍵取前 8（`MAX_SYLLABLE_GROUPS`）時，g 系就把名額全佔了，h 開頭一個都進不來：
+
+```
+i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
+```
+
+同理 `5`（k/l）、`4`（m/n）、`7`（p/s）、`3`（v/r）、`9`（q/t）、`8`（z/j）、`a`（a/b/c）都會偏科。
+
+### 修法（`core/TwelveKeyPreedit.kt` 的 `syllablesForSegment`）
+
+1. 精確碼命中仍然優先、按字數降序；
+2. 前綴命中先按**音節首字母**分桶（i → g 桶 / h 桶 / i 桶；5 → k 桶 / l 桶…），
+   每桶內部按字數降序；
+3. 桶之間按「桶內最頻繁音節的字數」排序，然後**輪流各取一個**（round-robin），
+   直到取滿 `limit`。
+
+這樣同一個鍵覆蓋的字母都能拿到名額，同時高頻音節依然靠前。
+
+### 測試
+
+`app/src/test/java/com/hazukieq/hkrime/core/SegmentSplitTest.kt` 新增
+`multiLetterKeyCoversEveryInitial`：
+- `syllablesForSegment("i", 8)` 至少 6 組，且首字母同時包含 g 與 h
+  （詞典裡沒有 i 開頭音節，i 介音寫成 y-/j-）；
+- `syllablesForSegment("5", 8)` 同時有 k、l 開頭；
+- `syllablesForSegment("4", 8)` 同時有 m、n 開頭。
+
+### 真機驗收
+
+- 輸入 `i44yi`（日誌 `raw=[gon nzi]`）：面板左列 `gon / hon / gong / hong …`（g、h 都有），
+  不再整列 g 開頭；
+- 同一輸入候選條 `汉语 韩语 官儿 莞尔 干 管`、面板組 `汉语韩语`（兩詞都在），
+  說明 `汉语/韩语` 這類詞沒有被吞掉。

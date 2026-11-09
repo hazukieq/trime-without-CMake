@@ -115,4 +115,25 @@ class SegmentSplitTest {
             assertEquals("同碼串拆段必須穩定 codes=$codes", a, b)
         }
     }
+
+    /**
+     * 用戶 2026-11-10 反饋：`ghi` 鍵（碼位 `i`，覆蓋 g/h/i）給出的單音節只有 g 開頭的。
+     * 原因：前綴命中原先只按「該音節在詞典裡的字數」排序，g 系字最多就整批佔滿；
+     * 現在改成「按首字母輪流取」，同一個鍵覆蓋的字母都要有代表。
+     */
+    @Test
+    fun multiLetterKeyCoversEveryInitial() {
+        // i 覆蓋 g/h/i 三個字母
+        val iSyllables = preedit.syllablesForSegment("i", 8)
+        assertTrue("i 鍵應至少 6 組，實際=$iSyllables", iSyllables.size >= 6)
+        val initials = iSyllables.map { it.first() }.toSet()
+        // 客家話詞典裡沒有 i 開頭的音節（i 介音寫成 y-/j-），所以只要求 g 與 h 都有代表。
+        assertTrue("i 鍵應同時覆蓋 g/h，實際首字母=$initials", initials.containsAll(listOf('g', 'h')))
+        // 5 覆蓋 k/l
+        val five = preedit.syllablesForSegment("5", 8)
+        assertTrue("5 鍵應同時有 k/l 開頭，實際=$five", five.any { it.startsWith("k") } && five.any { it.startsWith("l") })
+        // 4 覆蓋 m/n
+        val four = preedit.syllablesForSegment("4", 8)
+        assertTrue("4 鍵應同時有 m/n 開頭，實際=$four", four.any { it.startsWith("m") } && four.any { it.startsWith("n") })
+    }
 }

@@ -205,8 +205,25 @@ object TwelveKeyPreedit {
                 syllableCode.startsWith(code) -> prefix.addAll(list)
             }
         }
-        return (exact.sortedByDescending { it.freq } + prefix.sortedByDescending { it.freq })
-            .map { it.syllable }
+        val exactSorted = exact.sortedByDescending { it.freq }
+        // 前綴命中要「按鍵覆蓋的字母」輪流取（i → g/h/i、5 → k/l、4 → m/n …），
+        // 否則像 `i` 這種鍵會被字數最多的 g 系音節整批佔滿（g 系在詞典裡字最多），
+        // 出現「只給 g 開頭、h/i 一個都沒有」的問題（用戶 2026-11-10 反饋）。
+        val buckets = LinkedHashMap<Char, MutableList<Entry>>()
+        prefix.forEach { e ->
+            val key = e.syllable.firstOrNull() ?: '?'
+            buckets.getOrPut(key) { ArrayList() }.add(e)
+        }
+        buckets.values.forEach { it.sortByDescending { e -> e.freq } }
+        val order = buckets.entries.sortedByDescending { (_, list) -> list.first().freq }
+            .map { it.value }
+        val diversified = ArrayList<Entry>()
+        var round = 0
+        while (diversified.size < limit && order.any { round < it.size }) {
+            order.forEach { list -> if (round < list.size) diversified.add(list[round]) }
+            round++
+        }
+        return (exactSorted.map { it.syllable } + diversified.map { it.syllable })
             .distinct()
             .take(limit)
     }
