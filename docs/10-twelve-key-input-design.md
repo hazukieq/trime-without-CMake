@@ -2499,7 +2499,10 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
 | 2 | 引擎詞組（`ka gu`…） | 讀音字典序 |
 | 3 | 無讀音組（引擎沒給 comment） | 用第一條候選的首字讀音兜底，再按字典序 |
 
-- `syllablesForSegment` 的最終列表同樣改為字典序（精確碼音節仍固定第一條）；
+- 「高頻」只決定 **selection**：音節用「字典字數」、聯想詞用「詞表出現次數」挑出限額內的前 N 條；
+  挑出來之後再按字典序 **display**（`syllablesForSegment` 末尾 `.sorted()`、
+  `finishWordIndex` 索引保持熱度降序而 `associatedWords/ByReading` 取完再 `.sorted()`）。
+  精確碼音節仍固定第一條；
 - `orderGroups` 的 `charScore/generalScore` 參數保留但不再參與排序（只影響「留哪些」）。
 - 單測：`CandidateRankingTest.orderGroupsKeepsAssociationRowsInTheirOwnBucket`、
   `orderGroupsSortsAlphabetically`；`SyllableBucketTest.limitIsPerInitialBucket` 追加「列表整體字典序」斷言。

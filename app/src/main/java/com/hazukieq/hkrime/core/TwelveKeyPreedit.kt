@@ -222,10 +222,13 @@ object TwelveKeyPreedit {
     /** 詞表載入完後把索引整理成「按熱度降序」的列表，避免每次查詢都排序。 */
     internal fun finishWordIndex() {
         assocWords.values.forEach { bucket ->
-            // 聯想詞也按字母序（"共產黨" 按詞面排），方便掃讀；詞頻只用來「有沒有」與截斷前的粗排。
-            val sorted = bucket.keys.sorted()
+            // 索引維持「熱度降序」：它決定「取哪幾條」（selection）。
+            // 顯示時再對著截斷後的小列表按字母序排（display），兩件事分開（用戶 2026-11-10）。
+            val sorted = bucket.entries
+                .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+                .map { it.key }
             bucket.clear()
-            sorted.forEach { bucket[it] = 1 }
+            sorted.forEachIndexed { i, word -> bucket[word] = sorted.size - i }
         }
         // 建查詢索引：第一音節 → (第二音節 → 已排序詞列表)；先建好再整體替換，
         // 避免後台線程寫、按鍵線程讀同一個 Map 造成併發修改。
@@ -257,14 +260,15 @@ object TwelveKeyPreedit {
         if (!assocReady) return emptyList()
         val bySecond = assocByFirst[syllable] ?: return emptyList()
         val merged = LinkedHashSet<String>()
-        bySecond.forEach { (second, words) ->
-            if (second.isEmpty() || second[0] != initial) return@forEach
-            for (word in words) {
+        outer@ for ((second, words) in bySecond) {
+            if (second.isEmpty() || second[0] != initial) continue
+            for (word in words) {          // words 已按熱度降序
                 merged.add(word)
-                if (merged.size >= limit) return merged.toList()
+                if (merged.size >= limit) break@outer    // 取哪幾條由熱度決定
             }
         }
-        return merged.toList()
+        // 顯示按詞面字典序（用戶 2026-11-10：聯想詞也要按字母排）
+        return merged.sorted()
     }
 
     /**
@@ -285,10 +289,13 @@ object TwelveKeyPreedit {
         val rows = ArrayList<Pair<String, List<String>>>(bySecond.size)
         bySecond.forEach { (second, words) ->
             if (second.isEmpty() || second[0] !in initials) return@forEach
-            rows.add(second to words.take(limitPerReading))
+            // 先按熱度取前 N 條，再按詞面字典序顯示
+            rows.add(second to words.take(limitPerReading).sorted())
         }
-        // 詞列表已按熱度排好，行內詞數多 = 這一讀音更常用 → 行間按詞數降序（同數保持 altB 插入序）
+        // 行間：哪幾個讀音更常用由「行內候選詞總量」決定（保持 selection 語義），
+        // 選出來的行再按讀音字典序顯示（用戶 2026-11-10：行本身也要按首字母→次字母排）。
         rows.sortByDescending { it.second.size }
+        rows.sortBy { it.first }
         return if (rows.size > maxReadings) rows.subList(0, maxReadings) else rows
     }
 
