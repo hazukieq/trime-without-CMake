@@ -2147,3 +2147,40 @@ onPickPanelCandidate / onTwelveKeyCandidatePressed（段組分支）
 | 再點「去」 | 日誌 `prefix=[无去]`；輸入框仍空 |
 | 點最後一段 | `cacheDraft()` 一次出現整串（`无去去`）——全程只 commit 一次 |
 | 選「无」後按退格 | preedit 回到 `455`，候選條回到 `无权利 无下级 姥姥家`，可重選 |
+
+## 15.54 试点：候选排序下移到 librime-lua 的结果（2026-11-10）
+
+按 §15.53 收尾时讨论的三步走，做了第 2 步的**只读试点**：用 librime-lua 写一个 `lua_filter`，
+在引擎里复现 App 的两条排序规则（词组优先、权威字频），把「引擎原序」与「按规则重排」写日志，
+默认仍 yield 原顺序（不改行为）。脚本留在 `tools/pilot/hkrime_rank.lua`（含复现步骤）。
+
+### 做法
+
+1. `hakka_char_rank.txt`（8183 字，rime-ice 8105 语料权重）与 `hakka_char_freq.txt`（7990 字，客家词表统计）
+   放到用户目录，Lua 侧按与 App 相同的百分位公式建综合分；
+2. 目标 schema 的 `engine/filters` 末尾加 `lua_filter@hkrime_rank`，删 `build/<schema>.schema.yaml` 强制重建，
+   广播 deploy 后打字；
+3. 日志 `/sdcard/hkrime/hkrime_rank_pilot.log` 输出 `[load]` / `[cmp]` / `[perf]` 三类行。
+
+### 结果
+
+| 项目 | 结果 |
+| --- | --- |
+| 数据表 | `rank=8183 freq=7990 general=9379`，与 App 完全一致 |
+| 排序复现 | 词组优先 + 字频降序可复现；同一输入下候选条前段与 App 结果一致 |
+| 性能 | 309 条候选时 `avg 25.7ms / max 94ms`（纯 Lua 逐条 UTF-8 解析 + 排序，且跑在按键处理线程） |
+| 语义 | 把权威字频应用到候选条会覆盖引擎自身的整词词频/学习排序（例：`455` 下把「无奇/无忌…」提到「姥姥家」前） |
+
+### 结论（暂不下移）
+
+- **可行性没问题**：lua 侧拿到的数据、公式、结果都能和 App 对齐，说明「排序策略」本身是可移植的；
+- **但性能不可接受**：25.7ms/次打在按键主路径上，而 App 的等价排序在后台线程且有缓存；
+- **且有语义副作用**：候选条现在的顺序 = 引擎词频/学习 + App 的「词组优先」稳定分区；
+  再叠一层「首字权威字频」会改变引擎已经排好的整词顺序，需要产品决策而不是纯工程问题。
+
+因此排序继续留在 App（`CandidateRanking.kt` 纯函数 + 单测）。若将来确实要下移，
+前置条件是：Lua 侧按首字字节缓存 / 只重排前 N 条（目标 <5ms），或写成 C++ filter（按 rime-jni/patches 约定做可选补丁），
+并且先明确「引擎词频 vs 权威字频」的优先级顺序。
+
+试点结束后设备已还原：`hakka_jiugong.schema.yaml` 去掉 `lua_filter`、`default.custom.yaml` 去掉试点方案、
+删除试点 schema/lua/日志，重新 deploy；候选条回到引擎原序。
