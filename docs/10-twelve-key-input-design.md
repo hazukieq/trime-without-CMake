@@ -2379,3 +2379,18 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
   `song gong` 行內容 `香港 上光 上崗 上講 商港 賞光`。
 - 單測：`AssociatedWordsTest` +2（確切第二音節、initials 過濾）、`CandidateRankingTest` +1（合併語義），
   全量 41 tests / 0 failures。
+
+### 15.57.2 修卡頓：聯想詞索引改「預建 + 後台載入」（2026-11-10）
+
+用戶：「現在出現了卡頓…大概率是補聯想詞這塊拖累了」。
+
+- 原因一（每次按鍵都付）：`associatedByReading/associatedWords` 每次查詢都遍歷全部 8 千多個
+  `第一音節|第二音節` 鍵，還要 `split('|')` 造字符串 —— 面板每次按鍵重建快照時跑 4 個音節 × 2 個首字母。
+- 原因二（首次使用一次性 2MB 讀盤）：8 個詞表合計 2MB+，原本在 `TwelveKeyPreedit.load()` 同步讀取。
+- 修法：
+  1. `finishWordIndex()` 一次性建好 `assocByFirst: 第一音節 → (第二音節 → 詞列表)`，
+     查詢只做兩次 HashMap 查找（`assocReady` 未就緒時直接返回空）；
+  2. 詞表載入移到守護線程 `twelvekey-assoc`，日誌 `assoc keys=… byFirst=… load=…ms`；
+  3. 索引用 `@Volatile` 引用整體替換，避免後台寫 / 按鍵讀同一個 Map；
+  4. `assocGeneration` 進候選快照 `cacheKey`，索引就緒後自動重建一次快照（否則舊緩存裡沒有聯想行）。
+- 單測：41 tests / 0 failures（聯想索引的查詢語義不變，只是換了數據結構）。

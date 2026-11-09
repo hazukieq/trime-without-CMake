@@ -1,6 +1,7 @@
 package com.hazukieq.hkrime.core.twelvekey
 
 import com.hazukieq.hkrime.core.Rime
+import com.hazukieq.hkrime.core.TwelveKeyPreedit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -104,7 +105,7 @@ class TwelveKeyController(
                                 full,
                                 segmentAnchor,
                                 segmentMode,
-                            ) + "|o" + optionsVersion
+                            ) + "|o" + optionsVersion + "|a" + TwelveKeyPreedit.assocGeneration
                             val cached = cacheLookup(key) { it }
                             val t0 = System.nanoTime()
                             val built = cached ?: TwelveKeySnapshotBuilder.build(

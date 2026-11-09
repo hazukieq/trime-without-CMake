@@ -36,6 +36,25 @@ object TwelveKeyPreedit {
     private val assocWords = HashMap<String, LinkedHashMap<String, Int>>()
 
     /**
+     * 聯想詞的**查詢索引**：第一音節 → (第二音節 → 詞列表)。
+     *
+     * 面板每次按鍵都會重建快照，如果查詢時還要遍歷所有 8 千多個「第一音節|第二音節」鍵
+     * 並 split 字符串，按鍵線程會明顯卡頓（用戶 2026-11-10 反饋「補聯想詞後來卡了」）。
+     * 這裡在詞表載入完成後一次性建好，查詢只做兩次 HashMap 查找。
+     */
+    @Volatile
+    private var assocByFirst: Map<String, Map<String, List<String>>> = emptyMap()
+
+    /** 詞表索引是否已就緒（詞表在後台線程載入，沒就緒時面板只是暫時沒有聯想詞行）。 */
+    @Volatile
+    private var assocReady = false
+
+    /** 聯想詞索引版本：後台載入完成後 +1，輸入法用它讓候選快照緩存失效。 */
+    @Volatile
+    var assocGeneration: Int = 0
+        private set
+
+    /**
      * 單字 → 通用頻度（由詞表統計生成，見 assets/rime/hakka_char_freq.txt）。
      *
      * 展開面板「音節 → 漢字」列表用來把常用字排前、生僻字排後；詞典本身沒有 weight，
@@ -92,16 +111,28 @@ object TwelveKeyPreedit {
 
         finishLoading(counts)
 
-        // 兩字詞聯想索引（song g** / song h** 這類）——詞表只有詞條、沒有讀音，
+        // 兩字詞聯想索引（song gong 這類聯想行）——詞表只有詞條、沒有讀音，
         // 依賴上面 finishLoading 建好的 charTable 反推，所以必須放在它後面。
-        runCatching {
-            WORD_LISTS.forEach { name ->
-                context.assets.open("rime/$name.dict.yaml").bufferedReader(Charsets.UTF_8)
-                    .useLines { lines -> loadWordLines(lines) }
-            }
-            finishWordIndex()
-            Timber.i("TwelveKeyPreedit: assoc keys=%d", assocWords.size)
-        }.onFailure { Timber.w(it, "TwelveKeyPreedit: load word lists failed") }
+        // 8 個詞表合計 2MB+，同步讀會讓第一次按鍵卡住（用戶 2026-11-10 反饋），
+        // 因此丟到後台線程：面板在索引就緒前只是暫時沒有聯想詞行。
+        val appContext = context.applicationContext
+        Thread({
+            val t0 = System.nanoTime()
+            runCatching {
+                WORD_LISTS.forEach { name ->
+                    appContext.assets.open("rime/$name.dict.yaml").bufferedReader(Charsets.UTF_8)
+                        .useLines { lines -> loadWordLines(lines) }
+                }
+                finishWordIndex()
+                Timber.i(
+                    "TwelveKeyPreedit: assoc keys=%d byFirst=%d load=%dms",
+                    assocWords.size, assocByFirst.size, (System.nanoTime() - t0) / 1_000_000,
+                )
+            }.onFailure { Timber.w(it, "TwelveKeyPreedit: load word lists failed") }
+        }, "twelvekey-assoc").apply {
+            isDaemon = true
+            start()
+        }
     }
 
     private val WORD_LISTS = listOf(
@@ -185,6 +216,20 @@ object TwelveKeyPreedit {
             bucket.clear()
             sorted.forEach { bucket[it] = 1 }
         }
+        // 建查詢索引：第一音節 → (第二音節 → 已排序詞列表)；先建好再整體替換，
+        // 避免後台線程寫、按鍵線程讀同一個 Map 造成併發修改。
+        val index = HashMap<String, LinkedHashMap<String, List<String>>>()
+        assocWords.forEach { (key, bucket) ->
+            val sep = key.indexOf('|')
+            if (sep <= 0 || sep >= key.length - 1) return@forEach
+            val first = key.substring(0, sep)
+            val second = key.substring(sep + 1)
+            if (second.isEmpty()) return@forEach
+            index.getOrPut(first) { LinkedHashMap() }[second] = bucket.keys.toList()
+        }
+        assocByFirst = index
+        assocReady = index.isNotEmpty()
+        assocGeneration++
     }
 
     private fun isCjk(ch: Char): Boolean {
@@ -198,13 +243,12 @@ object TwelveKeyPreedit {
      * 用戶 2026-11-10：面板要列 `song g**` / `song h**` 這種聯想詞，而不是另一種切法標籤。
      */
     fun associatedWords(syllable: String, initial: Char, limit: Int = 6): List<String> {
+        if (!assocReady) return emptyList()
+        val bySecond = assocByFirst[syllable] ?: return emptyList()
         val merged = LinkedHashSet<String>()
-        assocWords.forEach { (key, bucket) ->
-            val parts = key.split('|')
-            if (parts.size != 2 || parts[0] != syllable) return@forEach
-            val second = parts[1]
+        bySecond.forEach { (second, words) ->
             if (second.isEmpty() || second[0] != initial) return@forEach
-            for (word in bucket.keys) {
+            for (word in words) {
                 merged.add(word)
                 if (merged.size >= limit) return merged.toList()
             }
@@ -225,16 +269,16 @@ object TwelveKeyPreedit {
         limitPerReading: Int = 6,
         maxReadings: Int = 4,
     ): List<Pair<String, List<String>>> {
-        if (initials.isEmpty()) return emptyList()
-        val rows = ArrayList<Pair<String, List<String>>>()
-        assocWords.forEach { (key, bucket) ->
-            val parts = key.split('|')
-            if (parts.size != 2 || parts[0] != syllable) return@forEach
-            val second = parts[1]
+        if (initials.isEmpty() || !assocReady) return emptyList()
+        val bySecond = assocByFirst[syllable] ?: return emptyList()
+        val rows = ArrayList<Pair<String, List<String>>>(bySecond.size)
+        bySecond.forEach { (second, words) ->
             if (second.isEmpty() || second[0] !in initials) return@forEach
-            rows.add(second to bucket.keys.take(limitPerReading))
+            rows.add(second to words.take(limitPerReading))
         }
-        return rows.sortedByDescending { it.second.size }.take(maxReadings)
+        // 詞列表已按熱度排好，行內詞數多 = 這一讀音更常用 → 行間按詞數降序（同數保持 altB 插入序）
+        rows.sortByDescending { it.second.size }
+        return if (rows.size > maxReadings) rows.subList(0, maxReadings) else rows
     }
 
     /** 碼段的所有可能「下一個音節首字母」（去重、保持輪轉順序），用於決定列哪幾行聯想詞。 */
