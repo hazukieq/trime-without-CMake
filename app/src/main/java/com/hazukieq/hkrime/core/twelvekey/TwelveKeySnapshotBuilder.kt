@@ -169,6 +169,8 @@ object TwelveKeySnapshotBuilder {
         } else {
             wordsFirst(ranked).take(BAR_ITEMS).filter { it.text.isNotEmpty() }
         }
+        // 預覽文字與候選條第 0 條同源：一次算好，隨快照發佈。
+        val previewText = barEntries.firstOrNull { it.text.isNotEmpty() }?.text ?: ""
         val fallback = if (groups.isEmpty() && remaining.isNotEmpty()) {
             val raw = remaining.takeLast(MAX_FALLBACK_CODE)
             Fallback(rawCode = raw, letters = if (mapFallbackLetters) toLetters(raw) else raw)
@@ -186,6 +188,7 @@ object TwelveKeySnapshotBuilder {
             fallback = fallback,
             degradedToSinglePage = degraded,
             barEntries = barEntries,
+            previewText = previewText,
         )
     }
 

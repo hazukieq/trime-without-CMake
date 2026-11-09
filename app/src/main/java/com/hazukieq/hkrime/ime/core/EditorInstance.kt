@@ -73,8 +73,11 @@ class EditorInstance(private val ims: InputMethodService) {
     fun updateComposingText() {
         val ic = inputConnection ?: return
         val composingText = when (prefs.keyboard.inlinePreedit) {
-            // 12 鍵：預覽要跟固定候選欄一致（候選欄會被常用字記憶重排，引擎 preview 不會）
-            InlineModeType.INLINE_PREVIEW -> textInputManager.twelveKeyPreviewText() ?: Rime.getComposingText()
+            // 12 鍵：預覽文字來自最近一次發佈的快照（= 候選條第 0 條），與候選條同源；
+            // 快照尚未到達時先清空，等 applyInlinePreview() 同幀寫入，避免閃一下引擎順序的字。
+            InlineModeType.INLINE_PREVIEW ->
+                textInputManager.currentPreviewText()
+                    ?: if (textInputManager.isTwelveKeyMode()) "" else Rime.getComposingText()
             InlineModeType.INLINE_COMPOSITION -> Rime.getCompositionText()
             InlineModeType.INLINE_INPUT -> Rime.RimeGetInput()
             else -> ""

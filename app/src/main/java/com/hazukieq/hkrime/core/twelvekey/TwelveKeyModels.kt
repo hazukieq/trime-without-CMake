@@ -53,6 +53,14 @@ data class TwelveKeySnapshot(
     val fallback: Fallback?,
     val degradedToSinglePage: Boolean = false,
     val barEntries: List<CandidateItem> = emptyList(),
+    /**
+     * 嵌入式預覽（inline preview）要顯示的文字。
+     *
+     * 由快照本身算好（= 候選條第一條），隨快照一起發佈，這樣「候選條 / 面板 / preedit 預覽」
+     * 三者讀的是同一份狀態；不再讓 EditorInstance 另外去問引擎要 commit_text_preview，
+     * 避免「候選欄是第一條、預覽是引擎第 0 條」這種兩套 index 的錯位。
+     */
+    val previewText: String = "",
 ) {
     val isEmpty: Boolean get() = input.isEmpty()
     val hasCandidates: Boolean get() = groups.isNotEmpty()

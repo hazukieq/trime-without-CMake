@@ -14,6 +14,7 @@ import com.hazukieq.hkrime.core.twelvekey.TwelveKeyController
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshot
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder
 import com.hazukieq.hkrime.data.AppPrefs
+import com.hazukieq.hkrime.ime.enums.InlineModeType
 import com.hazukieq.hkrime.data.Config
 import com.hazukieq.hkrime.databinding.InputRootBinding
 import com.hazukieq.hkrime.ime.broadcast.IntentReceiver
@@ -233,7 +234,7 @@ class TextInputManager private constructor() :
 
     // ---------- 候選展開面板 ----------
 
-    private fun isTwelveKeyMode(): Boolean = runCatching {
+    fun isTwelveKeyMode(): Boolean = runCatching {
         // 主題 style/keyboards 裡的名字是 hakka_jiugong（其 preset 為 jiugong_simp），兩者都接受
         val keyboard = keyboardSwitcher.getCurrentKeyboardName()
         Rime.getSchemaId() == "hakka_jiugong" &&
@@ -247,8 +248,7 @@ class TextInputManager private constructor() :
     fun commitTopCandidateIfTwelveKey(keyCode: Int): Boolean {
         if (keyCode != android.view.KeyEvent.KEYCODE_SPACE) return false
         if (!isTwelveKeyMode() || !Rime.isComposing()) return false
-        val item = boundBarItems.firstOrNull()
-            ?: twelveKeyController?.snapshot?.barItems?.firstOrNull()
+        val item = currentSnapshot.barItems.firstOrNull()
             ?: return false
         withEngineLock { twelveKeyController?.selectCandidate(item.index) }
         return true
@@ -260,12 +260,9 @@ class TextInputManager private constructor() :
      * 引擎的 commit_text_preview 是引擎順序第一條；12 鍵候選條會被 SelectionMemory
      * 重排（用戶常用字優先），兩者不一致時會出現「候選欄是怕、預覽是啥」的錯位。
      */
-    fun twelveKeyPreviewText(): String? {
+    fun currentPreviewText(): String? {
         if (!isTwelveKeyMode() || !Rime.isComposing()) return null
-        val item = boundBarItems.firstOrNull()
-            ?: twelveKeyController?.snapshot?.barItems?.firstOrNull()
-            ?: return null
-        return item.text.takeIf { it.isNotEmpty() }
+        return currentSnapshot.previewText.takeIf { it.isNotEmpty() }
     }
 
     fun isCandidatePanelShown(): Boolean =
@@ -340,14 +337,28 @@ class TextInputManager private constructor() :
             }
             lastKeyAtNs = 0L
         }
-        boundBarItems = snapshot.barItems
+        currentSnapshot = snapshot
         candidateBarBinder?.bind(snapshot)
         candidatePanelController?.submit(snapshot)
+        applyInlinePreview(snapshot)
         if (snapshot.isEmpty || (!snapshot.hasCandidates && snapshot.fallback == null)) {
             if (candidatePanelController?.isShown == true) candidatePanelController?.hide()
         }
         // 面板可能被 submit() 自動收起（上屏後無剩餘碼），箭頭方向要跟著回到 ▼
         candidateView?.setPanelOpen(candidatePanelController?.isShown == true)
+    }
+
+    /**
+     * 12 鍵 preedit 預覽與候選條同幀落地：快照一到就把第一條寫進 preedit。
+     * 只在「嵌入式編輯模式 = 首選」時接管；其他模式仍由 EditorInstance 按各自來源更新。
+     */
+    private fun applyInlinePreview(snapshot: TwelveKeySnapshot) {
+        if (!isTwelveKeyMode()) return
+        if (prefs.keyboard.inlinePreedit != InlineModeType.INLINE_PREVIEW) return
+        val ic = activeEditorInstance.inputConnection ?: return
+        val text = if (snapshot.isEmpty || !Rime.isComposing()) "" else snapshot.previewText
+        runCatching { ic.setComposingText(text, 1) }
+            .onFailure { Timber.e(it, "twelvekey: inline preview failed") }
     }
 
     private fun onPickPanelCandidate(item: CandidatePanelAdapter.Item) {
@@ -684,7 +695,8 @@ class TextInputManager private constructor() :
     private var lastKeyAtNs = 0L
 
     /** 最近一次綁到候選條的條目（點擊下標必須按這份解析，保證所見即所得）。 */
-    private var boundBarItems: List<CandidateItem> = emptyList()
+    /** 最近一次發佈的快照：候選條、面板、preedit 預覽、空格上屏全部只讀這一份。 */
+    private var currentSnapshot: TwelveKeySnapshot = TwelveKeySnapshot.EMPTY
 
     override fun onEvent(event: Event?) {
         lastKeyAtNs = System.nanoTime()
@@ -870,8 +882,7 @@ class TextInputManager private constructor() :
         val snapshot = twelveKeyController?.snapshot ?: return
         // 用「最近一次綁到候選條的那份列表」做下標映射：顯示與點擊必須同一份數據，
         // 否則非同步刷新/學習重排後會出現「看到的是看、上屏的卻是别字」。
-        val list = if (boundBarItems.isNotEmpty()) boundBarItems else snapshot.barItems
-        val item = list.getOrNull(index)
+        val item = currentSnapshot.barItems.getOrNull(index)
         if (item != null) {
             // 分詞輸入時候選條列的是「這一段能選的字」（index = -1）：
             // 直接上屏、把剩餘段餵回引擎，不進引擎選詞（用戶 2026-11-09 指示）。
@@ -883,7 +894,7 @@ class TextInputManager private constructor() :
             return
         }
         val fallback = snapshot.fallback
-        if (fallback != null && index == list.size) {
+        if (fallback != null && index == currentSnapshot.barItems.size) {
             twelveKeyController?.commitFallback(fallback)
         }
     }

@@ -1790,3 +1790,31 @@ private fun isChecked(index: Int): Boolean =
 真機驗證：
 - 碼 `y 1`（nz + ng）→ 候選條 `让我 而我 尔雅 肉眼 二外`（全是詞組，之前會是單字在前）；
 - 碼 `nzu i18y` → `儒家 儒教 儒学 女儿国`。
+
+## 15.44 單一狀態源：候選條 / 面板 / preedit 預覽同源（2026-11-09）
+
+問題：候選條會被 App 重排（常用字記憶 + 詞組優先），而嵌入式預覽先前問引擎要
+`commit_text_preview`（引擎第 0 條）；兩套「第一條」+ 兩份列表（`boundBarItems` 與
+`snapshot.barItems`）→ 預覽與候選條對不上，而且非同步刷新時「畫出來的列表」和「點擊時用的
+列表」也可能不是同一份。用戶指出「同時維護兩個不一致的 index 很容易出 bug」。
+
+**設計原則：只用一份狀態，所有讀者都讀它。**
+
+1. `TwelveKeySnapshot` 增加 `previewText` —— 由 `TwelveKeySnapshotBuilder.build()` 在候選條
+   算完之後一次算出（`barEntries.firstOrNull { it.text.isNotEmpty() }?.text`），隨快照發佈；
+2. `TextInputManager` 刪掉 `boundBarItems`，改為 `private var currentSnapshot`：
+   預覽、空格上屏（`commitTopCandidateIfTwelveKey`）、候選條點擊下標映射、面板提交
+   全部讀 `currentSnapshot`；
+3. `onTwelveKeySnapshot()` 是唯一發布點（Main 線程）：`currentSnapshot = snapshot` →
+   `candidateBarBinder.bind(snapshot)` → `candidatePanelController.submit(snapshot)` →
+   `applyInlinePreview(snapshot)`（`INLINE_PREVIEW` 時 `ic.setComposingText(snapshot.previewText, 1)`）。
+   同幀落地，不會出現「條是新的、預覽是舊的」；
+4. `EditorInstance.updateComposingText()` 的 12 鍵 `INLINE_PREVIEW` 分支改為讀
+   `textInputManager.currentPreviewText()`（快照沒到時先給空字串），其餘方案仍用引擎 preview；
+5. 引擎側下標只有一個語義：`CandidateItem.index` 是 librime 全局下標，App 排序只改變列表
+   順序、不改 index；點擊時 `currentSnapshot.barItems[id].index` 直接回傳引擎，
+   不存在「位置下標」與「引擎下標」兩套並存。
+
+真機驗證（嵌入式編輯模式=首選）：
+- 12 鍵打 `nz`+`ng`（碼 `y 1`）：輸入框預覽與候選條第一條同為「让我」，其後 `而我 尔雅 肉眼 二外`；
+- 空格上屏「让我」後預覽清空，未殘留舊字。
