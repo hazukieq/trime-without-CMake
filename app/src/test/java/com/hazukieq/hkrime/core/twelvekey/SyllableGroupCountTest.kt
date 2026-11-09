@@ -213,15 +213,16 @@ class SyllableGroupCountTest {
     fun `segment syllable limit is 16 or 24 for rich codes`() {
         load()
         // 用戶 2026-11-10：有段組時，一個編碼給出的音節上限 16；音節構成很豐富的（可用 > 16）給 24。
-        val builderSource = File("src/main/java/com/hazukieq/hkrime/core/twelvekey/TwelveKeySnapshotBuilder.kt")
+        // 2026-11-10 起這些配額集中在 TwelveKeyTuning（用戶要求常數好找好改）
+        val tuningSource = File("src/main/java/com/hazukieq/hkrime/core/twelvekey/TwelveKeyTuning.kt")
             .readText()
         assertTrue(
             "應有 SEGMENT_SYLLABLE_LIMIT = 16",
-            builderSource.contains("SEGMENT_SYLLABLE_LIMIT = 16"),
+            tuningSource.contains("SEGMENT_SYLLABLE_LIMIT = 16"),
         )
         assertTrue(
             "應有 SEGMENT_SYLLABLE_LIMIT_RICH = 24",
-            builderSource.contains("SEGMENT_SYLLABLE_LIMIT_RICH = 24"),
+            tuningSource.contains("SEGMENT_SYLLABLE_LIMIT_RICH = 24"),
         )
 
         heads.forEach { head ->

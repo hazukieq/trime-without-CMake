@@ -2604,3 +2604,31 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
   原實現用 `syllableCode.length <= code.length` 把精確碼排除了。改成 `length < code.length` 後，
   「整碼即音節」的鍵（r、以及類似情況）也能把首字母納入聯想詞行。
 - 全量 **50 tests / 0 failures**。
+
+## 15.60 面板可调参数集中表（TwelveKeyTuning）
+
+用户 2026-11-10：「这些什么词组数、音节数呀等关键常量，要做好说明及便于修改，后期可能要频繁改动的」。
+
+所有**产品策略型**数量参数集中到
+`app/src/main/java/com/hazukieq/hkrime/core/twelvekey/TwelveKeyTuning.kt`，
+`TwelveKeySnapshotBuilder` / `TwelveKeyPreedit` 只保留别名（改值请改 Tuning，别在多处改）。
+
+| 常量 | 现值 | 含义 | 调大的后果 | 调小的后果 |
+| --- | --- | --- | --- | --- |
+| `MAX_CANDIDATES` | 600 | 一次向引擎要多少候选 | 更全、引擎枚举更慢 | 候选缺失 |
+| `BAR_ITEMS` | 12 | 固定候选条一页条数 | 条更挤 | 一页更少 |
+| `MAX_GROUPS` | 200 | 面板分组总数上限 | 更长列表 | 后面读音被截 |
+| `SEGMENT_SYLLABLE_LIMIT` | 16 | 普通键的单音节组上限 | 更全、要滑更多 | 滑得少、够不到 |
+| `SEGMENT_SYLLABLE_LIMIT_RICH` | 24 | 音节丰富键的上限 | 同上 | 同上 |
+| `RICH_SYLLABLE_THRESHOLD` | 16 | 判定「丰富」的可用音節數阈值 | 更多键算普通（只给 16） | 更多键给 24 |
+| `SECONDARY_SPLIT_DIVISOR` | 2 | 备选切法的配額分母 | 备选更少 | 备选更多 |
+| `ASSOC_WORDS` | 6 | 每个联想行的词数 | 行更长 | 行更短 |
+| `ASSOC_HEAD_SYLLABLES` | 4 | 最多给几个第一音節建联想 | 联想更全、每键更贵 | 更省 |
+| `ASSOC_INITIAL_ROWS` | 2 | 每个第一音節最多几行 | 行更多 | 行更少 |
+| `ASSOC_MAX_ROWS` | 4 | 每轮联想行总上限 | 面板更长 | 更克制 |
+| `ASSOC_INITIALS` | 2 | 展开几个第二段首字母找词 | 更全 | 更省 |
+| `ASSOC_READINGS` | 4 | 确切读音行上限 | 同上 | 同上 |
+| `MAX_FALLBACK_CODE` | 48 | 无候选时「本地原文」长度 | 更长 | 更短 |
+
+改参数后的验证顺序：`./gradlew :app:testDebugUnitTest`（55 tests：覆盖/排序/联想）
+→ 装机 → `python3 tools/perf-gate.py`（看 `op=assoc`、`build_full_p90` 是否超阈值）。

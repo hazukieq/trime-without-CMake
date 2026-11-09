@@ -1,0 +1,93 @@
+package com.hazukieq.hkrime.core.twelvekey
+
+/**
+ * 12 鍵面板/候選的**可調參數**集中地（用戶 2026-11-10 要求：這些常數後期會頻繁調整，
+ * 必須集中在一個地方、每個都寫清「含義 / 現在值 / 調大調小的後果」）。
+ *
+ * 規矩：
+ * 1. 只放「產品策略」型常數（數量、上限、配額），不要放算法內部的中間量；
+ * 2. 每個常數都要有中文註釋，說明它出現在哪一步、影響用戶看到什麼；
+ * 3. 改完先跑 `python3 tools/perf-gate.py`（有對應項就看對應 op），再裝機看面板；
+ * 4. 對應的資料級測試：`SyllableGroupCountTest`（音節覆蓋）、`AssociatedWordsTest`（聯想詞）、
+ *    `TwelveKeyCoverageTest`（逐鍵/鍵對）、`CandidateRankingTest`（分組排序）。
+ */
+object TwelveKeyTuning {
+
+    // ---------- 候選枚舉 ----------
+
+    /**
+     * 一次向 librime 要多少條候選（全局下標的來源）。
+     *
+     * 影響：候選條 + 展開面板看到/可選的總量；調大面板更全但枚舉更慢（引擎側成本）。
+     * 現在 600：實測覆蓋 12 鍵常用輸入的全部候選，且 `op=engine` 仍在 1ms 級。
+     */
+    const val MAX_CANDIDATES = 600
+
+    /** 固定候選條一頁顯示幾條（`barItems` 的截斷長度）。 */
+    const val BAR_ITEMS = 12
+
+    /** 面板分組總數上限（引擎按讀音分組可能上百個）。 */
+    const val MAX_GROUPS = 200
+
+    // ---------- 單音節組：每個碼位給幾個音節 ----------
+
+    /**
+     * 普通鍵的單音節組上限：一個碼位最多列 16 個「音節 → 單字」組。
+     *
+     * 調大：左列更長、更全，但要滑更多；調小：滑動少，但部分音節夠不到。
+     * 有段組時生效（面板展開才有分組）。
+     */
+    const val SEGMENT_SYLLABLE_LIMIT = 16
+
+    /**
+     * 「音節構成豐富」的鍵放開到多少個單音節組。
+     *
+     * 12 鍵裡大部分首碼能覆蓋 60~86 個音節（`y` 29、`3` 23），16 個明顯不夠滑，
+     * 故對可用音節數超過 [RICH_SYLLABLE_THRESHOLD] 的鍵放開到 24。
+     */
+    const val SEGMENT_SYLLABLE_LIMIT_RICH = 24
+
+    /**
+     * 「豐富」的判定閾值 = 該碼位可用音節數（精確碼 + 前綴命中）。
+     *
+     * 超過它就用 [SEGMENT_SYLLABLE_LIMIT_RICH]。現在等於 16：
+     * 即「基礎上限不夠用」就算豐富（避免 17~23 個的鍵被砍掉一截，例：`3` 有 23 個）。
+     */
+    const val RICH_SYLLABLE_THRESHOLD = SEGMENT_SYLLABLE_LIMIT
+
+    /**
+     * 同一個碼位的「備選切法」拿多少配額（按一半算）。
+     *
+     * 例如 `we` 既能整串讀 the、也能切成 w|e：第一種切法吃滿 16/24，
+     * 備選切法只拿一半，避免次要解讀把左列灌滿。
+     */
+    const val SECONDARY_SPLIT_DIVISOR = 2
+
+    // ---------- 聯想詞組 ----------
+
+    /** 每個聯想行最多幾個詞（行內按熱度取，再按詞面字典序顯示）。 */
+    const val ASSOC_WORDS = 6
+
+    /** 每次最多給幾個「第一音節」生成聯想行（取面板最高頻的前幾個音節）。 */
+    const val ASSOC_HEAD_SYLLABLES = 4
+
+    /** 每個第一音節最多幾行聯想（每個第二音節一行，行標題是兩個完整讀音）。 */
+    const val ASSOC_INITIAL_ROWS = 2
+
+    /** 每次整輪聯想行總數上限（跨所有第一音節、跨切法）。 */
+    const val ASSOC_MAX_ROWS = 4
+
+    /** 剩餘碼要展開幾個「第二段首字母」來找聯想（用於精確音節行的候選集）。 */
+    const val ASSOC_INITIALS = 2
+
+    /** `associatedByReading` 最多幾行（確切讀音行，與 [ASSOC_INITIAL_ROWS] 共用總上限）。 */
+    const val ASSOC_READINGS = 4
+
+    // ---------- 兜底 ----------
+
+    /** 無候選時「本地原文」最多顯示多少個碼位對應的字母。 */
+    const val MAX_FALLBACK_CODE = 48
+
+    /** 沒讀音 comment 的組顯示的佔位標題。 */
+    const val BLANK_READING = "…"
+}

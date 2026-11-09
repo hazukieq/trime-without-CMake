@@ -88,7 +88,9 @@ object TwelveKeyPreedit {
     private val generalScores = HashMap<Int, Int>()
 
     /** 面板左列「多個聲母一把抓」時，所有首字母合計最多列多少個音節（防左列過長）。 */
-    private const val MAX_SYLLABLES_TOTAL = 16
+    /** 單次 `syllablesForSegment` 的默認總上限（面板實際用 [com.hazukieq.hkrime.core.twelvekey.TwelveKeyTuning]）。 */
+    private const val MAX_SYLLABLES_TOTAL =
+        com.hazukieq.hkrime.core.twelvekey.TwelveKeyTuning.SEGMENT_SYLLABLE_LIMIT
 
     private var loaded = false
 

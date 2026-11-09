@@ -18,31 +18,26 @@ import timber.log.Timber
 object TwelveKeySnapshotBuilder {
 
     /** 單次最多枚舉的候選數（設計 §7.2）。 */
-    const val MAX_CANDIDATES = 600
+    /** 一次向 librime 要多少條候選（見 [TwelveKeyTuning.MAX_CANDIDATES]）。 */
+    const val MAX_CANDIDATES = TwelveKeyTuning.MAX_CANDIDATES
 
-    /** 左列最多展示的組數（設計 §7.2）。 */
-    /**
-     * 面板左列「每個音節」最多列幾個讀音：只列高頻
-     * （用戶 2026-11-10：不要把首字母的所有組合都羅列）。
-     */
-    /** 面板左列**每個首字母**最多列幾個音節組（總數上限見 TwelveKeyPreedit.MAX_SYLLABLES_TOTAL=16）。 */
-    private const val MAX_SYLLABLE_GROUPS = 8
+    /** 候選條一頁顯示幾條（見 [TwelveKeyTuning.BAR_ITEMS]）。 */
+    private const val BAR_ITEMS = TwelveKeyTuning.BAR_ITEMS
 
-    /** 有段組時，一個碼位給出的音節上限：普通鍵 16、音節構成豐富的鍵 24（用戶 2026-11-10）。 */
-    private const val SEGMENT_SYLLABLE_LIMIT = 16
-    private const val SEGMENT_SYLLABLE_LIMIT_RICH = 24
-    /** 可用音節超過基礎上限（16）就算「構成豐富」，放開到 24，避免 17~23 個的鍵被砍掉一截。 */
-    private const val RICH_SYLLABLE_THRESHOLD = SEGMENT_SYLLABLE_LIMIT
+    /** 面板分組總數上限（見 [TwelveKeyTuning.MAX_GROUPS]）。 */
+    private const val MAX_GROUPS = TwelveKeyTuning.MAX_GROUPS
 
-    private const val MAX_GROUPS = 200
+    // ---- 單音節組配額：全部集中在 [TwelveKeyTuning]，這裡只是別名（改值請改 Tuning）----
+    private const val MAX_SYLLABLE_GROUPS = TwelveKeyTuning.SEGMENT_SYLLABLE_LIMIT
+    private const val SEGMENT_SYLLABLE_LIMIT = TwelveKeyTuning.SEGMENT_SYLLABLE_LIMIT
+    private const val SEGMENT_SYLLABLE_LIMIT_RICH = TwelveKeyTuning.SEGMENT_SYLLABLE_LIMIT_RICH
+    private const val RICH_SYLLABLE_THRESHOLD = TwelveKeyTuning.RICH_SYLLABLE_THRESHOLD
 
-    /** 剩餘碼超過該長度時，fallback 只保留最後 48 個碼（設計 §8.4）。 */
-    private const val MAX_FALLBACK_CODE = 48
+    /** 無候選時「本地原文」最多顯示多少碼位字母（見 [TwelveKeyTuning.MAX_FALLBACK_CODE]）。 */
+    private const val MAX_FALLBACK_CODE = TwelveKeyTuning.MAX_FALLBACK_CODE
 
-    /** 候選條最多顯示的條目數（與選單順序一致；候選條可橫向滾動）。 */
-    private const val BAR_ITEMS = 12
-
-    private const val BLANK_READING = "…"
+    /** 沒讀音 comment 的組佔位標題（見 [TwelveKeyTuning.BLANK_READING]）。 */
+    private const val BLANK_READING = TwelveKeyTuning.BLANK_READING
 
     /** UI 線程同步算出的「本地部分」；segmentsKey 用於區分「input 不變但分段變了」。 */
     data class Local(
@@ -270,7 +265,11 @@ object TwelveKeySnapshotBuilder {
             } else {
                 SEGMENT_SYLLABLE_LIMIT
             }
-            val quota = if (splitIndex == 0) baseLimit else baseLimit / 2
+            val quota = if (splitIndex == 0) {
+                baseLimit
+            } else {
+                baseLimit / TwelveKeyTuning.SECONDARY_SPLIT_DIVISOR
+            }
             // 備選切法：head 本身是完整音節時只取精確碼（避免和前綴重複）；
             // head 只是裸碼（`w`）時必須允許前綴展開，否則 th* 全被吃掉。
             val exactOnly = splitIndex > 0 && TwelveKeyPreedit.isSingleSyllable(head)
@@ -368,20 +367,13 @@ object TwelveKeySnapshotBuilder {
     }
 
     /** 每位音節列幾個聯想詞（用戶：≤6）。 */
-    private const val ASSOC_WORDS = 6
-
-    /** 聯想詞行只對前幾個高頻音節建（避免左列被灌滿）。 */
-    private const val ASSOC_HEAD_SYLLABLES = 4
-    /** 首字母級（寬鬆）聯想行：每個音節最多 2 行，避免面板被灌滿。 */
-    private const val ASSOC_INITIAL_ROWS = 2
-    /** 每次最多給幾行聯想詞：多了面板被灌滿，也增加每鍵成本（用戶 2026-11-10）。 */
-    private const val ASSOC_MAX_ROWS = 4
-
-    /** 聯想詞行最多列幾個「下一個音節首字母」（`song g**` / `song h**`）。 */
-    private const val ASSOC_INITIALS = 2
-
-    /** 每個第一段音節最多列幾個「第二段讀音」的聯想行。 */
-    private const val ASSOC_READINGS = 4
+    // ---- 聯想詞配額：集中在 [TwelveKeyTuning]（改值請改 Tuning）----
+    private const val ASSOC_WORDS = TwelveKeyTuning.ASSOC_WORDS
+    private const val ASSOC_HEAD_SYLLABLES = TwelveKeyTuning.ASSOC_HEAD_SYLLABLES
+    private const val ASSOC_INITIAL_ROWS = TwelveKeyTuning.ASSOC_INITIAL_ROWS
+    private const val ASSOC_MAX_ROWS = TwelveKeyTuning.ASSOC_MAX_ROWS
+    private const val ASSOC_INITIALS = TwelveKeyTuning.ASSOC_INITIALS
+    private const val ASSOC_READINGS = TwelveKeyTuning.ASSOC_READINGS
 
     /** 兼容舊調用：同步一次做完（UI 線程慎用）。 */
     fun build(): TwelveKeySnapshot = build(local())
