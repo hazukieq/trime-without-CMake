@@ -2184,3 +2184,47 @@ onPickPanelCandidate / onTwelveKeyCandidatePressed（段組分支）
 
 试点结束后设备已还原：`hakka_jiugong.schema.yaml` 去掉 `lua_filter`、`default.custom.yaml` 去掉试点方案、
 删除试点 schema/lua/日志，重新 deploy；候选条回到引擎原序。
+
+## 15.55 修復：展開面板最後一行被退格鍵遮住、且剛好占滿時無法滾動（2026-11-10）
+
+用戶反饋：右側候選**剛好占滿**面板時，最後一行看不清，而且滾不動（至少應該能滾上去、避開退格鍵並完整顯示）。
+
+### 原因
+
+退格鍵 `panel_backspace` 是 `candidate_panel_root` 裡浮在右下角的一個 TextView（60×48dp + 14dp 邊距），
+候選網格用 `paddingBottom = 64dp` 給它讓位。出現兩種壞情況：
+
+1. **內容剛好一次裝滿**（`totalHeight ≤ 網格高度`）：RecyclerView 沒有滾動餘量，
+   最後一行就停在「64dp 讓位區」上方邊緣，與 48dp 高、帶 elevation 的按鈕視覺上貼住/半遮；
+2. **內容溢出但只差一點**：首屏最後一行被裁一半，用戶要滾動才能看清，
+   而右下角那格仍被按鈕蓋住——「滾上去」也只能繞開一部分。
+
+即：讓位區是死的 padding，按鈕是浮層，兩者沒有結構關係，邊界一抖就互相打架。
+
+### 修法（結構性，不再靠 padding 讓位）
+
+`app/src/main/res/layout/main_input_layout.xml` 的面板改成「上：候選區（weight=1）；下：56dp 退格條」：
+
+```xml
+<LinearLayout orientation="vertical">          <!-- 面板豎排 -->
+  <LinearLayout orientation="horizontal" height="0dp" weight="1">
+    <RecyclerView id=candidate_group_list width=88dp/>   <!-- 左音符 rail -->
+    <RecyclerView id=candidate_panel weight="1" paddingBottom="6dp"/>  <!-- 右候選網格 -->
+  </LinearLayout>
+  <FrameLayout height="56dp">                  <!-- 退格條：候選區不再被遮 -->
+    <TextView id=panel_backspace width=60dp height=48dp gravity="center_vertical|end" marginEnd=14dp/>
+  </FrameLayout>
+</LinearLayout>
+```
+
+- 網格 `paddingBottom` 由 64dp 降到 6dp（不再為浮層讓位），寬度恢復 4 列（`paddingEnd=2dp`）；
+- 退格鍵不再浮在候選上：最後一行任何時候都不會被遮；內容溢出時正常滾動，滾到底最後一行完整可見；
+- 退格鍵仍只在面板內生效（`CandidatePanelController` 的 `backspaceView`/`onBackspace` 不變），
+  點擊後走 `onKey(KEYCODE_DEL)` 刪一個碼，面板保持展開。
+
+### 真機驗收
+
+- `二月二 年月日 女艺人`（rail `nzi` 一組 60+ 字）：首屏第 4 行被裁、但可上滑；
+  滑到底最後一行（疑/劓/圉/刈…）完整顯示，底部退格條獨立、無遮擋；
+- 點退格條 ⌫：碼串少一個、候選重算、面板保持展開（日誌/截圖一致）；
+- 4 列寬度恢復（不再因 paddingEnd 變大掉到 3 列）。

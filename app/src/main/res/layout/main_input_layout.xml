@@ -25,50 +25,63 @@
             android:background="#FFFFFFFF"
             android:visibility="gone">
 
+            <!-- 垂直排布：候选网格在上、退格键独占底部一条，避免浮在候选上遮住最后一行 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:orientation="horizontal">
+                android:orientation="vertical">
 
-                <!-- 左側：拼音音節組（自切音節，僅顯示/導航） -->
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/candidate_group_list"
-                    android:layout_width="88dp"
-                    android:layout_height="match_parent"
-                    android:background="#FFEDF0F2"
-                    android:paddingTop="6dp"
-                    android:paddingBottom="6dp"
-                    android:clipToPadding="false" />
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/candidate_panel"
-                    android:layout_width="0dp"
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
                     android:layout_weight="1"
-                    android:layout_height="match_parent"
-                    android:clipToPadding="false"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="2dp"
-                    android:paddingTop="6dp"
-                    android:paddingBottom="64dp" />
-            </LinearLayout>
+                    android:orientation="horizontal">
 
-            <!-- 面板右下角：退格鍵（面板展開時鍵盤被蓋住，刪除不必先收起面板） -->
-            <TextView
-                android:id="@+id/panel_backspace"
-                android:layout_width="60dp"
-                android:layout_height="48dp"
-                android:layout_gravity="bottom|end"
-                android:layout_marginEnd="14dp"
-                android:layout_marginBottom="14dp"
-                android:background="@drawable/panel_backspace_bg"
-                android:clickable="true"
-                android:contentDescription="退格"
-                android:elevation="6dp"
-                android:focusable="true"
-                android:gravity="center"
-                android:text="⌫"
-                android:textColor="#FF3C4043"
-                android:textSize="22sp" />
+                    <!-- 左側：拼音音節組（自切音節，僅顯示/導航） -->
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/candidate_group_list"
+                        android:layout_width="88dp"
+                        android:layout_height="match_parent"
+                        android:background="#FFEDF0F2"
+                        android:paddingTop="6dp"
+                        android:paddingBottom="6dp"
+                        android:clipToPadding="false" />
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/candidate_panel"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="match_parent"
+                        android:clipToPadding="false"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="2dp"
+                        android:paddingTop="6dp"
+                        android:paddingBottom="6dp" />
+                </LinearLayout>
+
+                <!-- 底部一條：放退格鍵，候選區不再被它遮住（用戶 2026-11-10） -->
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:background="#FFFFFFFF">
+
+                    <TextView
+                        android:id="@+id/panel_backspace"
+                        android:layout_width="60dp"
+                        android:layout_height="48dp"
+                        android:layout_gravity="center_vertical|end"
+                        android:layout_marginEnd="14dp"
+                        android:background="@drawable/panel_backspace_bg"
+                        android:clickable="true"
+                        android:contentDescription="退格"
+                        android:elevation="2dp"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:text="⌫"
+                        android:textColor="#FF3C4043"
+                        android:textSize="22sp" />
+                </FrameLayout>
+            </LinearLayout>
         </FrameLayout>
     </FrameLayout>
 
