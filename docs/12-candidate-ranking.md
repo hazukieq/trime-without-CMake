@@ -158,14 +158,14 @@ groups = segmentGroupsFor(remaining, anchor)   // 段组（本段可选的「字
 | 日志 | 位置 | 含义 |
 |---|---|---|
 | `twelvekey:build … ms=` | `TwelveKeySnapshotBuilder.build` | 一次快照构建耗时（含引擎枚举 + 分组 + 排序） |
-| `twelvekey:panel order=… scores=…` | `rankPanelItems` | 面板某个组的前 8 条：`字:综合分`，用于核对「分数非递增」 |
+| `twelvekey:panel order=… keys=…` | `rankPanelItems` | 面板某个组的前 8 条及**两个比较键**：`字:u用户分/g综合分`；核对时先看 `u` 降序、同 `u` 再看 `g` 降序（只看 `g` 会因为用户习惯插队而「看起来不降序」，属正常） |
 | `twelvekey:topup split head=… rest=…` | `segmentGroupsFor` | 首字母相拼时把码串切成 head/rest 的结果 |
 
 抓日志：
 
 ```bash
 adb pull /sdcard/hkrime/logs/hkrime-$(date +%Y%m%d).log /tmp/app.log
-# 面板排序核对：每行的分数必须是降序
+# 面板排序核对：每行先按 u（用户分）降序、同 u 再按 g（综合分）降序
 grep "twelvekey:panel order" /tmp/app.log | tail -20
 ```
 
@@ -222,7 +222,7 @@ export JAVA_HOME=$HOME/opt/jdk17/jdk-17.0.9
 |---|---|
 | 候选条里词组排序不对 | `candidateBarBinder.bind` 收到的 `snapshot.barEntries` 对不对 → `rankBar` 是否被绕过 |
 | 候选条出现生僻单字挤掉常用字 | 这不是候选条的责任（候选条不做单字频度排序），看引擎候选本身 / `SelectionMemory` 学习结果 |
-| 面板某组生僻字靠前 | `twelvekey:panel order` 日志里分数是否非递增；不够就查 `hakka_char_rank.txt` 是否被正确加载（启动日志 `charRank=8183`、`scores=9379`） |
+| 面板某组生僻字靠前 | `twelvekey:panel order` 日志里 `u`/`g` 是否按比较键降序（`u` 不同时不必看 `g`）；不够就查 `hakka_char_rank.txt` 是否被正确加载（启动日志 `charRank=8183`、`scores=9379`） |
 | 面板没有单字组、只有词组 | `twelvekey:topup split` 是否出现；`splitFirstSyllable` 对当前码串返回 null 的话就不会有段组 |
 | 面板左列读音顺序乱 | `groupCandidates` 的排序键（空读音是否排最后、音节数是否升序） |
 | 段组点击后没「按顺序推进」 | `pickSegmentedCandidate` 的 `restCode` 是否透传（`CandidatePanelAdapter.Item.restCode`） |

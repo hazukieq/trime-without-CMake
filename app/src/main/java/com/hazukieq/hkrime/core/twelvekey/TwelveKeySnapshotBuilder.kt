@@ -297,10 +297,14 @@ object TwelveKeySnapshotBuilder {
             generalScore = { TwelveKeyPreedit.generalScore(it) },
         )
         if (BuildConfig.DEBUG && sorted !== items) {
+            // 打印的就是比較鍵本體（用戶分/通用分），排查時「降序」要按這個順序看：
+            // 先看 u（用戶常用字），同 u 再看 g（權威+詞表綜合頻度）。
             Timber.d(
-                "twelvekey:panel order=%s scores=%s",
+                "twelvekey:panel order=%s keys=%s",
                 sorted.take(8).joinToString("") { it.text },
-                sorted.take(8).joinToString(",") { "${it.text}:${TwelveKeyPreedit.generalScore(it.text)}" },
+                sorted.take(8).joinToString(",") {
+                    "${it.text}:u${SegmentMemory.charScore(it.text)}/g${TwelveKeyPreedit.generalScore(it.text)}"
+                },
             )
         }
         return sorted
