@@ -292,11 +292,11 @@ object TwelveKeyPreedit {
             // 先按熱度取前 N 條，再按詞面字典序顯示
             rows.add(second to words.take(limitPerReading).sorted())
         }
-        // 行間：哪幾個讀音更常用由「行內候選詞總量」決定（保持 selection 語義），
-        // 選出來的行再按讀音字典序顯示（用戶 2026-11-10：行本身也要按首字母→次字母排）。
-        rows.sortByDescending { it.second.size }
-        rows.sortBy { it.first }
-        return if (rows.size > maxReadings) rows.subList(0, maxReadings) else rows
+        // selection：按「行內候選詞總量」熱度取前 maxReadings 行；
+        // display：選出來的行再按讀音字典序排（用戶 2026-11-10）。
+        // 注意順序：必須先截斷再排序，否則高熱度行會被字母序擠掉（`than` 就這麼丟過）。
+        val chosen = rows.sortedByDescending { it.second.size }.take(maxReadings)
+        return chosen.sortedBy { it.first }
     }
 
     /** 碼段的所有可能「下一個音節首字母」（去重、保持輪轉順序），用於決定列哪幾行聯想詞。 */

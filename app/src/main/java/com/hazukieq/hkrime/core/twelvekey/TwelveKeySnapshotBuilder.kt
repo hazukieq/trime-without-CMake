@@ -233,6 +233,10 @@ object TwelveKeySnapshotBuilder {
      * 每項帶 `segment = 0` 與 `restCode = 其餘碼`：點擊 = 上屏這個字 + 其餘碼餵回引擎，
      * 面板接著列下一段的單字（按順序推進）。
      */
+    /** 單測用：把「第一待選段 → 組」的結果暴露出來（只讀，不碰引擎）。 */
+    internal fun debugSegmentGroups(remaining: String, anchor: Char? = null): List<SyllableGroup> =
+        segmentGroupsFor(remaining, anchor)
+
     private fun segmentGroupsFor(remaining: String, anchor: Char?): List<SyllableGroup> {
         val codes = remaining.replace("'", "")
         if (codes.isEmpty()) return emptyList()

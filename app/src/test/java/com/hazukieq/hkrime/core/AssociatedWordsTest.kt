@@ -75,6 +75,49 @@ class AssociatedWordsTest {
     }
 
     @Test
+    fun mixedCodeMatrixKeepsAssociationRows() {
+        // 12 鍵覆蓋矩陣（用戶 2026-11-10：「你的測試用例還有問題，12鍵根本沒有覆蓋完全」）：
+        // 每個混合碼都要能出「第一段音節組 + 至少一行聯想詞」。
+        val cases = mapOf(
+            "5i34iwe" to "kiung ",     // kiung + th + d：th/def 合成 the
+            "744ii" to "song ",        // song + i：引擎會切成 son + gi
+            "5i34iw" to "kiung ",
+            "i44yi" to null,           // gong + h：只剩前綴，不能崩
+        )
+        for ((codes, prefix) in cases) {
+            val groups = com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder
+                .debugSegmentGroups(codes)
+            val readings = groups.map { it.reading }
+            println("PROBE $codes -> $readings")
+            assertTrue("[$codes] 應至少有單字組，實際 $readings", groups.any { it.segment == 0 })
+            if (prefix != null) {
+                assertTrue(
+                    "[$codes] 應有以「$prefix」開頭的聯想詞行，實際 $readings",
+                    readings.any { it.startsWith(prefix) && it != prefix.trim() },
+                )
+                val row = groups.first { it.reading.startsWith(prefix) && it.reading != prefix.trim() }
+                assertTrue("[$codes] 聯想詞行不能是空的", row.items.isNotEmpty())
+            }
+        }
+    }
+
+    @Test
+    fun kiungPlusTheStillEmitsAssociationRows() {
+        // 用戶 2026-11-10：「kiung th d —— th 和 def 合成 the，導致什麼聯想詞都沒有」。
+        // 剩餘碼 `we` 剛好是一個完整音節（洗=the），面板仍必須出「kiung than」這類聯想詞行。
+        val groups = com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder
+            .debugSegmentGroups("5i34iwe")
+        val readings = groups.map { it.reading }
+        println("PROBE groups=$readings")
+        assertTrue("應有 kiung than 行，實際 $readings", readings.any { it == "kiung than" })
+        val thanGroup = groups.first { it.reading == "kiung than" }
+        assertTrue(
+            "kiung than 行應含共產黨，實際 ${thanGroup.items.map { it.text }}",
+            thanGroup.items.any { it.text.contains("共产党") },
+        )
+    }
+
+    @Test
     fun kiungFollowedByThanListsCommunistParty() {
         // 用戶 2026-11-10：打 kiung + th 想選「共產黨」三個字，但面板既沒有 than 音節、
         // 也沒有 kiung than 這行聯想詞。這裡釘住：索引要收 3~4 字詞，並按 (第一音節, 第二音節) 命中。
@@ -83,6 +126,9 @@ class AssociatedWordsTest {
         assertTrue("應有 kiung than 行，實際 ${rows.map { it.first }}", thanRow != null)
         val words = thanRow!!.second
         assertTrue("kiung than 應含共產黨，實際 $words", words.any { it.contains("共产党") || it.contains("共產黨") })
+        // 行截斷必須按熱度、不能按字母序：僅取 2 行時也要保留 than（3 字詞都在這裡）
+        val top2 = preedit.associatedByReading("kiung", setOf('t'), 6, 2)
+        assertTrue("取 2 行時應保留 than，實際 ${top2.map { it.first }}", top2.any { it.first == "than" })
     }
 
     @Test

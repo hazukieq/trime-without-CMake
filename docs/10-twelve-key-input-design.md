@@ -2508,3 +2508,24 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
   `orderGroupsSortsAlphabetically`；`SyllableBucketTest.limitIsPerInitialBucket` 追加「列表整體字典序」斷言。
 - 真機（`5i34i w`）：左列 `kiung` → `kiung tu` / `kiung tung`（聯想詞）→ `ka gu` / `kai gu` / `kai gun`（引擎詞組），
   三檔涇渭分明，各檔內字母序。
+
+### 15.59.2 聯想詞行的 selection/display 與 12 鍵混合碼覆蓋（2026-11-10）
+
+用戶追問：`kiung th d`（`5i34iwe`）時 th 與 def 合成完整音節 `the`，聯想詞全沒了；`song i`（`744ii`）同樣。
+並指出「12 鍵根本沒有覆蓋完全」。
+
+排查結論與修正：
+
+1. **行截斷順序錯了**：`associatedByReading` 原本先按熱度排序、再按讀音字典序排、最後 `subList(0, maxReadings)`
+   → 截斷落在字母序上，高熱度行（如 `than`，三個字都在這行）會被字母靠前的低熱度行擠掉。
+   修法：先按熱度 `take(maxReadings)`，再對選中的行按讀音字典序排；
+   詞列表同理（`take(limitPerReading)` 後再 `.sorted()`）。
+2. **`kiung + the` 這種「剩餘碼剛好是一整個音節」的情況本來就會出聯想詞**：
+   `segmentGroupsFor` 只按 `remaining` 的碼位拆段，不依賴引擎怎麼切；`we` 會算出首字母 `t`，
+   於是 `kiung than / kiung thu / kiung tu / kiung tung` 都在。之前看不到是上面的截斷 bug + 快照緩存疊加。
+3. **補 12 鍵混合碼矩陣測試**（`AssociatedWordsTest.mixedCodeMatrixKeepsAssociationRows`）：
+   - `5i34iwe`（kiung + th + d）→ `kiung` + `kiung than/thu/tu/tung`
+   - `744ii`（song + i，引擎切 son+gi）→ `pong/song` + `song gon/gong/gui/hok`、`pong gi/gon/hang/he`
+   - `5i34iw`、`i44yi`（gong + h）同樣斷言「有單字組 + 有聯想詞行」
+   - 另有 `TwelveKeySnapshotBuilder.debugSegmentGroups()` 測試鉤子（只讀），把「組生成」這段真正納入單測。
+4. 目前全量 **47 tests / 0 failures**；真機 `lastUpdateTime=2026-11-10 04:57:59`。
