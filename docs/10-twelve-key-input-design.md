@@ -2529,3 +2529,21 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
    - `5i34iw`、`i44yi`（gong + h）同樣斷言「有單字組 + 有聯想詞行」
    - 另有 `TwelveKeySnapshotBuilder.debugSegmentGroups()` 測試鉤子（只讀），把「組生成」這段真正納入單測。
 4. 目前全量 **47 tests / 0 failures**；真機 `lastUpdateTime=2026-11-10 04:57:59`。
+
+### 15.59.3 12 鍵全鍵位測試 + `initialsForPrefix` 精確碼漏洞（2026-11-10）
+
+用戶：「你確定測試完整 12 鍵了？比如 ng、nz 呢？」
+
+- 新增 `app/src/test/java/com/hazukieq/hkrime/core/TwelveKeyCoverageTest.kt`（5 個用例）：
+  1. `allTwelveKeysProduceSyllables`：12 個鍵帽（nz/qt/abc/def/ng/ghi/kl/mno/th/ps/vur/zj → y/9/a/e/1/i/5/4/w/7/3/8）
+     逐一斷言「有音節」且每個音節 `codeOf()` 以該碼位開頭；
+  2. `multiLetterKeysCoverEveryAvailableInitial`：多字母鍵（a/e/i/5/4/7/3/8/9）要覆蓋詞典裡**實際存在的每一個首字母**，
+     期望值從 `hakka.dict.yaml` 現算（不再硬編碼，避免字典缺某首字母時誤報）；
+  3. `singleLetterKeysAreListed`：nz/ng/th 這類沒法前綴展開的鍵也必須出音節；
+  4. `everyKeyPairBuildsSingleGroups`：**12×12 = 144 種鍵對**全跑 `debugSegmentGroups`，
+     斷言「有分組、每組有字、至少有單字組」；
+  5. `twoLetterKeyCombinationsKeepItems`：多字母鍵兩兩相連（最容易「整串一個音節」的邊界）也不能出空組。
+- 這輪跑出一個真 bug：`initialsForPrefix("3")` 只回 `v`、漏了 `r` —— 因為 `r` 的碼位**恰好就是整碼 `3`**，
+  原實現用 `syllableCode.length <= code.length` 把精確碼排除了。改成 `length < code.length` 後，
+  「整碼即音節」的鍵（r、以及類似情況）也能把首字母納入聯想詞行。
+- 全量 **50 tests / 0 failures**。

@@ -306,7 +306,9 @@ object TwelveKeyPreedit {
         // syllablesForSegment 前 N 條裡找——那種取法可能前 8 條全是同一首字母。
         val weightByInitial = LinkedHashMap<Char, Int>()
         codeToSyllables.forEach { (syllableCode, list) ->
-            if (syllableCode.length <= code.length || !syllableCode.startsWith(code)) return@forEach
+            // 注意：`==` 也要收——像 `r` 這種「整碼就是一個音節」的鍵，
+            // 它的首字母只會出現在精確碼裡，漏掉就會讓聯想詞只剩另一邊（用戶 2026-11-10 的 v/r 就是這個坑）。
+            if (syllableCode.length < code.length || !syllableCode.startsWith(code)) return@forEach
             list.forEach { entry ->
                 val initial = entry.syllable.firstOrNull() ?: return@forEach
                 weightByInitial[initial] = (weightByInitial[initial] ?: 0) + entry.freq
@@ -334,8 +336,8 @@ object TwelveKeyPreedit {
         Timber.i("TwelveKeyPreedit: syllables=%d codes=%d scores=%d", counts.size, table.size, generalScores.size)
     }
 
-    /** 拼音 → 12 鍵碼（對應 alphabet 的 abbrev/xform/xlit）。 */
-    private fun codeOf(syllable: String): String {
+    /** 拼音 → 12 鍵碼（對應 alphabet 的 abbrev/xform/xlit）。internal 供單測做鍵位覆蓋校驗。 */
+    internal fun codeOf(syllable: String): String {
         var s = syllable
         s = when {
             s.startsWith("nz") -> "y" + s.substring(2)

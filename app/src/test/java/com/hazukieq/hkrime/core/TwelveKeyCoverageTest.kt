@@ -1,0 +1,132 @@
+package com.hazukieq.hkrime.core
+
+import com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.BeforeClass
+import org.junit.Test
+import java.io.File
+
+/**
+ * 12 鍵**全鍵位**覆蓋（用戶 2026-11-10：「你確定測試完整 12 鍵了？比如 ng、nz 呢」）。
+ *
+ * 之前只挑 i/5/4/w 幾個鍵測，這次把 12 個鍵帽全部列出來，
+ * 再按「鍵 × 鍵」的二元組跑組裝，保證每一種混合碼都能出單字組。
+ */
+class TwelveKeyCoverageTest {
+
+    companion object {
+        private lateinit var preedit: TwelveKeyPreedit
+
+        /** 鍵帽 → 該鍵送出的碼位（與 hakka_theme.trime.yaml 的 preset_keys 對應）。 */
+        val KEYS: List<Pair<String, Char>> = listOf(
+            "nz" to 'y', "qt" to '9', "abc" to 'a', "def" to 'e', "ng" to '1', "ghi" to 'i',
+            "kl" to '5', "mno" to '4', "th" to 'w', "ps" to '7', "vur" to '3', "zj" to '8',
+        )
+
+        /** 從詞典實際統計：每個碼位覆蓋的音節首字母（不硬編碼，避免字典沒有該首字母時誤報）。 */
+        private var availableInitials: Map<Char, Set<Char>> = emptyMap()
+
+        @BeforeClass
+        @JvmStatic
+        fun load() {
+            preedit = TwelveKeyPreedit
+            val dict = File("src/main/assets/rime/hakka.dict.yaml").readLines()
+            val counts = HashMap<String, Int>()
+            dict.forEach { line ->
+                val parts = line.split('\t')
+                if (parts.size >= 2 && parts[1].isNotBlank()) {
+                    counts[parts[1]] = (counts[parts[1]] ?: 0) + 1
+                }
+            }
+            val lines = dict.asSequence().filter { it.contains('\t') }
+            preedit.loadDictLines(lines)
+            preedit.finishLoading(counts)
+            val byCode = HashMap<Char, MutableSet<Char>>()
+            counts.keys.forEach { syllable ->
+                val code = preedit.codeOf(syllable)
+                if (code.isEmpty()) return@forEach
+                byCode.getOrPut(code[0]) { HashSet() }.add(syllable.first())
+            }
+            availableInitials = byCode
+        }
+    }
+
+    @Test
+    fun allTwelveKeysProduceSyllables() {
+        for ((label, code) in KEYS) {
+            val got = preedit.syllablesForSegment(code.toString(), 16)
+            assertTrue("[$label/$code] 應有音節，實際 $got", got.isNotEmpty())
+            // 每個音節的碼必須以該鍵的碼位開頭（精確或前綴）
+            val bad = got.filterNot { preedit.codeOf(it).startsWith(code) }
+            assertTrue("[$label/$code] 音節碼與鍵位不符：$bad", bad.isEmpty())
+        }
+    }
+
+    @Test
+    fun multiLetterKeysCoverEveryAvailableInitial() {
+        val multiLetter = listOf('a', 'e', 'i', '5', '4', '7', '3', '8', '9')
+        for (code in multiLetter) {
+            val initials = availableInitials[code]?.toSet().orEmpty()
+            assertTrue("[$code] 詞典裡應有以該鍵開頭的整首字母", initials.isNotEmpty())
+            val got = preedit.syllablesForSegment(code.toString(), 16)
+            val gotInitials = got.map { it.first() }.toSet()
+            for (initial in initials) {
+                assertTrue(
+                    "[$code] 應覆蓋首字母 $initial，實際 $gotInitials（$got）",
+                    initial in gotInitials,
+                )
+            }
+            val viaPrefix = preedit.initialsForPrefix(code.toString(), 4).toSet()
+            assertTrue(
+                "[$code] initialsForPrefix 應含全部可用首字母 $initials，實際 $viaPrefix",
+                viaPrefix.containsAll(initials),
+            )
+        }
+    }
+
+    @Test
+    fun singleLetterKeysAreListed() {
+        // nz/ng/th 這類「一個鍵就是一個完整碼位組合」的鍵也要能出音節（不能因為沒有前綴展開而為空）
+        for (code in listOf('y', '1', 'w')) {
+            val got = preedit.syllablesForSegment(code.toString(), 8)
+            assertTrue("[$code] 單字母鍵也必須有音節，實際 $got", got.isNotEmpty())
+        }
+    }
+
+    @Test
+    fun everyKeyPairBuildsSingleGroups() {
+        // 12 × 12 = 144 種「鍵 + 鍵」：任一條混合碼都必須能生成單字組（面板才有東西可點）
+        var checked = 0
+        for ((labelA, codeA) in KEYS) {
+            for ((labelB, codeB) in KEYS) {
+                val codes = "$codeA$codeB"
+                val groups = TwelveKeySnapshotBuilder.debugSegmentGroups(codes)
+                assertTrue("[$labelA+$labelB=$codes] 應有分組", groups.isNotEmpty())
+                assertTrue(
+                    "[$labelA+$labelB=$codes] 每組都必須有候選字",
+                    groups.all { it.items.isNotEmpty() },
+                )
+                assertTrue(
+                    "[$labelA+$labelB=$codes] 至少要有一個單字組（segment=0）",
+                    groups.any { it.segment == 0 },
+                )
+                checked++
+            }
+        }
+        assertEquals(144, checked)
+    }
+
+    @Test
+    fun twoLetterKeyCombinationsKeepItems() {
+        // 兩個「多字母鍵」相連（如 abc+def、ghi+mno）最容易出「整串是一個音節」的邊界
+        val multiLetterCodes = setOf('a', 'e', 'i', '5', '4', '7', '3', '8', '9')
+        for ((la, a) in KEYS.filter { (_, c) -> c in multiLetterCodes }) {
+            for ((lb, b) in KEYS.filter { (_, c) -> c in multiLetterCodes }) {
+                val groups = TwelveKeySnapshotBuilder.debugSegmentGroups("$a$b")
+                assertTrue("[$la+$lb] 應有分組", groups.isNotEmpty())
+                assertTrue("[$la+$lb] 分組不能為空組", groups.all { it.items.isNotEmpty() })
+            }
+        }
+    }
+}
