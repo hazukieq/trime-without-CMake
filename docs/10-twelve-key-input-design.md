@@ -2560,24 +2560,28 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
   `1i`/`yi` 同理非空。
 - 加上既有的 12×12=144 組合矩陣，`ng`/`nz` 與其餘 10 鍵的兩兩組合都已覆蓋。
 
-### 15.59.2.3 聯想行放寬：第二段只按首字母匹配 + 行數上限（2026-11-10）
+### 15.59.2.3 聯想行：確切音節 + 與引擎合併 + 行數封頂（2026-11-10）
 
-用戶定案（m10992）：「C 保持現狀（不讀用戶詞庫），但繼續：第二段只按「首字母」匹配
-（th* + d/e/f 任意音節，可能較散，沒關係）；增補聯想組不要給太多（影響性能就截斷）」。
+用戶定案（m10992 起）：「C 保持現狀（不讀用戶詞庫）」；「第二段只按首字母匹配」的方案被否決——
+「`than d` 你怎麼整出這種呢？精確音節呀，不然 hashmap 用來做什麼」「可以和 engine 聯想詞合并嗎」。
 
-- `TwelveKeyPreedit` 新增 **首字母級二級索引** `assocByFirstInitial`（第一音節 → 第二音節首字母 → 詞列表，
-  組內按熱度降序），建索引時與既有的「確切第二音節」索引一起建；查詢只剩兩次 HashMap 查找。
-- 新 API `associatedByInitial(syllable, initials, perRow = 6, maxRows = 2)`：行標題 `than d` 這種，
-  每行先按熱度取 6 條再按詞面字典序顯示；同音節最多 2 行。
-- `segmentGroupsFor` 每個第一段音節先出「首字母級」寬鬆行、再出「確切音節」行；
-  整輪聯想行總數上限 `ASSOC_MAX_ROWS = 4`（超出直接不再加），避免面板被灌滿、也壓住每鍵成本。
-- 真機前的單測證據（`we` = 選完「共」剩 th+d）：
-  單字組 `than the them then thep thet theu thi thu`（than 回來了）；
-  聯想行首批 `than d / than f / than dung / than fo`（正好 4 行封頂）。
-- 效能：`op=assoc 0.29ms`（新索引沒有讓查詢變慢）；`assoc_load` 因多建一層索引升到 1.2–1.6s
-  （後台線程），門禁閾值由 1.5s 調到 2.5s 並在 docs/13 註明原因。
-- 單測：`afterPickingFirstSegmentRemainingTwoCodesCoverBothReadings` 追加「必須有聯想行、每行 ≤6 條、
-  總行數 ≤4」；全量 **55 tests / 0 failures**。
+最終實現：
+
+- 索引仍是 **(第一音節, 第二音節) 精確哈希** `assocByFirst: Map<first, Map<second, List<word>>>`；
+  不再有「首字母級」二級索引/`than d` 這種通配行標題。
+- 新 API `associatedBySegmentCode(syllable, secondCode, perRow = 6, maxRows = 2)`：
+  把 `secondCode`（剩餘碼）用 `syllablesForSegment` 展開成**確切音節**（`e` → `dung/fu/fo/fung…`），
+  逐個查哈希，命中就出一行 `"第一音節 第二音節"`（`than dung`）；
+  行內按熱度取 6 條再按詞面字典序顯示；行間先按熱度選 `maxRows` 行，再按行標題字典序排。
+- **與引擎合併**：`CandidateRanking.mergeAssociationGroups(merged, assocGroups)` 對 `reading` 相同的組
+  做合併 —— 引擎候選在前、我們補的詞去重後追加；引擎沒有該讀音時才新建行（補集）。
+- 每次整輪聯想行上限 `ASSOC_MAX_ROWS = 4`，每音節 ≤2 行、每行 ≤6 詞，避免面板被灌滿、也壓每鍵成本。
+- 實測（`we` = 「共」選完後 th+d）：單字組 `than the them then thep thet theu thi thu`；
+  聯想行 `than dung / than fu / than fo / than fung`（全部是完整讀音）。
+- 效能：`op=assoc 0.29ms`；移除首字母級索引後 `assoc_load` 回落到 ~0.8–1.2s，門禁閾值仍保留 2.5s 餘量。
+- 單測：`associatedBySegmentCodeUsesExactSyllables`（第二段必須 ≥2 字母、每行 ≤6、行數 ≤2）、
+  `afterPickingFirstSegmentRemainingTwoCodesCoverBothReadings`（we 必須有聯想行、總數 ≤4）；
+  全量 **55 tests / 0 failures**。
 
 ### 15.59.3 12 鍵全鍵位測試 + `initialsForPrefix` 精確碼漏洞（2026-11-10）
 

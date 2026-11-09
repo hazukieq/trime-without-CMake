@@ -102,14 +102,16 @@ class AssociatedWordsTest {
     }
 
     @Test
-    fun probeInitialRows() {
-        for (syl in listOf("than", "the", "kiung", "song")) {
-            for (ini in listOf('d', 'f', 't', 'g', 'h')) {
-                val rows = preedit.associatedByInitial(syl, setOf(ini))
-                if (rows.isNotEmpty()) println("PROBE byInitial($syl,$ini) = ${rows.map { it.first to it.second.take(3) }}")
-            }
+    fun associatedBySegmentCodeUsesExactSyllables() {
+        // 用戶 2026-11-10：行標題必須是兩個完整讀音（`than dung`），不能是 `than d`。
+        val rows = preedit.associatedBySegmentCode("than", "e", perRow = 6, maxRows = 2)
+        assertTrue("應有行，實際 $rows", rows.isNotEmpty())
+        for ((reading, words) in rows) {
+            val second = reading.substringAfter(' ')
+            assertTrue("第二段必須是完整音節（不是單字母）：$reading", second.length >= 2)
+            assertTrue("詞數應 ≤6，實際 ${words.size}", words.size <= 6)
         }
-        assertTrue(true)
+        assertTrue("行數應 ≤2，實際 ${rows.size}", rows.size <= 2)
     }
 
     @Test

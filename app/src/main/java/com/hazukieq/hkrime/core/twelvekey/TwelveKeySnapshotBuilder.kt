@@ -297,8 +297,8 @@ object TwelveKeySnapshotBuilder {
                     if (assocAdded >= ASSOC_MAX_ROWS) break
                     // 寬鬆行（第二段只按首字母匹配）：先算，數量受 ASSOC_INITIAL_ROWS 限制，
                     // 用戶 2026-11-10「散一點沒關係，但增補聯想組不要給太多」。
-                    TwelveKeyPreedit.associatedByInitial(
-                        syllable, initials, ASSOC_WORDS, ASSOC_INITIAL_ROWS,
+                    TwelveKeyPreedit.associatedBySegmentCode(
+                        syllable, rest, ASSOC_WORDS, ASSOC_INITIAL_ROWS,
                     ).forEach { (reading, words) ->
                         if (words.isEmpty() || assocAdded >= ASSOC_MAX_ROWS) return@forEach
                         if (!seen.add("$reading|assoc")) return@forEach
