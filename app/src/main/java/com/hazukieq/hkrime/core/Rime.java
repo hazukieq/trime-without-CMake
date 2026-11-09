@@ -435,7 +435,9 @@ public class Rime {
       if (cs != null && cs.length > 0) {
         hint = cs[0].text;
       }
-      String decoded = TwelveKeyPreedit.INSTANCE.decode(composition.preedit, hint);
+      // 保留 librime preedit 裡「已選中的前綴」（如 `咧5e` 的 `咧`），只把尾部碼段轉拼音；
+      // 否則選完一段後前綴被整串替換掉，用戶看到「漢字消失了」。
+      String decoded = TwelveKeyPreedit.INSTANCE.rewrite(composition.preedit, hint);
       Timber.d("dbgpre: raw=[%s] hint=[%s] decoded=[%s]", composition.preedit, hint, decoded);
       if (decoded != null) {
         composition.preedit = decoded;
@@ -443,6 +445,21 @@ public class Rime {
       }
     }
     return composition;
+  }
+
+  /**
+   * 12 鍵：librime preedit 裡「已選中的前綴」（如 `咧le` 的 `咧`）。
+   *
+   * 12 鍵多音節輸入時，選中一段的字不會立刻 commit，而是留在 librime 的 context 裡，
+   * preedit 呈 `已選字 + 剩餘碼`。嵌入式預覽要把這段前綴也顯示出來，否則選中的字會「消失」。
+   */
+  public static String getCompositionPrefix() {
+    if (mContext == null || mContext.composition == null) return "";
+    String preedit = mContext.composition.preedit;
+    if (preedit == null || preedit.isEmpty()) return "";
+    int i = preedit.length();
+    while (i > 0 && preedit.charAt(i - 1) < 128) i--;
+    return preedit.substring(0, i);
   }
 
   public static String getCompositionText() {

@@ -1818,3 +1818,29 @@ private fun isChecked(index: Int): Boolean =
 真機驗證（嵌入式編輯模式=首選）：
 - 12 鍵打 `nz`+`ng`（碼 `y 1`）：輸入框預覽與候選條第一條同為「让我」，其後 `而我 尔雅 肉眼 二外`；
 - 空格上屏「让我」後預覽清空，未殘留舊字。
+
+## 15.45 修復：選中一段的漢字「消失」（preedit / 嵌入式預覽都不見）（2026-11-09）
+
+現象：12 鍵多音節輸入（如 `kl`+`def`+`kl`+`def` = `le le`），點候選條選中第一個字後，
+那個字在 preedit 和輸入框裡都不見了，要到全部段落選完才一次出現。
+
+根因：**字沒有丟，它一直在 librime 的 context 裡**（多音節輸入時選中的段是
+`Segment::kSelected`，只有 context 全部選完才產生 commit text；用戶詞不落盤、也沒 commit）。
+消失的是「顯示」：
+
+1. `TwelveKeyPreedit` 改寫 preedit 時，把 librime 給的 `咧5e` **整串**當碼去 `decode()`，
+   ASCII 過濾後只剩 `5e` → 前綴 `咧` 被丟掉；
+2. 嵌入式預覽（首選）只寫「候選條第一條」，也沒有帶上已選前綴。
+
+修法：
+
+- `core/TwelveKeyPreedit.kt` 新增 `rewrite(preedit, hint)`：只把**尾部連續 ASCII** 當作
+  未選碼段 → `前綴 + decode(碼段)`；尾端沒有碼段時返回 null（保持 librime 原樣，如選完後的 `咧`）。
+  `Rime.getComposition()` 改用它（保留 `decode()` 給其他場景）；
+- `Rime.getCompositionPrefix()`：取 preedit 的已選前綴（`咧le` → `咧`）；
+- `TwelveKeySnapshot` 增加 `inlineText` = `getCompositionPrefix() + previewText`，由 builder
+  在 `ENGINE_LOCK` 內一次算好；`applyInlinePreview()` / `currentPreviewText()` 改用 `inlineText`。
+
+真機驗證（`le le`）：
+- 選第一個「咧」後：鍵盤上 preedit 顯示 `咧le`（已選字 + 剩餘碼的拼音），輸入框（首選模式）
+  顯示 `咧` + 下一條候選（不再是只剩一條字、也不是空）；選完第二段後整串 commit。

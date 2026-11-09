@@ -171,6 +171,8 @@ object TwelveKeySnapshotBuilder {
         }
         // 預覽文字與候選條第 0 條同源：一次算好，隨快照發佈。
         val previewText = barEntries.firstOrNull { it.text.isNotEmpty() }?.text ?: ""
+        // 已選前綴（librime context 裡尚未 commit 的字）+ 第一條候選 = 嵌入式預覽全文
+        val inlineText = runCatching { Rime.getCompositionPrefix() }.getOrDefault("") + previewText
         val fallback = if (groups.isEmpty() && remaining.isNotEmpty()) {
             val raw = remaining.takeLast(MAX_FALLBACK_CODE)
             Fallback(rawCode = raw, letters = if (mapFallbackLetters) toLetters(raw) else raw)
@@ -189,6 +191,7 @@ object TwelveKeySnapshotBuilder {
             degradedToSinglePage = degraded,
             barEntries = barEntries,
             previewText = previewText,
+            inlineText = inlineText,
         )
     }
 

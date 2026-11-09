@@ -61,6 +61,13 @@ data class TwelveKeySnapshot(
      * 避免「候選欄是第一條、預覽是引擎第 0 條」這種兩套 index 的錯位。
      */
     val previewText: String = "",
+    /**
+     * 嵌入式預覽要寫進輸入框的完整文本 = 已選前綴 + [previewText]。
+     *
+     * 12 鍵多音節輸入時選中的字還沒 commit（留在 librime context 裡），預覽只寫第一條候選
+     * 會讓「已選的字」在輸入框裡消失；這裡把 librime preedit 的前綴一起帶上。
+     */
+    val inlineText: String = "",
 ) {
     val isEmpty: Boolean get() = input.isEmpty()
     val hasCandidates: Boolean get() = groups.isNotEmpty()

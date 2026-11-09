@@ -262,7 +262,7 @@ class TextInputManager private constructor() :
      */
     fun currentPreviewText(): String? {
         if (!isTwelveKeyMode() || !Rime.isComposing()) return null
-        return currentSnapshot.previewText.takeIf { it.isNotEmpty() }
+        return currentSnapshot.inlineText.takeIf { it.isNotEmpty() }
     }
 
     fun isCandidatePanelShown(): Boolean =
@@ -356,7 +356,7 @@ class TextInputManager private constructor() :
         if (!isTwelveKeyMode()) return
         if (prefs.keyboard.inlinePreedit != InlineModeType.INLINE_PREVIEW) return
         val ic = activeEditorInstance.inputConnection ?: return
-        val text = if (snapshot.isEmpty || !Rime.isComposing()) "" else snapshot.previewText
+        val text = if (snapshot.isEmpty || !Rime.isComposing()) "" else snapshot.inlineText
         runCatching { ic.setComposingText(text, 1) }
             .onFailure { Timber.e(it, "twelvekey: inline preview failed") }
     }

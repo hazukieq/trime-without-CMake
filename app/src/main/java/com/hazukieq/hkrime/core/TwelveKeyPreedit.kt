@@ -167,6 +167,25 @@ object TwelveKeyPreedit {
         return aligned.joinToString(" ")
     }
 
+    /**
+     * 改寫 librime 給的 preedit：**保留已選中的前綴**，只把尾部「未選中的鍵碼」換成拼音。
+     *
+     * librime 的 preedit 形如 `咧5e`（咧 = 已選字，5e = 剩餘碼）；之前把整串都當碼去 decode，
+     * 前綴被丟掉 → 用戶選完第一個字後「字消失了」。這裡只切尾部連續 ASCII 當碼段。
+     *
+     * @return 改寫後文本；若沒有可改寫的碼段（例如已全部選完 `咧`）回傳 null，保持 librime 原樣
+     */
+    fun rewrite(preedit: String?, hint: String? = null): String? {
+        if (preedit.isNullOrEmpty() || table.isEmpty()) return null
+        var split = preedit.length
+        while (split > 0 && preedit[split - 1].code < 128) split--
+        if (split == preedit.length) return null          // 尾端沒有碼段：已選完
+        val prefix = preedit.substring(0, split)
+        val codes = preedit.substring(split)
+        val decoded = decode(codes, hint) ?: return null
+        return prefix + decoded
+    }
+
     private val MULTI_DELIMITER = Regex("[\u0027\\s]+")
 
     /** 單段碼串 → 音節列表；切不出完整音節回傳 null。 */
