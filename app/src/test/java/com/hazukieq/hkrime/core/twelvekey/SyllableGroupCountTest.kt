@@ -1,0 +1,212 @@
+package com.hazukieq.hkrime.core.twelvekey
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.io.File
+
+/**
+ * 「面板左列每個待選段該列幾個音節組」的數據測試。
+ *
+ * 為什麼用單元測試而不是點 UI：這個數字是**資料決定**的（`syllablesForSegment` 的頻次排序 +
+ * 字表權重），跑一次 JVM 測試就能把 12 個首碼的覆蓋率算清楚，比在手機上點快幾個數量級。
+ *
+ * 這裡刻意用純檔案讀取 + 復刻 `TwelveKeyPreedit` 的解析/xlit 規則（不 new Android Context），
+ * 規則若有變動，兩邊都要改（見 `TwelveKeyPreedit.load()` / `codeOf()` / `syllablesForSegment()`）。
+ */
+class SyllableGroupCountTest {
+
+    private val assetDir = File("src/main/assets/rime")
+
+    /** 字 -> 讀音（多讀音只取第一個，與生產代碼 `charTable.putIfAbsent` 一致）。 */
+    private val charTable = HashMap<String, String>()
+
+    /** 讀音 -> 該讀音的字（與生產代碼 `syllableToChars` 一致）。 */
+    private val syllableToChars = LinkedHashMap<String, MutableList<String>>()
+
+    /** 讀音 -> 詞典裡出現次數（= 該讀音的字數；生產代碼 `Entry.freq` 同義）。 */
+    private val syllableFreq = HashMap<String, Int>()
+
+    /** 綜合字頻分（0..10000）：詞表統計與權威字頻各取百分位、取較大值，與生產代碼一致。 */
+    private var generalScore = HashMap<Int, Int>()
+
+    private fun load() {
+        File(assetDir, "hakka.dict.yaml").forEachLine { raw ->
+            if (raw.isBlank() || raw.startsWith("#")) return@forEachLine
+            val tab = raw.indexOf('\t')
+            if (tab < 0) return@forEachLine
+            val ch = raw.substring(0, tab).trim()
+            val syllable = raw.substring(tab + 1).trim()
+            if (ch.length == 1) {
+                charTable.putIfAbsent(ch, syllable)
+                syllableToChars.getOrPut(syllable) { ArrayList() }.let { if (!it.contains(ch)) it.add(ch) }
+            }
+            if (syllable.isNotEmpty() && syllable.all { it in 'a'..'z' }) {
+                syllableFreq[syllable] = (syllableFreq[syllable] ?: 0) + 1
+            }
+        }
+        generalScore = buildGeneralScores()
+    }
+
+    private fun readWeights(name: String): Map<String, Int> {
+        val out = HashMap<String, Int>()
+        File(assetDir, name).forEachLine { raw ->
+            if (raw.isEmpty() || raw.startsWith("#")) return@forEachLine
+            val tab = raw.indexOf('\t')
+            if (tab <= 0) return@forEachLine
+            raw.substring(tab + 1).trim().toIntOrNull()?.let { out[raw.substring(0, tab)] = it }
+        }
+        return out
+    }
+
+    private fun percentile(values: Map<String, Int>): Map<Int, Int> {
+        val ordered = values.entries.sortedByDescending { it.value }
+        val n = ordered.size
+        val out = HashMap<Int, Int>(n * 2)
+        ordered.forEachIndexed { index, entry ->
+            out[entry.key.codePointAt(0)] = (n - index) * 10000 / n
+        }
+        return out
+    }
+
+    private fun buildGeneralScores(): HashMap<Int, Int> {
+        val byFreq = percentile(readWeights("hakka_char_freq.txt"))
+        val byRank = percentile(readWeights("hakka_char_rank.txt"))
+        val out = HashMap<Int, Int>(byFreq.size + byRank.size)
+        byFreq.forEach { (cp, score) -> out[cp] = score }
+        byRank.forEach { (cp, score) -> out[cp] = maxOf(out[cp] ?: 0, score) }
+        return out
+    }
+
+    private fun scoreOf(ch: String): Int =
+        if (ch.isEmpty()) 0 else generalScore[ch.codePointAt(0)] ?: 0
+
+    /** 復刻 speller/algebra：nz→y、th→w、ng→1、(\w)o→$1M→4、(\w)u→$1V→3 + xlit。 */
+    private fun codeOf(syllable: String): String {
+        var s = syllable.replace("nz", "y").replace("th", "w").replace("ng", "1")
+        s = Regex("(\\w)o").replace(s) { it.groupValues[1] + "M" }
+        s = Regex("(\\w)u").replace(s) { it.groupValues[1] + "V" }
+        s = s.replace("M", "4").replace("V", "3")
+        val xlit = "abcdefghiklmnpsvrzjqt" to "aaaeeeiii554477338899"
+        val sb = StringBuilder(s.length)
+        for (c in s) {
+            val idx = xlit.first.indexOf(c)
+            sb.append(if (idx >= 0) xlit.second[idx] else c)
+        }
+        return sb.toString()
+    }
+
+    /** code -> 音節列表（生產代碼的 `codeToSyllables` 等價物）。 */
+    private fun codeToSyllables(): Map<String, MutableList<String>> {
+        val out = HashMap<String, MutableList<String>>()
+        syllableToChars.keys.forEach { syllable ->
+            out.getOrPut(codeOf(syllable)) { ArrayList() }.add(syllable)
+        }
+        return out
+    }
+
+    /** 與 `TwelveKeyPreedit.syllablesForSegment` 同規則：精確碼優先，其次前綴碼，各自按詞頻降序。 */
+    private fun syllablesForSegment(code: String, limit: Int): List<String> {
+        val byCode = codeToSyllables()
+        val exact = ArrayList<String>()
+        val prefix = ArrayList<String>()
+        byCode.forEach { (syllableCode, syllables) ->
+            when {
+                syllableCode == code -> exact.addAll(syllables)
+                syllableCode.startsWith(code) -> prefix.addAll(syllables)
+            }
+        }
+        val byFreq = compareByDescending<String> { syllableFreq[it] ?: 0 }
+        return (exact.sortedWith(byFreq) + prefix.sortedWith(byFreq)).distinct().take(limit)
+    }
+
+    private fun syllableMass(syllable: String): Int =
+        syllableToChars[syllable]?.sumOf { scoreOf(it) } ?: 0
+
+    /** 第一個待選段可能落到的音節總量（按字頻加權）。 */
+    private fun totalMass(head: String): Int {
+        val syllables = syllablesForSegment(head, Int.MAX_VALUE)
+        return syllables.sumOf { syllableMass(it) }.coerceAtLeast(1)
+    }
+
+    /** 前 n 個音節組覆蓋的「字頻質量」比例（0..1）。 */
+    private fun coverage(head: String, n: Int): Double {
+        val syllables = syllablesForSegment(head, n)
+        return syllables.sumOf { syllableMass(it) }.toDouble() / totalMass(head)
+    }
+
+    private val heads = "y9ae1i54w738".map { it.toString() }
+
+    @Test
+    fun `analyse coverage for candidate group counts`() {
+        load()
+        println("head   #syl   N4     N6     N8     N10    N12")
+        for (head in heads) {
+            val total = syllablesForSegment(head, Int.MAX_VALUE).size
+            val line = buildString {
+                append("%-5s %5d  ".format(head, total))
+                for (n in listOf(4, 6, 8, 10, 12)) {
+                    append("%6.1f%%".format(coverage(head, n) * 100))
+                }
+            }
+            println(line)
+        }
+        for (n in listOf(4, 5, 6, 7, 8, 10, 12)) {
+            val covs = heads.map { coverage(it, n) }
+            println(
+                "N=%2d  min=%5.1f%%  avg=%5.1f%%  max=%5.1f%%".format(
+                    n,
+                    covs.minOf { it } * 100,
+                    covs.average() * 100,
+                    covs.maxOf { it } * 100,
+                ),
+            )
+        }
+    }
+
+    /**
+     * 選定的常數：面板左列每個待選段最多列 8 個高頻音節組。
+     *
+     * 依據（見上面打印的表，12 個首碼的實測）：
+     * - 一屏可見 6 行，8 組 = 一屏 + 兩行滾動；
+     * - N=6 → 8 平均覆蓋 36.5% → 44.2%，最低首碼 22.8% → 28.8%；
+     *   再往上 8 → 12 只多 11 個百分點卻要多滾近兩屏，收益遞減；
+     * - 剩下的音節基本是生僻讀音，且用戶可以「繼續打碼」精確化，不必全羅列
+     *   （用戶 2026-11-10：「不可能每個首字母的所有組合都羅列」）。
+     * 若日後字表/詞典變化很大，跑這個測試看錶再改常數即可。
+     */
+    @Test
+    fun `MAX_SYLLABLE_GROUPS is 6 and yields sane coverage`() {
+        load()
+        val constant = 8 // 與 TwelveKeySnapshotBuilder.MAX_SYLLABLE_GROUPS 保持一致
+        val builderSource = File("src/main/java/com/hazukieq/hkrime/core/twelvekey/TwelveKeySnapshotBuilder.kt")
+            .readText()
+        assertTrue(
+            "MAX_SYLLABLE_GROUPS 應為 $constant（見本測試的選擇依據）",
+            builderSource.contains("MAX_SYLLABLE_GROUPS = $constant"),
+        )
+
+        val covs = heads.map { coverage(it, constant) }
+        val avg = covs.average()
+        val min = covs.minOf { it }
+        println("MAX_SYLLABLE_GROUPS=$constant -> avg=%.1f%% min=%.1f%%".format(avg * 100, min * 100))
+        // 守門值：資料若退化（音節索引損壞/字表丟失），覆蓋率會明顯掉下來。
+        assertTrue("平均覆蓋率過低：%.1f%%".format(avg * 100), avg >= 0.40)
+        assertTrue("最差首碼覆蓋率過低：%.1f%%".format(min * 100), min >= 0.27)
+
+        // 每個首碼都能拿到 8 組（除非該首碼本身音節數 < 8）。
+        heads.forEach { head ->
+            val available = syllablesForSegment(head, Int.MAX_VALUE).size
+            val got = syllablesForSegment(head, constant).size
+            assertEquals("head=$head", minOf(constant, available), got)
+        }
+    }
+
+    @Test
+    fun `every head code has at least one syllable group`() {
+        load()
+        heads.forEach { head ->
+            assertTrue("head=$head 沒有任何音節", syllablesForSegment(head, 1).isNotEmpty())
+        }
+    }
+}

@@ -25,7 +25,7 @@ object TwelveKeySnapshotBuilder {
      * 面板左列「每個音節」最多列幾個讀音：只列高頻
      * （用戶 2026-11-10：不要把首字母的所有組合都羅列）。
      */
-    private const val MAX_SYLLABLE_GROUPS = 6
+    private const val MAX_SYLLABLE_GROUPS = 8
 
     private const val MAX_GROUPS = 200
 
