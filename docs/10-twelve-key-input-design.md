@@ -2228,3 +2228,25 @@ onPickPanelCandidate / onTwelveKeyCandidatePressed（段組分支）
   滑到底最後一行（疑/劓/圉/刈…）完整顯示，底部退格條獨立、無遮擋；
 - 點退格條 ⌫：碼串少一個、候選重算、面板保持展開（日誌/截圖一致）；
 - 4 列寬度恢復（不再因 paddingEnd 變大掉到 3 列）。
+
+### 15.55.1 微调：左列贯通到底、退格条只占右侧（同日追加）
+
+首次改成「上候選 + 下退格條」後，左側音節列只鋪到退格條上方，出現兩個視覺斷點：
+音節列的淺灰背景在退格條那一行突然中斷，退格條又是一整條白底橫貫左右。
+按用戶要求再調一次結構（`main_input_layout.xml`）：
+
+```xml
+<LinearLayout orientation="horizontal">        <!-- 面板橫排 -->
+  <RecyclerView id=candidate_group_list width=88dp height=match_parent/>  <!-- 左列貫通到底 -->
+  <LinearLayout orientation="vertical" weight=1>
+    <RecyclerView id=candidate_panel height=0dp weight=1/>
+    <FrameLayout height=56dp background=#FFFFFFFF>   <!-- 只佔右側，白底＝候選區底色 -->
+      <TextView id=panel_backspace .../>
+    </FrameLayout>
+  </LinearLayout>
+</LinearLayout>
+```
+
+- 左側音節列的淺灰底一路貫通到面板底部（含退格鍵那一行的垂直範圍），不再中斷；
+- 退格條只佔右側候選區寬度、底色與右側候選區一致（白），形成「一整塊候選區 + 右下角退格」；
+- 候選網格仍是 `weight=1` 可滾動，退格鍵行為不變。

@@ -25,45 +25,45 @@
             android:background="#FFFFFFFF"
             android:visibility="gone">
 
-            <!-- 垂直排布：候选网格在上、退格键独占底部一条，避免浮在候选上遮住最后一行 -->
+            <!-- 橫向排布：左側音節列整列貫通到底（含退格鍵那一行的高度）；
+                 右側 = 候選網格 + 底部退格條（退格條背景與候選區一致，左列不停斷）。 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:orientation="vertical">
+                android:orientation="horizontal">
+
+                <!-- 左側：拼音音節組（自切音節，僅顯示/導航），高度貫通到底 -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/candidate_group_list"
+                    android:layout_width="88dp"
+                    android:layout_height="match_parent"
+                    android:background="#FFEDF0F2"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="6dp"
+                    android:clipToPadding="false" />
 
                 <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
                     android:layout_weight="1"
-                    android:orientation="horizontal">
-
-                    <!-- 左側：拼音音節組（自切音節，僅顯示/導航） -->
-                    <androidx.recyclerview.widget.RecyclerView
-                        android:id="@+id/candidate_group_list"
-                        android:layout_width="88dp"
-                        android:layout_height="match_parent"
-                        android:background="#FFEDF0F2"
-                        android:paddingTop="6dp"
-                        android:paddingBottom="6dp"
-                        android:clipToPadding="false" />
+                    android:orientation="vertical">
 
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/candidate_panel"
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
                         android:layout_weight="1"
-                        android:layout_height="match_parent"
                         android:clipToPadding="false"
                         android:paddingStart="14dp"
                         android:paddingEnd="2dp"
                         android:paddingTop="6dp"
                         android:paddingBottom="6dp" />
-                </LinearLayout>
 
-                <!-- 底部一條：放退格鍵，候選區不再被它遮住（用戶 2026-11-10） -->
-                <FrameLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:background="#FFFFFFFF">
+                    <!-- 底部一條：放退格鍵，候選區不再被它遮住（用戶 2026-11-10） -->
+                    <FrameLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:background="#FFFFFFFF">
 
                     <TextView
                         android:id="@+id/panel_backspace"
@@ -80,7 +80,8 @@
                         android:text="⌫"
                         android:textColor="#FF3C4043"
                         android:textSize="22sp" />
-                </FrameLayout>
+                    </FrameLayout>
+                </LinearLayout>
             </LinearLayout>
         </FrameLayout>
     </FrameLayout>
