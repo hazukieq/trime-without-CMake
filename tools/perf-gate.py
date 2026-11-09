@@ -41,6 +41,8 @@ DEFAULT_THRESHOLDS = {
     "engine": 60.0,
     "build_p90": 40.0,
     "build_max": 120.0,
+    "build_full_p90": 90.0,
+    "build_full_max": 200.0,
     "latency_p90": 80.0,
     "latency_max": 300.0,
     "assoc_load": 1500.0,
@@ -54,7 +56,7 @@ READY_LINE = re.compile(
     r" charFreq=(?P<charfreq>\d+) charRank=(?P<charrank>\d+) assocReady=(?P<assoc>\w+)"
 )
 LATENCY_LINE = re.compile(r"twelvekey:latency (?P<ms>[0-9.]+)ms input=\[(?P<input>[^\]]*)\]")
-BUILD_LINE = re.compile(r"twelvekey:build .*?cached=(?P<cached>true|false) ms=(?P<ms>[0-9.]+)")
+BUILD_LINE = re.compile(r"twelvekey:build (?P<key>\S+) cached=(?P<cached>true|false) ms=(?P<ms>[0-9.]+)")
 ASSOC_LOAD = re.compile(r"assoc keys=(?P<keys>\d+).*?load=(?P<ms>\d+)ms")
 DONE_LINE = re.compile(r"perfgate: done total=(?P<ms>[0-9.]+)ms")
 
@@ -82,7 +84,8 @@ def fetch_log(serial: str | None) -> str:
 
 
 def parse(text: str) -> dict:
-    out: dict = {"ops": {}, "ready": None, "latencies": [], "builds": [], "assoc_load": None, "total": None}
+    out: dict = {"ops": {}, "ready": None, "latencies": [], "builds": [], "builds_full": [],
+                 "assoc_load": None, "total": None}
     lines = text.splitlines()
     # 只統計「本次進程啟動之後」的按鍵延遲：日誌是跨進程累積的，
     # 舊版本的慢樣本不該影響今天的判定。
@@ -109,11 +112,22 @@ def parse(text: str) -> dict:
         elif m := BUILD_LINE.search(line):
             # 只統計 cache miss 的真實構建耗時（cache hit 是 0ms，算進去會掩蓋問題）
             if m.group("cached") == "false":
-                out["builds"].append(float(m.group("ms")))
+                # 分兩類：bar = 每鍵都跑（熱路徑）；full = 開面板時一次性（可以寬一點）
+                if "|full" in m.group("key"):
+                    out["builds_full"].append(float(m.group("ms")))
+                else:
+                    out["builds"].append(float(m.group("ms")))
         elif m := ASSOC_LOAD.search(line):
             out["assoc_load"] = float(m.group("ms"))
         elif m := DONE_LINE.search(line):
             out["total"] = float(m.group("ms"))
+
+    builds_full = out["builds_full"][-200:]
+    if builds_full:
+        builds_full.sort()
+        out["build_full_p90"] = builds_full[min(len(builds_full) - 1, int(len(builds_full) * 0.9))]
+        out["build_full_max"] = builds_full[-1]
+        out["build_full_n"] = len(builds_full)
 
     builds = out["builds"][-200:]
     if builds:
@@ -146,6 +160,8 @@ def evaluate(data: dict, thresholds: dict) -> list[dict]:
         add(f"op={op}", data["ops"].get(op), thresholds.get(op, 0))
     add("build_p90", data.get("build_p90"), thresholds.get("build_p90", 0))
     add("build_max", data.get("build_max"), thresholds.get("build_max", 0))
+    add("build_full_p90", data.get("build_full_p90"), thresholds.get("build_full_p90", 0))
+    add("build_full_max", data.get("build_full_max"), thresholds.get("build_full_max", 0))
     add("latency_p90", data.get("latency_p90"), thresholds.get("latency_p90", 0))
     add("latency_max", data.get("latency_max"), thresholds.get("latency_max", 0))
     add("assoc_load", data.get("assoc_load"), thresholds.get("assoc_load", 0))
@@ -186,7 +202,9 @@ def print_report(data: dict, rows: list[dict], as_json: bool) -> int:
             "charRank={char_rank} assocReady={assoc_ready}".format(**ready)
         )
     if data.get("build_n"):
-        print(f"快照构建样本: {data['build_n']} 条（cache miss，最近 200 条）")
+        print(f"按键快照构建样本: {data['build_n']} 条（bar，cache miss，最近 200 条）")
+    if data.get("build_full_n"):
+        print(f"开面板构建样本: {data['build_full_n']} 条（full，cache miss，最近 200 条）")
     if data.get("latency_n"):
         print(f"按键延迟样本: {data['latency_n']} 条（最近 200 条）")
     else:
