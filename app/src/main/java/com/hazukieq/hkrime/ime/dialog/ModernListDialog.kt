@@ -46,7 +46,9 @@ class ModernListDialog private constructor(
 
     private val checkedFlags: BooleanArray? = initialChecked?.copyOf()
     private fun isChecked(index: Int): Boolean =
-        if (checkedFlags != null) checkedFlags[index] else index == checkedIndex
+        // 單選模式必須看 currentIndex：之前這裡用的是構造時的 checkedIndex，
+        // 於是點一行只改了 currentIndex、勾選記號卻永遠不動，看起來像「選不了」。
+        if (checkedFlags != null) checkedFlags[index] else index == currentIndex
 
     private var currentIndex = checkedIndex
     private val checks = ArrayList<View>()

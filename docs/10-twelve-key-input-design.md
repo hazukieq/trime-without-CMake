@@ -1728,3 +1728,25 @@ filter 是生效的（實測 12 鍵打 `a39` 也能出 `出 不 (＞﹏＜) 弗�
 - `TextInputManager.kt`：preedit override 設置/清理、空格與面板入口統一、取消/退格規則（約 100 行）
 - `TwelveKeyPreedit.kt`：恢復 `SegmentOverride`（已有現成實現，約 20 行）
 - 真機測試矩陣：單字逐段、整詞命中、空格、退格、ESC、面板選詞、非 12 鍵方案不受影響
+
+## 15.41 修復：設置裡的單選 picker「看起來選不了」（2026-11-09）
+
+現象：設置 → 偏好設置 / 鍵盤 / 其他 裡的 ListPreference（嵌入式編輯模式、橫屏全屏編輯、
+延遲時間等）點開對話框後，點任何一行，勾選記號都不動，看起來像個假對話框；按「確定」其實
+會生效（值已改），只是沒有任何視覺反饋，所以用戶以為不能選。
+
+根因：`ime/dialog/ModernListDialog.kt` 的 `isChecked()` 在單選模式下讀的是**構造時**傳進來的
+`checkedIndex`，而點行只更新可變的 `currentIndex` → `refreshChecks()` 拿舊值重繪，勾永遠不動。
+
+修法：
+
+```kotlin
+private fun isChecked(index: Int): Boolean =
+    // 單選模式必須看 currentIndex：之前這裡用的是構造時的 checkedIndex，
+    // 於是點一行只改了 currentIndex、勾選記號卻永遠不動，看起來像「選不了」。
+    if (checkedFlags != null) checkedFlags[index] else index == currentIndex
+```
+
+影響面：所有走 `ModernListDialog.singleChoice()` 的入口（ModernListPreference、音效包、
+主題、顏色、方案選擇）一併修好。真機驗證：偏好設置 → 橫屏時全屏編輯，點「總是」勾記號即時
+移動，確定後摘要變「總是」；再改回「自動」正常。
