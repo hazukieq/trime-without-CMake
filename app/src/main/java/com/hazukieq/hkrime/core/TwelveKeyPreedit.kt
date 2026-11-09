@@ -192,6 +192,28 @@ object TwelveKeyPreedit {
             .take(limit)
     }
 
+    /**
+     * 把碼串切成「第一個音節碼 + 其餘碼」，都必須能切出完整音節才返回（否則 null）。
+     *
+     * 用途：多音節輸入但引擎只給詞組候選時，展開面板要補一組「第一個音節的單字」；
+     * 點單字上屏後把 [second] 重新餵回引擎繼續輸入。
+     */
+    fun splitFirstSyllable(codes: String): Pair<String, String>? {
+        if (codes.length < 2) return null
+        val total = decode(codes)?.split(' ')?.size ?: return null
+        if (total < 2) return null
+        for (i in 1 until codes.length) {
+            val head = codes.substring(0, i)
+            val tail = codes.substring(i)
+            val headSyllables = decodeSingle(head) ?: continue
+            val tailSyllables = decode(tail)?.split(' ') ?: continue
+            if (headSyllables.size == 1 && headSyllables.size + tailSyllables.size == total) {
+                return head to tail
+            }
+        }
+        return null
+    }
+
     /** 音節 → 該讀音的字（字典順序；需要按常用度排時用 [rankChars]）。 */
     fun charsForSyllable(syllable: String, limit: Int = 60): List<String> =
         syllableToChars[syllable]?.take(limit) ?: emptyList()

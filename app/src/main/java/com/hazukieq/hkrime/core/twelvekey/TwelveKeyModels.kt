@@ -14,6 +14,8 @@ data class CandidateItem(
     val index: Int,
     /** >=0 表示「分詞後按段選字」的字典候選（index=-1，不來自引擎）；值為段序號。 */
     val segment: Int = -1,
+    /** 選中後要重新餵回引擎的剩餘碼（按段選字用；空表示沒有剩餘）。 */
+    val restCode: String = "",
 )
 
 /** 左列一個音節組：reading 是精確拼音（comment），items 是該讀音下的全部候選。 */

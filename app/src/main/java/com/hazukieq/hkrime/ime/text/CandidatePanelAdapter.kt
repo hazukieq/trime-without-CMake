@@ -40,6 +40,8 @@ class CandidatePanelAdapter(
         val index: Int,
         /** >=0 = 分詞段選字（字典候選，index=-1），值為段序號 */
         val segment: Int = -1,
+        /** 選中後要重新餵回引擎的剩餘碼（按段選字用；空表示沒有剩餘）。 */
+        val restCode: String = "",
     )
 
     private val density = context.resources.displayMetrics.density

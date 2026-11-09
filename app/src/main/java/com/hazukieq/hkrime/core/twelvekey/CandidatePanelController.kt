@@ -212,6 +212,7 @@ class CandidatePanelController(
                     comment = it.comment,
                     index = it.index,
                     segment = it.segment,
+                    restCode = it.restCode,
                 )
             },
         )

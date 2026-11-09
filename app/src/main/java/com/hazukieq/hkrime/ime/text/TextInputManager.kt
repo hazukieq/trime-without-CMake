@@ -367,8 +367,8 @@ class TextInputManager private constructor() :
             return
         }
         if (item.segment >= 0) {
-            // 分詞段的字典候選：上屏這一段的字，再把後面幾段的碼重新餵回引擎。
-            pickSegmentedCandidate(item.text)
+            // 字典候選（分詞段 / 多音節補的單字組）：上屏這一段的字，再把剩餘碼餵回引擎。
+            pickSegmentedCandidate(item.text, item.restCode)
             return
         }
         if (item.index < 0) {
@@ -383,14 +383,16 @@ class TextInputManager private constructor() :
      * 分詞（`'`）後的逐段選字：上屏這一段的字，然後把剩下的段重新餵回引擎，
      * 讓下一段繼續出候選。只處理第一個待選段（分詞是逐段進行的）。
      */
-    private fun pickSegmentedCandidate(text: String) {
+    private fun pickSegmentedCandidate(text: String, restCode: String = "") {
         val input = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
-        if (input.isEmpty()) return
-        val segments = input.split('\'').filter { it.isNotEmpty() }
-        // 只剩最後一段（重新餵回引擎後分隔符已消失）：直接上屏該字，不再回填。
-        // 大於等於兩段時才把剩下的段餵回去。
-        if (segments.isEmpty()) return
-        val rest = segments.drop(1)
+        // restCode 由快照算好（多音節但沒按分詞鍵的情況，碼串裡沒有 `'` 可以切）。
+        val rest: List<String> = if (restCode.isNotEmpty()) {
+            listOf(restCode)
+        } else {
+            val segments = input.split('\'').filter { it.isNotEmpty() }
+            if (segments.isEmpty()) return
+            segments.drop(1)
+        }
         runCatching {
             withEngineLock { Rime.clearComposition() }
             activeEditorInstance.commitText(text, false)
@@ -887,7 +889,7 @@ class TextInputManager private constructor() :
             // 分詞輸入時候選條列的是「這一段能選的字」（index = -1）：
             // 直接上屏、把剩餘段餵回引擎，不進引擎選詞（用戶 2026-11-09 指示）。
             if (item.segment >= 0) {
-                pickSegmentedCandidate(item.text)
+                pickSegmentedCandidate(item.text, item.restCode)
                 return
             }
             twelveKeyController?.selectCandidate(item.index)

@@ -1921,3 +1921,25 @@ librime 表排序退化成文件順序（≈ Unicode/部首順序），所以越
 - `Trime`：新增 `isInputViewReady()`；`onCreateInputView()` 末尾若
   `Rime.consumeKeyboardRebindPending()` 為真，`mainKeyboardView.post { getImeConfig().reset(); initKeyboard() }`
   —— 此時控件才建好，`reset()` 裡的 `schema_id = Rime.getSchemaId()` 才是有效值。
+
+## 15.48 面板「只有組詞、沒有單字」的兜底補組 (2026-11-10)
+
+用戶反饋：多音節輸入（不論有沒有按分詞鍵）時，展開面板左列全是組詞（2 音節以上的組），
+看不到「單音節 → 單字」的列表，於是沒法退化成逐字選。
+
+- 正常情況：引擎候選裡本來就有「第一音節單字」（comment 為單音節，如 `le`），
+  面板會把它們列成單音節組（`group()` 按 comment 分組，且單音節組排最前）。
+- 出問題的情況：引擎只返回詞組候選（沒有該音節的單字），面板就沒有單字組可選。
+
+兜底（`TwelveKeySnapshotBuilder.firstSyllableGroups`）：
+
+1. 只在「沒有分詞段組」且「引擎組裡沒有任何單音節組」時觸發；
+2. `TwelveKeyPreedit.splitFirstSyllable(codes)` 把碼串切成「第一音節碼 + 其餘碼」，
+   要求兩段都能切出完整音節（總音節數與整串解碼一致），單音節輸入不會誤切；
+3. 用 `syllablesForSegment(head)` 列出該碼對應的讀音組（如 `5` → `ke`/`le`/`ko`），
+   組內字按 `rankChars`（用戶關聯度 → 用戶常用字 → 通用字頻）排序；
+4. 每項帶 `restCode = 其餘碼`，點擊走 `pickSegmentedCandidate(text, restCode)`：
+   上屏該字 → 把剩餘碼餵回引擎 → 下一段繼續出候選（與分詞逐段選字完全一致）；
+5. 這些組 `segment = 0`，面板打開時默認選中（用戶要的就是「先看單字」）。
+
+同一套 `segment`/`restCode` 也補進了 `CandidatePanelAdapter.Item` 與候選條點擊路徑。

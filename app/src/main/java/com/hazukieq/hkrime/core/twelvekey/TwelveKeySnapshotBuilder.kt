@@ -139,9 +139,14 @@ object TwelveKeySnapshotBuilder {
         // 分詞段組放在最前面：它們才是「逐段選字」的操作入口，往後塞會被幾十個引擎組淹沒。
         val segmentGroups = dictGroupsFor(remaining, segmentAnchor, segmented)
         // 展開面板的「音節 → 漢字」列表也按常用度排：用戶常用字 → 通用字頻 → 引擎原順序。
-        val groups = segmentGroups + group(ranked).map { g ->
-            g.copy(items = rankPanelItems(g.items))
-        }
+        val engineGroups = group(ranked).map { g -> g.copy(items = rankPanelItems(g.items)) }
+        // 多音節輸入（含沒按分詞鍵的普通輸入）但引擎只給詞組候選時，面板會「全是組詞、
+        // 沒有單字」——這裡按字典補一組「第一個音節的單字」，點它上屏後把剩餘碼餵回引擎，
+        // 讓用戶隨時能退化成逐字選（用戶 2026-11-09 反饋）。
+        val singleCharTopUp = if (segmentGroups.isEmpty() &&
+            engineGroups.none { it.syllables.size == 1 }
+        ) firstSyllableGroups(remaining, segmentAnchor) else emptyList()
+        val groups = segmentGroups + singleCharTopUp + engineGroups
         // 候選條按「選單順序」取前 N 條：長輸入時 reading 各不相同，
         // 按第 0 組取會只剩 1 條（用戶 2026-11-08 反饋「打到這麼多就停止候選」）。
         // 分詞輸入（`5'e`）時，候選條直接列「這一段能選的字」：用戶點一個字就上屏，
@@ -242,6 +247,40 @@ object TwelveKeySnapshotBuilder {
                 compareByDescending { g ->
                     SegmentMemory.bigramScore(anchor, g.items.first().text)
                 },
+            )
+        }
+        return result.take(MAX_GROUPS)
+    }
+
+    /**
+     * 多音節輸入沒按分詞鍵、引擎又只給詞組候選時，補「第一個音節的單字」組。
+     *
+     * 與分詞段組不同：這裡的剩餘碼是從碼串裡切出來的（沒有 `'`），點字上屏後
+     * 直接把 [CandidateItem.restCode] 餵回引擎，效果和分詞逐段選字一致。
+     */
+    private fun firstSyllableGroups(remaining: String, anchor: Char?): List<SyllableGroup> {
+        if (remaining.isEmpty() || remaining.contains('\'')) return emptyList()
+        val split = TwelveKeyPreedit.splitFirstSyllable(remaining) ?: return emptyList()
+        val (head, rest) = split
+        val result = ArrayList<SyllableGroup>()
+        for (syllable in TwelveKeyPreedit.syllablesForSegment(head)) {
+            val chars = TwelveKeyPreedit.rankChars(TwelveKeyPreedit.charsForSyllable(syllable), anchor)
+            val items = chars.map { ch ->
+                CandidateItem(text = ch, comment = syllable, index = -1, segment = 0, restCode = rest)
+            }
+            if (items.isEmpty()) continue
+            result.add(
+                SyllableGroup(
+                    reading = syllable,
+                    syllables = listOf(syllable),
+                    items = items,
+                    segment = 0,
+                ),
+            )
+        }
+        if (anchor != null) {
+            result.sortWith(
+                compareByDescending { g -> SegmentMemory.bigramScore(anchor, g.items.first().text) },
             )
         }
         return result.take(MAX_GROUPS)
