@@ -52,6 +52,9 @@ object TwelveKeyPreedit {
      */
     private val generalScores = HashMap<Int, Int>()
 
+    /** 面板左列「多個聲母一把抓」時，所有首字母合計最多列多少個音節（防左列過長）。 */
+    private const val MAX_SYLLABLES_TOTAL = 16
+
     private var loaded = false
 
     fun init(context: Context) {
@@ -221,15 +224,27 @@ object TwelveKeyPreedit {
         buckets.values.forEach { it.sortByDescending { e -> e.freq } }
         val order = buckets.entries.sortedByDescending { (_, list) -> list.first().freq }
             .map { it.value }
+        // limit = **每個首字母**最多取幾個（用戶 2026-11-10：常數應對應「各取一份」而不是平分）；
+        // 總數另有上限 MAX_SYLLABLES_TOTAL，避免一個鍵覆蓋 3 個聲母時左列過長。
+        val distinctExact = exactSorted.map { it.syllable }.distinct()
+        val totalCap = maxOf(limit, minOf(limit * order.size, MAX_SYLLABLES_TOTAL))
         val diversified = ArrayList<Entry>()
         var round = 0
-        while (diversified.size < limit && order.any { round < it.size }) {
-            order.forEach { list -> if (round < list.size) diversified.add(list[round]) }
+        val perBucketSeen = IntArray(order.size)
+        while (diversified.size + distinctExact.size < totalCap && order.indices.any { i -> round < order[i].size && perBucketSeen[i] < limit }) {
+            order.forEachIndexed { i, list ->
+                if (round < list.size && perBucketSeen[i] < limit &&
+                    diversified.size + distinctExact.size < totalCap
+                ) {
+                    diversified.add(list[round])
+                    perBucketSeen[i]++
+                }
+            }
             round++
         }
-        return (exactSorted.map { it.syllable } + diversified.map { it.syllable })
+        return (distinctExact + diversified.map { it.syllable })
             .distinct()
-            .take(limit)
+            .take(maxOf(limit, totalCap))
     }
 
     /**

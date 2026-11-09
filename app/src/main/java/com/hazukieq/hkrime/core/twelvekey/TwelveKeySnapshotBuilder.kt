@@ -25,6 +25,7 @@ object TwelveKeySnapshotBuilder {
      * 面板左列「每個音節」最多列幾個讀音：只列高頻
      * （用戶 2026-11-10：不要把首字母的所有組合都羅列）。
      */
+    /** 面板左列**每個首字母**最多列幾個音節組（總數上限見 TwelveKeyPreedit.MAX_SYLLABLES_TOTAL=16）。 */
     private const val MAX_SYLLABLE_GROUPS = 8
 
     private const val MAX_GROUPS = 200
@@ -190,8 +191,8 @@ object TwelveKeySnapshotBuilder {
      * 不區分「有沒有按分詞鍵」：碼串先去掉 `'`，再按碼位切出第一段與其餘碼。
      * - 完整拼音（如 `5e5e`）：切成 `5e` + `5e`；
      * - 首字母相拼（如 `855`、`4i`）：切成第一個碼位 + 其餘碼，`syllablesForSegment` 會展開成
-     *   「以該字母開頭的音節」，只取高頻前 [MAX_SYLLABLE_GROUPS] 個（用戶 2026-11-10：
-     *   不可能把每個首字母的所有組合都羅列）。
+     *   「以該字母開頭的音節」：**每個首字母**各取高頻前 [MAX_SYLLABLE_GROUPS] 個
+     *   （合計受 `TwelveKeyPreedit.MAX_SYLLABLES_TOTAL`=16 限制；用戶 2026-11-10 定案）。
      *
      * 每項帶 `segment = 0` 與 `restCode = 其餘碼`：點擊 = 上屏這個字 + 其餘碼餵回引擎，
      * 面板接著列下一段的單字（按順序推進）。

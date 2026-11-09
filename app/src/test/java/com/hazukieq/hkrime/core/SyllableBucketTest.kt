@@ -72,14 +72,14 @@ class SyllableBucketTest {
     }
 
     @Test
-    fun limitIsSplitAcrossInitialBucketsByRoundRobin() {
-        // 8 個名額、2 個桶 → 每個桶 4 個（用戶指出的「各取一半」）
+    fun limitIsPerInitialBucket() {
+        // 2026-11-10 定案：limit 是「每個首字母」的名額（不是總數），總數另有上限 16。
+        // i 鍵有 g/h 兩桶、各 8 → 共 16；輪轉順序 g1 h1 g2 h2 …
         val got = TwelveKeyPreedit.syllablesForSegment("i", 8)
-        assertEquals("limit=8 應該只回 8 個音節", 8, got.size)
+        assertEquals("i 鍵 limit=8（每桶）應回 16 個音節", 16, got.size)
         val byInitial = got.groupingBy { initialOf(it) }.eachCount()
-        assertEquals("g 桶應拿到一半名額", 4, byInitial['g'])
-        assertEquals("h 桶應拿到一半名額", 4, byInitial['h'])
-        // 輪轉：g1 h1 g2 h2 …
+        assertEquals("g 桶應拿到 8 個", 8, byInitial['g'])
+        assertEquals("h 桶應拿到 8 個", 8, byInitial['h'])
         assertEquals('g', initialOf(got[0]))
         assertEquals('h', initialOf(got[1]))
     }
@@ -108,10 +108,10 @@ class SyllableBucketTest {
     }
 
     @Test
-    fun limitIsRespectedForSmallValues() {
-        // 名額小於桶數時也要剛好回 limit 個（輪轉每桶最多一個）
-        assertEquals(3, TwelveKeyPreedit.syllablesForSegment("i", 3).size)
-        assertEquals(1, TwelveKeyPreedit.syllablesForSegment("i", 1).size)
+    fun smallLimitGivesOneSlotPerInitial() {
+        // 每桶名額 1 → 兩桶各 1（共 2）；每桶 3 → 共 6
+        assertEquals(2, TwelveKeyPreedit.syllablesForSegment("i", 1).size)
+        assertEquals(6, TwelveKeyPreedit.syllablesForSegment("i", 3).size)
     }
 
     @Test
