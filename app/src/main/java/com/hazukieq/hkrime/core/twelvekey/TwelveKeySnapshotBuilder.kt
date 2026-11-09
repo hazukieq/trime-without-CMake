@@ -243,65 +243,79 @@ object TwelveKeySnapshotBuilder {
         // 一種碼串可能有多種合法切法（`744ii` = son+gi 或 song+g**），但面板只列**第一段**
         // 的「音節 → 單字」組，接著列「聯想詞組」行（`song g**` / `song h**`）——
         // 用戶 2026-11-10：「我要的是列出 song h**(<=6), song g**(<=6) 的联想词组，而不是 son·2」。
-        // 整串就是一個音節（例如選完前幾段後只剩 `we`）→ 不拆，直接按這個音節出組；
-        // 否則 splitHeads 會硬切出 `w` + `e`，`w` 不是音節 → 面板只剩「本地原文」一行。
-        val splits = if (TwelveKeyPreedit.isSingleSyllable(codes)) {
-            listOf(codes to "")
-        } else {
-            TwelveKeyPreedit.splitHeads(codes)
-        }
+        // 兩種解讀都要給（用戶 2026-11-10 定案：「剩下那兩個編碼不是兩個了嗎？每兩個處理完->遞歸」）：
+        //  1) 整串是一個音節（`we` = the）→ 先列這個音節的單字組；
+        //  2) 再把每個碼位當獨立段切開（`w` = th*、`e` = d/e/f*），給出「第一段的音節組 + 聯想詞行」，
+        //     點下去之後剩餘碼自動遞歸（pickSegmentedCandidate 會把 rest 餵回引擎）。
+        // 早期版本只做 (1)，於是 `we` 面板只剩 the 系列、聯想詞全無。
+        val single = if (TwelveKeyPreedit.isSingleSyllable(codes)) listOf(codes to "") else emptyList()
+        val splits = (single + TwelveKeyPreedit.splitHeads(codes)).distinctBy { it.first }
         if (splits.isEmpty()) return emptyList()
-        val (head, rest) = splits.first()
         val result = ArrayList<SyllableGroup>()
         val seen = HashSet<String>()
-        val syllables = TwelveKeyPreedit.syllablesForSegment(head, MAX_SYLLABLE_GROUPS)
-        for (syllable in syllables) {
-            if (!seen.add(syllable)) continue
-            val chars = TwelveKeyPreedit.rankChars(
-                TwelveKeyPreedit.charsForSyllable(syllable),
-                anchor,
-            )
-            val items = chars.map { ch ->
-                CandidateItem(text = ch, comment = syllable, index = -1, segment = 0, restCode = rest)
+        splits.forEachIndexed { splitIndex, split ->
+            val (head, rest) = split
+            // 第一種切法吃完整配額；備選切法減半（面板不能被次要切法灌滿）。
+            val quota = if (splitIndex == 0) MAX_SYLLABLE_GROUPS else MAX_SYLLABLE_GROUPS / 2
+            // 備選切法：head 本身是完整音節時只取精確碼（避免和前綴重複）；
+            // head 只是裸碼（`w`）時必須允許前綴展開，否則 th* 全被吃掉。
+            val exactOnly = splitIndex > 0 && TwelveKeyPreedit.isSingleSyllable(head)
+            val syllables = TwelveKeyPreedit.syllablesForSegment(head, quota, exactOnly)
+            for (syllable in syllables) {
+                // 同一個音節可能由多種切法得到（`the` 既可整段、也可 w|e）：
+                // 只留第一種切法那份，避免面板出現 `then` / `then·1` 這種重複行。
+                if (!seen.add(syllable)) continue
+                val chars = TwelveKeyPreedit.rankChars(
+                    TwelveKeyPreedit.charsForSyllable(syllable),
+                    anchor,
+                )
+                val items = chars.map { ch ->
+                    CandidateItem(
+                        text = ch,
+                        comment = syllable,
+                        index = -1,
+                        segment = 0,
+                        restCode = rest,
+                    )
+                }
+                if (items.isEmpty()) continue
+                result.add(
+                    SyllableGroup(
+                        reading = syllable,
+                        syllables = listOf(syllable),
+                        items = items,
+                        segment = 0,
+                    ),
+                )
             }
-            if (items.isEmpty()) continue
-            result.add(
-                SyllableGroup(
-                    reading = syllable,
-                    syllables = listOf(syllable),
-                    items = items,
-                    segment = 0,
-                ),
-            )
-        }
 
-        // ---- 聯想詞組（用戶 2026-11-10）----
-        // 行標題用**確切第二音節**（`song hau`、`song heu`…，與引擎組同一種寫法），
-        // 稍後再與引擎組按讀音合併：引擎有就併進去，沒有才新建（補集）。
-        val initials = TwelveKeyPreedit.initialsForPrefix(rest, ASSOC_INITIALS)
-        if (initials.isNotEmpty()) {
-            for (syllable in syllables.take(ASSOC_HEAD_SYLLABLES)) {
-                TwelveKeyPreedit.associatedByReading(syllable, initials, ASSOC_WORDS, ASSOC_READINGS)
-                    .forEach { (second, words) ->
-                        if (words.isEmpty()) return@forEach
-                        val reading = "$syllable $second"
-                        val items = words.map { word ->
-                            CandidateItem(
-                                text = word,
-                                comment = reading,
-                                index = -1,
-                                segment = 1, // 1 = 聯想詞：整詞上屏
+            // ---- 聯想詞組：按這一種切法的剩餘碼推第二段首字母 ----
+            val initials = TwelveKeyPreedit.initialsForPrefix(rest, ASSOC_INITIALS)
+            if (initials.isNotEmpty()) {
+                for (syllable in syllables.take(ASSOC_HEAD_SYLLABLES)) {
+                    TwelveKeyPreedit.associatedByReading(syllable, initials, ASSOC_WORDS, ASSOC_READINGS)
+                        .forEach { (second, words) ->
+                            if (words.isEmpty()) return@forEach
+                            val reading = "$syllable $second"
+                            if (!seen.add("$reading|assoc")) return@forEach
+                            val items = words.map { word ->
+                                CandidateItem(
+                                    text = word,
+                                    comment = reading,
+                                    index = -1,
+                                    segment = 1, // 1 = 聯想詞：整詞上屏
+                                )
+                            }
+                            result.add(
+                                SyllableGroup(
+                                    reading = reading,
+                                    syllables = listOf(syllable, second),
+                                    items = items,
+                                    segment = 1,
+                                ),
                             )
                         }
-                        result.add(
-                            SyllableGroup(
-                                reading = reading,
-                                syllables = listOf(syllable, second),
-                                items = items,
-                                segment = 1,
-                            ),
-                        )
-                    }
+                }
             }
         }
 

@@ -2530,6 +2530,25 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
    - 另有 `TwelveKeySnapshotBuilder.debugSegmentGroups()` 測試鉤子（只讀），把「組生成」這段真正納入單測。
 4. 目前全量 **47 tests / 0 failures**；真機 `lastUpdateTime=2026-11-10 04:57:59`。
 
+### 15.59.2.1 「剩下兩個編碼」按逐碼位拆段（2026-11-10）
+
+用戶：「kiung 被選中「共」時，剩下那兩個編碼不是兩個了嗎？每兩個處理完->遞歸，是最符合邏輯且最不消耗性能的」
+以及「we 明顯還有問題：只有 the* 開頭，常用高頻的明顯缺少」。
+
+- `segmentGroupsFor` 對剩餘碼同時給**兩種解讀**並合併：
+  1. 整串是一個音節（`we` = the）→ 該音節的單字組；
+  2. 逐碼位拆段（`w`|`e`）→ 第一段按 `w` 的前綴音節（th*）出組，`restCode = e`，
+     點下去後把剩餘碼遞歸餵回引擎（`pickSegmentedCandidate` 現成邏輯）。
+- 備選切法的 `exactOnly` 只在「head 本身是完整音節」時開啟；`w` 這種裸碼必須允許前綴展開，
+  否則 th* 全被吃掉（這是之前 `we` 只剩 the 系列的直接原因）。
+- 單字組去重按音節本身：`we` 的結果 = `than, the, them, then, thep, thet, theu, thi, thu`
+  —— 高頻 `than` 回來了，不再是清一色 the*。
+- 聯想詞：需要「第一段確切音節 × 第二段確切音節」在詞表裡有兩字詞；
+  `e` 鍵（d/e/f 開頭）與 th* 的組合在現有 8 個詞表裡沒有命中，所以這一路行為空
+  （不是被吞）。若要放寬成「首字母即可」或收 3 字詞，是另一個策略選擇。
+- 單測：`TwelveKeyCoverageTest.afterPickingFirstSegmentRemainingTwoCodesCoverBothReadings`
+  斷言 `we` 必須同時含 `the`（整段）與 `than`（拆段），且不能只有 the 系列。
+
 ### 15.59.3 12 鍵全鍵位測試 + `initialsForPrefix` 精確碼漏洞（2026-11-10）
 
 用戶：「你確定測試完整 12 鍵了？比如 ng、nz 呢？」

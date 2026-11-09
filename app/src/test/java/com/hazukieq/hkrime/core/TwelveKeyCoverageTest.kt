@@ -118,6 +118,22 @@ class TwelveKeyCoverageTest {
     }
 
     @Test
+    fun afterPickingFirstSegmentRemainingTwoCodesCoverBothReadings() {
+        // 用戶 2026-11-10：「kiung 被選中「共」時，剩下那兩個編碼不是兩個了嗎？
+        // 每兩個處理完->遞歸」。`we` 既是完整音節 the，也要按 w|e 拆出 th* 各音節，
+        // 否則面板只剩 the 系列、常用高頻（than 等）全丟。
+        val groups = TwelveKeySnapshotBuilder.debugSegmentGroups("we")
+        val readings = groups.map { it.reading }
+        println("PROBE we groups(single)=" + groups.filter { it.segment == 0 }.map { it.reading })
+        println("PROBE we groups(assoc)=" + groups.filter { it.segment == 1 }.map { it.reading })
+        assertTrue("應含完整音節 the：$readings", "the" in readings)
+        assertTrue("應含 than（w|e 拆法）：$readings", "than" in readings)
+        assertTrue("應含 thu/thi 等同族音節：$readings", readings.any { it == "thu" || it == "thi" })
+        // 反例：不能只出 the 系列
+        assertTrue("不能只有 the 系列：$readings", readings.any { it != "the" && !it.startsWith("the") })
+    }
+
+    @Test
     fun twoLetterKeyCombinationsKeepItems() {
         // 兩個「多字母鍵」相連（如 abc+def、ghi+mno）最容易出「整串是一個音節」的邊界
         val multiLetterCodes = setOf('a', 'e', 'i', '5', '4', '7', '3', '8', '9')
