@@ -137,7 +137,10 @@ object TwelveKeySnapshotBuilder {
         // 再把後面幾段的碼重新餵回引擎 —— 讓「分詞」真正能逐段聯想。
         // 分詞段組放在最前面：它們才是「逐段選字」的操作入口，往後塞會被幾十個引擎組淹沒。
         val segmentGroups = dictGroupsFor(remaining, segmentAnchor, segmented)
-        val groups = segmentGroups + group(ranked)
+        // 展開面板的「音節 → 漢字」列表也按常用度排：用戶常用字 → 通用字頻 → 引擎原順序。
+        val groups = segmentGroups + group(ranked).map { g ->
+            g.copy(items = rankPanelItems(g.items))
+        }
         // 候選條按「選單順序」取前 N 條：長輸入時 reading 各不相同，
         // 按第 0 組取會只剩 1 條（用戶 2026-11-08 反饋「打到這麼多就停止候選」）。
         // 分詞輸入（`5'e`）時，候選條直接列「這一段能選的字」：用戶點一個字就上屏，
@@ -221,7 +224,8 @@ object TwelveKeySnapshotBuilder {
         for (syllable in TwelveKeyPreedit.syllablesForSegment(first)) {
             // 固定候選區不用靜態詞表：先按用戶自己的組詞記憶（與上一字的關聯度），
             // 再按用戶常用字頻率排序（見 SegmentMemory）。
-            val chars = SegmentMemory.rank(
+            // 關聯度 → 用戶常用字 → 通用字頻（詞表統計）：冷啟動時也不會按字典順序把生僻字排前面
+            val chars = TwelveKeyPreedit.rankChars(
                 TwelveKeyPreedit.charsForSyllable(syllable),
                 anchor,
             )
@@ -315,6 +319,20 @@ object TwelveKeySnapshotBuilder {
         items.forEach { if (isCjkWord(it.text)) words.add(it) else rest.add(it) }
         if (words.isEmpty() || rest.isEmpty()) return items
         return words + rest
+    }
+
+    /**
+     * 展開面板「音節 → 漢字」列表排序：用戶常用字 → 通用字頻 → 引擎原順序（穩定）。
+     *
+     * 引擎候選順序對單字並不可靠（詞典無 weight 時基本是文件順序，喏/偌 這種生僻字會排前面）。
+     */
+    private fun rankPanelItems(items: List<CandidateItem>): List<CandidateItem> {
+        if (items.size < 2) return items
+        return items.sortedWith(
+            compareByDescending<CandidateItem> { SegmentMemory.charScore(it.text) }
+                .thenByDescending { TwelveKeyPreedit.charFrequency(it.text) }
+                .thenBy { it.index },
+        )
     }
 
     private fun isCjkWord(text: String): Boolean =

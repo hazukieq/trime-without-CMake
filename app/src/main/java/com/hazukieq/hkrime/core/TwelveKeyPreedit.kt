@@ -27,6 +27,14 @@ object TwelveKeyPreedit {
     /** 單字 → 音節（取字典裡第一次出現的讀音），用來在歧義時對齊第一個候選字。 */
     private val charTable = HashMap<String, String>()
 
+    /**
+     * 單字 → 通用頻度（由詞表統計生成，見 assets/rime/hakka_char_freq.txt）。
+     *
+     * 展開面板「音節 → 漢字」列表用來把常用字排前、生僻字排後；詞典本身沒有 weight，
+     * 只能靠詞表統計的出現次數當代理指標。
+     */
+    private val charFreq = HashMap<String, Int>()
+
     private var loaded = false
 
     fun init(context: Context) {
@@ -55,6 +63,22 @@ object TwelveKeyPreedit {
                 }
             }
         }
+        // 通用字頻（可選資源，缺失不影響主流程）
+        runCatching {
+            context.assets.open("rime/hakka_char_freq.txt").bufferedReader(Charsets.UTF_8)
+                .useLines { lines ->
+                    lines.forEach { raw ->
+                        if (raw.isEmpty() || raw.startsWith("#")) return@forEach
+                        val tab = raw.indexOf('\t')
+                        if (tab <= 0) return@forEach
+                        val ch = raw.substring(0, tab)
+                        val v = raw.substring(tab + 1).trim().toIntOrNull() ?: return@forEach
+                        if (ch.length == 1) charFreq[ch] = v
+                    }
+                }
+            Timber.i("TwelveKeyPreedit: charFreq=%d", charFreq.size)
+        }.onFailure { Timber.w(it, "TwelveKeyPreedit: load char freq failed") }
+
         counts.forEach { (syllable, freq) ->
             val code = codeOf(syllable)
             val old = table[code]
@@ -131,9 +155,26 @@ object TwelveKeyPreedit {
             .take(limit)
     }
 
-    /** 音節 → 該讀音的字（字典順序）。 */
+    /** 音節 → 該讀音的字（字典順序；需要按常用度排時用 [rankChars]）。 */
     fun charsForSyllable(syllable: String, limit: Int = 60): List<String> =
         syllableToChars[syllable]?.take(limit) ?: emptyList()
+
+    /** 單字的通用頻度（未收錄回 0）；多字詞取首字。 */
+    fun charFrequency(text: String): Int =
+        if (text.isEmpty()) 0 else charFreq[text.substring(0, 1)] ?: 0
+
+    /**
+     * 按「用戶關聯度 → 用戶常用字 → 通用字頻」排列同讀音的字，冷啟動時也有合理順序。
+     *
+     * @param anchor 剛上屏的前一個字（分詞逐段選字用，可為 null）
+     */
+    fun rankChars(chars: List<String>, anchor: Char?): List<String> =
+        if (chars.size < 2) chars else chars.sortedWith(
+            compareByDescending<String> {
+                com.hazukieq.hkrime.core.twelvekey.SegmentMemory.bigramScore(anchor, it)
+            }.thenByDescending { com.hazukieq.hkrime.core.twelvekey.SegmentMemory.charScore(it) }
+                .thenByDescending { charFrequency(it) },
+        )
 
     /**
      * 把碼串切成音節串；切不出來回傳 null（保持原 preedit）。

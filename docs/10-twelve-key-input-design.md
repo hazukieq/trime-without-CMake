@@ -1844,3 +1844,28 @@ private fun isChecked(index: Int): Boolean =
 真機驗證（`le le`）：
 - 選第一個「咧」後：鍵盤上 preedit 顯示 `咧le`（已選字 + 剩餘碼的拼音），輸入框（首選模式）
   顯示 `咧` + 下一條候選（不再是只剩一條字、也不是空）；選完第二段後整串 commit。
+
+## 15.46 展開面板「音節 → 漢字」按常用度排序（2026-11-09）
+
+現象：展開面板右側某個讀音下的字列表按字典文件順序排（喏/偌/姞 這類生僻字排前面）。
+
+根因：`hakka.dict.yaml` 是 `sort: by_weight` 但條目只有 `字<TAB>讀音`、沒有 weight，
+librime 表排序退化成文件順序（≈ Unicode/部首順序），所以越生僻越可能靠前。
+
+修法（數據驅動，不引入新依賴）：
+
+1. 新增生成腳本 `tools/gen-char-freq.py`：統計各詞表裡每字的出現次數
+   （`hakka_oftenwords` ×3、`hakka_mobilewords` ×2、其餘 ×1），輸出
+   `app/src/main/assets/rime/hakka_char_freq.txt`（7990 字，53KB），格式 `字<TAB>權重`；
+2. `core/TwelveKeyPreedit.kt`：`init()` 時加載該表（8k 行，主線程約幾 ms）；
+   新增 `charFrequency(text)` 與 `rankChars(chars, anchor)`；
+3. `core/twelvekey/TwelveKeySnapshotBuilder.kt`：
+   - 分詞段組（`dictGroupsFor`）的字排序改走 `TwelveKeyPreedit.rankChars`：
+     **用戶組詞關聯度 → 用戶常用字 → 通用字頻**；
+   - 引擎候選分組（`group(ranked)`）的每組字列表過一遍 `rankPanelItems`：
+     **用戶常用字 → 通用字頻 → 引擎原順序（穩定）**；
+   - 候選條的 `wordsFirst` / 詞頻排序不受影響。
+
+真機驗證（12 鍵打 `nz`+`ghi`+`zj` = `nzi 8`，展開面板 → 左列 `nzia`）：
+字列表從「惹 喏 偌 汝 茹 若 姞」變為「惹 汝 喏 偌 婼」
+（對應權重 70 / 45 / 8 / 4 / 0），常用字在前、生僻字在後。
