@@ -161,16 +161,32 @@ object CandidateRanking {
      * 排序鍵：單音節組 → 多音節（詞組）組 → 讀音未知；同類內按組內第一個字的
      * 用戶字頻、通用字頻降序，最後用讀音兜底保證穩定。數量不做限制（引擎給多少列多少）。
      */
+    /**
+     * 左列分組排序（用戶 2026-11-10 定案）：
+     * **先按首字母、再按次字母**——即讀音字典序，而不是常用度降序。
+     * 高頻音節靠常用度只決定「留哪些」，留在列表裡之後一律按字母排，掃讀才找得到。
+     *
+     * 分三檔：單音節組 → 詞組（多音節）→ 讀音未知（空 comment）組；
+     * 每檔內部都按 reading 字典序（空 comment 組用第一條候選字兜底）。
+     */
     fun orderGroups(
         groups: List<SyllableGroup>,
-        charScore: (String) -> Int,
-        generalScore: (String) -> Int,
+        @Suppress("UNUSED_PARAMETER") charScore: (String) -> Int = { 0 },
+        @Suppress("UNUSED_PARAMETER") generalScore: (String) -> Int = { 0 },
     ): List<SyllableGroup> = groups.sortedWith(
         compareBy(
-            { if (it.syllables.isEmpty()) 2 else if (it.syllables.size == 1) 0 else 1 },
-            { g -> -(charScore(g.items.firstOrNull()?.text ?: "")) },
-            { g -> -(generalScore(g.items.firstOrNull()?.text ?: "")) },
+            // 分檔：單音節組 → 聯想詞組（App 合成）→ 引擎詞組 → 無讀音組；
+            // 每檔內部各自按字典序排，互不摻和（用戶 2026-11-10：「單音節排自己的，聯想詞排自己的」）。
+            {
+                when {
+                    it.syllables.isEmpty() -> 3
+                    it.segment == 1 -> 1
+                    it.syllables.size == 1 -> 0
+                    else -> 2
+                }
+            },
             { it.reading.lowercase() },
+            { it.items.firstOrNull()?.text ?: "" },
         ),
     )
 }

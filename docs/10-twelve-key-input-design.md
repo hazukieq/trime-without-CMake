@@ -2481,3 +2481,27 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
   全量 44 tests / 0 failures。
 - 真機：`5i34i w`（`kiung` + th 鍵）候選條第一條就是「**共產**」，面板 `kiung` 組正常；
   `w` 音節列表含 `than/thu/thi/then/tho/…`。
+
+### 15.59.1 左列排序定案：各檔內按字母序，檔與檔不混排（2026-11-10）
+
+用戶追加兩條規則：
+
+1. **先首字母、再次字母**：高頻只決定「留哪些音節/詞」，留下來之後一律按讀音字典序，
+   否則高頻項一多、順序跳來跳去，照樣「找半天」；
+2. **各排各的**：單音節組自己排、聯想詞組自己排，不要和引擎詞組混在一張字母序表裡。
+
+最終分檔與排序（`CandidateRanking.orderGroups` + `TwelveKeySnapshotBuilder` 組裝後統一排一次）：
+
+| 檔 | 內容 | 排序 |
+| --- | --- | --- |
+| 0 | 單音節組（`kiung`、`than`…） | 讀音字典序 |
+| 1 | 聯想詞組（`kiung tu`、`kiung tung`…，`segment = 1`） | 讀音字典序，組內詞也按詞面字典序 |
+| 2 | 引擎詞組（`ka gu`…） | 讀音字典序 |
+| 3 | 無讀音組（引擎沒給 comment） | 用第一條候選的首字讀音兜底，再按字典序 |
+
+- `syllablesForSegment` 的最終列表同樣改為字典序（精確碼音節仍固定第一條）；
+- `orderGroups` 的 `charScore/generalScore` 參數保留但不再參與排序（只影響「留哪些」）。
+- 單測：`CandidateRankingTest.orderGroupsKeepsAssociationRowsInTheirOwnBucket`、
+  `orderGroupsSortsAlphabetically`；`SyllableBucketTest.limitIsPerInitialBucket` 追加「列表整體字典序」斷言。
+- 真機（`5i34i w`）：左列 `kiung` → `kiung tu` / `kiung tung`（聯想詞）→ `ka gu` / `kai gu` / `kai gun`（引擎詞組），
+  三檔涇渭分明，各檔內字母序。

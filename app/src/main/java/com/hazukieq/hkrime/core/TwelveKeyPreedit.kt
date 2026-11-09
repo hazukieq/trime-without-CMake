@@ -222,7 +222,8 @@ object TwelveKeyPreedit {
     /** 詞表載入完後把索引整理成「按熱度降序」的列表，避免每次查詢都排序。 */
     internal fun finishWordIndex() {
         assocWords.values.forEach { bucket ->
-            val sorted = bucket.entries.sortedByDescending { it.value }.map { it.key }
+            // 聯想詞也按字母序（"共產黨" 按詞面排），方便掃讀；詞頻只用來「有沒有」與截斷前的粗排。
+            val sorted = bucket.keys.sorted()
             bucket.clear()
             sorted.forEach { bucket[it] = 1 }
         }
@@ -432,7 +433,11 @@ object TwelveKeyPreedit {
             }
             round++
         }
-        return (distinctExact + diversified.map { it.syllable })
+        // 排序規則（用戶 2026-11-10）：先按首字母、再按次字母……即讀音字典序，
+        // 這樣哪怕高頻音節少、也能靠字母位置快速找到；精確碼（整段音節）仍固定排第一。
+        return (distinctExact + diversified.map { it.syllable }
+            .distinct()
+            .sorted())
             .distinct()
             .take(maxOf(limit, totalCap))
     }
@@ -453,6 +458,12 @@ object TwelveKeyPreedit {
      * [limit] 控制最多幾種切法。
      */
     /** 整串碼剛好是一個音節（`we` = the、`nz` = ngin…）：這種情況不該再拆段。 */
+    /** 單字/詞的首字讀音，用於「沒有 comment」的候選組按字母序兜底排序。 */
+    fun pinyinOfText(text: String): String {
+        val first = text.firstOrNull() ?: return ""
+        return charTable[first.toString()] ?: ""
+    }
+
     fun isSingleSyllable(codes: String): Boolean {
         if (codes.isEmpty()) return false
         val decoded = decode(codes) ?: return false

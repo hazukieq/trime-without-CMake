@@ -80,13 +80,16 @@ class SyllableBucketTest {
         val byInitial = got.groupingBy { initialOf(it) }.eachCount()
         assertEquals("g 桶應拿到 8 個", 8, byInitial['g'])
         assertEquals("h 桶應拿到 8 個", 8, byInitial['h'])
-        assertEquals('g', initialOf(got[0]))
-        assertEquals('h', initialOf(got[1]))
+        // 2026-11-10 追加約定：最終列表按讀音字典序（先首字母、再次字母），
+        // 所以 g 系列一定排在 h 之前，且同一首字母內按字母升序。
+        assertEquals('g', initialOf(got.first()))
+        assertEquals('h', initialOf(got.last()))
+        assertTrue("列表應按字典序：$got", got == got.sorted())
     }
 
     @Test
     fun eachBucketIsOrderedByDictFrequencyDescending() {
-        // 桶內必須是「字典裡出現字數」降序，才能保證面板左列先出高頻音節。
+        // 選哪些音節由「字典字數」決定；但最終列表按字母序排（用戶 2026-11-10 要求）。
         val got = TwelveKeyPreedit.syllablesForSegment("i", 16)
         val byInitial = got.groupBy { initialOf(it) }
         assertTrue("i 鍵應同時有 g/h 兩桶", byInitial.containsKey('g') && byInitial.containsKey('h'))

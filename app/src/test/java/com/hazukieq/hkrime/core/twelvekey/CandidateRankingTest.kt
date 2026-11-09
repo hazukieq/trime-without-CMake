@@ -290,7 +290,7 @@ class CandidateRankingTest {
 
     // ── orderGroups：單音節輸入時左列按常用度排（用戶 2026-11-10）───────────────
     @Test
-    fun orderGroupsSortsSingleSyllableGroupsByFrequency() {
+    fun orderGroupsSortsAlphabetically() {
         val g = { reading: String, text: String, index: Int ->
             CandidateRanking.groupCandidates(listOf(item(text, reading, index))).first()
         }
@@ -303,8 +303,24 @@ class CandidateRankingTest {
         )
         val score = mapOf("阿" to 1, "家" to 99, "家加" to 50, "?" to 0)
         val ordered = CandidateRanking.orderGroups(groups, { score[it] ?: 0 }, { 0 })
-        // 單音節組按分數降序（家 99 → 阿 1），詞組其次，未知讀音最後
-        assertEquals(listOf("b", "a", "b a", "…"), ordered.map { it.reading })
+        // 單音節組按讀音字母序（a → b），詞組其次，未知讀音最後（用戶 2026-11-10 定案）
+        assertEquals(listOf("a", "b", "b a", "…"), ordered.map { it.reading })
+    }
+
+    @Test
+    fun orderGroupsKeepsAssociationRowsInTheirOwnBucket() {
+        // 用戶 2026-11-10：「單音節排自己的，聯想詞排自己的，不要搞混」。
+        // 分檔必須是：單音節 → 聯想詞(segment=1) → 引擎詞組 → 無讀音。
+        val single = CandidateRanking.groupCandidates(listOf(item("共", "kiung", 0))).first()
+        val assoc = CandidateRanking.groupCandidates(listOf(item("共產黨", "kiung than", 1)))
+            .first().copy(segment = 1)
+        val word = CandidateRanking.groupCandidates(listOf(item("共生", "kiung sen", 2))).first()
+        val blank = CandidateRanking.groupCandidates(listOf(item("?", "", 3))).first()
+        val ordered = CandidateRanking.orderGroups(listOf(blank, word, assoc, single))
+        assertEquals(
+            listOf("kiung", "kiung than", "kiung sen", "…"),
+            ordered.map { it.reading },
+        )
     }
 
     @Test

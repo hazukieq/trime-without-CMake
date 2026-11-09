@@ -151,9 +151,8 @@ object TwelveKeySnapshotBuilder {
         // 面板關閉時不需要分組（候選條只吃 ranked 順序）：跳過「音節桶輪轉 + 聯想詞 + 分組合併」，
         // 這是每次按鍵的主要開銷之一（用戶 2026-11-10：補聯想詞後按鍵卡頓）。
         val segmentGroups = if (wantGroups) segmentGroupsFor(remaining, segmentAnchor) else emptyList()
-        // 展開面板的「音節 → 漢字」列表也按常用度排：用戶常用字 → 通用字頻 → 引擎原順序。
-        // 單音節輸入時左列全是同類音節組：必須按常用度排，不能按讀音字母序
-        // （用戶 2026-11-10：「找半天都找不到想要的音節」）。
+        // 展開面板的「音節 → 漢字」列表：選哪些音節由常用度/字頻決定，
+        // 但最終順序按讀音字典序（用戶 2026-11-10：「按首字母→次字母排，不然還是找得艱難」）。
         val engineGroups = if (!wantGroups) emptyList() else CandidateRanking.orderGroups(
             group(ranked).map { g -> g.copy(items = rankPanelItems(g.items)) },
             charScore = { text -> SegmentMemory.charScore(text) },
@@ -166,6 +165,28 @@ object TwelveKeySnapshotBuilder {
         val baseSegmentGroups = segmentGroups.filter { it.segment != 1 }
         val merged = CandidateRanking.panelGroups(baseSegmentGroups, engineGroups)
         val groups = CandidateRanking.mergeAssociationGroups(merged, assocGroups)
+            // 統一排序：單音節組 → 詞組 → 無讀音組，各檔內按讀音字典序；
+            // 「無讀音組」（引擎沒給 comment）用第一條候選的首字讀音兜底，也要按字母排。
+            .sortedWith(
+                compareBy(
+                    {
+                        when {
+                            it.syllables.isEmpty() -> 3
+                            it.segment == 1 -> 1     // 聯想詞組單獨一檔
+                            it.syllables.size == 1 -> 0
+                            else -> 2               // 引擎詞組
+                        }
+                    },
+                    {
+                        (if (it.reading.isBlank() || it.reading == BLANK_READING) {
+                            TwelveKeyPreedit.pinyinOfText(it.items.firstOrNull()?.text ?: "")
+                        } else {
+                            it.reading
+                        }).lowercase()
+                    },
+                    { it.items.firstOrNull()?.text ?: "" },
+                ),
+            )
         // 候選條按「選單順序」取前 N 條：長輸入時 reading 各不相同，
         // 按第 0 組取會只剩 1 條（用戶 2026-11-08 反饋「打到這麼多就停止候選」）。
         // 分詞輸入（`5'e`）時，候選條直接列「這一段能選的字」：用戶點一個字就上屏，
@@ -280,15 +301,15 @@ object TwelveKeySnapshotBuilder {
             }
         }
 
-        // 組之間按「組內第一字與前一字的關聯度」排：打完「區」後，含「域」的那組排最前。
-        if (anchor != null) {
-            result.sortWith(
-                compareByDescending { g ->
-                    SegmentMemory.bigramScore(anchor, g.items.first().text)
-                },
-            )
-        }
-        return result
+        // 組之間一律按讀音字典序（用戶 2026-11-10：先首字母、再次字母）；
+        // 之前按「與上一字的關聯度」排，會讓同一段內的同音節組跳來跳去、難以掃讀。
+        // anchor 只影響組內字的順序（rankChars），不再影響組的順序。
+        return result.sortedWith(
+            compareBy(
+                { if (it.syllables.isEmpty()) 2 else if (it.syllables.size == 1) 0 else 1 },
+                { it.reading.lowercase() },
+            ),
+        )
     }
 
     /** 每位音節列幾個聯想詞（用戶：≤6）。 */
