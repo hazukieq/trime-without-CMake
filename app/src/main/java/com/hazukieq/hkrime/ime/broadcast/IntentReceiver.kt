@@ -65,6 +65,10 @@ class IntentReceiver : BroadcastReceiver(), CoroutineScope by MainScope() {
                 com.hazukieq.hkrime.ime.core.Trime.getService()
                     ?.textInputManager?.hideCandidatePanel()
             }
+            COMMAND_DEBUG_PERF_GATE -> {
+                // 測試/性能門禁：adb shell am broadcast -a com.hazukieq.hkrime.debug.perfgate
+                com.hazukieq.hkrime.core.twelvekey.PerfGate.run()
+            }
             Intent.ACTION_SHUTDOWN -> Rime.destroy()
             else -> return
         }
@@ -79,6 +83,7 @@ class IntentReceiver : BroadcastReceiver(), CoroutineScope by MainScope() {
         context.registerReceiver(this, IntentFilter(COMMAND_DEBUG_CARET_SCAN))
         context.registerReceiver(this, IntentFilter(COMMAND_DEBUG_SHOW_PANEL))
         context.registerReceiver(this, IntentFilter(COMMAND_DEBUG_HIDE_PANEL))
+        context.registerReceiver(this, IntentFilter(COMMAND_DEBUG_PERF_GATE))
     }
 
     fun unregisterReceiver(context: Context) {
@@ -93,5 +98,6 @@ class IntentReceiver : BroadcastReceiver(), CoroutineScope by MainScope() {
         private const val COMMAND_DEBUG_CARET_SCAN = "com.hazukieq.hkrime.debug.caretscan"
         private const val COMMAND_DEBUG_SHOW_PANEL = "com.hazukieq.hkrime.debug.showpanel"
         private const val COMMAND_DEBUG_HIDE_PANEL = "com.hazukieq.hkrime.debug.hidepanel"
+        private const val COMMAND_DEBUG_PERF_GATE = "com.hazukieq.hkrime.debug.perfgate"
     }
 }

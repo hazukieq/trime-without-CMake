@@ -45,6 +45,14 @@ object TwelveKeyPreedit {
     @Volatile
     private var assocByFirst: Map<String, Map<String, List<String>>> = emptyMap()
 
+    // ---- 只讀診斷（性能門禁 PerfGate / 單測用）----
+    fun debugSyllableCount(): Int = table.size
+    fun debugCodeCount(): Int = codeToSyllables.size
+    fun debugCharFreqCount(): Int = charFreq.size
+    fun debugCharRankCount(): Int = charRank.size
+    fun debugAssocReady(): Boolean = assocReady
+    fun debugAssocCount(): Int = assocByFirst.size
+
     /** 詞表索引是否已就緒（詞表在後台線程載入，沒就緒時面板只是暫時沒有聯想詞行）。 */
     @Volatile
     private var assocReady = false

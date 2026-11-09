@@ -46,6 +46,9 @@ class TrimeApplication : Application() {
             // 放在 prefs 初始化之後，才能拿到 userDataDir。
             val logTree = com.hazukieq.hkrime.util.LogFileTree(this@TrimeApplication)
             Timber.plant(logTree)
+            // 性能門禁（tools/perf-gate.py）用它切分出「本次進程」的按鍵延遲樣本，
+            // 否則日誌跨進程累積，舊版本的慢樣本會讓門禁一直 FAIL。
+            Timber.i("perfgate: process-start t=%d", System.currentTimeMillis())
             // 把本進程啟動前後的 logcat 也抓一段寫進文件（release 包同樣有效）。
             Thread {
                 runCatching { logTree.dumpCurrentLogcat() }
