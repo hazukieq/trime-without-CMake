@@ -147,24 +147,27 @@ object TwelveKeySnapshotBuilder {
         // 而不是繼續用字典順序 —— 否則「最後一個字」看起來完全不受詞頻影響（用戶 2026-11-09 反饋）。
         val lastSegmentMode = segmentGroups.isEmpty() && segmented && segmentAnchor != null
         val barEntries = if (lastSegmentMode) {
-            ranked.sortedWith(
-                compareByDescending<CandidateItem> {
-                    SegmentMemory.bigramScore(segmentAnchor, it.text)
-                }.thenByDescending { SegmentMemory.charScore(it.text) }
-                    .thenBy { it.index },
+            wordsFirst(
+                ranked.sortedWith(
+                    compareByDescending<CandidateItem> {
+                        SegmentMemory.bigramScore(segmentAnchor, it.text)
+                    }.thenByDescending { SegmentMemory.charScore(it.text) }
+                        .thenBy { it.index },
+                ),
             ).take(BAR_ITEMS).filter { it.text.isNotEmpty() }
         } else if (segmentGroups.isNotEmpty()) {
             // 全域排序：先把所有音節組的字攤平，再統一按「與前一字的組詞關聯度 → 字頻」排。
             // 不能按組取（組順序是字典音節順序）—— 否則關聯度最高的字仍可能被擠到後面。
-            segmentGroups.flatMap { it.items }
-                .sortedWith(
-                    compareByDescending<CandidateItem> {
-                        SegmentMemory.bigramScore(segmentAnchor, it.text)
-                    }.thenByDescending { SegmentMemory.charScore(it.text) },
-                )
-                .take(BAR_ITEMS)
+            wordsFirst(
+                segmentGroups.flatMap { it.items }
+                    .sortedWith(
+                        compareByDescending<CandidateItem> {
+                            SegmentMemory.bigramScore(segmentAnchor, it.text)
+                        }.thenByDescending { SegmentMemory.charScore(it.text) },
+                    ),
+            ).take(BAR_ITEMS)
         } else {
-            ranked.take(BAR_ITEMS).filter { it.text.isNotEmpty() }
+            wordsFirst(ranked).take(BAR_ITEMS).filter { it.text.isNotEmpty() }
         }
         val fallback = if (groups.isEmpty() && remaining.isNotEmpty()) {
             val raw = remaining.takeLast(MAX_FALLBACK_CODE)
@@ -292,6 +295,25 @@ object TwelveKeySnapshotBuilder {
     }
 
     /** 按 comment 分組；組順序 = 首次出現順序，不重排。 */
+    /**
+     * 候選條「詞組優先」：在**已按所有因素（引擎詞頻 / 用戶記憶 / 關聯度）排好**的順序上做穩定分區，
+     * 把漢字詞組（≥2 個漢字）整體提前，其餘（單字、顏文字、拉丁詞）保持原相對順序。
+     *
+     * 需求（用戶 2026-11-09）：候選欄永遠是「組詞 > 單字」，但這個分區必須在全部排序之後做，
+     * 否則會蓋掉詞頻與用戶習慣的排序。
+     */
+    private fun wordsFirst(items: List<CandidateItem>): List<CandidateItem> {
+        if (items.size < 2) return items
+        val words = ArrayList<CandidateItem>(items.size)
+        val rest = ArrayList<CandidateItem>(items.size)
+        items.forEach { if (isCjkWord(it.text)) words.add(it) else rest.add(it) }
+        if (words.isEmpty() || rest.isEmpty()) return items
+        return words + rest
+    }
+
+    private fun isCjkWord(text: String): Boolean =
+        text.length >= 2 && text.all { it.code in 0x3400..0x4DBF || it.code in 0x4E00..0x9FFF }
+
     private fun group(items: List<CandidateItem>): List<SyllableGroup> {
         if (items.isEmpty()) return emptyList()
         val grouped = LinkedHashMap<String, MutableList<CandidateItem>>()
