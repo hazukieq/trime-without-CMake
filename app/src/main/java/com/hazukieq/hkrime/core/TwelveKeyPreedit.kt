@@ -62,59 +62,78 @@ object TwelveKeyPreedit {
     }
 
     private fun load(context: Context) {
-        val counts = HashMap<String, Int>()
-        context.assets.open("rime/hakka.dict.yaml").bufferedReader(Charsets.UTF_8).useLines { lines ->
-            lines.forEach { raw ->
-                if (raw.isBlank() || raw.startsWith("#")) return@forEach
-                val tab = raw.indexOf('\t')
-                if (tab < 0) return@forEach
-                val ch = raw.substring(0, tab).trim()
-                val syllable = raw.substring(tab + 1).trim()
-                if (ch.length == 1) {
-                    charTable.putIfAbsent(ch, syllable)
-                    val chars = syllableToChars.getOrPut(syllable) { ArrayList() }
-                    if (!chars.contains(ch)) chars.add(ch)
-                }
-                if (syllable.isNotEmpty() && syllable.all { it in 'a'..'z' }) {
-                    counts[syllable] = (counts[syllable] ?: 0) + 1
-                }
-            }
-        }
+        val counts = context.assets.open("rime/hakka.dict.yaml")
+            .bufferedReader(Charsets.UTF_8)
+            .useLines { lines -> loadDictLines(lines) }
         // 通用字頻（可選資源，缺失不影響主流程）
         runCatching {
             context.assets.open("rime/hakka_char_freq.txt").bufferedReader(Charsets.UTF_8)
-                .useLines { lines ->
-                    lines.forEach { raw ->
-                        if (raw.isEmpty() || raw.startsWith("#")) return@forEach
-                        val tab = raw.indexOf('\t')
-                        if (tab <= 0) return@forEach
-                        val ch = raw.substring(0, tab)
-                        val v = raw.substring(tab + 1).trim().toIntOrNull() ?: return@forEach
-                        if (ch.length == 1) charFreq[ch] = v
-                    }
-                }
+                .useLines { lines -> loadCharFreqLines(lines) }
             Timber.i("TwelveKeyPreedit: charFreq=%d", charFreq.size)
         }.onFailure { Timber.w(it, "TwelveKeyPreedit: load char freq failed") }
 
         // 權威字頻（可選資源；缺失時退回只用詞表統計）
         runCatching {
             context.assets.open("rime/hakka_char_rank.txt").bufferedReader(Charsets.UTF_8)
-                .useLines { lines ->
-                    lines.forEach { raw ->
-                        if (raw.isEmpty() || raw.startsWith("#")) return@forEach
-                        val tab = raw.indexOf('\t')
-                        if (tab <= 0) return@forEach
-                        val ch = raw.substring(0, tab)
-                        val v = raw.substring(tab + 1).trim().toIntOrNull() ?: return@forEach
-                        // 8105 表含 205 個擴展 B 區字（UTF-16 佔兩個 char），按碼點存取
-                        if (ch.isNotEmpty() && Character.codePointCount(ch, 0, ch.length) == 1) {
-                            charRank[ch.codePointAt(0)] = v
-                        }
-                    }
-                }
+                .useLines { lines -> loadCharRankLines(lines) }
             Timber.i("TwelveKeyPreedit: charRank=%d", charRank.size)
         }.onFailure { Timber.w(it, "TwelveKeyPreedit: load char rank failed") }
 
+        finishLoading(counts)
+    }
+
+    /**
+     * 從詞典行（`字<TAB>音節`）建立字表/音節表，返回「音節 → 出現次數」。
+     *
+     * 抽出來是為了單測：JVM 測試讀 assets 文件的行直接餵進來，驗證的正是 App 實際用的邏輯。
+     */
+    internal fun loadDictLines(lines: Sequence<String>): HashMap<String, Int> {
+        val counts = HashMap<String, Int>()
+        lines.forEach { raw ->
+            if (raw.isBlank() || raw.startsWith("#")) return@forEach
+            val tab = raw.indexOf('\t')
+            if (tab < 0) return@forEach
+            val ch = raw.substring(0, tab).trim()
+            val syllable = raw.substring(tab + 1).trim()
+            if (ch.length == 1) {
+                charTable.putIfAbsent(ch, syllable)
+                val chars = syllableToChars.getOrPut(syllable) { ArrayList() }
+                if (!chars.contains(ch)) chars.add(ch)
+            }
+            if (syllable.isNotEmpty() && syllable.all { it in 'a'..'z' }) {
+                counts[syllable] = (counts[syllable] ?: 0) + 1
+            }
+        }
+        return counts
+    }
+
+    internal fun loadCharFreqLines(lines: Sequence<String>) {
+        lines.forEach { raw ->
+            if (raw.isEmpty() || raw.startsWith("#")) return@forEach
+            val tab = raw.indexOf('\t')
+            if (tab <= 0) return@forEach
+            val ch = raw.substring(0, tab)
+            val v = raw.substring(tab + 1).trim().toIntOrNull() ?: return@forEach
+            if (ch.length == 1) charFreq[ch] = v
+        }
+    }
+
+    internal fun loadCharRankLines(lines: Sequence<String>) {
+        lines.forEach { raw ->
+            if (raw.isEmpty() || raw.startsWith("#")) return@forEach
+            val tab = raw.indexOf('\t')
+            if (tab <= 0) return@forEach
+            val ch = raw.substring(0, tab)
+            val v = raw.substring(tab + 1).trim().toIntOrNull() ?: return@forEach
+            // 8105 表含 205 個擴展 B 區字（UTF-16 佔兩個 char），按碼點存取
+            if (ch.isNotEmpty() && Character.codePointCount(ch, 0, ch.length) == 1) {
+                charRank[ch.codePointAt(0)] = v
+            }
+        }
+    }
+
+    /** 詞典行載入後統一收尾：音節次數 → code 表。 */
+    internal fun finishLoading(counts: HashMap<String, Int>) {
         counts.forEach { (syllable, freq) ->
             val code = codeOf(syllable)
             val old = table[code]

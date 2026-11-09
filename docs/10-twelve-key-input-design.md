@@ -2081,3 +2081,69 @@ twelvekey: commit buffer=[区]  / cacheDraft() 地区   ← 之後只提交了�
   `no commit buffer after select, prefix=[江苏]`；面板選「疼」→ `cacheDraft() …江苏疼`（江蘇一併上屏），
   再選「了」→ 只追加「了」，不重複。
 - 選「江蘇」→ 直接點候選條單字（引擎路徑）同樣會帶上前綴。
+
+## 15.53 改回 librime 原生語義：逐段選字留在 preedit、全部選完才上屏（2026-11-10）
+
+### 用戶指出的問題
+
+§15.52 的修法是「把已選未提交的前綴一起 commit」→ 就變成**提前上屏**：選「江蘇」時它已經進輸入框，
+再選「地」「區」時無法退格反悔。用戶明確要求：
+
+> 「江蘇」在 preedit 上才對，逐字選「地」「區」時也應該保持住，隨後全部選完才上屏；
+> 用戶可能還會退格反悔重選。
+
+### 做法：段組點擊優先落回引擎候選（零 librime 改動）
+
+12 鍵的「段組」字（面板左列音符對應的漢字）是 App 按字典生成的，沒有引擎下標，所以才會走
+App 側「commit + 重餵剩餘碼」那條路。實際上這些字**大多數也在引擎候選裡**（同一份詞典），
+於是改成先解析成引擎全局下標，再走 librime 原生 `select_candidate`：
+
+```
+onPickPanelCandidate / onTwelveKeyCandidatePressed（段組分支）
+  → resolveEngineIndexForSegment(text, syllable)
+      用 Rime.candidatesSnapshot(MAX_CANDIDATES) 掃：
+      text 相等且 comment 等於/以其開頭的音節 → 命中；否則退一步只比 text → looseMatch
+  → 命中：twelveKeyController.selectCandidate(index)   // 引擎自己「選中不提交」
+  → 未命中：才退回 App 側 pickSegmentedCandidate（會提前上屏，日誌有記錄）
+```
+
+這樣就得到用戶要的語義，且**完全走 librime 自己的流程**：
+
+- 選中一段 → `no commit buffer after select, prefix=[…]`，字留在 context 的 preedit 前綴裡；
+- 繼續選下一段 → 前綴累加（`prefix=[无去]`），輸入框仍然是空的；
+- 全部選完 → 引擎一次性產生 commit buffer，`cacheDraft()` 出現整串（`无去去`）；
+- 退格 → 引擎自己把上一段的選擇撤掉，preedit 回到純碼串（`455`）重新出候選，可再選；
+- librime 的學習、用戶詞庫、整詞候選全部照舊生效。
+
+### 與 librime 解耦的邊界（用戶 2026-11-10 指示）
+
+> 覺得 App 做不到時可以改 librime，但不要破壞 librime（後期要升級），做好解耦。
+
+本輪**不需要**改 librime：語義由引擎原生提供，App 只做「字 → 引擎下標」的解析（只讀 API）。
+若將來真需要引擎側新能力（例如「任意字元注入某一段」這種引擎不支持的候選題），
+按 `rime-jni/patches/` 的既有約定加**可選補丁**（`git apply` 在 vendored librime 上、上游文件零改動、
+補丁自帶 README 與版本 pin），App 側用 `#ifdef` 式能力探測，升級 librime 時最多重做補丁而不是重寫功能。
+
+### mixing codes 測試（用戶給的組合）
+
+12 鍵送出的其實是碼位，`gong th t k` 這種口語混打落到碼串是 `i44iw95` / `i5i95i` 這類。
+新增 `app/src/test/java/com/hazukieq/hkrime/core/SegmentSplitTest.kt`（JVM，讀真實 assets）：
+
+- `i44i9i95`（gong th t k）、`i5i95i`（g th ti ki）、`i44iw5i95`（gong thu ti k）、`i5i95i5`（g thu t ki）、
+  `i44iw95`（日誌裡真實出現的串）、`855`（純首碼 jkl）：逐段切分必須走到底、每段 rest 嚴格變短、
+  所有 head 拼回等於原碼串（不丟碼不重複）、每段 head 都能查回音節（面板不會空）；
+- 單音節串（`4i`=mi/ni、`i5`=le）必須**不拆段**，交給引擎；
+- 同碼串拆段結果穩定。
+
+另外把 `TwelveKeyPreedit.load()` 拆成 `loadDictLines` / `loadCharFreqLines` / `loadCharRankLines` /
+`finishLoading`，讓單測直接餵 assets 的行，測的就是 App 真用的邏輯。
+
+### 真機驗收（12 鍵，UTF 坐標見 §15.49）
+
+| 步驟 | 觀察 |
+| --- | --- |
+| 打 `455` | preedit `4 5 5`，候選條 `无权利 无下级 姥姥家` |
+| 展開面板點「无」 | 日誌 `no commit buffer after select, prefix=[无]`；輸入框空；候選條換下一段 |
+| 再點「去」 | 日誌 `prefix=[无去]`；輸入框仍空 |
+| 點最後一段 | `cacheDraft()` 一次出現整串（`无去去`）——全程只 commit 一次 |
+| 選「无」後按退格 | preedit 回到 `455`，候選條回到 `无权利 无下级 姥姥家`，可重選 |

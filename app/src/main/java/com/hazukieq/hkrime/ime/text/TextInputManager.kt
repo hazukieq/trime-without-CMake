@@ -369,7 +369,14 @@ class TextInputManager private constructor() :
             return
         }
         if (item.segment >= 0) {
-            // 字典候選（分詞段 / 多音節補的單字組）：上屏這一段的字，再把剩餘碼餵回引擎。
+            // 段組字：優先解析成引擎候選下標，走 librime 原生 select_candidate ——
+            // 引擎自己會「選中不提交」，preedit 保留、全部選完才上屏、退格可反悔（用戶 2026-11-10 要求）。
+            // 引擎確實沒有這個字（字表有、詞庫沒收）時才退回 App 側兜底。
+            val engineIndex = resolveEngineIndexForSegment(item.text, item.comment)
+            if (engineIndex >= 0) {
+                twelveKeyController?.selectCandidate(engineIndex)
+                return
+            }
             pickSegmentedCandidate(item.text, item.restCode)
             return
         }
@@ -379,6 +386,31 @@ class TextInputManager private constructor() :
             return
         }
         twelveKeyController?.selectCandidate(item.index)
+    }
+
+    /**
+     * 把「段組裡的一個字」解析成 librime 的**全局候選下標**。
+     *
+     * 命中就交給引擎原生 `select_candidate`：選中不提交、preedit 保留已選段、全部選完才上屏，
+     * 退格由引擎自己反悔，學習也走 librime —— 不需要 App 在旁邊維護一份「待上屏的字」。
+     * 只有引擎候選裡確實沒有這個字（字典有、詞庫沒收）時返回 -1，調用方再退回 App 側兜底。
+     */
+    private fun resolveEngineIndexForSegment(text: String, syllable: String): Int {
+        if (text.isEmpty()) return -1
+        val rows = withEngineLock {
+            runCatching { Rime.candidatesSnapshot(TwelveKeySnapshotBuilder.MAX_CANDIDATES) }.getOrNull()
+        } ?: return -1
+        var looseMatch = -1
+        for (i in rows.indices) {
+            val row = rows[i] ?: continue
+            if ((row.getOrNull(0) ?: "") != text) continue
+            if (looseMatch < 0) looseMatch = i
+            val comment = row.getOrNull(1)?.trim().orEmpty()
+            if (syllable.isNotEmpty() && (comment == syllable || comment.startsWith(syllable))) {
+                return i
+            }
+        }
+        return looseMatch
     }
 
     /**
@@ -921,6 +953,11 @@ class TextInputManager private constructor() :
             // 分詞輸入時候選條列的是「這一段能選的字」（index = -1）：
             // 直接上屏、把剩餘段餵回引擎，不進引擎選詞（用戶 2026-11-09 指示）。
             if (item.segment >= 0) {
+                val engineIndex = resolveEngineIndexForSegment(item.text, item.comment)
+                if (engineIndex >= 0) {
+                    twelveKeyController?.selectCandidate(engineIndex)
+                    return
+                }
                 pickSegmentedCandidate(item.text, item.restCode)
                 return
             }
