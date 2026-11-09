@@ -216,7 +216,7 @@ class TextInputManager private constructor() :
                 }
                 runCatching { trime.updateComposing() }
                     .onFailure { Timber.e(it, "twelvekey: updateComposing failed") }
-                twelveKeyController?.refresh(immediate = true)
+                refreshTwelveKey()
             },
             onCommitText = { text ->
                 runCatching {
@@ -267,9 +267,32 @@ class TextInputManager private constructor() :
         return currentSnapshot.inlineText.takeIf { it.isNotEmpty() }
     }
 
+    /**
+     * 「用戶想要面板開著」的意圖。
+     *
+     * 只靠 [isCandidatePanelShown] 判斷會漏：選字/上屏那一瞬間 view 可能短暫不可見，
+     * 於是 refresh(full=false) 建出一份「沒有分組」的快照，面板就只剩 `{we} … 本地原文`；
+     * 再關一次再開一次才拿到分組。這裡用意圖兜住這一瞬。
+     */
+    private var panelWanted = false
+
     fun isCandidatePanelShown(): Boolean =
         candidatePanelController?.isShown == true ||
             candidatePanelRoot?.visibility == android.view.View.VISIBLE
+
+    /**
+     * 12 鍵統一刷新入口：面板「想開著」時必須帶分組（full=true）。
+     *
+     * 之前只有 onCandidatesRefreshed 判斷 full，選字/上屏後還有幾處 `refresh(immediate = true)`
+     * 會用 full=false 再刷一次，把面板的分組覆蓋成空 → 面板只剩 `{we} … 本地原文`，
+     * 關掉再開才恢復（用戶 2026-11-10 反饋）。
+     */
+    private fun refreshTwelveKey() {
+        twelveKeyController?.refresh(
+            immediate = true,
+            full = panelWanted || isCandidatePanelShown(),
+        )
+    }
 
     /** 切換展開面板；空候選時 ▼ 的語義是「收起鍵盤」。 */
     fun toggleCandidatePanel() {
@@ -296,6 +319,7 @@ class TextInputManager private constructor() :
 
     fun showCandidatePanel() {
         if (!Rime.isComposing()) return
+        panelWanted = true
         if (isTwelveKeyMode()) {
             if (twelveKeyController?.snapshot?.isEmpty != false) twelveKeyController?.refreshSync()
             val snapshot = twelveKeyController?.snapshot
@@ -317,6 +341,7 @@ class TextInputManager private constructor() :
     }
 
     fun hideCandidatePanel() {
+        panelWanted = false
         candidatePanelController?.hide()
         candidateView?.setPanelOpen(false)
         if (Rime.isComposing()) {
@@ -377,7 +402,7 @@ class TextInputManager private constructor() :
             activeEditorInstance.commitText(text, false)
             setSegmentAnchor(text.lastOrNull())
             trime.updateComposing()
-            twelveKeyController?.refresh(immediate = true)
+            refreshTwelveKey()
         }.onFailure { Timber.e(it, "twelvekey: association pick failed") }
     }
 
@@ -465,7 +490,7 @@ class TextInputManager private constructor() :
                 withEngineLock { Rime.onText(rest.joinToString("'")) }
             }
             trime.updateComposing()
-            twelveKeyController?.refresh(immediate = true)
+            refreshTwelveKey()
         }.onFailure { Timber.e(it, "twelvekey: segmented pick failed") }
     }
 
@@ -565,7 +590,7 @@ class TextInputManager private constructor() :
             // 面板打開才全量枚舉（按鍵卡頓的另一半原因：每鍵 600 條枚舉）。
             twelveKeyController?.refresh(
                 immediate = true,
-                full = isCandidatePanelShown(),
+                full = panelWanted || isCandidatePanelShown(),
             )
             return
         }
@@ -733,7 +758,7 @@ class TextInputManager private constructor() :
         // 否則固定候選欄與展開面板都會顯示舊候選（用戶 2026-11-09）。
         twelveKeyController?.invalidateForOptions()
         if (isTwelveKeyMode()) {
-            if (Rime.isComposing()) twelveKeyController?.refresh(immediate = true)
+            if (Rime.isComposing()) refreshTwelveKey()
         } else if (isCandidatePanelShown()) {
             candidatePanelController?.submit(legacySnapshot())
         }

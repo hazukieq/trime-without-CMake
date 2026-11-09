@@ -90,6 +90,18 @@ public class Rime {
      * preedit 被 12 鍵方案改寫後，librime 原始的 length/cursor_pos/sel_* 是舊 preedit 的字節偏移，
      * 必須重新按新文本歸一化，否則 {@link #getStart()}/{@link #getEnd()} 會越界。
      */
+    /** 複製一份，避免把「改寫後的 preedit」寫回 librime context 的鏡像物件。 */
+    RimeComposition copy() {
+      RimeComposition c = new RimeComposition();
+      c.length = length;
+      c.cursor_pos = cursor_pos;
+      c.sel_start = sel_start;
+      c.sel_end = sel_end;
+      c.preedit = preedit;
+      c.bytes = bytes;
+      return c;
+    }
+
     void normalizeAfterRewrite() {
       if (preedit == null) return;
       bytes = preedit.getBytes();
@@ -443,8 +455,13 @@ public class Rime {
       String decoded = TwelveKeyPreedit.INSTANCE.rewrite(composition.preedit, hint);
       Timber.d("dbgpre: raw=[%s] hint=[%s] decoded=[%s]", composition.preedit, hint, decoded);
       if (decoded != null) {
-        composition.preedit = decoded;
-        composition.normalizeAfterRewrite();
+        // 只改「返回給 UI 的副本」：mContext.composition 是 librime context 的鏡像，
+        // 寫回去會讓下一次讀到的 raw 已經是被改寫過的拼音（日誌裡 raw=[共the]、
+        // decoded=[null] 就是這個污染），也會讓 getCompositionPrefix() 之類的調用看到殘留。
+        RimeComposition rewritten = composition.copy();
+        rewritten.preedit = decoded;
+        rewritten.normalizeAfterRewrite();
+        return rewritten;
       }
     }
     return composition;

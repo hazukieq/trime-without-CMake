@@ -427,6 +427,13 @@ object TwelveKeyPreedit {
      * 一個都切不出（純首碼簡拼，如 `855`）時退回「第一個碼位 + 其餘碼」；
      * [limit] 控制最多幾種切法。
      */
+    /** 整串碼剛好是一個音節（`we` = the、`nz` = ngin…）：這種情況不該再拆段。 */
+    fun isSingleSyllable(codes: String): Boolean {
+        if (codes.isEmpty()) return false
+        val decoded = decode(codes) ?: return false
+        return decoded.split(' ').size == 1
+    }
+
     fun splitHeads(codes: String, limit: Int = 2): List<Pair<String, String>> {
         if (codes.length < 2) return emptyList()
         val out = ArrayList<Pair<String, String>>()

@@ -2400,3 +2400,45 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
   `TwelveKeyController` 傳 `wantGroups = full`（full = 面板是否展開）。
   真機 10 鍵連打實測：面板關閉時每鍵 60ms → 33ms（回到未加聯想詞前的水平）；
   詞表索引後台載入 `load=598ms`（不再落在第一次按鍵上）。
+
+## 15.58 「共」選完後面板只剩 `{we} … 本地原文`（2026-11-10）
+
+用戶反饋：選中「共」之後，展開面板只剩一行 `{we} …`，右邊是 `the / 本地原文`；關掉面板再打開又正常。
+同時用戶在日誌裡看到 `the` 這個「原文」。
+
+### `the` 是什麼
+
+`the` 不是洩漏的英文字，是**合法的客語音節**：`西/細/洗/婿/胥 = the`，
+12 鍵碼 `we`（`th`→`w`、`e`→`e`）對應的就是它。preedit 顯示 `共the` = 已選的「共」+ 剩餘碼的讀音。
+
+### 真正的 bug（兩個）
+
+1. **選字後用「沒分組」的快照覆蓋面板**
+   `TextInputManager` 裡有幾處 `refresh(immediate = true)`（選字後、按鍵釋放後等）沒有傳 `full`，
+   默認 `full=false` → `wantGroups=false` → 快照 `groups` 為空；而 `onTwelveKeySnapshot`
+   不分 full 一律 `candidatePanelController.submit(...)`，面板就被這份空分組快照覆蓋，
+   只剩 `render()` 裡的兜底行 `{rawCode} …` + `fallback.letters`（`we` → `w`→th、`e`→e = `the`）。
+   因為空分組快照帶著相同/相近 cacheKey 被緩存，重開面板時只是重新 render 舊對象，看起來「好了」。
+
+2. **preedit 改寫被寫回 librime context 的鏡像**
+   `Rime.getComposition()` 直接改 `mContext.composition.preedit = decoded`（`mContext` 是
+   `get_context()` 填的靜態鏡像）。第二次調用讀到的 `raw` 已經是改寫後的拼音，於是日誌出現
+   `raw=[共the] decoded=[null]`；`getCompositionPrefix()` 等讀同一份鏡像的邏輯也跟著看污染數據。
+
+### 修法
+
+- `Rime.RimeComposition` 加 `copy()`；`getComposition()` 改寫時**返回副本**，不再寫回 `mContext`。
+  （`getCompositionPrefix()` 繼續讀原生 preedit，語義不變。）
+- `TextInputManager` 新增 `panelWanted`（show/hide 時置位）與統一入口 `refreshTwelveKey()`：
+  所有 12 鍵刷新都 `full = panelWanted || isCandidatePanelShown()`，不會再有人用 `full=false`
+  把面板分組刷掉；`onCandidatesRefreshed` 也走同一判斷。
+- `TwelveKeyPreedit.isSingleSyllable(codes)` + `segmentGroupsFor` 先判斷「整串就是一個音節」：
+  剩 `we` 時不再拆成 `w` + `e`（`w` 不是音節），直接按 `the` 出組。
+  否則即使有分組，面板也只會顯示兜底行。
+
+### 驗收
+
+- `kl ghi vur mno ghi th def`（`5i34iwe`）→ 面板首組 `kiung`（共/穷/恐…）→ 點「共」→
+  面板立刻顯示 `the` 組（西/細/洗/婿/胥），不再出現 `{we} … 本地原文`；不需要關開面板。
+- 日誌 `raw` 穩定是 `5i34iwe`（不再被改寫成 `共the`），`decoded` 恆為 `kiung the`。
+- 單測：`SegmentSplitTest.wholeSingleSyllableIsNotSplit`（`we`/`yi` 為單音節、`744ii`/`z` 不是）。

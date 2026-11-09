@@ -218,7 +218,13 @@ object TwelveKeySnapshotBuilder {
         // 一種碼串可能有多種合法切法（`744ii` = son+gi 或 song+g**），但面板只列**第一段**
         // 的「音節 → 單字」組，接著列「聯想詞組」行（`song g**` / `song h**`）——
         // 用戶 2026-11-10：「我要的是列出 song h**(<=6), song g**(<=6) 的联想词组，而不是 son·2」。
-        val splits = TwelveKeyPreedit.splitHeads(codes)
+        // 整串就是一個音節（例如選完前幾段後只剩 `we`）→ 不拆，直接按這個音節出組；
+        // 否則 splitHeads 會硬切出 `w` + `e`，`w` 不是音節 → 面板只剩「本地原文」一行。
+        val splits = if (TwelveKeyPreedit.isSingleSyllable(codes)) {
+            listOf(codes to "")
+        } else {
+            TwelveKeyPreedit.splitHeads(codes)
+        }
         if (splits.isEmpty()) return emptyList()
         val (head, rest) = splits.first()
         val result = ArrayList<SyllableGroup>()

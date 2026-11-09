@@ -1,6 +1,7 @@
 package com.hazukieq.hkrime.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.BeforeClass
@@ -19,6 +20,18 @@ import java.io.File
  * 4) 每個 head 都能查回至少一個音節（面板能出組）。
  */
 class SegmentSplitTest {
+
+    @Test
+    fun wholeSingleSyllableIsNotSplit() {
+        // 選完前幾段後剩 `we`（the = 洗/細/西…）：必須當成一個音節出組，
+        // 不能切成 `w` + `e`，否則面板只剩「本地原文」。
+        assertTrue(TwelveKeyPreedit.isSingleSyllable("we"))
+        // `yi` = nzi（一個音節）；`nz` 只是鍵帽文字，不是音節
+        assertTrue(TwelveKeyPreedit.isSingleSyllable("yi"))
+        assertFalse(TwelveKeyPreedit.isSingleSyllable("744ii"))
+        assertFalse(TwelveKeyPreedit.isSingleSyllable("z"))
+    }
+
 
     companion object {
         private val preedit: TwelveKeyPreedit by lazy { TwelveKeyPreedit }
