@@ -2308,3 +2308,56 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
   不再整列 g 開頭；
 - 同一輸入候選條 `汉语 韩语 官儿 莞尔 干 管`、面板組 `汉语韩语`（兩詞都在），
   說明 `汉语/韩语` 這類詞沒有被吞掉。
+
+## 15.57 展開面板列出「聯想詞組」行：`song g**` / `song h**`（2026-11-10）
+
+### 需求（用戶原話）
+
+> 「我要的是列出 song h**(<=6), song g**(<=6) 的联想词组，而不是什么 son·2...」
+
+`744ii`（ps mno mno ghi ghi）在引擎裡只有一種切法 `son|gi`（候選 船記/船），
+用戶要的是**聯想**：以 `song` 開頭、第二個音節以 `g`（或 `h`）開頭的兩字詞，每行最多 6 條。
+（先前實現的「另一種第一段切法 → `son·2`」不是他要的，已移除。）
+
+### 數據從哪來
+
+`app/src/main/assets/rime/` 的詞表（`hakka_sougou_words` / `mobilewords` / `oftenwords` /
+`places` / `poems` / `website` / `zon` / `cn_en`）**只有詞條、沒有讀音**；
+只有 `hakka.dict.yaml` 是 `字<TAB>音節`。所以讀音靠單字首讀音反推：
+
+1. `TwelveKeyPreedit.loadWordLines()`：只收長度 2、全 CJK 的詞，
+   `r1 = charTable[第一字]`、`r2 = charTable[第二字]`；
+2. 按 `(r1, r2[0])` 建桶並累計出現次數（跨 8 個詞表累加，當熱度）；
+3. `finishWordIndex()` 把桶按熱度降序固化成列表；
+4. `associatedWords(syllable, initial, limit = 6)` 直接取前 N 條 —— 面板生成組時零額外計算。
+
+真機日誌：`TwelveKeyPreedit: assoc keys=7971`（≈8 千個「音節+首字母」桶）。
+離線核對：`song g` 54 個詞（香港/上個/上交/上佳/上供/上光…），`song h` 27 個（上下/上好/上學/上海…）。
+
+### 面板行
+
+`TwelveKeySnapshotBuilder.segmentGroupsFor()`：
+
+- 只取**第一種**切法（`splitHeads(codes).first()`）建「音節 → 單字」組（`segment = 0`）；
+- 再對前 4 個高頻音節 × 其餘碼能展開的前 2 個首字母，建聯想詞行：
+  - 行標題 `"$syllable ${initial}**"`（如 `song g**`）；
+  - 每項 `CandidateItem(text = 詞, comment = "$syllable ${initial}**", index = -1, segment = 1)`；
+- 常數：`ASSOC_WORDS = 6`、`ASSOC_HEAD_SYLLABLES = 4`、`ASSOC_INITIALS = 2`。
+
+### 點擊語義
+
+`TextInputManager`：`segment == 1` 走 `pickAssociationWord(word)` ——
+`Rime.clearComposition()` → `commitText(word)` → 記 anchor → `updateComposing()` + refresh。
+（這些詞的碼不是用戶打出來的，引擎沒有對應 context，只能整詞上屏。）
+
+### 真機驗收
+
+- `744ii` 開面板：左列 `song / pong / song g** / song h** / pong g** / pong h**`；
+- 點 `song g**`：右格 `香港 上個 上交 上佳 上供 上光`（6 條）；
+- 點「上交」：搜尋框一次出現 `上交`（整詞上屏）。
+
+### 已知取捨
+
+- 讀音用「單字首讀音」，多音字（如「香」）可能歸錯桶 → 少量詞排到意料外的行；
+- 熱度是「跨詞表出現次數」，不是語料詞頻（詞表本身沒有權重）；
+- 只處理兩字詞；三字以上的聯想（`song g** *`）暫不做。

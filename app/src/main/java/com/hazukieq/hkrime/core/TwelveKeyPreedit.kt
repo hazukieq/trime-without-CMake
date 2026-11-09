@@ -26,6 +26,14 @@ object TwelveKeyPreedit {
 
     /** 單字 → 音節（取字典裡第一次出現的讀音），用來在歧義時對齊第一個候選字。 */
     private val charTable = HashMap<String, String>()
+    /**
+     * 兩字詞的「聯想索引」：key = (第一字音節, 第二字音節首字母)，value = 詞 → 出現次數。
+     *
+     * 詞表（hakka_sougou_words / mobilewords / oftenwords / places / poems / website / zon / cn_en）
+     * 只存詞條、沒有讀音，所以用 [charTable]（hakka.dict.yaml 的 `字<TAB>音節`）反推：
+     * 這樣才能回答「song 開頭、下一個音節是 g 開頭」有哪些詞 —— 也就是用戶要的 `song g**`。
+     */
+    private val assocWords = HashMap<String, LinkedHashMap<String, Int>>()
 
     /**
      * 單字 → 通用頻度（由詞表統計生成，見 assets/rime/hakka_char_freq.txt）。
@@ -83,7 +91,23 @@ object TwelveKeyPreedit {
         }.onFailure { Timber.w(it, "TwelveKeyPreedit: load char rank failed") }
 
         finishLoading(counts)
+
+        // 兩字詞聯想索引（song g** / song h** 這類）——詞表只有詞條、沒有讀音，
+        // 依賴上面 finishLoading 建好的 charTable 反推，所以必須放在它後面。
+        runCatching {
+            WORD_LISTS.forEach { name ->
+                context.assets.open("rime/$name.dict.yaml").bufferedReader(Charsets.UTF_8)
+                    .useLines { lines -> loadWordLines(lines) }
+            }
+            finishWordIndex()
+            Timber.i("TwelveKeyPreedit: assoc keys=%d", assocWords.size)
+        }.onFailure { Timber.w(it, "TwelveKeyPreedit: load word lists failed") }
     }
+
+    private val WORD_LISTS = listOf(
+        "hakka_sougou_words", "hakka_mobilewords", "hakka_oftenwords", "hakka_places",
+        "hakka_poems", "hakka_website", "hakka_zon", "hakka_cn_en",
+    )
 
     /**
      * 從詞典行（`字<TAB>音節`）建立字表/音節表，返回「音節 → 出現次數」。
@@ -133,6 +157,60 @@ object TwelveKeyPreedit {
                 charRank[ch.codePointAt(0)] = v
             }
         }
+    }
+
+    /**
+     * 詞表行 → 兩字詞聯想索引（測試可單獨餵 fixture）。
+     *
+     * 只收「長度 2、全 CJK」的詞；讀音取 [charTable] 的單字首讀音，缺失就跳過。
+     */
+    internal fun loadWordLines(lines: Sequence<String>) {
+        lines.forEach { raw ->
+            val word = raw.trim()
+            if (word.length != 2) return@forEach
+            if (!word.all { isCjk(it) }) return@forEach
+            val r1 = charTable[word.substring(0, 1)] ?: return@forEach
+            val r2 = charTable[word.substring(1, 2)] ?: return@forEach
+            if (r1.isEmpty() || r2.isEmpty()) return@forEach
+            val key = "$r1|${r2[0]}"
+            val bucket = assocWords.getOrPut(key) { LinkedHashMap() }
+            bucket[word] = (bucket[word] ?: 0) + 1
+        }
+    }
+
+    /** 詞表載入完後把索引整理成「按熱度降序」的列表，避免每次查詢都排序。 */
+    internal fun finishWordIndex() {
+        assocWords.values.forEach { bucket ->
+            val sorted = bucket.entries.sortedByDescending { it.value }.map { it.key }
+            bucket.clear()
+            sorted.forEach { bucket[it] = 1 }
+        }
+    }
+
+    private fun isCjk(ch: Char): Boolean {
+        val code = ch.code
+        return code in 0x3400..0x4DBF || code in 0x4E00..0x9FFF
+    }
+
+    /**
+     * 「以 [syllable] 為第一段、第二段以 [initial] 開頭」的聯想兩字詞，按熱度降序取前 [limit] 條。
+     *
+     * 用戶 2026-11-10：面板要列 `song g**` / `song h**` 這種聯想詞，而不是另一種切法標籤。
+     */
+    fun associatedWords(syllable: String, initial: Char, limit: Int = 6): List<String> {
+        val bucket = assocWords["$syllable|$initial"] ?: return emptyList()
+        return bucket.keys.take(limit)
+    }
+
+    /** 碼段的所有可能「下一個音節首字母」（去重、保持輪轉順序），用於決定列哪幾行聯想詞。 */
+    fun initialsForPrefix(code: String, limit: Int = 2): List<Char> {
+        if (code.isEmpty()) return emptyList()
+        val result = LinkedHashSet<Char>()
+        syllablesForSegment(code, 8).forEach { syllable ->
+            syllable.firstOrNull()?.let { result.add(it) }
+            if (result.size >= limit) return result.toList()
+        }
+        return result.toList()
     }
 
     /** 詞典行載入後統一收尾：音節次數 → code 表。 */

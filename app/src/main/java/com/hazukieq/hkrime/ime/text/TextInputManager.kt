@@ -363,9 +363,31 @@ class TextInputManager private constructor() :
             .onFailure { Timber.e(it, "twelvekey: inline preview failed") }
     }
 
+
+    /**
+     * 聯想詞（`song g**` 這類）：整個詞直接上屏。
+     *
+     * 這些詞的碼不是用戶打出來的（是 App 依「第一段音節 + 下一個音節首字母」合成的），
+     * 引擎沒有對應 context，所以只能整詞 commit，再把組字清掉。
+     */
+    private fun pickAssociationWord(text: String) {
+        if (text.isEmpty()) return
+        runCatching {
+            withEngineLock { Rime.clearComposition() }
+            activeEditorInstance.commitText(text, false)
+            setSegmentAnchor(text.lastOrNull())
+            trime.updateComposing()
+            twelveKeyController?.refresh(immediate = true)
+        }.onFailure { Timber.e(it, "twelvekey: association pick failed") }
+    }
+
     private fun onPickPanelCandidate(item: CandidatePanelAdapter.Item) {
         if (!isTwelveKeyMode()) {
             pickLegacyPanelCandidate(item)
+            return
+        }
+        if (item.segment == 1) {
+            pickAssociationWord(item.text)
             return
         }
         if (item.segment >= 0) {
@@ -950,6 +972,11 @@ class TextInputManager private constructor() :
         // 否則非同步刷新/學習重排後會出現「看到的是看、上屏的卻是别字」。
         val item = currentSnapshot.barItems.getOrNull(index)
         if (item != null) {
+            // 聯想詞（segment = 1）：整詞上屏。
+            if (item.segment == 1) {
+                pickAssociationWord(item.text)
+                return
+            }
             // 分詞輸入時候選條列的是「這一段能選的字」（index = -1）：
             // 直接上屏、把剩餘段餵回引擎，不進引擎選詞（用戶 2026-11-09 指示）。
             if (item.segment >= 0) {

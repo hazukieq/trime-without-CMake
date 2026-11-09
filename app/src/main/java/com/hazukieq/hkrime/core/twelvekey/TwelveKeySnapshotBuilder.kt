@@ -208,38 +208,63 @@ object TwelveKeySnapshotBuilder {
     private fun segmentGroupsFor(remaining: String, anchor: Char?): List<SyllableGroup> {
         val codes = remaining.replace("'", "")
         if (codes.isEmpty()) return emptyList()
-        // 一個碼串可能有多種合法切法（`744ii` = son+gi 或 song+g*/h**）：
-        // 每種切法都列出「第一段的音節 → 單字」組，用戶才能自己決定怎麼斷（2026-11-10）。
+        // 一種碼串可能有多種合法切法（`744ii` = son+gi 或 song+g**），但面板只列**第一段**
+        // 的「音節 → 單字」組，接著列「聯想詞組」行（`song g**` / `song h**`）——
+        // 用戶 2026-11-10：「我要的是列出 song h**(<=6), song g**(<=6) 的联想词组，而不是 son·2」。
         val splits = TwelveKeyPreedit.splitHeads(codes)
         if (splits.isEmpty()) return emptyList()
+        val (head, rest) = splits.first()
         val result = ArrayList<SyllableGroup>()
         val seen = HashSet<String>()
-        splits.forEachIndexed { splitIndex, (head, rest) ->
-            // 第一種切法給足名額；備選切法減半，避免左列被「所有可能切法」灌滿。
-            val quota = if (splitIndex == 0) MAX_SYLLABLE_GROUPS else MAX_SYLLABLE_GROUPS / 2
-            // 備選切法只認精確碼：否則 `744`(son) 會把前綴同碼的 `744i`(song)、`7444`(pong)
-            // 也算進來，和第一種切法重複。
-            for (syllable in TwelveKeyPreedit.syllablesForSegment(head, quota, exactOnly = splitIndex > 0)) {
-                if (!seen.add(syllable)) continue
-                val chars = TwelveKeyPreedit.rankChars(
-                    TwelveKeyPreedit.charsForSyllable(syllable),
-                    anchor,
-                )
-                val items = chars.map { ch ->
-                    CandidateItem(text = ch, comment = syllable, index = -1, segment = 0, restCode = rest)
+        val syllables = TwelveKeyPreedit.syllablesForSegment(head, MAX_SYLLABLE_GROUPS)
+        for (syllable in syllables) {
+            if (!seen.add(syllable)) continue
+            val chars = TwelveKeyPreedit.rankChars(
+                TwelveKeyPreedit.charsForSyllable(syllable),
+                anchor,
+            )
+            val items = chars.map { ch ->
+                CandidateItem(text = ch, comment = syllable, index = -1, segment = 0, restCode = rest)
+            }
+            if (items.isEmpty()) continue
+            result.add(
+                SyllableGroup(
+                    reading = syllable,
+                    syllables = listOf(syllable),
+                    items = items,
+                    segment = 0,
+                ),
+            )
+        }
+
+        // ---- 聯想詞組：`song g**` / `song h**`（每行 ≤6 條）----
+        // 只對「第一段的高頻音節」×「其餘碼能展開出的首字母」建行；詞的讀音由單字首讀音反推。
+        val initials = TwelveKeyPreedit.initialsForPrefix(rest, ASSOC_INITIALS)
+        if (initials.isNotEmpty()) {
+            for (syllable in syllables.take(ASSOC_HEAD_SYLLABLES)) {
+                for (initial in initials) {
+                    val words = TwelveKeyPreedit.associatedWords(syllable, initial, ASSOC_WORDS)
+                    if (words.isEmpty()) continue
+                    val items = words.map { word ->
+                        CandidateItem(
+                            text = word,
+                            comment = "$syllable ${initial}**",
+                            index = -1,
+                            segment = 1, // 1 = 聯想詞：整詞上屏
+                        )
+                    }
+                    result.add(
+                        SyllableGroup(
+                            reading = "$syllable ${initial}**",
+                            syllables = listOf(syllable),
+                            items = items,
+                            segment = 1,
+                        ),
+                    )
                 }
-                if (items.isEmpty()) continue
-                result.add(
-                    SyllableGroup(
-                        // 備選切法標上剩餘碼數，避免和第一種切法的同名音節混淆（如 song·1）。
-                        reading = if (splitIndex == 0) syllable else "$syllable·${rest.length}",
-                        syllables = listOf(syllable),
-                        items = items,
-                        segment = 0,
-                    ),
-                )
             }
         }
+
         // 組之間按「組內第一字與前一字的關聯度」排：打完「區」後，含「域」的那組排最前。
         if (anchor != null) {
             result.sortWith(
@@ -250,6 +275,15 @@ object TwelveKeySnapshotBuilder {
         }
         return result
     }
+
+    /** 每位音節列幾個聯想詞（用戶：≤6）。 */
+    private const val ASSOC_WORDS = 6
+
+    /** 聯想詞行只對前幾個高頻音節建（避免左列被灌滿）。 */
+    private const val ASSOC_HEAD_SYLLABLES = 4
+
+    /** 聯想詞行最多列幾個「下一個音節首字母」（`song g**` / `song h**`）。 */
+    private const val ASSOC_INITIALS = 2
 
     /** 兼容舊調用：同步一次做完（UI 線程慎用）。 */
     fun build(): TwelveKeySnapshot = build(local())
