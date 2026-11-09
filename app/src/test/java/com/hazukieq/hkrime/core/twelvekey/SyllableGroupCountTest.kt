@@ -176,7 +176,7 @@ class SyllableGroupCountTest {
      * 若日後字表/詞典變化很大，跑這個測試看錶再改常數即可。
      */
     @Test
-    fun `MAX_SYLLABLE_GROUPS is 6 and yields sane coverage`() {
+    fun `MAX_SYLLABLE_GROUPS is 8 and yields sane coverage`() {
         load()
         val constant = 8 // 與 TwelveKeySnapshotBuilder.MAX_SYLLABLE_GROUPS 保持一致
         val builderSource = File("src/main/java/com/hazukieq/hkrime/core/twelvekey/TwelveKeySnapshotBuilder.kt")

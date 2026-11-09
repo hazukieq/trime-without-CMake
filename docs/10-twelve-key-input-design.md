@@ -2015,3 +2015,33 @@ librime 表排序退化成文件順序（≈ Unicode/部首順序），所以越
 
 測試同時守住三件事：常數必須是 8、平均覆蓋 ≥ 40%、最差首碼 ≥ 27%、每個首碼都能拿到
 min(8, 該首碼音節數) 組。字表/詞典大改後跑一次測試看錶再調。
+
+## 15.51 候選排序規則整理成文 + 兩個版塊補齊單測 (2026-11-10)
+
+用戶要求（m08620）：把「固定候選區的漢字顯示/關聯算法」與「展開面板」的排序規則寫進文檔，
+並把兩個版塊的測試補齊。
+
+### 做法
+
+- 新增 **`docs/12-candidate-ranking.md`**：兩塊排序的數據源、比較鍵、代碼位置、不變量、調參位、
+  調試日誌、單測映射、歷史決策、排查清單（以後改排序先看它）。
+- 把排序邏輯抽成**純函數** `core/twelvekey/CandidateRanking.kt`（`isCjkWord` / `wordsFirst` /
+  `rankBar` / `rankPanelItems` / `rankSegmentChars` / `groupCandidates`），`TwelveKeySnapshotBuilder`
+  只做裝配（`barList()` / `group()` / `rankPanelItems()` 委託）。好處：不依賴 Android，可在 JVM 直接測。
+- 行為微調：`groupCandidates` 裡「comment 為空（讀音未知）」的組由原來的 key=1（排在單音節組後、
+  多音節組前）改成 `Int.MAX_VALUE`（**永遠最後**）——它是兜底分組，不該擋在真正的單字組前面。
+- 新增 `app/src/test/java/com/hazukieq/hkrime/core/twelvekey/CandidateRankingTest.kt`（12 個用例）：
+  候選條（詞組穩定分區、截斷、去空、引擎序保持）；面板（組內三級排序、分組順序與組數上限、
+  段組關聯排序）；兩條真實數據校驗（`ji` 字表綜合分非遞增且「以」第一；詞表詞組在候選條前段）。
+- 修正 `SyllableGroupCountTest` 裡一個過時的用例名（`MAX_SYLLABLE_GROUPS is 6` → `is 8`）。
+- 新增 `tools/rank-sanity.py`：離線校驗（不裝 App）——`--syllable ji` 看某讀音排序、
+  `--audit` 全量體檢 694 個音節的「綜合分非遞增」，當前 **0 違規**。
+
+### 驗收
+
+```bash
+JAVA_HOME=$HOME/opt/jdk17/jdk-17.0.9 ./gradlew :app:testDebugUnitTest   # BUILD SUCCESSFUL（15 用例）
+python3 tools/rank-sanity.py --syllable ji                              # 以/而/如/意/已/儿/与/于…
+python3 tools/rank-sanity.py --audit                                    # 694 音節，違規 0
+```
+

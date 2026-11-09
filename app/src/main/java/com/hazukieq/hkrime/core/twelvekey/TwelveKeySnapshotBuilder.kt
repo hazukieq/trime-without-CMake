@@ -157,7 +157,7 @@ object TwelveKeySnapshotBuilder {
         // 有 segmentAnchor（剛上屏的前一個字）時，與它關聯度高的字排前面。
         // 只剩最後一段時，用引擎候選（引擎本身按詞頻/用戶詞庫排序）再疊用戶關聯度，
         // 而不是繼續用字典順序 —— 否則「最後一個字」看起來完全不受詞頻影響（用戶 2026-11-09 反饋）。
-        val barEntries = wordsFirst(ranked).take(BAR_ITEMS).filter { it.text.isNotEmpty() }
+        val barEntries = barList(ranked)
         // 預覽文字與候選條第 0 條同源：一次算好，隨快照發佈。
         val previewText = barEntries.firstOrNull { it.text.isNotEmpty() }?.text ?: ""
         // 已選前綴（librime context 裡尚未 commit 的字）+ 第一條候選 = 嵌入式預覽全文
@@ -289,37 +289,14 @@ object TwelveKeySnapshotBuilder {
         return page.map { (it.text ?: "") to (it.comment ?: "") }
     }
 
-    /** 按 comment 分組；組順序 = 首次出現順序，不重排。 */
-    /**
-     * 候選條「詞組優先」：在**已按所有因素（引擎詞頻 / 用戶記憶 / 關聯度）排好**的順序上做穩定分區，
-     * 把漢字詞組（≥2 個漢字）整體提前，其餘（單字、顏文字、拉丁詞）保持原相對順序。
-     *
-     * 需求（用戶 2026-11-09）：候選欄永遠是「組詞 > 單字」，但這個分區必須在全部排序之後做，
-     * 否則會蓋掉詞頻與用戶習慣的排序。
-     */
-    private fun wordsFirst(items: List<CandidateItem>): List<CandidateItem> {
-        if (items.size < 2) return items
-        val words = ArrayList<CandidateItem>(items.size)
-        val rest = ArrayList<CandidateItem>(items.size)
-        items.forEach { if (isCjkWord(it.text)) words.add(it) else rest.add(it) }
-        if (words.isEmpty() || rest.isEmpty()) return items
-        return words + rest
-    }
-
-    /**
-     * 展開面板「音節 → 漢字」列表排序：用戶常用字 → 綜合通用頻度 → 引擎原順序（穩定）。
-     *
-     * 引擎候選順序對單字並不可靠（詞典無 weight 時基本是文件順序，生僻字會排前面），
-     * 所以最後用綜合頻度（詞表統計 + 權威 8105 字表權重）做硬排序，只在同分時才看引擎順序。
-     */
+    /** 面板右側列表排序（委託 [CandidateRanking]，純函數便於單測）。 */
     private fun rankPanelItems(items: List<CandidateItem>): List<CandidateItem> {
-        if (items.size < 2) return items
-        val sorted = items.sortedWith(
-            compareByDescending<CandidateItem> { SegmentMemory.charScore(it.text) }
-                .thenByDescending { TwelveKeyPreedit.generalScore(it.text) }
-                .thenBy { it.index },
+        val sorted = CandidateRanking.rankPanelItems(
+            items = items,
+            charScore = { SegmentMemory.charScore(it) },
+            generalScore = { TwelveKeyPreedit.generalScore(it) },
         )
-        if (BuildConfig.DEBUG) {
+        if (BuildConfig.DEBUG && sorted !== items) {
             Timber.d(
                 "twelvekey:panel order=%s scores=%s",
                 sorted.take(8).joinToString("") { it.text },
@@ -329,32 +306,11 @@ object TwelveKeySnapshotBuilder {
         return sorted
     }
 
-    private fun isCjkWord(text: String): Boolean =
-        text.length >= 2 && text.all { it.code in 0x3400..0x4DBF || it.code in 0x4E00..0x9FFF }
+    /** 面板左列分組（委託 [CandidateRanking]）。 */
+    private fun group(items: List<CandidateItem>): List<SyllableGroup> =
+        CandidateRanking.groupCandidates(items, BLANK_READING, MAX_GROUPS)
 
-    private fun group(items: List<CandidateItem>): List<SyllableGroup> {
-        if (items.isEmpty()) return emptyList()
-        val grouped = LinkedHashMap<String, MutableList<CandidateItem>>()
-        items.forEach { item ->
-            if (item.text.isEmpty()) return@forEach
-            val reading = if (item.comment.isBlank()) BLANK_READING else item.comment
-            grouped.getOrPut(reading) { ArrayList() }.add(item)
-        }
-        // 左列排序：單音節組排前面（用戶 2026-11-08：對聯想詞不滿意時，先手動選單字），
-        // 其餘按音節數升序，同音節數保持候選原有順序（stable sort）。
-        return grouped.entries.take(MAX_GROUPS).map { (reading, items) ->
-            SyllableGroup(
-                reading = reading,
-                syllables = if (reading == BLANK_READING) emptyList() else {
-                    reading.split(' ').filter { it.isNotBlank() }
-                },
-                items = items,
-            )
-        }.sortedWith(
-            compareBy(
-                { if (it.syllables.isEmpty()) 1 else it.syllables.size },
-                { it.reading.lowercase() },
-            ),
-        )
-    }
+    /** 候選條最終列表（委託 [CandidateRanking]）。 */
+    private fun barList(ranked: List<CandidateItem>): List<CandidateItem> =
+        CandidateRanking.rankBar(ranked, BAR_ITEMS)
 }
