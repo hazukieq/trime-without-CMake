@@ -134,6 +134,10 @@ object TwelveKeyPreedit {
 
     /** 詞典行載入後統一收尾：音節次數 → code 表。 */
     internal fun finishLoading(counts: HashMap<String, Int>) {
+        // 可重入：測試會在不同測試類別各自載入一次資源；這裡先把派生表清空再重建，
+        // 避免同一個碼位的音節被重複 append（會讓「輪轉取 limit 個」變少）。
+        table.clear()
+        codeToSyllables.clear()
         counts.forEach { (syllable, freq) ->
             val code = codeOf(syllable)
             val old = table[code]
