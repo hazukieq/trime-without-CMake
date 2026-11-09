@@ -205,12 +205,14 @@ class TextInputManager private constructor() :
             onEngineChanged = {
                 val committed = runCatching { Rime.getCommit() }.getOrDefault(false)
                 if (committed) {
-                    val text = Rime.getCommitText()
+                    val text = foldUncommittedPrefix(Rime.getCommitText())
                     Timber.i("twelvekey: commit buffer=[%s]", text)
                     runCatching { activeEditorInstance.commitText(text, false) }
                         .onFailure { Timber.e(it, "twelvekey: commitText failed") }
                 } else {
-                    Timber.i("twelvekey: no commit buffer after select")
+                    // 多字詞被選中：buffer 空、但 preedit 前綴已有字，先記住，下一次提交一起上屏。
+                    uncommittedPrefix = compositionPrefix()
+                    Timber.i("twelvekey: no commit buffer after select, prefix=[%s]", uncommittedPrefix)
                 }
                 runCatching { trime.updateComposing() }
                     .onFailure { Timber.e(it, "twelvekey: updateComposing failed") }
@@ -394,8 +396,15 @@ class TextInputManager private constructor() :
             segments.drop(1)
         }
         runCatching {
+            // 先把「已選中但未提交」的前綴（如「江蘇」）並進來，再清組合重建，
+            // 否則 clearComposition 會把它丟掉（用戶 2026-11-10 報的問題）。
+            // 前綴已在 onEngineChanged 記住時優先用它（那是 librime 真正選中的段），
+            // 用完立刻清空，避免下一次（尤其是走引擎選詞那條路）被重複拼一次。
+            val remembered = uncommittedPrefix
+            uncommittedPrefix = ""
+            val prefix = remembered.ifEmpty { withEngineLock { compositionPrefix() } }
             withEngineLock { Rime.clearComposition() }
-            activeEditorInstance.commitText(text, false)
+            activeEditorInstance.commitText(prefix + text, false)
             // 記住剛上屏的字：下一段的候選條按「與它的關聯度」排序（區 → 域）。
             setSegmentAnchor(text.firstOrNull())
             if (rest.isNotEmpty()) {
@@ -404,6 +413,22 @@ class TextInputManager private constructor() :
             trime.updateComposing()
             twelveKeyController?.refresh(immediate = true)
         }.onFailure { Timber.e(it, "twelvekey: segmented pick failed") }
+    }
+
+    /** librime preedit 裡已選前綴（不含碼串）。調用方需持有引擎鎖。 */
+    private fun compositionPrefix(): String =
+        runCatching { Rime.getCompositionPrefix() }.getOrDefault("").orEmpty()
+
+    /**
+     * 把「已選未提交前綴」並進上屏文字。
+     *
+     * librime 有時 commit buffer 已包含前綴（整串一次提交），此時不能重複拼接，用 startsWith 判斷。
+     */
+    private fun foldUncommittedPrefix(commitText: String): String {
+        val prefix = uncommittedPrefix
+        uncommittedPrefix = ""
+        if (prefix.isEmpty() || commitText.startsWith(prefix)) return commitText
+        return prefix + commitText
     }
 
     /** 更新「按段選字」的關聯度錨點（前一個上屏的字）；變化時讓快照緩存失效。 */
@@ -478,6 +503,8 @@ class TextInputManager private constructor() :
         // 分段不再依賴用戶按 `'`：面板按碼位自動拆段（見 TwelveKeySnapshotBuilder.segmentGroupsFor）。
         if (!Rime.isComposing()) {
             setSegmentAnchor(null)
+            // 組字結束（上屏/清空/取消）→ 未提交前綴已無意義，避免後續一次性誤上屏。
+            uncommittedPrefix = ""
         }
         if (isTwelveKeyMode()) {
             // 按鍵後立即重建快照（不 debounce）；面板關閉時只枚舉候選條需要的 16 條，
@@ -695,6 +722,15 @@ class TextInputManager private constructor() :
     /** 最近一次綁到候選條的條目（點擊下標必須按這份解析，保證所見即所得）。 */
     /** 最近一次發佈的快照：候選條、面板、preedit 預覽、空格上屏全部只讀這一份。 */
     private var currentSnapshot: TwelveKeySnapshot = TwelveKeySnapshot.EMPTY
+
+    /**
+     * librime context 裡「已選中但尚未提交」的前綴（例如先選了一個多字詞「江蘇」）。
+     *
+     * 多字詞被 `select_candidate` 選中時不會產生 commit buffer：TextInputManager 只能看到
+     * preedit 前綴（`Rime.getCompositionPrefix()`）。之後的分段選字會 `clearComposition()`
+     * 重建組合，若不把這個前綴一併上屏就會被丟掉（用戶 2026-11-10 報「江蘇沒上屏」）。
+     */
+    private var uncommittedPrefix: String = ""
 
     override fun onEvent(event: Event?) {
         lastKeyAtNs = System.nanoTime()

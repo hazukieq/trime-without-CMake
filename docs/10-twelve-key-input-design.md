@@ -2045,3 +2045,39 @@ python3 tools/rank-sanity.py --syllable ji                              # 以/�
 python3 tools/rank-sanity.py --audit                                    # 694 音節，違規 0
 ```
 
+
+## 15.52 修復：先選多字詞、再逐段選字時，前面的詞「沒上屏」(2026-11-10)
+
+用戶複現：原始碼串混合（`gong th t k` 這種），候選條先選「江蘇」，再從展開面板逐個選「地」「區」，
+最後「江蘇」消失、只有地/區上屏。日誌（`/sdcard/hkrime/logs/hkrime-YYYYMMDD.log`）：
+
+```
+twelvekey: no commit buffer after select          ← 選「江蘇」後 librime 沒有 commit buffer
+dbgpre: raw=[江苏9 5] hint=[压力]                  ← 江蘇停留在 preedit 前綴，未提交
+twelvekey: commit buffer=[区]  / cacheDraft() 地区   ← 之後只提交了單字，江蘇被丟掉
+```
+
+### 根因
+
+多字詞被 `select_candidate()` 選中時，librime 只是把那一**段**標成 selected（`Segment::kSelected`），
+不會產生 commit buffer；字留在 context 的 preedit 前綴裡。而「按段選字」路徑
+（`TextInputManager.pickSegmentedCandidate`）為了重建組合會先 `Rime.clearComposition()`，
+這個動作把 context 整個丟掉 —— 之前已選但未提交的前綴（江蘇）就一起沒了。
+
+### 修法（`ime/text/TextInputManager.kt`）
+
+1. 新增 `uncommittedPrefix`：`onEngineChanged` 裡若 `Rime.getCommit()` 為 false（選中未提交），
+   用 `Rime.getCompositionPrefix()` 記下 preedit 前綴。
+2. `foldUncommittedPrefix(commitText)`：提交時若前綴非空且 commit buffer 不以它開頭，
+   就拼成 `前綴 + buffer` 一起上屏（`startsWith` 判斷避免「整串一次提交」時重複）。
+3. `pickSegmentedCandidate`：清組合**之前**取「記住的前綴（沒有則現讀 `getCompositionPrefix()`）」，
+   上屏 `前綴 + 選中的字`，**用完立刻清空** `uncommittedPrefix`——否則下一次走引擎選詞路徑時會被再拼一次
+   （第一次修完就踩到這個，出現「江蘇疼江蘇了」）。
+4. 組字結束（`!Rime.isComposing()`：上屏/清空/ESC/退格刪空）統一把 `uncommittedPrefix` 清掉。
+
+### 真機驗收
+
+- 碼串 `gong w95` → 候選條 `江苏 广西 光绪 江西 钢丝`；選「江蘇」→ 日誌
+  `no commit buffer after select, prefix=[江苏]`；面板選「疼」→ `cacheDraft() …江苏疼`（江蘇一併上屏），
+  再選「了」→ 只追加「了」，不重複。
+- 選「江蘇」→ 直接點候選條單字（引擎路徑）同樣會帶上前綴。
