@@ -202,14 +202,14 @@ object TwelveKeyPreedit {
      * 段碼 → 可能音節（例如 `5` → ke/le/ko…），精確碼優先，其次簡拼前綴；按字典頻次降序。
      * 給「分詞後按段選字」用（見 [com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder]）。
      */
-    fun syllablesForSegment(code: String, limit: Int = 12): List<String> {
+    fun syllablesForSegment(code: String, limit: Int = 12, exactOnly: Boolean = false): List<String> {
         if (code.isEmpty()) return emptyList()
         val exact = ArrayList<Entry>()
         val prefix = ArrayList<Entry>()
         codeToSyllables.forEach { (syllableCode, list) ->
             when {
                 syllableCode == code -> exact.addAll(list)
-                syllableCode.startsWith(code) -> prefix.addAll(list)
+                !exactOnly && syllableCode.startsWith(code) -> prefix.addAll(list)
             }
         }
         val exactSorted = exact.sortedByDescending { it.freq }
@@ -253,6 +253,31 @@ object TwelveKeyPreedit {
      * 用途：多音節輸入但引擎只給詞組候選時，展開面板要補一組「第一個音節的單字」；
      * 點單字上屏後把 [second] 重新餵回引擎繼續輸入。
      */
+    /**
+     * 一個碼串可能有多種「合法第一段」切法：`744ii` 可以是 `744|ii`（son+gi，引擎給的那種），
+     * 也可以是 `744i|i`（song + 以 g/h 開頭的下一段）。只列引擎挑中的那種，用戶就看不到
+     * 「song g / song h」這些組合（用戶 2026-11-10）。
+     *
+     * 規則：由長到短找「head 恰好是一個完整音節」的切法（長音節更具體，避免 `74`=po 搶先）；
+     * 一個都切不出（純首碼簡拼，如 `855`）時退回「第一個碼位 + 其餘碼」；
+     * [limit] 控制最多幾種切法。
+     */
+    fun splitHeads(codes: String, limit: Int = 2): List<Pair<String, String>> {
+        if (codes.length < 2) return emptyList()
+        val out = ArrayList<Pair<String, String>>()
+        val maxHead = minOf(codes.length - 1, 5)
+        for (k in maxHead downTo 1) {
+            val head = codes.substring(0, k)
+            val single = decodeSingle(head) ?: continue
+            if (single.size == 1) {
+                out.add(head to codes.substring(k))
+                if (out.size >= limit) break
+            }
+        }
+        if (out.isEmpty()) out.add(codes.substring(0, 1) to codes.substring(1))
+        return out
+    }
+
     fun splitFirstSyllable(codes: String): Pair<String, String>? {
         if (codes.length < 2) return null
         val total = decode(codes)?.split(' ')?.size ?: 0
@@ -380,7 +405,7 @@ object TwelveKeyPreedit {
     private val MULTI_DELIMITER = Regex("[\u0027\\s]+")
 
     /** 單段碼串 → 音節列表；切不出完整音節回傳 null。 */
-    private fun decodeSingle(input: String): List<String>? {
+    internal fun decodeSingle(input: String): List<String>? {
         if (input.isEmpty()) return null
         val n = input.length
         // 先比「音節數量少」，再比「詞頻高」：避免被 ngh/mi 這類高頻短音節切碎

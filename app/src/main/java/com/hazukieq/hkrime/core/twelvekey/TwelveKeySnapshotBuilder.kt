@@ -208,26 +208,37 @@ object TwelveKeySnapshotBuilder {
     private fun segmentGroupsFor(remaining: String, anchor: Char?): List<SyllableGroup> {
         val codes = remaining.replace("'", "")
         if (codes.isEmpty()) return emptyList()
-        val split = TwelveKeyPreedit.splitFirstSyllable(codes) ?: return emptyList()
-        val (head, rest) = split
+        // 一個碼串可能有多種合法切法（`744ii` = son+gi 或 song+g*/h**）：
+        // 每種切法都列出「第一段的音節 → 單字」組，用戶才能自己決定怎麼斷（2026-11-10）。
+        val splits = TwelveKeyPreedit.splitHeads(codes)
+        if (splits.isEmpty()) return emptyList()
         val result = ArrayList<SyllableGroup>()
-        for (syllable in TwelveKeyPreedit.syllablesForSegment(head, MAX_SYLLABLE_GROUPS)) {
-            val chars = TwelveKeyPreedit.rankChars(
-                TwelveKeyPreedit.charsForSyllable(syllable),
-                anchor,
-            )
-            val items = chars.map { ch ->
-                CandidateItem(text = ch, comment = syllable, index = -1, segment = 0, restCode = rest)
+        val seen = HashSet<String>()
+        splits.forEachIndexed { splitIndex, (head, rest) ->
+            // 第一種切法給足名額；備選切法減半，避免左列被「所有可能切法」灌滿。
+            val quota = if (splitIndex == 0) MAX_SYLLABLE_GROUPS else MAX_SYLLABLE_GROUPS / 2
+            // 備選切法只認精確碼：否則 `744`(son) 會把前綴同碼的 `744i`(song)、`7444`(pong)
+            // 也算進來，和第一種切法重複。
+            for (syllable in TwelveKeyPreedit.syllablesForSegment(head, quota, exactOnly = splitIndex > 0)) {
+                if (!seen.add(syllable)) continue
+                val chars = TwelveKeyPreedit.rankChars(
+                    TwelveKeyPreedit.charsForSyllable(syllable),
+                    anchor,
+                )
+                val items = chars.map { ch ->
+                    CandidateItem(text = ch, comment = syllable, index = -1, segment = 0, restCode = rest)
+                }
+                if (items.isEmpty()) continue
+                result.add(
+                    SyllableGroup(
+                        // 備選切法標上剩餘碼數，避免和第一種切法的同名音節混淆（如 song·1）。
+                        reading = if (splitIndex == 0) syllable else "$syllable·${rest.length}",
+                        syllables = listOf(syllable),
+                        items = items,
+                        segment = 0,
+                    ),
+                )
             }
-            if (items.isEmpty()) continue
-            result.add(
-                SyllableGroup(
-                    reading = syllable,
-                    syllables = listOf(syllable),
-                    items = items,
-                    segment = 0,
-                ),
-            )
         }
         // 組之間按「組內第一字與前一字的關聯度」排：打完「區」後，含「域」的那組排最前。
         if (anchor != null) {

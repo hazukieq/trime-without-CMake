@@ -136,4 +136,35 @@ class SegmentSplitTest {
         val four = preedit.syllablesForSegment("4", 8)
         assertTrue("4 鍵應同時有 m/n 開頭，實際=$four", four.any { it.startsWith("m") } && four.any { it.startsWith("n") })
     }
+
+    /**
+     * 用戶 2026-11-10：`744ii`（ps mno mno ghi ghi）除引擎挑中的 `son|gi`，
+     * 還要有「song + g 開頭」與「song + h 開頭」這種切法 —— splitHeads 由長到短枚舉第一段音節。
+     */
+    @Test
+    fun splitHeadsEnumeratesAlternativeFirstSyllables() {
+        // 744i = song（4 碼，更長更具體）先；744 = son 次之
+        assertEquals(listOf("744i" to "i", "744" to "ii"), preedit.splitHeads("744ii"))
+        // 常規兩段只有一種切法
+        assertEquals(listOf("5e" to "5e"), preedit.splitHeads("5e5e"))
+        // 首碼簡拼：退回「第一個碼位 + 其餘碼」
+        assertEquals(listOf("8" to "55"), preedit.splitHeads("855"))
+    }
+
+    @Test
+    fun splitHeadsNeverRepeatsAndAlwaysCoversAllCodes() {
+        for (codes in mixedCodes) {
+            val splits = preedit.splitHeads(codes)
+            assertTrue("code=$codes 至少要一種切法", splits.isNotEmpty())
+            val isFallback = splits.size == 1 && splits[0].first.length == 1 &&
+                preedit.decodeSingle(splits[0].first) == null
+            for ((head, rest) in splits) {
+                assertEquals("code=$codes head+rest 必須拼回原碼", codes, head + rest)
+                if (!isFallback) {
+                    assertEquals("code=$codes head 必須是一個音節（$head）", 1, preedit.decodeSingle(head)?.size)
+                }
+            }
+            assertEquals("code=$codes 切法不應重複", splits.distinct(), splits)
+        }
+    }
 }
