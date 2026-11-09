@@ -149,7 +149,13 @@ object TwelveKeySnapshotBuilder {
         // 之前 `'` 那套作廢，用這套按序推進的實現）。
         val segmentGroups = segmentGroupsFor(remaining, segmentAnchor)
         // 展開面板的「音節 → 漢字」列表也按常用度排：用戶常用字 → 通用字頻 → 引擎原順序。
-        val engineGroups = group(ranked).map { g -> g.copy(items = rankPanelItems(g.items)) }
+        // 單音節輸入時左列全是同類音節組：必須按常用度排，不能按讀音字母序
+        // （用戶 2026-11-10：「找半天都找不到想要的音節」）。
+        val engineGroups = CandidateRanking.orderGroups(
+            group(ranked).map { g -> g.copy(items = rankPanelItems(g.items)) },
+            charScore = { text -> SegmentMemory.charScore(text) },
+            generalScore = { text -> TwelveKeyPreedit.generalScore(text) },
+        )
         // 有段組時只保留引擎的詞組組，否則左列會被引擎的幾十個單音節讀音灌滿
         // （段組本身已按「每個首字母 8 個」限量）；單音節輸入沒有段組，引擎組照舊。
         val groups = CandidateRanking.panelGroups(segmentGroups, engineGroups)

@@ -260,4 +260,30 @@ class CandidateRankingTest {
         )
         assertEquals(engine, CandidateRanking.panelGroups(emptyList(), engine))
     }
+
+    // ── orderGroups：單音節輸入時左列按常用度排（用戶 2026-11-10）───────────────
+    @Test
+    fun orderGroupsSortsSingleSyllableGroupsByFrequency() {
+        val g = { reading: String, text: String, index: Int ->
+            CandidateRanking.groupCandidates(listOf(item(text, reading, index))).first()
+        }
+        // 引擎順序：a(低頻) / b(高頻) / c(詞組) / 未知讀音
+        val groups = listOf(
+            g("a", "阿", 0),
+            g("b", "家", 1),
+            CandidateRanking.groupCandidates(listOf(item("家加", "b a", 2))).first(),
+            CandidateRanking.groupCandidates(listOf(item("?", "", 3))).first(),
+        )
+        val score = mapOf("阿" to 1, "家" to 99, "家加" to 50, "?" to 0)
+        val ordered = CandidateRanking.orderGroups(groups, { score[it] ?: 0 }, { 0 })
+        // 單音節組按分數降序（家 99 → 阿 1），詞組其次，未知讀音最後
+        assertEquals(listOf("b", "a", "b a", "…"), ordered.map { it.reading })
+    }
+
+    @Test
+    fun orderGroupsKeepsEngineOrderWhenScoresTie() {
+        val groups = (1..4).map { CandidateRanking.groupCandidates(listOf(item("字$it", "ji", it))).first() }
+        val ordered = CandidateRanking.orderGroups(groups, { 0 }, { 0 })
+        assertEquals(groups.map { it.reading }, ordered.map { it.reading })
+    }
 }

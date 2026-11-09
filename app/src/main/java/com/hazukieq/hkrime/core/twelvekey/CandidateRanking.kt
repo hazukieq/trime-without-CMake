@@ -122,4 +122,25 @@ object CandidateRanking {
         val words = engineGroups.filter { it.syllables.size >= 2 }
         return segmentGroups + words
     }
+
+    /**
+     * 左列的最終顯示順序（用戶 2026-11-10）：
+     * 單音節輸入時左列全是「同一批音節」的組，必須按常用度排（常用音節在前），
+     * 不能按讀音字母序 —— 否則找想要的音節要找半天。
+     *
+     * 排序鍵：單音節組 → 多音節（詞組）組 → 讀音未知；同類內按組內第一個字的
+     * 用戶字頻、通用字頻降序，最後用讀音兜底保證穩定。數量不做限制（引擎給多少列多少）。
+     */
+    fun orderGroups(
+        groups: List<SyllableGroup>,
+        charScore: (String) -> Int,
+        generalScore: (String) -> Int,
+    ): List<SyllableGroup> = groups.sortedWith(
+        compareBy(
+            { if (it.syllables.isEmpty()) 2 else if (it.syllables.size == 1) 0 else 1 },
+            { g -> -(charScore(g.items.firstOrNull()?.text ?: "")) },
+            { g -> -(generalScore(g.items.firstOrNull()?.text ?: "")) },
+            { it.reading.lowercase() },
+        ),
+    )
 }
