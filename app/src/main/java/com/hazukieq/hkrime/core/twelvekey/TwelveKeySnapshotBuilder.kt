@@ -28,6 +28,12 @@ object TwelveKeySnapshotBuilder {
     /** 面板左列**每個首字母**最多列幾個音節組（總數上限見 TwelveKeyPreedit.MAX_SYLLABLES_TOTAL=16）。 */
     private const val MAX_SYLLABLE_GROUPS = 8
 
+    /** 有段組時，一個碼位給出的音節上限：普通鍵 16、音節構成豐富的鍵 24（用戶 2026-11-10）。 */
+    private const val SEGMENT_SYLLABLE_LIMIT = 16
+    private const val SEGMENT_SYLLABLE_LIMIT_RICH = 24
+    /** 可用音節超過基礎上限（16）就算「構成豐富」，放開到 24，避免 17~23 個的鍵被砍掉一截。 */
+    private const val RICH_SYLLABLE_THRESHOLD = SEGMENT_SYLLABLE_LIMIT
+
     private const val MAX_GROUPS = 200
 
     /** 剩餘碼超過該長度時，fallback 只保留最後 48 個碼（設計 §8.4）。 */
@@ -256,7 +262,15 @@ object TwelveKeySnapshotBuilder {
         splits.forEachIndexed { splitIndex, split ->
             val (head, rest) = split
             // 第一種切法吃完整配額；備選切法減半（面板不能被次要切法灌滿）。
-            val quota = if (splitIndex == 0) MAX_SYLLABLE_GROUPS else MAX_SYLLABLE_GROUPS / 2
+            // 有段組時放寬音節數（用戶 2026-11-10）：普通鍵 16、音節豐富的鍵 24；
+            // 備選切法減半，避免次要解讀把面板灌滿。
+            val headPool = TwelveKeyPreedit.syllableCountForCode(split.first)
+            val baseLimit = if (headPool >= RICH_SYLLABLE_THRESHOLD) {
+                SEGMENT_SYLLABLE_LIMIT_RICH
+            } else {
+                SEGMENT_SYLLABLE_LIMIT
+            }
+            val quota = if (splitIndex == 0) baseLimit else baseLimit / 2
             // 備選切法：head 本身是完整音節時只取精確碼（避免和前綴重複）；
             // head 只是裸碼（`w`）時必須允許前綴展開，否則 th* 全被吃掉。
             val exactOnly = splitIndex > 0 && TwelveKeyPreedit.isSingleSyllable(head)

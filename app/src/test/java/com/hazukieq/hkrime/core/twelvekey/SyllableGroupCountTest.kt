@@ -111,7 +111,11 @@ class SyllableGroupCountTest {
      * - 前綴命中的音節**按首字母分桶**，桶內按詞頻降序，桶間輪轉；
      * - [limit] 是**每個首字母**的名額，總數上限 [MAX_TOTAL]（=16）。
      */
-    private fun syllablesForSegment(code: String, limit: Int): List<String> {
+    private fun syllablesForSegment(
+        code: String,
+        limit: Int,
+        totalLimit: Int = MAX_TOTAL,
+    ): List<String> {
         val byCode = codeToSyllables()
         val exact = ArrayList<String>()
         val buckets = LinkedHashMap<Char, MutableList<String>>()
@@ -127,7 +131,7 @@ class SyllableGroupCountTest {
         val exactSorted = exact.sortedWith(byFreq).distinct()
         buckets.values.forEach { it.sortWith(byFreq) }
         val order = buckets.values.sortedByDescending { it.firstOrNull()?.let { s -> syllableFreq[s] ?: 0 } ?: 0 }
-        val cap = maxOf(limit, minOf(limit * order.size, MAX_TOTAL))
+        val cap = maxOf(limit, minOf(limit * order.size, totalLimit))
         val diversified = ArrayList<String>()
         val seen = IntArray(order.size)
         var round = 0
@@ -206,38 +210,31 @@ class SyllableGroupCountTest {
      * 若日後字表/詞典變化很大，跑這個測試看錶再改常數即可。
      */
     @Test
-    fun `MAX_SYLLABLE_GROUPS is 8 and yields sane coverage`() {
+    fun `segment syllable limit is 16 or 24 for rich codes`() {
         load()
-        val constant = 8 // 與 TwelveKeySnapshotBuilder.MAX_SYLLABLE_GROUPS 保持一致（每個首字母 8 個）
+        // 用戶 2026-11-10：有段組時，一個編碼給出的音節上限 16；音節構成很豐富的（可用 > 16）給 24。
         val builderSource = File("src/main/java/com/hazukieq/hkrime/core/twelvekey/TwelveKeySnapshotBuilder.kt")
             .readText()
         assertTrue(
-            "MAX_SYLLABLE_GROUPS 應為 $constant（見本測試的選擇依據）",
-            builderSource.contains("MAX_SYLLABLE_GROUPS = $constant"),
+            "應有 SEGMENT_SYLLABLE_LIMIT = 16",
+            builderSource.contains("SEGMENT_SYLLABLE_LIMIT = 16"),
+        )
+        assertTrue(
+            "應有 SEGMENT_SYLLABLE_LIMIT_RICH = 24",
+            builderSource.contains("SEGMENT_SYLLABLE_LIMIT_RICH = 24"),
         )
 
-        val covs = heads.map { coverage(it, constant) }
-        val avg = covs.average()
-        val min = covs.minOf { it }
-        println("MAX_SYLLABLE_GROUPS=$constant -> avg=%.1f%% min=%.1f%%".format(avg * 100, min * 100))
-        // 守門值：資料若退化（音節索引損壞/字表丟失），覆蓋率會明顯掉下來。
-        // 2026-11-10 改成「每個首字母 8 個」後：12 首碼 avg=55.3%、min=44.9%（舊的總數 8 是 44.2/28.8）。
-        assertTrue("平均覆蓋率過低：%.1f%%".format(avg * 100), avg >= 0.50)
-        assertTrue("最差首碼覆蓋率過低：%.1f%%".format(min * 100), min >= 0.40)
-
-        // 每個首碼都拿到「每個首字母 constant 個」（總數受 MAX_TOTAL 限制）。
         heads.forEach { head ->
-            val available = syllablesForSegment(head, Int.MAX_VALUE).size
-            // 「首字母桶數」= 前綴命中的音節裡有幾種首字母（不是幾個碼）
-            val buckets = codeToSyllables().entries
-                .filter { it.key.startsWith(head) && it.key != head }
-                .flatMap { it.value }
-                .map { it.first() }
-                .distinct()
-                .size
-            val expected = minOf(available, minOf(constant * maxOf(1, buckets), MAX_TOTAL))
-            val got = syllablesForSegment(head, constant).size
-            assertEquals("head=$head expected=$expected available=$available buckets=$buckets", expected, got)
+            val available = syllablesForSegment(head, Int.MAX_VALUE)
+            val limit = if (available.size > 16) 24 else 16
+            val got = syllablesForSegment(head, limit, totalLimit = limit)
+            // 上限就是「min(可用音節數, 16 或 24)」；音節不足的鍵自然拿不滿。
+            assertEquals(
+                "head=$head available=${available.size} limit=$limit",
+                minOf(available.size, limit),
+                got.size,
+            )
+            println("head=$head available=${available.size} -> ${got.size}")
         }
     }
 

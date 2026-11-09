@@ -327,6 +327,19 @@ object TwelveKeyPreedit {
         return chosen.sortedBy { it.first }
     }
 
+    /**
+     * 該碼位能覆蓋多少個音節（精確碼 + 前綴命中），面板用它決定「這個鍵音節構成是否豐富」：
+     * 豐富的鍵放 24 個音節組，普通鍵放 16 個（用戶 2026-11-10）。
+     */
+    fun syllableCountForCode(code: String): Int {
+        if (code.isEmpty()) return 0
+        var n = 0
+        codeToSyllables.forEach { (syllableCode, list) ->
+            if (syllableCode == code || syllableCode.startsWith(code)) n += list.size
+        }
+        return n
+    }
+
     /** 碼段的所有可能「下一個音節首字母」（去重、保持輪轉順序），用於決定列哪幾行聯想詞。 */
     fun initialsForPrefix(code: String, limit: Int = 2): List<Char> {
         if (code.isEmpty()) return emptyList()
@@ -415,7 +428,12 @@ object TwelveKeyPreedit {
      * 段碼 → 可能音節（例如 `5` → ke/le/ko…），精確碼優先，其次簡拼前綴；按字典頻次降序。
      * 給「分詞後按段選字」用（見 [com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder]）。
      */
-    fun syllablesForSegment(code: String, limit: Int = 12, exactOnly: Boolean = false): List<String> {
+    fun syllablesForSegment(
+        code: String,
+        limit: Int = 12,
+        exactOnly: Boolean = false,
+        totalLimit: Int = MAX_SYLLABLES_TOTAL,
+    ): List<String> {
         if (code.isEmpty()) return emptyList()
         val exact = ArrayList<Entry>()
         // 前綴命中記住「code 之後的下一個碼位」：分桶時用它，`w`（th 鍵）才能同時給出
@@ -447,7 +465,7 @@ object TwelveKeyPreedit {
         // limit = **每個首字母**最多取幾個（用戶 2026-11-10：常數應對應「各取一份」而不是平分）；
         // 總數另有上限 MAX_SYLLABLES_TOTAL，避免一個鍵覆蓋 3 個聲母時左列過長。
         val distinctExact = exactSorted.map { it.syllable }.distinct()
-        val totalCap = maxOf(limit, minOf(limit * order.size, MAX_SYLLABLES_TOTAL))
+        val totalCap = maxOf(limit, minOf(limit * order.size, totalLimit))
         val diversified = ArrayList<Entry>()
         val perInitialSeen = HashMap<Char, Int>()
         // 每個首字母的名額：至少 limit，但當一個鍵只覆蓋一個首字母時（`w` = th*，全是 t），

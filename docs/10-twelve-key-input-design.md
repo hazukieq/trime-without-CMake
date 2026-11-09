@@ -2575,6 +2575,10 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
   行內按熱度取 6 條再按詞面字典序顯示；行間先按熱度選 `maxRows` 行，再按行標題字典序排。
 - **與引擎合併**：`CandidateRanking.mergeAssociationGroups(merged, assocGroups)` 對 `reading` 相同的組
   做合併 —— 引擎候選在前、我們補的詞去重後追加；引擎沒有該讀音時才新建行（補集）。
+- **音節組上限（有段組時）**：一個碼位最多 16 個音節組；可用音節超過 16 的算「構成豐富」，
+  放開到 24（`SEGMENT_SYLLABLE_LIMIT = 16`、`SEGMENT_SYLLABLE_LIMIT_RICH = 24`、
+  `RICH_SYLLABLE_THRESHOLD = 16`，用戶 2026-11-10）。備選切法用一半配額。
+  實測 12 個首碼：`y/9/a/e/1/i/5/4/w/7/8` 都是 24，`3`（23 個）全列 23。
 - 每次整輪聯想行上限 `ASSOC_MAX_ROWS = 4`，每音節 ≤2 行、每行 ≤6 詞，避免面板被灌滿、也壓每鍵成本。
 - 實測（`we` = 「共」選完後 th+d）：單字組 `than the them then thep thet theu thi thu`；
   聯想行 `than dung / than fu / than fo / than fung`（全部是完整讀音）。
