@@ -1943,3 +1943,42 @@ librime 表排序退化成文件順序（≈ Unicode/部首順序），所以越
 5. 這些組 `segment = 0`，面板打開時默認選中（用戶要的就是「先看單字」）。
 
 同一套 `segment`/`restCode` 也補進了 `CandidatePanelAdapter.Item` 與候選條點擊路徑。
+
+## 15.49 按碼位拆段統一實現（`'` 那套作廢）(2026-11-10)
+
+用戶定調：之前依賴「分詞鍵 `'`」的按段選字作廢，改用按**碼位**自動拆段的實現，
+並且「不可能把每個首字母的所有組合都羅列」——只列高頻音節。
+
+### 統一後的規則（不再看輸入裡有沒有 `'`）
+
+`TwelveKeySnapshotBuilder.segmentGroupsFor(remaining, anchor)`：
+
+1. `codes = remaining.replace("'", "")`（`'` 只當分隔符字元剝掉，不再作為「分段模式」開關）；
+2. `TwelveKeyPreedit.splitFirstSyllable(codes)`：
+   - 能完整解成 ≥2 個音節（如 `5e5e`）→ 按音節邊界切成「第一音節碼 + 其餘碼」；
+   - 解不出完整音節（首字母相拼，如 `855`、`4i`）→ 按「第一個碼位 + 其餘」切；
+   - 單音節（如 `5e`）→ 返回 null，不補段組（直接走引擎候選）。
+3. 對第一段用 `syllablesForSegment(head, MAX_SYLLABLE_GROUPS = 6)` 取**高頻前 6 個**讀音
+   （`codeToSyllables` 按詞表頻次降序，天然是「高頻拼音」），每個讀音一組；
+4. 組內字 `rankChars`（用戶組詞關聯度 → 用戶常用字 → 通用字頻）排序；
+5. 每項 `CandidateItem(segment = 0, restCode = 其餘碼)`；點擊走
+   `pickSegmentedCandidate(text, restCode)`：清組字 → 上屏該字 → 其餘碼 `Rime.onText` 餵回
+   → 下一段繼續出候選（「按順序推進」）；
+6. 段組排在引擎組前面，面板打開默認選中（`preferredGroup` 選第一個 `segment >= 0` 的組）。
+
+### 候選條
+
+候選條回到「引擎候選 + 詞組優先」：`barEntries = wordsFirst(ranked).take(12)`，
+不再有 `lastSegmentMode` / `segmentGroups` 兩個覆蓋分支（那兩個都是 `'` 那套的遺留）。
+
+### 效果（真機，12 鍵碼 `855`）
+
+- 面板左列：`ji`（以/而/如/意/已/儿…按字頻排）→ `jen` `zi` `jin` `zin` `jiu` → 引擎詞組組（於下去/伊拉克…）；
+- 點「以」：輸入框出現「以」，preedit 剩 `5 5`，左列換成下一段 `ki li lin lu kui ken`；
+- 點「去」：輸入框「以去」，preedit 剩 `5`，左列是 `5` 的引擎單字組 + `ka kai kam kan kang kap`；
+- 全程沒按過分詞鍵，也不依賴 `'`。
+
+### 備註
+
+- `'` 仍可作為 librime 側的音節分隔符輸入（主題的「分詞」鍵照舊送出），但 App 側不再據此切段；
+- `TwelveKeyController.segmentMode`/`segmented` 參數暫時保留但不再影響面板分段（後續可清）。

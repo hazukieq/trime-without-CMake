@@ -21,6 +21,12 @@ object TwelveKeySnapshotBuilder {
     const val MAX_CANDIDATES = 600
 
     /** 左列最多展示的組數（設計 §7.2）。 */
+    /**
+     * 面板左列「每個音節」最多列幾個讀音：只列高頻
+     * （用戶 2026-11-10：不要把首字母的所有組合都羅列）。
+     */
+    private const val MAX_SYLLABLE_GROUPS = 6
+
     private const val MAX_GROUPS = 200
 
     /** 剩餘碼超過該長度時，fallback 只保留最後 48 個碼（設計 §8.4）。 */
@@ -137,16 +143,13 @@ object TwelveKeySnapshotBuilder {
         // 這裡按「段」補上字典候選：每段列出該碼對應的讀音與字，點擊後上屏該字、
         // 再把後面幾段的碼重新餵回引擎 —— 讓「分詞」真正能逐段聯想。
         // 分詞段組放在最前面：它們才是「逐段選字」的操作入口，往後塞會被幾十個引擎組淹沒。
-        val segmentGroups = dictGroupsFor(remaining, segmentAnchor, segmented)
+        // 多音節輸入一律按「碼位」拆段：面板先列第一個待選段的「高頻音節 → 單字」組
+        // （n**、h**、j**…），點字上屏後把其餘碼餵回引擎繼續——不再依賴用戶按 `'`（用戶 2026-11-10：
+        // 之前 `'` 那套作廢，用這套按序推進的實現）。
+        val segmentGroups = segmentGroupsFor(remaining, segmentAnchor)
         // 展開面板的「音節 → 漢字」列表也按常用度排：用戶常用字 → 通用字頻 → 引擎原順序。
         val engineGroups = group(ranked).map { g -> g.copy(items = rankPanelItems(g.items)) }
-        // 多音節輸入（含沒按分詞鍵的普通輸入）但引擎只給詞組候選時，面板會「全是組詞、
-        // 沒有單字」——這裡按字典補一組「第一個音節的單字」，點它上屏後把剩餘碼餵回引擎，
-        // 讓用戶隨時能退化成逐字選（用戶 2026-11-09 反饋）。
-        val singleCharTopUp = if (segmentGroups.isEmpty() &&
-            engineGroups.none { it.syllables.size == 1 }
-        ) firstSyllableGroups(remaining, segmentAnchor) else emptyList()
-        val groups = segmentGroups + singleCharTopUp + engineGroups
+        val groups = segmentGroups + engineGroups
         // 候選條按「選單順序」取前 N 條：長輸入時 reading 各不相同，
         // 按第 0 組取會只剩 1 條（用戶 2026-11-08 反饋「打到這麼多就停止候選」）。
         // 分詞輸入（`5'e`）時，候選條直接列「這一段能選的字」：用戶點一個字就上屏，
@@ -154,30 +157,7 @@ object TwelveKeySnapshotBuilder {
         // 有 segmentAnchor（剛上屏的前一個字）時，與它關聯度高的字排前面。
         // 只剩最後一段時，用引擎候選（引擎本身按詞頻/用戶詞庫排序）再疊用戶關聯度，
         // 而不是繼續用字典順序 —— 否則「最後一個字」看起來完全不受詞頻影響（用戶 2026-11-09 反饋）。
-        val lastSegmentMode = segmentGroups.isEmpty() && segmented && segmentAnchor != null
-        val barEntries = if (lastSegmentMode) {
-            wordsFirst(
-                ranked.sortedWith(
-                    compareByDescending<CandidateItem> {
-                        SegmentMemory.bigramScore(segmentAnchor, it.text)
-                    }.thenByDescending { SegmentMemory.charScore(it.text) }
-                        .thenBy { it.index },
-                ),
-            ).take(BAR_ITEMS).filter { it.text.isNotEmpty() }
-        } else if (segmentGroups.isNotEmpty()) {
-            // 全域排序：先把所有音節組的字攤平，再統一按「與前一字的組詞關聯度 → 字頻」排。
-            // 不能按組取（組順序是字典音節順序）—— 否則關聯度最高的字仍可能被擠到後面。
-            wordsFirst(
-                segmentGroups.flatMap { it.items }
-                    .sortedWith(
-                        compareByDescending<CandidateItem> {
-                            SegmentMemory.bigramScore(segmentAnchor, it.text)
-                        }.thenByDescending { SegmentMemory.charScore(it.text) },
-                    ),
-            ).take(BAR_ITEMS)
-        } else {
-            wordsFirst(ranked).take(BAR_ITEMS).filter { it.text.isNotEmpty() }
-        }
+        val barEntries = wordsFirst(ranked).take(BAR_ITEMS).filter { it.text.isNotEmpty() }
         // 預覽文字與候選條第 0 條同源：一次算好，隨快照發佈。
         val previewText = barEntries.firstOrNull { it.text.isNotEmpty() }?.text ?: ""
         // 已選前綴（librime context 裡尚未 commit 的字）+ 第一條候選 = 嵌入式預覽全文
@@ -205,66 +185,28 @@ object TwelveKeySnapshotBuilder {
     }
 
     /**
-     * 分詞段 → 字典候選組。
+     * 多音節輸入 → 「第一個待選段」的音節→單字組。
      *
-     * 只處理「第一個待選段」（`remaining` 按 `'` 切開後的第一段）：分詞是逐段選字的，
-     * 後面的段要等前面選完、碼被重新餵回引擎之後才有意義。
+     * 不區分「有沒有按分詞鍵」：碼串先去掉 `'`，再按碼位切出第一段與其餘碼。
+     * - 完整拼音（如 `5e5e`）：切成 `5e` + `5e`；
+     * - 首字母相拼（如 `855`、`4i`）：切成第一個碼位 + 其餘碼，`syllablesForSegment` 會展開成
+     *   「以該字母開頭的音節」，只取高頻前 [MAX_SYLLABLE_GROUPS] 個（用戶 2026-11-10：
+     *   不可能把每個首字母的所有組合都羅列）。
      *
-     * 每組 = 一個讀音（例如段碼 `5` → `ke`/`le`/`ko`…），組裡是該讀音的字。
+     * 每項帶 `segment = 0` 與 `restCode = 其餘碼`：點擊 = 上屏這個字 + 其餘碼餵回引擎，
+     * 面板接著列下一段的單字（按順序推進）。
      */
-    private fun dictGroupsFor(
-        remaining: String,
-        anchor: Char?,
-        segmented: Boolean,
-    ): List<SyllableGroup> {
-        if (remaining.isEmpty()) return emptyList()
-        // 分段輸入（按過分詞鍵）時，即使只剩一段（重新餵回引擎後分隔符已消失）
-        // 也照樣按段列字，否則第二段又跳回引擎候選，用戶沒法逐段選。
-        if (!segmented && !remaining.contains('\'')) return emptyList()
-        val segments = remaining.split('\'').filter { it.isNotEmpty() }
-        if (segments.isEmpty()) return emptyList()
-        // 只有「還有兩段以上要選」時才給字典段組；最後一段交給引擎（詞頻 + 用戶詞庫）排序。
-        if (segments.size < 2) return emptyList()
-        val first = segments.first()
+    private fun segmentGroupsFor(remaining: String, anchor: Char?): List<SyllableGroup> {
+        val codes = remaining.replace("'", "")
+        if (codes.isEmpty()) return emptyList()
+        val split = TwelveKeyPreedit.splitFirstSyllable(codes) ?: return emptyList()
+        val (head, rest) = split
         val result = ArrayList<SyllableGroup>()
-        for (syllable in TwelveKeyPreedit.syllablesForSegment(first)) {
-            // 固定候選區不用靜態詞表：先按用戶自己的組詞記憶（與上一字的關聯度），
-            // 再按用戶常用字頻率排序（見 SegmentMemory）。
-            // 關聯度 → 用戶常用字 → 通用字頻（詞表統計）：冷啟動時也不會按字典順序把生僻字排前面
+        for (syllable in TwelveKeyPreedit.syllablesForSegment(head, MAX_SYLLABLE_GROUPS)) {
             val chars = TwelveKeyPreedit.rankChars(
                 TwelveKeyPreedit.charsForSyllable(syllable),
                 anchor,
             )
-            val items = chars.map { ch ->
-                CandidateItem(text = ch, comment = syllable, index = -1, segment = 0)
-            }
-            if (items.isEmpty()) continue
-            result.add(SyllableGroup(reading = syllable, syllables = listOf(syllable), items = items, segment = 0))
-        }
-        // 組之間也按「組內第一字與前一字的關聯度」排：打完「區」後，含「域」的那組排最前。
-        if (anchor != null) {
-            result.sortWith(
-                compareByDescending { g ->
-                    SegmentMemory.bigramScore(anchor, g.items.first().text)
-                },
-            )
-        }
-        return result.take(MAX_GROUPS)
-    }
-
-    /**
-     * 多音節輸入沒按分詞鍵、引擎又只給詞組候選時，補「第一個音節的單字」組。
-     *
-     * 與分詞段組不同：這裡的剩餘碼是從碼串裡切出來的（沒有 `'`），點字上屏後
-     * 直接把 [CandidateItem.restCode] 餵回引擎，效果和分詞逐段選字一致。
-     */
-    private fun firstSyllableGroups(remaining: String, anchor: Char?): List<SyllableGroup> {
-        if (remaining.isEmpty() || remaining.contains('\'')) return emptyList()
-        val split = TwelveKeyPreedit.splitFirstSyllable(remaining) ?: return emptyList()
-        val (head, rest) = split
-        val result = ArrayList<SyllableGroup>()
-        for (syllable in TwelveKeyPreedit.syllablesForSegment(head)) {
-            val chars = TwelveKeyPreedit.rankChars(TwelveKeyPreedit.charsForSyllable(syllable), anchor)
             val items = chars.map { ch ->
                 CandidateItem(text = ch, comment = syllable, index = -1, segment = 0, restCode = rest)
             }
@@ -278,12 +220,15 @@ object TwelveKeySnapshotBuilder {
                 ),
             )
         }
+        // 組之間按「組內第一字與前一字的關聯度」排：打完「區」後，含「域」的那組排最前。
         if (anchor != null) {
             result.sortWith(
-                compareByDescending { g -> SegmentMemory.bigramScore(anchor, g.items.first().text) },
+                compareByDescending { g ->
+                    SegmentMemory.bigramScore(anchor, g.items.first().text)
+                },
             )
         }
-        return result.take(MAX_GROUPS)
+        return result
     }
 
     /** 兼容舊調用：同步一次做完（UI 線程慎用）。 */

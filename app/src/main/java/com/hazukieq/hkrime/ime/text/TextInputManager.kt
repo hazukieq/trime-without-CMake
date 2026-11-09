@@ -474,14 +474,10 @@ class TextInputManager private constructor() :
     }
 
     private fun doOnCandidatesRefreshed() {
-        // 組字結束（上屏/清空）→ 清掉「按段選字」的錨點與分段模式，下一輪重新記。
+        // 組字結束（上屏/清空）→ 清掉「按段選字」的錨點，下一輪重新記。
+        // 分段不再依賴用戶按 `'`：面板按碼位自動拆段（見 TwelveKeySnapshotBuilder.segmentGroupsFor）。
         if (!Rime.isComposing()) {
             setSegmentAnchor(null)
-            twelveKeyController?.segmentMode = false
-        } else if (isTwelveKeyMode()) {
-            // 用戶按過「分詞」→ 碼串裡出現分隔符；之後即便分隔符被吃掉，本輪也一直按段列字。
-            val input = runCatching { Rime.RimeGetInput() }.getOrNull().orEmpty()
-            if (input.contains('\'')) twelveKeyController?.segmentMode = true
         }
         if (isTwelveKeyMode()) {
             // 按鍵後立即重建快照（不 debounce）；面板關閉時只枚舉候選條需要的 16 條，

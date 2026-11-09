@@ -200,7 +200,12 @@ object TwelveKeyPreedit {
      */
     fun splitFirstSyllable(codes: String): Pair<String, String>? {
         if (codes.length < 2) return null
-        val total = decode(codes)?.split(' ')?.size ?: return null
+        val total = decode(codes)?.split(' ')?.size ?: 0
+        if (total == 0) {
+            // 簡拼/首字母相拼（如 `nh`、`jkl`）：整串解不出完整音節，按「第一個碼位 + 其餘」切。
+            // 面板左列由此得到「以該字母開頭的音節」組（n**、h**…）。
+            return codes.substring(0, 1) to codes.substring(1)
+        }
         if (total < 2) return null
         for (i in 1 until codes.length) {
             val head = codes.substring(0, i)
