@@ -113,6 +113,7 @@ class TwelveKeyController(
                                 if (full) TwelveKeySnapshotBuilder.MAX_CANDIDATES else BAR_CANDIDATES,
                                 segmentAnchor = segmentAnchor,
                                 segmented = segmentMode,
+                                wantGroups = full,
                             )
                             // 性能排查用：INFO 级别，真機 logcat 可直接統計每鍵快照耗時
                             Timber.i(

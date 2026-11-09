@@ -2394,3 +2394,9 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
   3. 索引用 `@Volatile` 引用整體替換，避免後台寫 / 按鍵讀同一個 Map；
   4. `assocGeneration` 進候選快照 `cacheKey`，索引就緒後自動重建一次快照（否則舊緩存裡沒有聯想行）。
 - 單測：41 tests / 0 failures（聯想索引的查詢語義不變，只是換了數據結構）。
+
+- 追加（同一輪）：`TwelveKeySnapshotBuilder.build(..., wantGroups: Boolean)` —— 面板關閉時
+  直接跳過「音節桶輪轉 + 聯想詞 + 分組合併」，只留候選條需要的 `ranked` 排序；
+  `TwelveKeyController` 傳 `wantGroups = full`（full = 面板是否展開）。
+  真機 10 鍵連打實測：面板關閉時每鍵 60ms → 33ms（回到未加聯想詞前的水平）；
+  詞表索引後台載入 `load=598ms`（不再落在第一次按鍵上）。

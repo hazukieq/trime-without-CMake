@@ -103,6 +103,7 @@ object TwelveKeySnapshotBuilder {
         mapFallbackLetters: Boolean = true,
         segmentAnchor: Char? = null,
         segmented: Boolean = false,
+        wantGroups: Boolean = true,
     ): TwelveKeySnapshot {
         if (local.isEmpty) return TwelveKeySnapshot.EMPTY
         val input = local.input
@@ -147,11 +148,13 @@ object TwelveKeySnapshotBuilder {
         // 多音節輸入一律按「碼位」拆段：面板先列第一個待選段的「高頻音節 → 單字」組
         // （n**、h**、j**…），點字上屏後把其餘碼餵回引擎繼續——不再依賴用戶按 `'`（用戶 2026-11-10：
         // 之前 `'` 那套作廢，用這套按序推進的實現）。
-        val segmentGroups = segmentGroupsFor(remaining, segmentAnchor)
+        // 面板關閉時不需要分組（候選條只吃 ranked 順序）：跳過「音節桶輪轉 + 聯想詞 + 分組合併」，
+        // 這是每次按鍵的主要開銷之一（用戶 2026-11-10：補聯想詞後按鍵卡頓）。
+        val segmentGroups = if (wantGroups) segmentGroupsFor(remaining, segmentAnchor) else emptyList()
         // 展開面板的「音節 → 漢字」列表也按常用度排：用戶常用字 → 通用字頻 → 引擎原順序。
         // 單音節輸入時左列全是同類音節組：必須按常用度排，不能按讀音字母序
         // （用戶 2026-11-10：「找半天都找不到想要的音節」）。
-        val engineGroups = CandidateRanking.orderGroups(
+        val engineGroups = if (!wantGroups) emptyList() else CandidateRanking.orderGroups(
             group(ranked).map { g -> g.copy(items = rankPanelItems(g.items)) },
             charScore = { text -> SegmentMemory.charScore(text) },
             generalScore = { text -> TwelveKeyPreedit.generalScore(text) },
