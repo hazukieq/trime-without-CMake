@@ -150,7 +150,9 @@ object TwelveKeySnapshotBuilder {
         val segmentGroups = segmentGroupsFor(remaining, segmentAnchor)
         // 展開面板的「音節 → 漢字」列表也按常用度排：用戶常用字 → 通用字頻 → 引擎原順序。
         val engineGroups = group(ranked).map { g -> g.copy(items = rankPanelItems(g.items)) }
-        val groups = segmentGroups + engineGroups
+        // 有段組時只保留引擎的詞組組，否則左列會被引擎的幾十個單音節讀音灌滿
+        // （段組本身已按「每個首字母 8 個」限量）；單音節輸入沒有段組，引擎組照舊。
+        val groups = CandidateRanking.panelGroups(segmentGroups, engineGroups)
         // 候選條按「選單順序」取前 N 條：長輸入時 reading 各不相同，
         // 按第 0 組取會只剩 1 條（用戶 2026-11-08 反饋「打到這麼多就停止候選」）。
         // 分詞輸入（`5'e`）時，候選條直接列「這一段能選的字」：用戶點一個字就上屏，

@@ -237,4 +237,27 @@ class CandidateRankingTest {
         val barSingles = bar.filter { !CandidateRanking.isCjkWord(it.text) }.map { it.text }
         assertEquals(singles.take(barSingles.size), barSingles)
     }
+
+    // ── panelGroups：有段組時只保留引擎的詞組組（用戶 2026-11-10）───────────────
+    @Test
+    fun panelGroupsDropsEngineSingleSyllableGroupsWhenSegmentsExist() {
+        val seg = listOf(CandidateRanking.groupCandidates(listOf(item("家", "ga", 0))).first())
+        val engine = listOf(
+            CandidateRanking.groupCandidates(listOf(item("加", "ga", 1))).first(),
+            CandidateRanking.groupCandidates(listOf(item("家加", "ga ga", 2))).first(),
+        )
+        val merged = CandidateRanking.panelGroups(seg, engine)
+        assertEquals("段組 + 引擎詞組組", 2, merged.size)
+        assertEquals("段組應在最前", "ga", merged[0].reading)
+        assertEquals("引擎的單音節組要被丟掉", "ga ga", merged[1].reading)
+    }
+
+    @Test
+    fun panelGroupsKeepsAllEngineGroupsWhenNoSegments() {
+        val engine = listOf(
+            CandidateRanking.groupCandidates(listOf(item("加", "ga", 0))).first(),
+            CandidateRanking.groupCandidates(listOf(item("家加", "ga ga", 1))).first(),
+        )
+        assertEquals(engine, CandidateRanking.panelGroups(emptyList(), engine))
+    }
 }

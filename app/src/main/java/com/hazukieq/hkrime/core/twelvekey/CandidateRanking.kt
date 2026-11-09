@@ -106,4 +106,20 @@ object CandidateRanking {
             ),
         )
     }
+
+    /**
+     * 面板左列「段組 + 引擎組」的合併規則（用戶 2026-11-10）。
+     *
+     * 有段組（按碼位自切的單字組，已按「每個首字母 8 個」限量）時，引擎那邊的
+     * **單音節組**只是同一批字的另一種排法：全列出來左列會被 g* 的幾十個讀音灌滿。
+     * 因此只保留引擎的**多音節（詞組）組**；沒有段組時（單音節輸入）引擎組照舊全留。
+     */
+    fun panelGroups(
+        segmentGroups: List<SyllableGroup>,
+        engineGroups: List<SyllableGroup>,
+    ): List<SyllableGroup> {
+        if (segmentGroups.isEmpty()) return engineGroups
+        val words = engineGroups.filter { it.syllables.size >= 2 }
+        return segmentGroups + words
+    }
 }
