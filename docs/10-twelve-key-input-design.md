@@ -1750,3 +1750,26 @@ private fun isChecked(index: Int): Boolean =
 影響面：所有走 `ModernListDialog.singleChoice()` 的入口（ModernListPreference、音效包、
 主題、顏色、方案選擇）一併修好。真機驗證：偏好設置 → 橫屏時全屏編輯，點「總是」勾記號即時
 移動，確定後摘要變「總是」；再改回「自動」正常。
+
+## 15.42 修復：嵌入式預覽（首選）與固定候選欄顯示不同的字（2026-11-09）
+
+現象：設置 → 偏好設置 → 嵌入式編輯模式選「首選」後，12 鍵打碼時輸入框裡的預覽是「啥」，
+而固定候選欄第一條是「怕」。
+
+根因：兩種「第一候選」來源不同——
+- `EditorInstance.updateComposingText()` 的 `INLINE_PREVIEW` 分支用 `Rime.getComposingText()`
+  （= librime 的 `commit_text_preview`，即**引擎順序**第一條，不受 App 側重排影響）；
+- 固定候選欄用 12 鍵快照 `barEntries`，會被 `SegmentMemory` 按「用戶常用字 / 組詞記憶」重排。
+兩者不一致時就出現「候選欄怕、預覽啥」。
+
+修法：
+
+1. `ime/text/TextInputManager.kt` 新增 `twelveKeyPreviewText(): String?`：12 鍵且組字中時取
+   `boundBarItems.firstOrNull() ?: twelveKeyController?.snapshot?.barItems?.firstOrNull()`
+   的 `text`（與候選欄、空格上屏用的是同一份「第一條」）；
+2. `ime/core/EditorInstance.kt` 的 `INLINE_PREVIEW` 分支改為
+   `textInputManager.twelveKeyPreviewText() ?: Rime.getComposingText()`——12 鍵走 App 側
+   第一條，其餘方案（全字母/英文）仍用引擎 preview，行為不變。
+
+真機驗證：嵌入式編輯模式=首選，12 鍵打 `nz`+`ghi`（碼 `nzi 8`），輸入框預覽與候選欄第一條
+同為「惹」。

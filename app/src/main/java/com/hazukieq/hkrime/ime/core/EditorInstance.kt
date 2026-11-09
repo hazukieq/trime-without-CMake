@@ -73,7 +73,8 @@ class EditorInstance(private val ims: InputMethodService) {
     fun updateComposingText() {
         val ic = inputConnection ?: return
         val composingText = when (prefs.keyboard.inlinePreedit) {
-            InlineModeType.INLINE_PREVIEW -> Rime.getComposingText()
+            // 12 鍵：預覽要跟固定候選欄一致（候選欄會被常用字記憶重排，引擎 preview 不會）
+            InlineModeType.INLINE_PREVIEW -> textInputManager.twelveKeyPreviewText() ?: Rime.getComposingText()
             InlineModeType.INLINE_COMPOSITION -> Rime.getCompositionText()
             InlineModeType.INLINE_INPUT -> Rime.RimeGetInput()
             else -> ""

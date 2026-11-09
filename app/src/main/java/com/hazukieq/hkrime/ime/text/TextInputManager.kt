@@ -254,6 +254,20 @@ class TextInputManager private constructor() :
         return true
     }
 
+    /**
+     * 12 鍵預編輯預覽文字：取「固定候選欄第一條」，讓嵌入式預覽與候選欄顯示同一個字。
+     *
+     * 引擎的 commit_text_preview 是引擎順序第一條；12 鍵候選條會被 SelectionMemory
+     * 重排（用戶常用字優先），兩者不一致時會出現「候選欄是怕、預覽是啥」的錯位。
+     */
+    fun twelveKeyPreviewText(): String? {
+        if (!isTwelveKeyMode() || !Rime.isComposing()) return null
+        val item = boundBarItems.firstOrNull()
+            ?: twelveKeyController?.snapshot?.barItems?.firstOrNull()
+            ?: return null
+        return item.text.takeIf { it.isNotEmpty() }
+    }
+
     fun isCandidatePanelShown(): Boolean =
         candidatePanelController?.isShown == true ||
             candidatePanelRoot?.visibility == android.view.View.VISIBLE
