@@ -111,6 +111,11 @@ public class Trime extends LifecycleInputMethodService {
     return AppPrefs.Companion.defaultInstance();
   }
 
+  /** 輸入視圖（鍵盤控件）是否已建好；背景維護後重綁鍵盤要等它。 */
+  public boolean isInputViewReady() {
+    return inputRootBinding != null;
+  }
+
   /** 输入法配置 */
   @NonNull
   public Config getImeConfig() {
@@ -788,6 +793,19 @@ public class Trime extends LifecycleInputMethodService {
     }
     getImeConfig().initCurrentColors();
     loadBackground();
+    if (com.hazukieq.hkrime.core.Rime.consumeKeyboardRebindPending()) {
+      // 背景維護在控件建好之前結束：那時的 initKeyboard() 因 inputRootBinding == null
+      // 直接 return，鍵盤會停在 default 布局（26 鍵）。等本方法把控件布局完再補一次重綁。
+      mainKeyboardView.post(() -> {
+        try {
+          getImeConfig().reset();
+          initKeyboard();
+          Timber.i("Trime: applied deferred keyboard rebind after view created");
+        } catch (Throwable e) {
+          Timber.w(e, "Trime: deferred keyboard rebind failed");
+        }
+      });
+    }
 
     if (keyboardSwitcher != null) keyboardSwitcher.newOrReset();
     Timber.i("onCreateInputView() finish");

@@ -345,6 +345,9 @@ public class Rime {
    * 重讀方案並讓輸入法重綁鍵盤。
    */
   private static volatile boolean maintenancePending = false;
+
+  /** 背景維護完成後需要重綁鍵盤；由 Trime.onCreateInputView() 消費（此時控件才建好）。 */
+  private static volatile boolean keyboardRebindPending = false;
   private static Context appContext;
 
   private static final RimeCommit mCommit = new RimeCommit();
@@ -554,15 +557,47 @@ public class Rime {
           }
           initSchema();
           maintenancePending = false;
+          keyboardRebindPending = true;
           Timber.i("Rime: re-initialized after background maintenance (schema=%s)", getSchemaId());
         } catch (Throwable e) {
           Timber.e(e, "Rime: re-init after maintenance failed");
           return;
         }
       }
-      final Trime trime = Trime.getServiceOrNull();
-      if (trime != null) trime.initKeyboard();
+      rebindKeyboardWhenServiceReady(0);
     });
+  }
+
+  /**
+   * 背景維護結束時，輸入法服務常常還沒 onCreate 完（Trime.getServiceOrNull() 為 null，
+   * 或 IME 配置還沒建）。輪詢重試直到服務可用再重綁鍵盤，否則鍵盤會停在
+   * 「schema=.default」解析出來的 default 布局（26 鍵），要重啟輸入法才恢復。
+   */
+  private static void rebindKeyboardWhenServiceReady(final int attempt) {
+    if (attempt > 40) {
+      Timber.w("Rime: give up rebinding keyboard (service not ready)");
+      return;
+    }
+    final Trime trime = Trime.getServiceOrNull();
+    if (trime != null && trime.isInputViewReady()) {
+      try {
+        trime.initKeyboard();
+      } catch (Throwable e) {
+        Timber.w(e, "Rime: rebind keyboard failed");
+      }
+      keyboardRebindPending = false;
+      Timber.i("Rime: keyboard rebound after background maintenance (attempt=%d)", attempt);
+      return;
+    }
+    final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+    handler.postDelayed(() -> rebindKeyboardWhenServiceReady(attempt + 1), 150);
+  }
+
+  /** 取走「需要重綁鍵盤」標記（一次性）。 */
+  public static boolean consumeKeyboardRebindPending() {
+    if (!keyboardRebindPending) return false;
+    keyboardRebindPending = false;
+    return true;
   }
 
   public static void destroy() {

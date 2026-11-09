@@ -1869,3 +1869,55 @@ librime 表排序退化成文件順序（≈ Unicode/部首順序），所以越
 真機驗證（12 鍵打 `nz`+`ghi`+`zj` = `nzi 8`，展開面板 → 左列 `nzia`）：
 字列表從「惹 喏 偌 汝 茹 若 姞」變為「惹 汝 喏 偌 婼」
 （對應權重 70 / 45 / 8 / 4 / 0），常用字在前、生僻字在後。
+
+## 15.47 硬排序：權威字頻（引擎原順序之前的兜底）(2026-11-10)
+
+問題：`§15.46` 用「詞表出現次數」當通用頻度，但客家話詞表覆蓋有限，很多字統計為 0 →
+最後仍退回**引擎原順序**（詞典無 weight ⇒ 文件順序），生僻字會混到常用字前面。
+
+用戶要求：當前幾層都沒信號時，要有「常用字在前、冷僻字在後」的硬排序，並找已發布的高頻字表。
+
+### 數據源
+
+- **rime-ice（雾凇拼音）`cn_dicts/8105.dict.yaml`**：《通用規範漢字表》8105 字，每字帶
+  25 億字語料統計的字頻權重（同音候選就是按它排的），格式 `字<TAB>拼音<TAB>weight`，
+  例 `的 de 76938354`、`惹 re 125358`、`婼 ruo 88`、`姞 ji 26`。
+- 許可/來源：https://github.com/iDvel/rime-ice （MIT）；字頻出處 BLCU 語料字頻表。
+- 生成腳本：`tools/gen-char-rank.py`（無參數時自動下載該文件）→
+  `app/src/main/assets/rime/hakka_char_rank.txt`（8183 字 / 74KB，`字<TAB>權重`，
+  按權重降序；擴展 B 區 205 字按碼點存取）。
+
+### 排序原則（每一級只在上一級打平時才看）
+
+    用戶組詞關聯度（SegmentMemory.bigramScore）
+      → 用戶常用字（SegmentMemory.charScore）
+        → 綜合通用頻度（generalScore）
+          → 引擎原順序（CandidateItem.index，穩定）
+
+`generalScore` 的算法：兩張表各自換算成**百分位**（0..10000），取**較大值**：
+
+- 為什麼取 max：兩張表覆蓋的「領域」不同 —— 客家話詞表覆蓋方言常用字（佢/冇/唔），
+  權威字頻覆蓋普通話高頻字與生僻字分級；只要在任一表裡高頻就不該被埋掉。
+- 兩表都沒收錄 ⇒ 0 分（= 極生僻，排最後）。
+- 實現：`TwelveKeyPreedit.buildGeneralScores()` 啟動時算好 `HashMap<碼點, 分數>`，
+  `generalScore(text)` O(1)；`rankChars()`（分詞段組）與 `rankPanelItems()`（面板每組字列表）共用。
+
+### 已知取捨
+
+- 權威字頻是「普通話語料」，個別客家話高頻字權重偏低，但被客家詞表那一列托住（取 max）。
+- 分數只在**同一讀音的候選集合內**比較，不影響跨讀音分組順序。
+- DEBUG 構建會打 `twelvekey:panel order=… scores=…`（前 8 個字及分數）方便核對。
+
+### 順帶修復：背景維護後鍵盤停在 26 鍵
+
+現象：加了 `charRank` 資源後首啟觸發維護，維護在主線程外完成；`initKeyboard()` 被
+`Rime.getServiceOrNull()` 為 null、或 `inputRootBinding == null`（控件還沒建）擋掉，
+鍵盤停在 `schema_id=.default` 解析出來的 `default` 佈局，要重啟輸入法才恢復。
+
+修法：
+
+- `Rime`：維護完成時置 `keyboardRebindPending`；重綁改為輪詢等待
+  `trime.isInputViewReady()`（150ms × 40 次），成功才清標記。
+- `Trime`：新增 `isInputViewReady()`；`onCreateInputView()` 末尾若
+  `Rime.consumeKeyboardRebindPending()` 為真，`mainKeyboardView.post { getImeConfig().reset(); initKeyboard() }`
+  —— 此時控件才建好，`reset()` 裡的 `schema_id = Rime.getSchemaId()` 才是有效值。

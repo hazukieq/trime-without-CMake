@@ -1,5 +1,6 @@
 package com.hazukieq.hkrime.core.twelvekey
 
+import com.hazukieq.hkrime.BuildConfig
 import com.hazukieq.hkrime.core.Rime
 import com.hazukieq.hkrime.core.TwelveKeyPreedit
 import timber.log.Timber
@@ -322,17 +323,26 @@ object TwelveKeySnapshotBuilder {
     }
 
     /**
-     * 展開面板「音節 → 漢字」列表排序：用戶常用字 → 通用字頻 → 引擎原順序（穩定）。
+     * 展開面板「音節 → 漢字」列表排序：用戶常用字 → 綜合通用頻度 → 引擎原順序（穩定）。
      *
-     * 引擎候選順序對單字並不可靠（詞典無 weight 時基本是文件順序，喏/偌 這種生僻字會排前面）。
+     * 引擎候選順序對單字並不可靠（詞典無 weight 時基本是文件順序，生僻字會排前面），
+     * 所以最後用綜合頻度（詞表統計 + 權威 8105 字表權重）做硬排序，只在同分時才看引擎順序。
      */
     private fun rankPanelItems(items: List<CandidateItem>): List<CandidateItem> {
         if (items.size < 2) return items
-        return items.sortedWith(
+        val sorted = items.sortedWith(
             compareByDescending<CandidateItem> { SegmentMemory.charScore(it.text) }
-                .thenByDescending { TwelveKeyPreedit.charFrequency(it.text) }
+                .thenByDescending { TwelveKeyPreedit.generalScore(it.text) }
                 .thenBy { it.index },
         )
+        if (BuildConfig.DEBUG) {
+            Timber.d(
+                "twelvekey:panel order=%s scores=%s",
+                sorted.take(8).joinToString("") { it.text },
+                sorted.take(8).joinToString(",") { "${it.text}:${TwelveKeyPreedit.generalScore(it.text)}" },
+            )
+        }
+        return sorted
     }
 
     private fun isCjkWord(text: String): Boolean =

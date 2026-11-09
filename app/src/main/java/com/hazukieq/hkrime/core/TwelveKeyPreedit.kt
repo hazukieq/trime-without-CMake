@@ -35,6 +35,23 @@ object TwelveKeyPreedit {
      */
     private val charFreq = HashMap<String, Int>()
 
+    /**
+     * 單字 → 權威字頻（來自 rime-ice 的《通用規範漢字表》8105 字表語料權重，
+     * 見 assets/rime/hakka_char_rank.txt）。
+     *
+     * 詞表統計在客家話詞表裡覆蓋不全，且同為生僻字時次序也不可靠；
+     * 這裡用「已發布的高頻字表」當硬排序依據：不在 8105 字表裡的字權重為 0（視為生僻）。
+     */
+    private val charRank = HashMap<Int, Int>()
+
+    /**
+     * 單字 → 綜合通用頻度分（0..10000），見 [generalScore]。
+     *
+     * 由兩份表各自換算成百分位後取較大值：在**任一**領域裡常見的字都排在前面
+     * （客家話詞表覆蓋不到的普通話常用字、8105 表覆蓋不到的方言字都不會被埋掉）。
+     */
+    private val generalScores = HashMap<Int, Int>()
+
     private var loaded = false
 
     fun init(context: Context) {
@@ -79,13 +96,33 @@ object TwelveKeyPreedit {
             Timber.i("TwelveKeyPreedit: charFreq=%d", charFreq.size)
         }.onFailure { Timber.w(it, "TwelveKeyPreedit: load char freq failed") }
 
+        // 權威字頻（可選資源；缺失時退回只用詞表統計）
+        runCatching {
+            context.assets.open("rime/hakka_char_rank.txt").bufferedReader(Charsets.UTF_8)
+                .useLines { lines ->
+                    lines.forEach { raw ->
+                        if (raw.isEmpty() || raw.startsWith("#")) return@forEach
+                        val tab = raw.indexOf('\t')
+                        if (tab <= 0) return@forEach
+                        val ch = raw.substring(0, tab)
+                        val v = raw.substring(tab + 1).trim().toIntOrNull() ?: return@forEach
+                        // 8105 表含 205 個擴展 B 區字（UTF-16 佔兩個 char），按碼點存取
+                        if (ch.isNotEmpty() && Character.codePointCount(ch, 0, ch.length) == 1) {
+                            charRank[ch.codePointAt(0)] = v
+                        }
+                    }
+                }
+            Timber.i("TwelveKeyPreedit: charRank=%d", charRank.size)
+        }.onFailure { Timber.w(it, "TwelveKeyPreedit: load char rank failed") }
+
         counts.forEach { (syllable, freq) ->
             val code = codeOf(syllable)
             val old = table[code]
             if (old == null || old.freq < freq) table[code] = Entry(syllable, freq)
             codeToSyllables.getOrPut(code) { ArrayList() }.add(Entry(syllable, freq))
         }
-        Timber.i("TwelveKeyPreedit: syllables=%d codes=%d", counts.size, table.size)
+        buildGeneralScores()
+        Timber.i("TwelveKeyPreedit: syllables=%d codes=%d scores=%d", counts.size, table.size, generalScores.size)
     }
 
     /** 拼音 → 12 鍵碼（對應 alphabet 的 abbrev/xform/xlit）。 */
@@ -159,9 +196,40 @@ object TwelveKeyPreedit {
     fun charsForSyllable(syllable: String, limit: Int = 60): List<String> =
         syllableToChars[syllable]?.take(limit) ?: emptyList()
 
-    /** 單字的通用頻度（未收錄回 0）；多字詞取首字。 */
+    /** 單字的通用頻度（詞表統計；未收錄回 0）；多字詞取首字。 */
     fun charFrequency(text: String): Int =
         if (text.isEmpty()) 0 else charFreq[text.substring(0, 1)] ?: 0
+
+    /**
+     * 單字的綜合通用頻度分（0..10000）：詞表統計與權威字頻各取百分位，取較大值。
+     *
+     * 為什麼取 max：兩份表的「領域」不同 —— 客家話詞表覆蓋方言常用字（佢/冇/唔），
+     * 權威字頻覆蓋普通話高頻字與生僻字分級（婼/姞 權重極低）；只要在任一表裡高頻，
+     * 就不該被排到後面。
+     */
+    fun generalScore(text: String): Int =
+        if (text.isEmpty()) 0 else generalScores[text.codePointAt(0)] ?: 0
+
+    private fun buildGeneralScores() {
+        fun percentile(values: List<Pair<Int, Int>>): Map<Int, Int> {
+            if (values.isEmpty()) return emptyMap()
+            val ordered = values.sortedByDescending { it.second }
+            val size = ordered.size
+            val out = HashMap<Int, Int>(size)
+            ordered.forEachIndexed { rank, entry ->
+                out[entry.first] = (size - rank) * 10000 / size
+            }
+            return out
+        }
+
+        val byFreq = percentile(charFreq.entries.map { it.key.codePointAt(0) to it.value })
+        val byRank = percentile(charRank.entries.map { it.key to it.value })
+        for ((cp, score) in byFreq) generalScores[cp] = score
+        for ((cp, score) in byRank) {
+            val old = generalScores[cp] ?: 0
+            if (score > old) generalScores[cp] = score
+        }
+    }
 
     /**
      * 按「用戶關聯度 → 用戶常用字 → 通用字頻」排列同讀音的字，冷啟動時也有合理順序。
@@ -173,7 +241,7 @@ object TwelveKeyPreedit {
             compareByDescending<String> {
                 com.hazukieq.hkrime.core.twelvekey.SegmentMemory.bigramScore(anchor, it)
             }.thenByDescending { com.hazukieq.hkrime.core.twelvekey.SegmentMemory.charScore(it) }
-                .thenByDescending { charFrequency(it) },
+                .thenByDescending { generalScore(it) },
         )
 
     /**
