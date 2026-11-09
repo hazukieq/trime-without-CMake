@@ -60,10 +60,10 @@
                         android:paddingBottom="6dp" />
 
                     <!-- 底部一條：放退格鍵，候選區不再被它遮住（用戶 2026-11-10） -->
+                    <!-- 不加底色：透明即透出面板根底色（= 右侧展开面板区颜色，隨主題鍵盤底色變） -->
                     <FrameLayout
                         android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:background="#FFFFFFFF">
+                        android:layout_height="56dp">
 
                     <TextView
                         android:id="@+id/panel_backspace"
