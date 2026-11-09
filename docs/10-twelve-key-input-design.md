@@ -1674,22 +1674,57 @@ filter 是生效的（實測 12 鍵打 `a39` 也能出 `出 不 (＞﹏＜) 弗�
 - `onTouchEvent()` 開頭 `if (preeditDisableTouch) return false;`。
 - `hakka_theme.trime.yaml` 的 `style` 段加上 `preedit_disable_touch: true` 作為自解釋的默認值。
 
-### 3) 12 鍵按段選字恢復「先替換編碼、全部選完才上屏」
+### 3) 12 鍵按段選字：C 版（先替換編碼）已回退（2026-11-09 當晚）
 
-舊行為（本次之前的實現）：點段字 → 立刻 `commitText` 上屏，再把剩下的段重新餵回引擎。
-新行為（用戶要求恢復）：選中的字**先替換掉對應的編碼**留在 preedit 裡，等所有段選完才整串上屏。
+當晚先做了一版「選中的字先替換掉編碼、等所有段選完才整串上屏」，但只對**按過分詞鍵**的
+輸入生效（因為分段信息來自 `'`）。用戶指出：「我要的是普通輸入，不是分詞這個」——
+所以這一版已整體回退，代碼回到「點段字立刻 `commitText` + 重餵剩餘段」的行為。
 
-- `TextInputManager`：
-  - 新增 `segmentPending`（已選未上屏的字）與 `TwelveKeyPreedit.segmentOverride`；
-  - `pickSegmentedCandidate(text)`：還有剩餘段時 → 把字塞進 `segmentPending`、清空組字、
-    重餵剩下的段，並設置 override（preedit 顯示 `已選字 + 剩下碼的解碼`）；
-    最後一段 → `commitText(segmentPending + text)`、清暫存與 override；
-  - 候選條點擊：段組字（`index = -1`）走分段流程；**最後一段列的是引擎候選（`index >= 0`）**，
-    但 `segmentPending` 非空時也走分段流程，否則前面選的字會被引擎那條覆蓋掉；
-  - 空格在分段模式等於「選當前段第一條」；
-  - 重要坑：不能因為 `!Rime.isComposing()` 就清 `segmentPending` —— 重餵剩餘段時必然出現
-    「尚未組字」的瞬間，清了就把已選的字丟了；暫存只在「新一輪分詞輸入開始」與「最後一段上屏」時清。
-- `TwelveKeyPreedit`：`SegmentOverride(picked, remaining)` + `applyOverride()`；
-  `Rime.getComposition()` 優先使用 override 改寫 preedit。
-- 真機驗證：12 鍵打 `kl` + 分詞 + `def` → preedit `5 e` → 點「了」→ preedit 變 `了 e`、
-  搜索框仍為空 → 點「多」→ 搜索框一次出現「了多」。
+針對「普通多段輸入（不按分詞）」如何實現先替換後上屏，評估與可行方案見 §15.40。
+
+## 15.40 評估：普通多段輸入下「先替換編碼、全部選完才上屏」怎麼做（2026-11-09）
+
+需求：12 鍵打多段碼（**不按分詞鍵**）時，選中一段的漢字先替換 preedit 裡對應的編碼，
+等所有段都選完才把整串字一次上屏。
+
+### 現狀（為什麼現在做不到）
+
+- 普通多段輸入時，分段信息只有引擎知道：`Rime.RimeGetInput()` 是碼串（如 `5e`），
+  引擎在 `select_candidate()` 內部消費「該候選匹配到的音節」，剩餘碼留在 input 裡；
+- App 收到的是「commit buffer（已被消費的那部分文字）」+「剩餘 input」；
+- 目前 `TwelveKeyController.onEngineChanged` 一拿到 commit buffer 就 `commitText()`
+  → 上屏不可逆，所以 preedit 裡不可能再顯示「已選字」。
+
+### 可行方案 A（推薦）：App 側「暫存 + 延遲 commit」
+
+在 `onEngineChanged` 裡攔一層：
+1. `select_candidate()` 後判定 `Rime.isComposing()` 與 `Rime.RimeGetInput()`：
+   - 還有剩餘碼 → **不 commit**，把 buffer 文本追加進 `pendingChars`；
+   - 沒有剩餘碼（最後一段 / 整詞命中）→ `commitText(pendingChars + buffer)`，清暫存；
+2. preedit 顯示：`pendingChars + " " + TwelveKeyPreedit.decode(remaining)`（沿用判詞實驗裡
+   已驗證可行的 `SegmentOverride` 機制，D 版已回退但機制本身可用）；
+3. 候選條/展開面板的點擊、空格上屏、面板選詞都必須走同一個入口（否則會有的 hold、有的直通）；
+4. 暫存清理規則要明確：`ESC` 取消、退格刪空、切換應用/收鍵盤。
+
+優點：走引擎的 `select_candidate`，詞頻、用戶詞庫、librime 學習、整詞候選（「區長」）
+全部保留；不需要自己切音節。
+風險/需定策略的點：
+- 空格上屏是否也延遲（建議：空格 = 立刻上屏 `pending + 當前第一候選`）；
+- 整詞命中（buffer 跨 2 段）時顯示與上屏策略；
+- 退格在「有 pending」時刪的是剩餘碼，剩餘碼刪空後是否立刻上屏 pending（建議：立刻上屏）；
+- 取消（ESC）時 pending 丟棄（與 C 版一致）還是上屏（原 A 版行為）；
+- 預編輯長度與 librime 的 `sel_start/sel_end` 不一致，`Composition.setWindow()` 已經踩過
+  `StringIndexOutOfBoundsException`，需要沿用現有 `runCatching` 保護並在真機覆蓋測試。
+
+### 方案 B（不推薦）：App 自己切音節、每段用字典段組
+
+即把 C 版的分段模型推廣到所有輸入（`TwelveKeyPreedit.decode()` 用 DP 切音節）。
+缺點：前幾段拿不到引擎整詞候選與 librime 學習，等於把 12 鍵退化成「逐字選」；
+與「最後一段用引擎詞頻」的行為也不一致。只在方案 A 做不通時才考慮。
+
+### 工作量估计（方案 A）
+
+- `TwelveKeyController.kt`：hold 邏輯 + 暫存 + 狀態機（約 80–120 行）
+- `TextInputManager.kt`：preedit override 設置/清理、空格與面板入口統一、取消/退格規則（約 100 行）
+- `TwelveKeyPreedit.kt`：恢復 `SegmentOverride`（已有現成實現，約 20 行）
+- 真機測試矩陣：單字逐段、整詞命中、空格、退格、ESC、面板選詞、非 12 鍵方案不受影響

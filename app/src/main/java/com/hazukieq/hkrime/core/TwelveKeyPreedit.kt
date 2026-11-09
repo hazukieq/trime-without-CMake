@@ -136,28 +136,6 @@ object TwelveKeyPreedit {
         syllableToChars[syllable]?.take(limit) ?: emptyList()
 
     /**
-     * 「按段選字」的暫存狀態：已經選中的字 + 還沒選的碼串。
-     *
-     * 12 鍵多段輸入時，選中的字**先替換對應的編碼**留在 preedit 裡，
-     * 等所有段都選完才整串上屏（用戶 2026-11-09 要求恢復這個行為）。
-     */
-    data class SegmentOverride(val picked: String, val remaining: String)
-
-    @Volatile
-    var segmentOverride: SegmentOverride? = null
-
-    /** 有暫存時，preedit 顯示「已選字 + 剩下碼的解碼」。 */
-    fun applyOverride(): String? {
-        val o = segmentOverride ?: return null
-        val rest = decode(o.remaining, null) ?: o.remaining
-        return when {
-            o.picked.isEmpty() -> rest
-            rest.isEmpty() -> o.picked
-            else -> o.picked + " " + rest
-        }
-    }
-
-    /**
      * 把碼串切成音節串；切不出來回傳 null（保持原 preedit）。
      *
      * 用戶按下「分詞」鍵（theme 的 `composing: delimiter`）會在碼串裡插入 `'`：

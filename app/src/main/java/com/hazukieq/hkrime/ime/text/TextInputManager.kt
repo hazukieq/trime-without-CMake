@@ -250,11 +250,6 @@ class TextInputManager private constructor() :
         val item = boundBarItems.firstOrNull()
             ?: twelveKeyController?.snapshot?.barItems?.firstOrNull()
             ?: return false
-        if (item.index < 0) {
-            // 分詞逐段選字時候選條列的是段字（index = -1），空格 = 選第一條。
-            pickSegmentedCandidate(item.text)
-            return true
-        }
         withEngineLock { twelveKeyController?.selectCandidate(item.index) }
         return true
     }
@@ -359,55 +354,25 @@ class TextInputManager private constructor() :
         twelveKeyController?.selectCandidate(item.index)
     }
 
-    /** 「按段選字」時已經選中、但還沒上屏的字（等所有段選完才整串上屏）。 */
-    private val segmentPending = StringBuilder()
-
-    /** 清掉分段暫存（組字結束/取消時調用）。 */
-    private fun resetSegmentPending() {
-        if (segmentPending.isNotEmpty()) segmentPending.setLength(0)
-        if (com.hazukieq.hkrime.core.TwelveKeyPreedit.segmentOverride != null) {
-            com.hazukieq.hkrime.core.TwelveKeyPreedit.segmentOverride = null
-        }
-    }
-
     /**
-     * 分詞（`'`）後的逐段選字。
-     *
-     * 行為（用戶 2026-11-09 要求恢復「原來行為」）：選中的字**先替換掉對應的編碼**顯示在
-     * preedit 裡（不立刻上屏），等所有段都選完才把整串字一次上屏。
-     * 做法：字先存進 [segmentPending]，把剩下的段重新餵回引擎讓下一段繼續出候選，
-     * preedit 由 [com.hazukieq.hkrime.core.TwelveKeyPreedit.segmentOverride] 改寫成
-     * 「已選字 + 剩下碼」。
-     *
-     * @param text 這一段選中的字（可能是多字詞）
+     * 分詞（`'`）後的逐段選字：上屏這一段的字，然後把剩下的段重新餵回引擎，
+     * 讓下一段繼續出候選。只處理第一個待選段（分詞是逐段進行的）。
      */
     private fun pickSegmentedCandidate(text: String) {
         val input = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
         if (input.isEmpty()) return
         val segments = input.split('\'').filter { it.isNotEmpty() }
+        // 只剩最後一段（重新餵回引擎後分隔符已消失）：直接上屏該字，不再回填。
+        // 大於等於兩段時才把剩下的段餵回去。
         if (segments.isEmpty()) return
         val rest = segments.drop(1)
-        val isLastSegment = rest.isEmpty()
         runCatching {
-            if (isLastSegment) {
-                // 最後一段：整串（之前選的字 + 這一段）一起上屏。
-                val whole = segmentPending.toString() + text
-                withEngineLock { Rime.clearComposition() }
-                activeEditorInstance.commitText(whole, false)
-                resetSegmentPending()
-                setSegmentAnchor(null)
-            } else {
-                // 還有段沒選：字先記著、替換 preedit 裡的編碼，不 commit。
-                segmentPending.append(text)
-                withEngineLock { Rime.clearComposition() }
+            withEngineLock { Rime.clearComposition() }
+            activeEditorInstance.commitText(text, false)
+            // 記住剛上屏的字：下一段的候選條按「與它的關聯度」排序（區 → 域）。
+            setSegmentAnchor(text.firstOrNull())
+            if (rest.isNotEmpty()) {
                 withEngineLock { Rime.onText(rest.joinToString("'")) }
-                // 下一段候選條按「與剛選的字的關聯度」排序（區 → 域）。
-                setSegmentAnchor(text.lastOrNull())
-                com.hazukieq.hkrime.core.TwelveKeyPreedit.segmentOverride =
-                    com.hazukieq.hkrime.core.TwelveKeyPreedit.SegmentOverride(
-                        picked = segmentPending.toString(),
-                        remaining = rest.joinToString("'"),
-                    )
             }
             trime.updateComposing()
             twelveKeyController?.refresh(immediate = true)
@@ -486,17 +451,10 @@ class TextInputManager private constructor() :
         if (!Rime.isComposing()) {
             setSegmentAnchor(null)
             twelveKeyController?.segmentMode = false
-            // 注意：這裡**不能**清 segmentPending —— 逐段選字時我們會 clearComposition + 重餵
-            // 剩下的段，中間必然出現「尚未組字」的瞬間，清了就把已選的字丟了。
-            // 暫存只在「新一輪分詞輸入開始」與「最後一段上屏」時清（見 pickSegmentedCandidate）。
         } else if (isTwelveKeyMode()) {
             // 用戶按過「分詞」→ 碼串裡出現分隔符；之後即便分隔符被吃掉，本輪也一直按段列字。
             val input = runCatching { Rime.RimeGetInput() }.getOrNull().orEmpty()
-            if (input.contains('\'')) {
-                // 新的一次分詞輸入（還沒選過任何字）→ 重置暫存。
-                if (!twelveKeyController!!.segmentMode) resetSegmentPending()
-                twelveKeyController?.segmentMode = true
-            }
+            if (input.contains('\'')) twelveKeyController?.segmentMode = true
         }
         if (isTwelveKeyMode()) {
             // 按鍵後立即重建快照（不 debounce）；面板關閉時只枚舉候選條需要的 16 條，
@@ -901,11 +859,9 @@ class TextInputManager private constructor() :
         val list = if (boundBarItems.isNotEmpty()) boundBarItems else snapshot.barItems
         val item = list.getOrNull(index)
         if (item != null) {
-            // 分詞逐段選字：段組的字（index = -1）走分段流程；
-            // 另外**最後一段**列的是引擎候選（index >= 0），但只要前面已經選過字
-            // （segmentPending 非空），也必須走分段流程——否則會直接把引擎那條上屏，
-            // 前面選好的字就丟了（用戶 2026-11-09 反饋「只上屏最後一個字」）。
-            if (item.segment >= 0 || (segmentPending.isNotEmpty() && twelveKeyController?.segmentMode == true)) {
+            // 分詞輸入時候選條列的是「這一段能選的字」（index = -1）：
+            // 直接上屏、把剩餘段餵回引擎，不進引擎選詞（用戶 2026-11-09 指示）。
+            if (item.segment >= 0) {
                 pickSegmentedCandidate(item.text)
                 return
             }
