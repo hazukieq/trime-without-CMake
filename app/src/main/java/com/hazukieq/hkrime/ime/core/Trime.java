@@ -890,6 +890,8 @@ public class Trime extends LifecycleInputMethodService {
 
   @Override
   public void onFinishInputView(boolean finishingInput) {
+    // 鍵盤收起時把內存裡的日誌刷到 /sdcard/hkrime/logs/，用戶回傳的文件才不會缺尾巴。
+    com.hazukieq.hkrime.util.LogFileTree.flushNow();
     if (normalTextEditor) addDraft();
     super.onFinishInputView(finishingInput);
     // Dismiss any pop-ups when the input-view is being finished and hidden.

@@ -161,6 +161,9 @@ public class Composition extends AppCompatTextView {
     }
   }
 
+  /** preedit 區是否禁用觸摸（默認禁用；主題 style/preedit_disable_touch=false 可恢復點按移光標）。 */
+  private boolean preeditDisableTouch = true;
+
   public Composition(Context context, AttributeSet attrs) {
     super(context, attrs);
     textInputManager = TextInputManager.Companion.getInstance();
@@ -171,6 +174,7 @@ public class Composition extends AppCompatTextView {
   @SuppressLint("ClickableViewAccessibility")
   @Override
   public boolean onTouchEvent(@NonNull MotionEvent event) {
+    if (preeditDisableTouch) return false;
     int action = event.getAction();
     if (action == MotionEvent.ACTION_UP) {
       int n = getOffsetForPosition(event.getX(), event.getY());
@@ -213,6 +217,11 @@ public class Composition extends AppCompatTextView {
     windows_comps = (List<Map<String, Object>>) config.getValue("window");
     if (config.hasKey("layout/max_entries")) max_entries = config.getInt("layout/max_entries");
     candidate_use_cursor = config.getBoolean("candidate_use_cursor");
+    // preedit 區默認不接收觸摸：12 鍵/26 鍵下誤點 preedit 會把光標挪走，
+    // 用戶反饋「打字時光標亂跳」。主題裡設 style/preedit_disable_touch: false 可恢復。
+    preeditDisableTouch =
+        !config.hasKey("style/preedit_disable_touch")
+            || config.getBoolean("style/preedit_disable_touch");
     text_size = config.getPixel("text_size");
     candidate_text_size = config.getPixel("candidate_text_size");
     comment_text_size = config.getPixel("comment_text_size");

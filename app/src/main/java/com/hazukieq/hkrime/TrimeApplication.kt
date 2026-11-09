@@ -42,6 +42,14 @@ class TrimeApplication : Application() {
             }
             val prefs = AppPrefs.initDefault(this@TrimeApplication)
             prefs.initDefaultPreferences()
+            // 日誌落盤到公共目錄（/sdcard/hkrime/logs/）：用戶試用後可以直接回傳文件。
+            // 放在 prefs 初始化之後，才能拿到 userDataDir。
+            val logTree = com.hazukieq.hkrime.util.LogFileTree(this@TrimeApplication)
+            Timber.plant(logTree)
+            // 把本進程啟動前後的 logcat 也抓一段寫進文件（release 包同樣有效）。
+            Thread {
+                runCatching { logTree.dumpCurrentLogcat() }
+            }.apply { name = "hkrime-log-head"; isDaemon = true }.start()
         } catch (e: Exception) {
             e.fillInStackTrace()
             return

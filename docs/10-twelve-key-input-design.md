@@ -1652,3 +1652,44 @@ filter 是生效的（實測 12 鍵打 `a39` 也能出 `出 不 (＞﹏＜) 弗�
   —— ✓/○ 表示開關是否已開，括號內明確寫出按下去會變成什麼。
 - `Trime.showSchemaSwitchDialog()` 增加說明行「✓ 已开启　○ 已关闭，点按一行即可切换」。
 - 真機（12 鍵 ☰）：三行顯示正確，點「颜文字/表情」後重開變 `✓ … 当前 情（点按切到 关）`。
+
+## 15.39 日志落盘 / preedit 触摸开关 / 按段选字「先替换编码，最后一起上屏」（2026-11-09）
+
+### 1) 内部日志写到公共目录
+
+- 新增 `app/src/main/java/com/hazukieq/hkrime/util/LogFileTree.kt`：Timber Tree，日誌先緩衝在內存
+  （60 條），滿了 append 到 `<userDataDir>/logs/hkrime-YYYYMMDD.log`（默認 `/sdcard/hkrime/logs/`）；
+  單檔超過 2MB 輪轉成 `.1`，最多保留 7 個文件。
+- release 包只落 INFO 以上（DEBUG/VERBOSE 有大量鍵盤佈局調試輸出，會很快把文件撐滿）；debug 包全留。
+- `TrimeApplication.onCreate` 在 `AppPrefs` 初始化之後 plant 這個 Tree，並在後台線程調
+  `dumpCurrentLogcat()`：用 `logcat --pid=<pid> -d` 抓最近 300 行寫進文件開頭
+  （用戶反饋回來的文件從進程啟動就有上下文）。`Trime.onFinishInputView` 時 `flushNow()` 保證尾巴不丟。
+- 文件開頭寫 build 信息、版本、pid、時間。
+
+### 2) preedit 區向主題提供 disable touch（默認關閉觸摸）
+
+- `Composition` 新增 `preeditDisableTouch`，`reset()` 讀 `style/preedit_disable_touch`：
+  **缺省為 true**（即默認不接收觸摸）；主題裡寫 `preedit_disable_touch: false` 可恢復
+  「點 preedit 移光標 / 拖動懸浮窗」的舊行為。
+- `onTouchEvent()` 開頭 `if (preeditDisableTouch) return false;`。
+- `hakka_theme.trime.yaml` 的 `style` 段加上 `preedit_disable_touch: true` 作為自解釋的默認值。
+
+### 3) 12 鍵按段選字恢復「先替換編碼、全部選完才上屏」
+
+舊行為（本次之前的實現）：點段字 → 立刻 `commitText` 上屏，再把剩下的段重新餵回引擎。
+新行為（用戶要求恢復）：選中的字**先替換掉對應的編碼**留在 preedit 裡，等所有段選完才整串上屏。
+
+- `TextInputManager`：
+  - 新增 `segmentPending`（已選未上屏的字）與 `TwelveKeyPreedit.segmentOverride`；
+  - `pickSegmentedCandidate(text)`：還有剩餘段時 → 把字塞進 `segmentPending`、清空組字、
+    重餵剩下的段，並設置 override（preedit 顯示 `已選字 + 剩下碼的解碼`）；
+    最後一段 → `commitText(segmentPending + text)`、清暫存與 override；
+  - 候選條點擊：段組字（`index = -1`）走分段流程；**最後一段列的是引擎候選（`index >= 0`）**，
+    但 `segmentPending` 非空時也走分段流程，否則前面選的字會被引擎那條覆蓋掉；
+  - 空格在分段模式等於「選當前段第一條」；
+  - 重要坑：不能因為 `!Rime.isComposing()` 就清 `segmentPending` —— 重餵剩餘段時必然出現
+    「尚未組字」的瞬間，清了就把已選的字丟了；暫存只在「新一輪分詞輸入開始」與「最後一段上屏」時清。
+- `TwelveKeyPreedit`：`SegmentOverride(picked, remaining)` + `applyOverride()`；
+  `Rime.getComposition()` 優先使用 override 改寫 preedit。
+- 真機驗證：12 鍵打 `kl` + 分詞 + `def` → preedit `5 e` → 點「了」→ preedit 變 `了 e`、
+  搜索框仍為空 → 點「多」→ 搜索框一次出現「了多」。

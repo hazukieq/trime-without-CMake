@@ -435,7 +435,12 @@ public class Rime {
       if (cs != null && cs.length > 0) {
         hint = cs[0].text;
       }
-      String decoded = TwelveKeyPreedit.INSTANCE.decode(composition.preedit, hint);
+      // 「按段選字」：已選的字先替換對應編碼（preedit 顯示 已選字 + 剩下碼），
+      // 等所有段選完才整串上屏。
+      String override = TwelveKeyPreedit.INSTANCE.applyOverride();
+      String decoded = override != null
+          ? override
+          : TwelveKeyPreedit.INSTANCE.decode(composition.preedit, hint);
       Timber.d("dbgpre: raw=[%s] hint=[%s] decoded=[%s]", composition.preedit, hint, decoded);
       if (decoded != null) {
         composition.preedit = decoded;
