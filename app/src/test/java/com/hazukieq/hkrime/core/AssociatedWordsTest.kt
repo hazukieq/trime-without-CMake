@@ -42,7 +42,7 @@ class AssociatedWordsTest {
         val words = preedit.associatedWords("song", 'g')
         assertTrue("song g** 應該有聯想詞，實際 ${words.size}", words.isNotEmpty())
         assertTrue("每行最多 6 條，實際 ${words.size}", words.size <= 6)
-        assertTrue("必須是兩字詞：$words", words.all { it.length == 2 })
+        assertTrue("必須是 2~4 字詞：$words", words.all { it.length in 2..4 })
     }
 
     @Test
@@ -75,6 +75,17 @@ class AssociatedWordsTest {
     }
 
     @Test
+    fun kiungFollowedByThanListsCommunistParty() {
+        // 用戶 2026-11-10：打 kiung + th 想選「共產黨」三個字，但面板既沒有 than 音節、
+        // 也沒有 kiung than 這行聯想詞。這裡釘住：索引要收 3~4 字詞，並按 (第一音節, 第二音節) 命中。
+        val rows = preedit.associatedByReading("kiung", setOf('t'), limitPerReading = 6, maxReadings = 6)
+        val thanRow = rows.firstOrNull { it.first == "than" }
+        assertTrue("應有 kiung than 行，實際 ${rows.map { it.first }}", thanRow != null)
+        val words = thanRow!!.second
+        assertTrue("kiung than 應含共產黨，實際 $words", words.any { it.contains("共产党") || it.contains("共產黨") })
+    }
+
+    @Test
     fun associatedByReadingUsesExactSecondSyllable() {
         val rows = preedit.associatedByReading("song", setOf('h'), limitPerReading = 6, maxReadings = 4)
         assertTrue("song + h 開頭應有讀音行，實際 ${rows.size}", rows.isNotEmpty())
@@ -82,7 +93,7 @@ class AssociatedWordsTest {
         for ((second, words) in rows) {
             assertTrue("第二音節必須是 h 開頭：$second", second.startsWith("h"))
             assertTrue("每行最多 6 條", words.size <= 6)
-            assertTrue("必須是兩字詞：$words", words.all { it.length == 2 })
+            assertTrue("必須是 2~4 字詞：$words", words.all { it.length in 2..4 })
         }
     }
 

@@ -205,8 +205,10 @@ object TwelveKeyPreedit {
      */
     internal fun loadWordLines(lines: Sequence<String>) {
         lines.forEach { raw ->
+            // 收 2~4 字詞：三/四字詞（共產黨、共產主義…）整詞上屏更有用，
+            // 用戶 2026-11-10 反饋「共產黨三個字拿不到」。
             val word = raw.trim()
-            if (word.length != 2) return@forEach
+            if (word.length !in 2..4) return@forEach
             if (!word.all { isCjk(it) }) return@forEach
             val r1 = charTable[word.substring(0, 1)] ?: return@forEach
             val r2 = charTable[word.substring(1, 2)] ?: return@forEach
@@ -292,12 +294,20 @@ object TwelveKeyPreedit {
     /** 碼段的所有可能「下一個音節首字母」（去重、保持輪轉順序），用於決定列哪幾行聯想詞。 */
     fun initialsForPrefix(code: String, limit: Int = 2): List<Char> {
         if (code.isEmpty()) return emptyList()
-        val result = LinkedHashSet<Char>()
-        syllablesForSegment(code, 8).forEach { syllable ->
-            syllable.firstOrNull()?.let { result.add(it) }
-            if (result.size >= limit) return result.toList()
+        // 按「音節首字母」聚合前綴匹配到的音節（按詞典字數加權排序）；不要從
+        // syllablesForSegment 前 N 條裡找——那種取法可能前 8 條全是同一首字母。
+        val weightByInitial = LinkedHashMap<Char, Int>()
+        codeToSyllables.forEach { (syllableCode, list) ->
+            if (syllableCode.length <= code.length || !syllableCode.startsWith(code)) return@forEach
+            list.forEach { entry ->
+                val initial = entry.syllable.firstOrNull() ?: return@forEach
+                weightByInitial[initial] = (weightByInitial[initial] ?: 0) + entry.freq
+            }
         }
-        return result.toList()
+        return weightByInitial.entries
+            .sortedByDescending { it.value }
+            .map { it.key }
+            .take(limit)
     }
 
     /** 詞典行載入後統一收尾：音節次數 → code 表。 */
@@ -370,39 +380,54 @@ object TwelveKeyPreedit {
     fun syllablesForSegment(code: String, limit: Int = 12, exactOnly: Boolean = false): List<String> {
         if (code.isEmpty()) return emptyList()
         val exact = ArrayList<Entry>()
-        val prefix = ArrayList<Entry>()
+        // 前綴命中記住「code 之後的下一個碼位」：分桶時用它，`w`（th 鍵）才能同時給出
+        // than（下一個 a）與 the（下一個 e）；只按音節首字母分桶時 th* 全是 t、the 系列會擠掉 than。
+        val prefix = ArrayList<Pair<Char, Entry>>()
         codeToSyllables.forEach { (syllableCode, list) ->
             when {
                 syllableCode == code -> exact.addAll(list)
-                !exactOnly && syllableCode.startsWith(code) -> prefix.addAll(list)
+                !exactOnly && syllableCode.length > code.length && syllableCode.startsWith(code) ->
+                    list.forEach { prefix.add(syllableCode[code.length] to it) }
             }
         }
         val exactSorted = exact.sortedByDescending { it.freq }
-        // 前綴命中要「按鍵覆蓋的字母」輪流取（i → g/h/i、5 → k/l、4 → m/n …），
-        // 否則像 `i` 這種鍵會被字數最多的 g 系音節整批佔滿（g 系在詞典裡字最多），
-        // 出現「只給 g 開頭、h/i 一個都沒有」的問題（用戶 2026-11-10 反饋）。
-        val buckets = LinkedHashMap<Char, MutableList<Entry>>()
-        prefix.forEach { e ->
-            val key = e.syllable.firstOrNull() ?: '?'
-            buckets.getOrPut(key) { ArrayList() }.add(e)
+        // 前綴命中要同時滿足兩件事：
+        // 1) 「下一個碼位」多樣：`w`（th 鍵）要能給 than（下一個 a）/ the（下一個 e）…
+        // 2) 「音節首字母」多樣：`i`（ghi 鍵）要 g/h/i 交替，不能整批 g 系。
+        // 所以做兩級桶：外層 next-code，內層 syllable-initial，兩層輪轉。
+        val outer = LinkedHashMap<Char, LinkedHashMap<Char, MutableList<Entry>>>()
+        prefix.forEach { (nextCode, e) ->
+            val initial = e.syllable.firstOrNull() ?: '?'
+            outer.getOrPut(nextCode) { LinkedHashMap() }
+                .getOrPut(initial) { ArrayList() }
+                .add(e)
         }
-        buckets.values.forEach { it.sortByDescending { e -> e.freq } }
-        val order = buckets.entries.sortedByDescending { (_, list) -> list.first().freq }
+        outer.values.forEach { inner -> inner.values.forEach { it.sortByDescending { e -> e.freq } } }
+        val order = outer.entries
+            .sortedByDescending { (_, inner) -> inner.values.maxOfOrNull { it.first().freq } ?: 0 }
             .map { it.value }
         // limit = **每個首字母**最多取幾個（用戶 2026-11-10：常數應對應「各取一份」而不是平分）；
         // 總數另有上限 MAX_SYLLABLES_TOTAL，避免一個鍵覆蓋 3 個聲母時左列過長。
         val distinctExact = exactSorted.map { it.syllable }.distinct()
         val totalCap = maxOf(limit, minOf(limit * order.size, MAX_SYLLABLES_TOTAL))
         val diversified = ArrayList<Entry>()
+        val perInitialSeen = HashMap<Char, Int>()
+        // 每個首字母的名額：至少 limit，但當一個鍵只覆蓋一個首字母時（`w` = th*，全是 t），
+        // 名額不能還是 8，否則 the 系列佔滿、than 之外的其他 next-code 桶全被截掉。
+        val initialCount = order.sumOf { it.size }.coerceAtLeast(1)
+        val perInitialCap = maxOf(limit, totalCap / initialCount)
         var round = 0
-        val perBucketSeen = IntArray(order.size)
-        while (diversified.size + distinctExact.size < totalCap && order.indices.any { i -> round < order[i].size && perBucketSeen[i] < limit }) {
-            order.forEachIndexed { i, list ->
-                if (round < list.size && perBucketSeen[i] < limit &&
-                    diversified.size + distinctExact.size < totalCap
-                ) {
-                    diversified.add(list[round])
-                    perBucketSeen[i]++
+        while (diversified.size + distinctExact.size < totalCap &&
+            order.any { inner -> inner.values.any { it.size > round } }
+        ) {
+            order.forEach { inner ->
+                inner.forEach { (initial, list) ->
+                    if (round < list.size && (perInitialSeen[initial] ?: 0) < perInitialCap &&
+                        diversified.size + distinctExact.size < totalCap
+                    ) {
+                        diversified.add(list[round])
+                        perInitialSeen[initial] = (perInitialSeen[initial] ?: 0) + 1
+                    }
                 }
             }
             round++

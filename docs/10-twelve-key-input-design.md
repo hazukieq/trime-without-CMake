@@ -2442,3 +2442,42 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
   面板立刻顯示 `the` 組（西/細/洗/婿/胥），不再出現 `{we} … 本地原文`；不需要關開面板。
 - 日誌 `raw` 穩定是 `5i34iwe`（不再被改寫成 `共the`），`decoded` 恆為 `kiung the`。
 - 單測：`SegmentSplitTest.wholeSingleSyllableIsNotSplit`（`we`/`yi` 為單音節、`744ii`/`z` 不是）。
+
+## 15.59 th 鍵只剩 the 系列、共產黨打不出來（2026-11-10）
+
+用戶反饋：`kiung th d` 打不出「共產黨」；th 鍵的音節全是 the 開頭、沒有 `than`，
+面板也沒有 `kiung than` 這行聯想詞（重打三次都一樣）。
+
+### 為什麼 th 鍵只剩 the 系列
+
+`syllablesForSegment("w")` 的前綴命中原本**按音節首字母分桶**（`syllable.first()`）。
+`w` 是 `th` 專用碼位，覆蓋的 th* 音節首字母**全是 t** → 只有一個桶，
+桶內按詞典字數降序：`then(21) thet(16) theu(14) the(5) …`，加上每首字母限額 8，
+`than`（產，19 字）排在 `then/thet/theu` 之後又被限額截斷。
+
+### 為什麼聯想詞沒有 `kiung than`
+
+1. 詞表索引只收 **2 字詞**（`loadWordLines` 的 `word.length != 2`），
+   而「共產黨」是 3 字詞，根本不在索引裡；
+2. 面板行標題用「剩餘碼的前綴」推第二音節首字母，`w` 只覆蓋 th*（首字母 t），
+   即使有 2 字詞也只會出 `kiung the*`，不會出 `kiung than`。
+
+### 修法
+
+- `syllablesForSegment` 前綴分桶改成**兩級**：外層「下一個碼位」、內層「音節首字母」，
+  兩層輪轉。`w` 因此能同時出 `than`（下一碼 a）、`the`（下一碼 e）、`thu`（3）、`tho`（4）、
+  `thi`（i）；`i` 鍵也仍然是 g/h/i 交錯。
+- 每首字母限額自適應：`perInitialCap = max(limit, totalCap / 首字母個數)`，
+  避免「只有一個首字母的鍵」（th）被限額 8 卡死。
+- `loadWordLines` 收 **2~4 字詞**：三/四字詞（共產黨、共產主義…）整詞上屏更有用；
+  行標題/去重邏輯不變，`segment = 1` 的整詞 click 仍走 `pickAssociationWord`。
+- `initialsForPrefix` 改為「按音節首字母聚合前綴命中音節、按字數加權排序」，
+  不再從 `syllablesForSegment` 的前 N 條裡找（那種取法可能前 8 條全是同一首字母）。
+
+### 驗收
+
+- 單測：`SyllableBucketTest.thKeyListsThanNotOnlyThe`（`w` 必含 `than`，且非 the 系列 ≥3 個）、
+  `AssociatedWordsTest.kiungFollowedByThanListsCommunistParty`（`kiung than` 行含「共產黨」）；
+  全量 44 tests / 0 failures。
+- 真機：`5i34i w`（`kiung` + th 鍵）候選條第一條就是「**共產**」，面板 `kiung` 組正常；
+  `w` 音節列表含 `than/thu/thi/then/tho/…`。

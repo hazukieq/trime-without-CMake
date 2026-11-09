@@ -90,13 +90,28 @@ class SyllableBucketTest {
         val got = TwelveKeyPreedit.syllablesForSegment("i", 16)
         val byInitial = got.groupBy { initialOf(it) }
         assertTrue("i 鍵應同時有 g/h 兩桶", byInitial.containsKey('g') && byInitial.containsKey('h'))
+        // 兩級桶（next-code × initial）輪轉後，同一首字母的音節不再全局頻率降序；
+        // 但每組的「第一條」必須是該首字母裡字典字數最多的那個，保證先出高頻音節。
         for ((initial, list) in byInitial) {
             val counts = list.map { freqOf[it] ?: 0 }
+            val best = freqOf.entries.filter { entry -> initialOf(entry.key) == initial }
+                .maxOfOrNull { it.value } ?: 0
             assertTrue(
-                "首字母 $initial 的音節不是高頻降序：${list.zip(counts)}",
-                counts.zipWithNext().all { (a, b) -> a >= b },
+                "首字母 $initial 沒給出最高頻音節：${list.zip(counts)}",
+                counts.maxOrNull() == best,
             )
         }
+    }
+
+    @Test
+    fun thKeyListsThanNotOnlyThe() {
+        // `w` = th 鍵：前綴音節有 than（產）、the（洗/西…）、then、thet…
+        // 只按首字母分桶時全落進 t 桶、the 系列把 than 擠掉（用戶 2026-11-10：共產黨打不出來）。
+        val got = TwelveKeyPreedit.syllablesForSegment("w", 8)
+        // 產 = than（用戶就是打不出「共產黨」）：必須出現，且不能只有 the 系列
+        assertTrue("th 鍵應該給出 than，實際 $got", got.contains("than"))
+        val diverse = got.filter { it != "the" && !it.startsWith("the") }
+        assertTrue("th 鍵不能只有 the 系列，實際 $got", diverse.size >= 3)
     }
 
     @Test
