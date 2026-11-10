@@ -489,6 +489,8 @@ python3 tools/panel_probe.py panel "kl ghi mno abc ps"      # 等价 5i4a7（li 
 
 # 其余子命令（同样接受键名写法）
 python3 tools/panel_probe.py syllables 4i         # 段码 → 左列音节组（标 exact/prefix、切法、剩余码）
+python3 tools/panel_probe.py syllables "kl ghi mno abc kl ps"   # 逐键累积：2 键→3 键→…→整串，最后去重
+python3 tools/panel_probe.py syllables 5i4a57 --no-stages       # 只看去重汇总
 python3 tools/panel_probe.py chars ji             # 音节 → 全部单字（--limit 截断）
 python3 tools/panel_probe.py assoc li 4a5         # 联想词（第一音节 + 剩余码前缀）
 python3 tools/panel_probe.py prefix 5i4a57        # 整串码前缀（多音节词，如 li nak si → Linux）
@@ -505,6 +507,16 @@ python3 tools/panel_probe.py selftest             # 文档样例自检（0 失�
 $ python3 tools/panel_probe.py syllables 4i
 mi  mh  ni  nh                       ← 整段是一个音节：只列它（exactOnly）
 man mau men min mo mu mui …          ← 另一切法 4|i：m**/n** 具体音节（配额内）
+
+$ python3 tools/panel_probe.py syllables "kl ghi mno abc kl ps"
+## 2 键  5i  → 单字组 16 + 联想/词行 17
+## 3 键  5i4 → 单字组 8 + 联想/词行 15
+…
+# 码串 '5i4a57' 累积去重后共 52 个读音（按首次出现的键数排序）
+  ki   单字  首现于 2 键
+  li   单字  首现于 2 键
+  …
+  li nak si   联想/词  首现于 6 键
 
 $ python3 tools/panel_probe.py prefix 5i4a57
 li nak si   Linux linux

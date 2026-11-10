@@ -421,6 +421,38 @@ class Data:
                 out[target] = {**existing, "items": existing.get("items", []) + extra}
         return out
 
+    def cumulative(self, codes: str, min_len: int = 2) -> list[tuple[int, str, list[dict]]]:
+        """逐键累积：2 键、3 键 … 直到整串，返回每个阶段的左列快照。
+
+        用户 2026-11-11：面板是随按键逐步长出来的，脚本要能复现「两个键→三个键→四个键」
+        每一步的左列，并且最后去重展示（同一个读音只保留第一次出现的位置）。
+        """
+        codes = codes.replace("'", "")
+        stages: list[tuple[int, str, list[dict]]] = []
+        for length in range(max(1, min_len), len(codes) + 1):
+            prefix = codes[:length]
+            rows: list[dict] = []
+            rows += [g for g in self.segment_groups(prefix) if g["segment"] == 0]
+            rows += [g for g in self.segment_groups(prefix) if g["segment"] == 1]
+            rows += self.prefix_word_rows(prefix)
+            rows = self.collapse(rows)
+
+            def tier(g: dict) -> int:
+                n = len([t for t in g["reading"].split(" ") if t])
+                return 2 if n == 0 else (0 if n == 1 else 1)
+
+            stages.append((length, prefix, sorted(rows, key=lambda g: (tier(g), g["reading"].lower()))))
+        return stages
+
+    def cumulative_unique(self, codes: str, min_len: int = 2) -> list[tuple[str, int, str]]:
+        """累积去重：(reading, 首次出现的键数, 类别)。"""
+        seen: "OrderedDict[str, tuple[int, str]]" = OrderedDict()
+        for length, _prefix, rows in self.cumulative(codes, min_len):
+            for g in rows:
+                kind = {0: "单字", 1: "联想/词"}.get(g["segment"], "?")
+                seen.setdefault(g["reading"], (length, kind))
+        return [(reading, length, kind) for reading, (length, kind) in seen.items()]
+
     def panel(self, codes: str) -> list[dict]:
         groups = self.segment_groups(codes)
         groups += self.prefix_word_rows(codes.replace("'", ""))
@@ -513,16 +545,22 @@ def cmd_pull(args) -> None:
 
 
 def cmd_syllables(args, data: Data) -> None:
+    """逐键累积地列左列音节（2 键 → 3 键 → … → 整串），最后去重汇总。"""
     args.codes = parse_code(args.codes)
-    groups = data.segment_groups(args.codes)
-    print(f"# 码串 {args.codes!r} → 左列音节组 {len(groups)} 个")
-    for g in groups:
-        if g["segment"] != 0:
-            continue
-        print(
-            f"  {g['reading']:<8} 字 {len(g['chars']):>4}  "
-            f"[{g['source']}, 切法{g['split']}, rest={g['rest']!r}]"
-        )
+    unique = data.cumulative_unique(args.codes, args.min_len)
+    if not args.no_stages:
+        for length, prefix, rows in data.cumulative(args.codes, args.min_len):
+            seg0 = [g for g in rows if g["segment"] == 0]
+            others = [g for g in rows if g["segment"] != 0]
+            print(f"## {length} 键  {prefix}  → 单字组 {len(seg0)} + 联想/词行 {len(others)}")
+            if seg0:
+                print("   单字: " + " ".join(g["reading"] for g in seg0))
+            if others:
+                print("   联想: " + " ".join(g["reading"] for g in others))
+        print()
+    print(f"# 码串 {args.codes!r} 累积去重后共 {len(unique)} 个读音（按首次出现的键数排序）")
+    for reading, length, kind in unique:
+        print(f"  {reading:<18} {kind}  首现于 {length} 键")
 
 
 def cmd_chars(args, data: Data) -> None:
@@ -605,6 +643,22 @@ def cmd_selftest(args, data: Data) -> None:
     ok = any(r["reading"] == "li nak si" and any(w.lower() == "linux" for w in r["items"]) for r in rows)
     expect(ok, f"5i4a57 的前缀词行含 li nak si→Linux：{[r['reading'] for r in rows]}")
 
+    # 4.5) 逐键累积：5i4a57 应给出 2..6 共 5 个阶段，去重后含 li nak si
+    stages = data.cumulative("5i4a57", 2)
+    expect(
+        [st[0] for st in stages] == [2, 3, 4, 5, 6],
+        f"累积阶段键数 = {[st[0] for st in stages]}",
+    )
+    unique = data.cumulative_unique("5i4a57", 2)
+    expect(
+        any(r[0] == "li nak si" for r in unique),
+        f"累积去重含 li nak si（{len(unique)} 个读音）",
+    )
+    expect(
+        all(unique[i][0] != unique[i + 1][0] for i in range(len(unique) - 1)),
+        "累积去重后没有相邻重复读音",
+    )
+
     # 5) 联想：li + 4a5（= nak）→ 至少一行 li nak（含 Linux）
     assoc = data.assoc_rows("li", "4a5")
     expect(
@@ -628,8 +682,10 @@ def main() -> None:
     p_pull = sub.add_parser("pull", help="从真机拉词库到 --data 目录")
     p_pull.set_defaults(func=None)
 
-    p_syl = sub.add_parser("syllables", help="码串 → 左列音节组")
+    p_syl = sub.add_parser("syllables", help="码串 → 逐键累积的左列音节（最后去重）")
     p_syl.add_argument("codes")
+    p_syl.add_argument("--min-len", type=int, default=2, help="从几键开始累积（默认 2）")
+    p_syl.add_argument("--no-stages", action="store_true", help="只打印去重汇总，不打印逐键过程")
     p_syl.set_defaults(func=cmd_syllables)
 
     p_chars = sub.add_parser("chars", help="音节 → 单字")
