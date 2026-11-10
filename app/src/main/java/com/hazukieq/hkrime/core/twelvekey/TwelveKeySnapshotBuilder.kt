@@ -174,92 +174,27 @@ object TwelveKeySnapshotBuilder {
         // 面板本來就會列「第一待選段的字典單字」（`de` 讀音下的 邸/的/地…），候選條也該用同一批。
         // 這樣候選條、面板、preedit 三者同源（用戶 2026-11-11：候選詞不該一會字母一會 邸）。
         val needDictionaryFallback = ordered.isEmpty() && remaining.isNotEmpty()
-        val segmentGroups = if (wantGroups || needDictionaryFallback) {
-            segmentGroupsFor(remaining, segmentAnchor)
-        } else {
-            emptyList()
-        }
-        // 展開面板的「音節 → 漢字」列表：選哪些音節由常用度/字頻決定，
-        // 但最終順序按讀音字典序（用戶 2026-11-10：「按首字母→次字母排，不然還是找得艱難」）。
-        val engineGroups = if (!wantGroups) emptyList() else CandidateRanking.orderGroups(
-            group(ordered).map { g -> g.copy(items = rankPanelItems(g.items)) },
-            charScore = { text -> SegmentMemory.charScore(text) },
-            generalScore = { text -> TwelveKeyPreedit.generalScore(text) },
-        )
-        // 有段組時只保留引擎的詞組組，否則左列會被引擎的幾十個單音節讀音灌滿
-        // （段組本身已按「每個首字母 8 個」限量）；單音節輸入沒有段組，引擎組照舊。
-        // 段組 = 單字組；另抽出的聯想詞組按「確切讀音」與引擎組合併（引擎優先、聯想詞去重補在後面）。
-        val assocGroups = segmentGroups.filter { it.segment == 1 }
-        val baseSegmentGroups = segmentGroups.filter { it.segment != 1 }
-        // 多音節（≥3 節）詞典詞的聯想行：`li nak si` → Linux。
-        //
-        // 走**輕路徑**：只按「整串碼前綴」查表（表只有 ~1.4k 條），按讀音排序後直接拼到左列
-        // 「推薦」之後，**不**進 `panelGroups`/`mergeAssociationGroups`/大排序那條重路徑
-        // （2026-11-11 實測：塞進那條路徑會讓面板全量構建卡死幾十秒）。
-        val prefixWordRows = if (wantGroups && remaining.isNotEmpty()) {
-            runCatching {
-                TwelveKeyPreedit.wordsByCodePrefix(
-                    remaining.replace("'", ""),
-                    TwelveKeyTuning.ASSOC_PREFIX_READINGS,
-                    ASSOC_WORDS,
-                ).map { (reading, words) ->
-                    SyllableGroup(
-                        reading = reading,
-                        syllables = reading.split(' '),
-                        items = words.map { word ->
-                            CandidateItem(text = word, comment = reading, index = -1, segment = 1)
-                        },
-                        segment = 1,
-                    )
-                }
-            }.getOrElse { emptyList() }
-        } else {
-            emptyList()
-        }
-        if (BuildConfig.DEBUG && prefixWordRows.isNotEmpty()) {
-            Timber.d(
-                "twelvekey: prefixWords %s",
-                prefixWordRows.joinToString(",") { "${it.reading}:${it.items.size}" },
+        // 左列走**唯一流水線**（見 docs/19 §3）：五源 → mergeRows → collapse → tier/sort → capRows。
+        // 面板關閉（wantGroups=false）時不建分組；但「引擎一條候選都沒有」時要用同一條流水線
+        // 產生的段組給候選條兜底（否則候選條會退成原始字母，見 docs/10 §15.74）。
+        val panel: PanelBuild = when {
+            wantGroups -> buildPanelRows(
+                remaining = remaining,
+                anchor = segmentAnchor,
+                engineGroups = engineGroupsOf(ordered),
+                includePanelOnlySources = true,
             )
-        }
-
-        val merged = CandidateRanking.panelGroups(baseSegmentGroups, engineGroups)
-        // 多音節詞行要和已有行**按讀音合併**，不能直接 append：同一個讀音在引擎那邊
-        // 往往已經有一行（例如 `deepseek` 同時在引擎候選與 `hakka_zon` 詞典裡，
-        // 讀音都是 `di thok`），直接 append 會出現兩行一模一樣的 `di thok → deepseek`
-        // （用戶 2026-11-11）。
-        val groups = collapsePrefixRows(
-            mergeRowsByReading(
-                CandidateRanking.mergeAssociationGroups(merged, assocGroups),
-                prefixWordRows,
-            ),
-        )
-            // 統一排序：單音節組 → 詞組 → 無讀音組，各檔內按讀音字典序；
-            // 「無讀音組」（引擎沒給 comment）用第一條候選的首字讀音兜底，也要按字母排。
-            .sortedWith(
-                compareBy(
-                    {
-                        // 分檔只看「**讀音**有幾個音節」：單音節一檔、多音節一檔、無讀音一檔。
-                        //
-                        // 注意：不能用 `syllables.size` —— 引擎組的 `syllables` 只是
-                        // `listOf(reading)`（1 個元素），`ka then` 這種兩音節詞會被誤判成單音節，
-                        // 結果混進單音節檔裡（用戶 2026-11-11：`ko thiau` / `ko thiau fa` 不在同一段）。
-                        when (readingSyllableCount(it)) {
-                            0 -> 2
-                            1 -> 0
-                            else -> 1
-                        }
-                    },
-                    {
-                        (if (it.reading.isBlank() || it.reading == BLANK_READING) {
-                            TwelveKeyPreedit.pinyinOfText(it.items.firstOrNull()?.text ?: "")
-                        } else {
-                            it.reading
-                        }).lowercase()
-                    },
-                    { it.items.firstOrNull()?.text ?: "" },
-                ),
+            needDictionaryFallback -> buildPanelRows(
+                remaining = remaining,
+                anchor = segmentAnchor,
+                engineGroups = emptyList(),
+                includePanelOnlySources = false,
             )
+            else -> PanelBuild(emptyList(), PanelStats.EMPTY)
+        }
+        val panelRows = panel.rows
+        // 字典兜底只用「單字組」（segment != 1）：候選條不需要聯想/詞行。
+        val dictionaryRows = panelRows.filter { it.segment != 1 }
         // 候選條按「選單順序」取前 N 條：長輸入時 reading 各不相同，
         // 按第 0 組取會只剩 1 條（用戶 2026-11-08 反饋「打到這麼多就停止候選」）。
         // 分詞輸入（`5'e`）時，候選條直接列「這一段能選的字」：用戶點一個字就上屏，
@@ -267,9 +202,9 @@ object TwelveKeySnapshotBuilder {
         // 有 segmentAnchor（剛上屏的前一個字）時，與它關聯度高的字排前面。
         // 只剩最後一段時，用引擎候選（引擎本身按詞頻/用戶詞庫排序）再疊用戶關聯度，
         // 而不是繼續用字典順序 —— 否則「最後一個字」看起來完全不受詞頻影響（用戶 2026-11-09 反饋）。
-        val barEntries = if (ordered.isEmpty() && segmentGroups.isNotEmpty()) {
+        val barEntries = if (ordered.isEmpty() && panelRows.isNotEmpty()) {
             // 字典兜底：取「第一待選段」的音節組候選（與面板左列第 0 組同源），最多候選條格數。
-            segmentGroups.filter { it.segment != 1 }
+            dictionaryRows
                 .flatMap { g -> g.items }
                 .distinctBy { it.text }
                 .take(TwelveKeyTuning.BAR_ITEMS)
@@ -279,9 +214,9 @@ object TwelveKeySnapshotBuilder {
         // 候選條放不下的續頁 → 面板左列第一個「推薦」組（用戶 2026-11-11 定案）。
         // 順序與候選條同源（[CandidateRanking.fullBarOrder]），起點是候選條之後的那一條：
         // 這樣連「被 4 條詞組配額擠掉的第 5..N 個詞」也一起收進來，而不是只剩單字續頁。
-        val recommend = if (ordered.isEmpty() && segmentGroups.isNotEmpty()) {
+        val recommend = if (ordered.isEmpty() && panelRows.isNotEmpty()) {
             // 字典兜底時同樣把「沒上條的部分」放進推薦組（續頁語義不變）
-            segmentGroups.filter { it.segment != 1 }
+            dictionaryRows
                 .flatMap { g -> g.items }
                 .distinctBy { it.text }
                 .drop(barEntries.size)
@@ -303,7 +238,7 @@ object TwelveKeySnapshotBuilder {
                 ),
             )
         }
-        val groupsWithRecommend = recommendRow + groups
+        val groupsWithRecommend = recommendRow + panelRows.map { it.toSyllableGroup() }
         // 預覽文字與候選條第 0 條同源：一次算好，隨快照發佈。
         val previewText = barEntries.firstOrNull { it.text.isNotEmpty() }?.text ?: ""
         // 已選前綴（librime context 裡尚未 commit 的字）+ 第一條候選 = 嵌入式預覽全文
@@ -330,12 +265,10 @@ object TwelveKeySnapshotBuilder {
         DiagLog.d(
             "snapshot",
             "build code=${input} wantGroups=$wantGroups groups=${groupsWithRecommend.size}" +
-                " bar=${barEntries.size} prefixWords=${prefixWordRows.size}" +
-                " prefixIdx=" + prefixWordRows.map { row ->
-                    groupsWithRecommend.indexOfFirst { it.reading == row.reading }
-                }.joinToString(",") +
+                " bar=${barEntries.size} ${panel.stats.line()}" +
                 " all=[" + groupsWithRecommend.joinToString(",") { it.reading.ifEmpty { "推荐" } } + "]",
         )
+        DiagLog.d("panel", panel.stats.line())
         return TwelveKeySnapshot(
             input = input,
             consumedEnd = consumedEnd,
@@ -372,48 +305,62 @@ object TwelveKeySnapshotBuilder {
      * 每項帶 `segment = 0` 與 `restCode = 其餘碼`：點擊 = 上屏這個字 + 其餘碼餵回引擎，
      * 面板接著列下一段的單字（按順序推進）。
      */
-    /** 單測用：把「第一待選段 → 組」的結果暴露出來（只讀，不碰引擎）。 */
-    internal fun debugSegmentGroups(remaining: String, anchor: Char? = null): List<SyllableGroup> =
-        segmentGroupsFor(remaining, anchor)
+    // =====================================================================================
+    // 五源流水線（docs/19 §3）
+    //
+    // 固定形狀：每源一個純函數 → mergeRows（唯一合併點）→ collapsePrefixRows
+    //          → tierAndSort（固定分檔）→ capRows（固定截斷）→ project 成 SyllableGroup。
+    // 源函數**不做**跨源去重、不排序、不碰引擎/UI；同一種規則只寫一次。
+    // =====================================================================================
 
-    private fun segmentGroupsFor(remaining: String, anchor: Char?): List<SyllableGroup> {
-        val codes = remaining.replace("'", "")
+    /**
+     * 一種「合法第一段切法」展開後的結果。
+     *
+     * [syllables] 已按配額 / 精確音節規則算好，SYNTH_SINGLE、SPLIT_SINGLE、ASSOC 三個源共用同一份
+     * （避免重複展開：`syllablesForSegment` 是每鍵成本的一部分）。
+     */
+    internal data class SplitPart(
+        val head: String,
+        val rest: String,
+        val syllables: List<String>,
+        /** head 本身就是一個完整音節（`4i`=mi、`ea`=da）→ 只列精確音節，不再前綴展開。 */
+        val headIsCompleteSyllable: Boolean,
+        /** 這段之後已經沒有碼（`rest` 為空）→ 允許 `r` 這種後綴音節。 */
+        val allowSuffixOnly: Boolean,
+    )
+
+    /**
+     * 把碼串拆成「合法第一段切法」並展開第一段音節（純函數，不碰引擎/UI）。
+     *
+     * 一種碼串可能有多種合法切法（`744ii` = son+gi 或 song+g**），但面板只列**第一段**：
+     *  1) 整串是一個音節（`we` = the）→ 先列這個音節的單字組；
+     *  2) 再把每個碼位當獨立段切開（`w` = th*、`e` = d/e/f*），給出「第一段的音節組 + 聯想詞行」，
+     *     點下去之後剩餘碼自動遞歸（pickSegmentedCandidate 會把 rest 餵回引擎）。
+     *
+     * 配額：第一種切法吃完整配額；備選切法減半（[TwelveKeyTuning.SECONDARY_SPLIT_DIVISOR]），
+     * 避免次要解讀把左列灌滿。音節豐富的鍵放開到 24（[TwelveKeyTuning.SEGMENT_SYLLABLE_LIMIT_RICH]）。
+     */
+    internal fun splitParts(codes: String): List<SplitPart> {
         if (codes.isEmpty()) return emptyList()
-        // 一種碼串可能有多種合法切法（`744ii` = son+gi 或 song+g**），但面板只列**第一段**
-        // 的「音節 → 單字」組，接著列「聯想詞組」行（`song g**` / `song h**`）——
-        // 用戶 2026-11-10：「我要的是列出 song h**(<=6), song g**(<=6) 的联想词组，而不是 son·2」。
-        // 兩種解讀都要給（用戶 2026-11-10 定案：「剩下那兩個編碼不是兩個了嗎？每兩個處理完->遞歸」）：
-        //  1) 整串是一個音節（`we` = the）→ 先列這個音節的單字組；
-        //  2) 再把每個碼位當獨立段切開（`w` = th*、`e` = d/e/f*），給出「第一段的音節組 + 聯想詞行」，
-        //     點下去之後剩餘碼自動遞歸（pickSegmentedCandidate 會把 rest 餵回引擎）。
-        // 早期版本只做 (1)，於是 `we` 面板只剩 the 系列、聯想詞全無。
         val single = if (TwelveKeyPreedit.isSingleSyllable(codes)) listOf(codes to "") else emptyList()
         val splits = (single + TwelveKeyPreedit.splitHeads(codes)).distinctBy { it.first }
         if (splits.isEmpty()) return emptyList()
-        val result = ArrayList<SyllableGroup>()
-        val seen = HashSet<String>()
-        splits.forEachIndexed { splitIndex, split ->
+        return splits.mapIndexed { index, split ->
             val (head, rest) = split
-            // 第一種切法吃完整配額；備選切法減半（面板不能被次要切法灌滿）。
-            // 有段組時放寬音節數（用戶 2026-11-10）：普通鍵 16、音節豐富的鍵 24；
-            // 備選切法減半，避免次要解讀把面板灌滿。
-            val headPool = TwelveKeyPreedit.syllableCountForCode(split.first)
+            val headPool = TwelveKeyPreedit.syllableCountForCode(head)
             val baseLimit = if (headPool >= RICH_SYLLABLE_THRESHOLD) {
                 SEGMENT_SYLLABLE_LIMIT_RICH
             } else {
                 SEGMENT_SYLLABLE_LIMIT
             }
-            val quota = if (splitIndex == 0) {
+            val quota = if (index == 0) {
                 baseLimit
             } else {
                 baseLimit / TwelveKeyTuning.SECONDARY_SPLIT_DIVISOR
             }
-            // 備選切法：head 本身是完整音節時只取精確碼（避免和前綴重複）；
-            // head 只是裸碼（`w`）時必須允許前綴展開，否則 th* 全被吃掉。
-            // 這一段的碼**剛好就是一個完整音節**（`4i`=mi、`ea`=fa、`74`=po…）時，只列這個音節：
-            // 用戶已經把音節打全了，再展開 `mia/min/nia…`（同前綴的更長音節）屬於噪音——
-            // 那些音節要打得更多（用戶 2026-11-11：「其他 16 個前綴展開理論上並不需要」）。
-            // 只有「碼只是前綴」（如 `7` = p/s，一個完整音節都不是）時才做前綴展開。
+            // 這一段的碼**剛好就是一個完整音節**（`4i`=mi、`ea`=fa、`74`=po…）時只列這個音節：
+            // 用戶已經把音節打全了，再展開 `mia/min/nia…`（同前綴的更長音節）屬於噪音。
+            // 只有「碼只是前綴」（如 `7` = p/s）時才做前綴展開；exact 為空會自動回退到展開。
             val headIsCompleteSyllable = TwelveKeyPreedit.isSingleSyllable(head)
             // 兒化後綴 `r`：只有「這段之後沒有碼了」（rest 空）才允許當音節；
             // 打在中間/開頭時不參與展開（用戶 2026-11-11 特殊規則）。
@@ -425,111 +372,291 @@ object TwelveKeySnapshotBuilder {
                         head, quota, false, allowSuffixOnly = allowSuffixOnly,
                     )
                 }
-            for (syllable in syllables) {
-                // 同一個音節可能由多種切法得到（`the` 既可整段、也可 w|e）：
-                // 只留第一種切法那份，避免面板出現 `then` / `then·1` 這種重複行。
-                if (!seen.add(syllable)) continue
-                val chars = TwelveKeyPreedit.rankChars(
-                    TwelveKeyPreedit.charsForSyllable(
-                        syllable,
-                        TwelveKeyTuning.SEGMENT_CHARS_LIMIT,
-                    ),
-                    anchor,
-                )
-                val items = chars.map { ch ->
-                    CandidateItem(
-                        text = ch,
-                        comment = syllable,
-                        index = -1,
-                        segment = 0,
-                        restCode = rest,
-                    )
-                }
-                if (items.isEmpty()) continue
-                result.add(
-                    SyllableGroup(
-                        reading = syllable,
-                        syllables = listOf(syllable),
-                        items = items,
-                        segment = 0,
-                    ),
-                )
-            }
+            SplitPart(
+                head = head,
+                rest = rest,
+                syllables = syllables,
+                headIsCompleteSyllable = headIsCompleteSyllable,
+                allowSuffixOnly = allowSuffixOnly,
+            )
+        }
+    }
 
-            // ---- 聯想詞組：按這一種切法的剩餘碼推第二段首字母 ----
-            val initials = TwelveKeyPreedit.initialsForPrefix(rest, ASSOC_INITIALS)
-            if (initials.isNotEmpty()) {
-                var assocAdded = 0
-                for (syllable in syllables.take(ASSOC_HEAD_SYLLABLES)) {
-                    if (assocAdded >= ASSOC_MAX_ROWS) break
-                    // 寬鬆行（第二段只按首字母匹配）：先算，數量受 ASSOC_INITIAL_ROWS 限制，
-                    // 用戶 2026-11-10「散一點沒關係，但增補聯想組不要給太多」。
-                    TwelveKeyPreedit.associatedBySegmentCode(
-                        syllable, rest, ASSOC_WORDS, ASSOC_INITIAL_ROWS,
-                    ).forEach { (reading, words) ->
-                        if (words.isEmpty() || assocAdded >= ASSOC_MAX_ROWS) return@forEach
-                        if (!seen.add("$reading|any")) return@forEach
-                        val items = words.map { word ->
-                            CandidateItem(text = word, comment = reading, index = -1, segment = 1)
-                        }
-                        result.add(
-                            SyllableGroup(
-                                reading = reading,
-                                syllables = listOf(syllable),
-                                items = items,
-                                segment = 1,
-                            ),
-                        )
-                        assocAdded++
-                    }
-                    TwelveKeyPreedit.associatedByReading(syllable, initials, ASSOC_WORDS, ASSOC_READINGS)
-                        .forEach { (second, words) ->
-                            if (words.isEmpty() || assocAdded >= ASSOC_MAX_ROWS) return@forEach
-                            val reading = "$syllable $second"
-                            if (!seen.add("$reading|any")) return@forEach
-                            val items = words.map { word ->
-                                CandidateItem(
-                                    text = word,
-                                    comment = reading,
-                                    index = -1,
-                                    segment = 1, // 1 = 聯想詞：整詞上屏
-                                )
-                            }
-                            result.add(
-                                SyllableGroup(
-                                    reading = reading,
-                                    syllables = listOf(syllable, second),
-                                    items = items,
-                                    segment = 1,
-                                ),
-                            )
-                            assocAdded++
-                        }
-                }
-            }
+    /**
+     * 源 1：整串碼恰好是一個完整音節（`ia` → ga/ha）→ 該音節的單字組。
+     *
+     * 對應 `panel_probe.py` 的 `Data.segment_groups()` 中 `single = [(codes, "")]` 那一組。
+     */
+    internal fun synthSingleRows(parts: List<SplitPart>, anchor: Char?): List<PanelRow> {
+        val part = parts.firstOrNull() ?: return emptyList()
+        if (!part.headIsCompleteSyllable || part.rest.isNotEmpty()) return emptyList()
+        return syllableRows(part, anchor, RowSource.SYNTH_SINGLE)
+    }
+
+    /**
+     * 源 2：備選切法的第一段單字組（`we` → w|e 的 th* / d*…）。
+     *
+     * 若整串本身是一個音節，那份由 [synthSingleRows] 負責，這裡只出其餘切法；
+     * 否則第一種切法就是「主切法」，吃完整配額。
+     */
+    internal fun splitSingleRows(parts: List<SplitPart>, anchor: Char?): List<PanelRow> {
+        val synthPart = parts.firstOrNull()?.takeIf { it.headIsCompleteSyllable && it.rest.isEmpty() }
+        val remainingParts = if (synthPart == null) parts else parts.drop(1)
+        return remainingParts.flatMap { syllableRows(it, anchor, RowSource.SPLIT_SINGLE) }
+    }
+
+    /** 一組「音節 → 單字」行（單字組的共用構造）。 */
+    private fun syllableRows(part: SplitPart, anchor: Char?, source: RowSource): List<PanelRow> =
+        part.syllables.mapNotNull { syllable ->
+            val chars = TwelveKeyPreedit.rankChars(
+                TwelveKeyPreedit.charsForSyllable(syllable, TwelveKeyTuning.SEGMENT_CHARS_LIMIT),
+                anchor,
+            )
+            if (chars.isEmpty()) return@mapNotNull null
+            PanelRow(
+                reading = syllable,
+                items = chars.map { ch ->
+                    CandidateItem(text = ch, comment = syllable, index = -1, segment = 0, restCode = part.rest)
+                },
+                segment = 0,
+                restCode = part.rest,
+                sources = setOf(source),
+            )
         }
 
-        // 組之間一律按讀音字典序（用戶 2026-11-10：先首字母、再次字母）；
-        // 之前按「與上一字的關聯度」排，會讓同一段內的同音節組跳來跳去、難以掃讀。
-        // anchor 只影響組內字的順序（rankChars），不再影響組的順序。
-        // 聯想行（segment=1）總數封頂：整串碼前綴行先佔位（它們對當前輸入更具體），
-        // 其餘按原順序補；超過 [ASSOC_MAX_ROWS] 的行直接丟掉（用戶 2026-11-10 定的配額）。
+    /**
+     * 源 3：兩音節聯想詞行（`ga zi`、`than dung`）。
+     *
+     * 行標題一律是兩個完整讀音（精確哈希 `(第一音節, 第二音節)`）；數量受
+     * [TwelveKeyTuning.ASSOC_MAX_ROWS] 封頂。這裡的局部去重只是**配額計數**用
+     * （同一個 reading 不能佔兩格额度），跨源合併仍由 [mergeRows] 負責。
+     */
+    internal fun assocRows(parts: List<SplitPart>): List<PanelRow> {
         var assocRows = 0
-        val capped = ArrayList<SyllableGroup>(result.size)
-        for (group in result) {
-            if (group.segment == 1) {
-                if (assocRows >= ASSOC_MAX_ROWS) continue
-                assocRows++
+        val out = ArrayList<PanelRow>()
+        val seen = HashSet<String>()
+        for (part in parts) {
+            if (assocRows >= ASSOC_MAX_ROWS) break
+            val initials = TwelveKeyPreedit.initialsForPrefix(part.rest, ASSOC_INITIALS)
+            if (initials.isEmpty()) continue
+            for (syllable in part.syllables.take(ASSOC_HEAD_SYLLABLES)) {
+                if (assocRows >= ASSOC_MAX_ROWS) break
+                // 寬鬆行（第二段只按首字母匹配）
+                TwelveKeyPreedit.associatedBySegmentCode(
+                    syllable, part.rest, ASSOC_WORDS, ASSOC_INITIAL_ROWS,
+                ).forEach { (reading, words) ->
+                    if (words.isEmpty() || assocRows >= ASSOC_MAX_ROWS) return@forEach
+                    if (!seen.add(reading)) return@forEach
+                    out.add(assocRow(reading, words))
+                    assocRows++
+                }
+                // 精確行（第二段是確切音節）
+                TwelveKeyPreedit.associatedByReading(syllable, initials, ASSOC_WORDS, ASSOC_READINGS)
+                    .forEach { (second, words) ->
+                        if (words.isEmpty() || assocRows >= ASSOC_MAX_ROWS) return@forEach
+                        val reading = "$syllable $second"
+                        if (!seen.add(reading)) return@forEach
+                        out.add(assocRow(reading, words))
+                        assocRows++
+                    }
             }
-            capped.add(group)
         }
-        return capped.sortedWith(
-            compareBy(
-                { if (it.syllables.isEmpty()) 2 else if (it.syllables.size == 1) 0 else 1 },
-                { it.reading.lowercase() },
+        return out
+    }
+
+    private fun assocRow(reading: String, words: List<String>) = PanelRow(
+        reading = reading,
+        items = words.map { CandidateItem(text = it, comment = reading, index = -1, segment = 1) },
+        segment = 1,
+        sources = setOf(RowSource.ASSOC),
+    )
+
+    /**
+     * 源 4：每鍵首字母笛卡爾積 → 按「讀音首字母序列」查詞表的行（`g·b` → `gang bung`）。
+     *
+     * 規則已在 `tools/panel_probe.py` 驗證（`initial_pattern_rows`）；本步驟先留空，
+     * 接入與常數見 docs/19 §7 步驟 3。
+     */
+    internal fun initialComboRows(codes: String): List<PanelRow> = emptyList()
+
+    /**
+     * 源 5：整串碼前綴命中的多音節詞條（`li nak si` → Linux）。
+     *
+     * 走**輕路徑**：只按「整串碼前綴」查表（表只有 ~1.4k 條），不做引擎/大排序那條重路徑
+     * （2026-11-11 實測：塞進重路徑會讓面板全量構建卡死幾十秒）。
+     * 第一段必須打全（`wordsByCodePrefix` 已修，別回退）。
+     */
+    internal fun wholeWordRows(remaining: String): List<PanelRow> {
+        val codes = remaining.replace("'", "")
+        if (codes.isEmpty()) return emptyList()
+        val rows = runCatching {
+            TwelveKeyPreedit.wordsByCodePrefix(
+                codes,
+                TwelveKeyTuning.ASSOC_PREFIX_READINGS,
+                ASSOC_WORDS,
+            ).map { (reading, words) ->
+                PanelRow(
+                    reading = reading,
+                    items = words.map { word ->
+                        CandidateItem(text = word, comment = reading, index = -1, segment = 1)
+                    },
+                    segment = 1,
+                    sources = setOf(RowSource.WHOLE_WORD),
+                )
+            }
+        }.getOrElse { emptyList() }
+        if (BuildConfig.DEBUG && rows.isNotEmpty()) {
+            Timber.d(
+                "twelvekey: prefixWords %s",
+                rows.joinToString(",") { "${it.reading}:${it.items.size}" },
+            )
+        }
+        return rows
+    }
+
+    /**
+     * 源 6：引擎候選組。
+     *
+     * 有段組（按碼位自切的單字組）時，引擎的**單音節組**只是同一批字的另一種排法：
+     * 全列出來左列會被 g* 的幾十個讀音灌滿，所以只保留「同讀音的引擎組」（並進段組）
+     * 與「多音節/含非漢字的組」——與舊 `CandidateRanking.panelGroups` 同一口徑。
+     */
+    internal fun engineRows(engineGroups: List<SyllableGroup>, segmentReadings: Set<String>): List<PanelRow> {
+        if (engineGroups.isEmpty()) return emptyList()
+        // 沒有任何段組時（單鍵/純碼位、段組還沒展開）引擎組原樣全留 —— 這是舊 panelGroups 的
+        // `if (segmentGroups.isEmpty()) return engineGroups` 分支；不能套用下面的「只留詞組」過濾，
+        // 否則單鍵輸入的單音節引擎組會整批消失（`8` 的 `ji` 就是這樣被吞掉的）。
+        if (segmentReadings.isEmpty()) {
+            return engineGroups.map { group ->
+                PanelRow(group.reading, group.items, group.segment, sources = setOf(RowSource.ENGINE))
+            }
+        }
+        val out = ArrayList<PanelRow>(engineGroups.size)
+        engineGroups.forEach { group ->
+            if (group.reading in segmentReadings) {
+                // 同讀音引擎組會並進段組：漢字在前、非漢字補在後面（舊 panelGroups 的分區口徑）。
+                val (cjk, other) = group.items.partition {
+                    CandidateRanking.isSingleCjkChar(it.text) || CandidateRanking.isCjkWord(it.text)
+                }
+                out.add(
+                    PanelRow(
+                        reading = group.reading,
+                        items = cjk + other,
+                        segment = group.segment,
+                        sources = setOf(RowSource.ENGINE),
+                    )
+                )
+            } else if (group.syllables.size >= 2 ||
+                group.items.any { !CandidateRanking.isSingleCjkChar(it.text) }
+            ) {
+                out.add(
+                    PanelRow(
+                        reading = group.reading,
+                        items = group.items,
+                        segment = group.segment,
+                        sources = setOf(RowSource.ENGINE),
+                    )
+                )
+            }
+        }
+        return out
+    }
+
+    /** 面板分組統計（只進 `diag.log` / `twelvekey:build`；UI 不可見）。 */
+    internal data class PanelStats(
+        val synth: Int = 0,
+        val split: Int = 0,
+        val assoc: Int = 0,
+        val combo: Int = 0,
+        val word: Int = 0,
+        val engine: Int = 0,
+        val merged: Int = 0,
+        val collapsed: Int = 0,
+        val capped: Int = 0,
+        val tierSingles: Int = 0,
+        val tierWords: Int = 0,
+        val tierBlank: Int = 0,
+    ) {
+        /** 每源一行日誌（docs/19 §6.1）：出問題能直接判斷「哪源多給/少給/被截斷」。 */
+        fun line(): String = "panel sources synth=$synth split=$split assoc=$assoc combo=$combo" +
+            " word=$word engine=$engine → merged=$merged collapsed=$collapsed" +
+            " tier=[single:$tierSingles word:$tierWords blank:$tierBlank] capped=$capped"
+
+        companion object {
+            val EMPTY = PanelStats()
+        }
+    }
+
+    internal data class PanelBuild(val rows: List<PanelRow>, val stats: PanelStats)
+
+    /**
+     * 面板左列的**唯一入口**：五源 → 合併 → 收斂 → 分檔排序 → 截斷。
+     *
+     * @param includePanelOnlySources 面板打開時才產生的來源（首字母組合行、整串詞行）；
+     *   候選條兜底只需要段組，傳 false 可省掉這兩源的查表成本。
+     */
+    internal fun buildPanelRows(
+        remaining: String,
+        anchor: Char?,
+        engineGroups: List<SyllableGroup>,
+        includePanelOnlySources: Boolean,
+    ): PanelBuild {
+        val codes = remaining.replace("'", "")
+        if (codes.isEmpty()) return PanelBuild(emptyList(), PanelStats.EMPTY)
+        val parts = splitParts(codes)
+        val synth = synthSingleRows(parts, anchor)
+        val split = splitSingleRows(parts, anchor)
+        val segmentReadings = HashSet<String>(synth.size + split.size)
+        synth.forEach { segmentReadings.add(it.reading) }
+        split.forEach { segmentReadings.add(it.reading) }
+        val engine = engineRows(engineGroups, segmentReadings)
+        val assoc = assocRows(parts)
+        val combo = if (includePanelOnlySources) initialComboRows(codes) else emptyList()
+        val word = if (includePanelOnlySources) wholeWordRows(remaining) else emptyList()
+
+        // 拼接順序固定：段組 → 引擎 → 聯想 → 首字母組合 → 整串詞行。
+        // mergeRows 的「引擎項在前、App 補集在後」「單字組(0) 優先於詞行(1)」都由這個順序決定。
+        val merged = mergeRows(synth + split + engine + assoc + combo + word)
+        val collapsed = collapsePrefixRows(merged)
+        val sorted = tierAndSort(collapsed)
+        val capped = capRows(sorted)
+        return PanelBuild(
+            rows = capped,
+            stats = PanelStats(
+                synth = synth.size,
+                split = split.size,
+                assoc = assoc.size,
+                combo = combo.size,
+                word = word.size,
+                engine = engine.size,
+                merged = merged.size,
+                collapsed = collapsed.size,
+                capped = capped.size,
+                tierSingles = sorted.count { it.syllableCount == 1 },
+                tierWords = sorted.count { it.syllableCount >= 2 },
+                tierBlank = sorted.count { it.syllableCount == 0 },
             ),
         )
     }
+
+    /** 引擎候選 → 面板分組（面板專用；候選條模式不建）。 */
+    private fun engineGroupsOf(ordered: List<CandidateItem>): List<SyllableGroup> {
+        if (ordered.isEmpty()) return emptyList()
+        return CandidateRanking.orderGroups(
+            group(ordered).map { g -> g.copy(items = rankPanelItems(g.items)) },
+            charScore = { text -> SegmentMemory.charScore(text) },
+            generalScore = { text -> TwelveKeyPreedit.generalScore(text) },
+        )
+    }
+
+    /** 單測用：把「第一待選段 → 組」的結果暴露出來（只讀，不碰引擎）。 */
+    internal fun debugSegmentGroups(remaining: String, anchor: Char? = null): List<SyllableGroup> =
+        buildPanelRows(
+            remaining = remaining,
+            anchor = anchor,
+            engineGroups = emptyList(),
+            includePanelOnlySources = false,
+        ).rows.map { it.toSyllableGroup() }
 
     /** 每位音節列幾個聯想詞（用戶：≤6）。 */
     // ---- 聯想詞配額：集中在 [TwelveKeyTuning]（改值請改 Tuning）----
@@ -575,94 +702,6 @@ object TwelveKeySnapshotBuilder {
         return String(bytes, consumedEnd, bytes.size - consumedEnd, Charsets.UTF_8)
     }
 
-    /**
-     * 多音節行按「開頭相同」收斂：`ko thiau fa` 並進 `ko thiau`、`ka thu di` 並進 `ka thu`。
-     *
-     * 為什麼需要（用戶 2026-11-11）：「整串碼查詢是按開頭匹配的，那 `ko thiau` 和 `ko thiau fa`
-     * 就是同一個 list，為什麼面板裡是兩行」——引擎的每個候選詞都有自己的完整 comment，
-     * 組出來就是 `ka thu` 一行、`ka thu di` 再一行；既然查詢語義是前綴，顯示也該收斂到最短前綴行。
-     *
-     * 限制：**只收斂多音節行（≥2 音節）之間**，單音節行（`ka`）不吸收詞行 ——
-     * 否則 `ka then` 這種詞會跑到單字格里，破壞「單音節組 = 這一段能選的字」的語義。
-     */
-    private fun collapsePrefixRows(rows: List<SyllableGroup>): List<SyllableGroup> {
-        if (rows.size < 2) return rows
-        fun tokens(g: SyllableGroup) = g.reading.split(' ').filter { it.isNotBlank() }
-
-        val out = ArrayList<SyllableGroup>(rows.size)
-        // 1) 單音節/無讀音行原樣保留（順序不變）
-        rows.forEach { if (tokens(it).size < 2) out.add(it) }
-        // 2) 多音節行按音節數從短到長處理：短的先就位，長的才有前綴可並
-        rows.filter { tokens(it).size >= 2 }
-            .sortedBy { tokens(it).size }
-            .forEach { row ->
-                val rowTokens = tokens(row)
-                var target = -1
-                var bestLen = 0
-                out.forEachIndexed { i, cand ->
-                    val candTokens = tokens(cand)
-                    if (candTokens.size < 2 || candTokens.size >= rowTokens.size) return@forEachIndexed
-                    if (rowTokens.take(candTokens.size) == candTokens && candTokens.size > bestLen) {
-                        bestLen = candTokens.size
-                        target = i
-                    }
-                }
-                if (target < 0) {
-                    out.add(row)
-                    return@forEach
-                }
-                val existing = out[target]
-                val texts = existing.items.mapTo(HashSet()) { it.text.lowercase() }
-                val add = row.items.filter { texts.add(it.text.lowercase()) }
-                if (add.isNotEmpty()) out[target] = existing.copy(items = existing.items + add)
-            }
-        return out
-    }
-
-    /**
-     * 把 [extra] 的行按讀音並進 [base]：同讀音就合併候選（文字不分大小寫去重），沒有才新增行。
-     *
-     * 用於「字典多音節詞行」：它們和引擎/聯想行可能同讀音，必須合併成一格，
-     * 否則面板會出現兩行相同的 `讀音 → 詞`（用戶 2026-11-11 的 `deepseek` 重複）。
-     */
-    /** 一行的讀音有幾個音節（`ko thiau fa` = 3）；空白/「推薦」組回 0。 */
-    private fun readingSyllableCount(group: SyllableGroup): Int =
-        group.reading.split(' ').count { it.isNotBlank() }
-
-    private fun mergeRowsByReading(
-        base: List<SyllableGroup>,
-        extra: List<SyllableGroup>,
-    ): List<SyllableGroup> {
-        if (extra.isEmpty()) return base
-        val out = base.toMutableList()
-        for (row in extra) {
-            // 先找**同讀音**；沒有就找「已有行是它的前綴」（`ko thiau` 之于 `ko thiau fa`）。
-            // 用戶 2026-11-11：整串碼是「開頭相同匹配」的，長詞就該落在那個更短的讀音行裡，
-            // 不該再單獨起一行，否則 `ko thiau` / `ko thiau fa` 看起來是兩個 list。
-            var idx = out.indexOfFirst { it.reading == row.reading }
-            if (idx < 0) {
-                val rowTokens = row.reading.split(' ').filter { it.isNotEmpty() }
-                var bestLen = 0
-                out.forEachIndexed { i, cand ->
-                    val candTokens = cand.reading.split(' ').filter { it.isNotEmpty() }
-                    if (candTokens.isEmpty() || candTokens.size >= rowTokens.size) return@forEachIndexed
-                    if (rowTokens.take(candTokens.size) == candTokens && candTokens.size > bestLen) {
-                        bestLen = candTokens.size
-                        idx = i
-                    }
-                }
-            }
-            if (idx < 0) {
-                out.add(row)
-                continue
-            }
-            val existing = out[idx]
-            val texts = existing.items.mapTo(HashSet()) { it.text.lowercase() }
-            val add = row.items.filter { texts.add(it.text.lowercase()) }
-            if (add.isNotEmpty()) out[idx] = existing.copy(items = existing.items + add)
-        }
-        return out
-    }
 
     /** 12 鍵碼 → 拼音字母（只用於本地兜底上屏，不影響引擎）。 */
     fun toLetters(rawCode: String): String = buildString(rawCode.length + 8) {

@@ -38,6 +38,9 @@
     python3 tools/panel_probe.py panel 5i4a57
     python3 tools/panel_probe.py panel 5we
 
+    # 6) 结构化输出（App 侧 golden 单测对拍用）：五源 + merged，单个 JSON 到 stdout
+    python3 tools/panel_probe.py json ia 5i4a57
+
 数据文件（与 App 的 `core/RimeDictSource.kt` 一致：共享目录优先，这里就是 --data 目录）：
 
 - `hakka.dict.yaml`：音节表 + 单字表（`字<TAB>读音`）
@@ -47,6 +50,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -81,6 +85,18 @@ MAX_SYLLABLES_TOTAL = SEGMENT_SYLLABLE_LIMIT
 ASSOC_WORDS = 6
 ASSOC_MAX_ROWS = 4
 ASSOC_PREFIX_READINGS = 4
+
+# --- 首字母組合（INITIAL_COMBO）常量：與 App `TwelveKeyTuning` 及 docs/19 §5.2 同值 ---
+# 影響：面板流水線的 INITIAL_COMBO 源（本腳本對應 `initial_pattern_rows()`）。
+# 現在值 8：`ia8` 有 8 個組合、`ia8i3` 有 32 個；組合全出會淹沒單字組/聯想行。
+# 調大 → 首字母組合行更多（面板更長，單字組被推後）；調小 → `ia8i3` 這類多鍵輸入幾乎只剩單字組。
+INITIAL_COMBO_MAX_ROWS = 8
+# 每個首字母組合**每輪**先出幾行；現在值 1（第一輪每組合保 1 行，第二輪再補第 2 行）。
+# 調大 → 少數高頻組合壟斷行數預算；調小到 0 → 不生成首字母組合行。
+INITIAL_COMBO_ROWS_PER_PATTERN = 1
+# 首字母組合數上限；現在值 64。6 鍵以上笛卡爾積通常超過（2^k），等於「>4 鍵長輸入不生成」。
+# 調大 → 2^k 爆炸風險（組合數 × 詞條查詢變慢）；調小 → 5 鍵以上就沒有首字母組合行。
+INITIAL_COMBO_PATTERN_LIMIT = 64
 
 
 # ---------------------------------------------------------------- 基础工具
@@ -408,6 +424,10 @@ class Data:
             if not syllables:
                 syllables = self.syllables_for_segment(head, quota, False, allow_suffix_only)
             source = "exact" if head_complete else "prefix"
+            # 這一行來自哪個切法（json 子命令的五源劃分用）：
+            # synth = 整串碼本身就是一個完整音節（split 0、rest 空）；其餘切法的單字組 = split。
+            # 注意 `source` 欄位已被「exact/prefix」佔用，這裡另開 `origin`，不改既有語義。
+            origin = "synth" if index == 0 and not rest else "split"
             for syl in syllables:
                 if syl in seen:
                     continue
@@ -423,6 +443,7 @@ class Data:
                         "rest": rest,
                         "chars": chars,
                         "source": source,
+                        "origin": origin,
                         "split": index,
                     }
                 )
@@ -516,40 +537,51 @@ class Data:
             if not letters:
                 return []
             combos = [pre + (x,) for pre in combos for x in letters]
-            if len(combos) > 64:
+            if len(combos) > INITIAL_COMBO_PATTERN_LIMIT:
                 return []
         return combos
 
-    def initial_pattern_rows(self, codes: str, max_rows: int = 16) -> list[tuple[str, list[str]]]:
-        """「每键一个音节首字母」的联想行：字母组合×真实词条，行标题仍是具体读音。"""
+    def initial_pattern_rows(
+        self, codes: str, max_rows: int = INITIAL_COMBO_MAX_ROWS
+    ) -> list[tuple[str, list[str]]]:
+        """「每键一个音节首字母」的联想行：字母组合×真实词条，行标题仍是具体读音。
+
+        与 App `INITIAL_COMBO` 源同一套**轮转**语义（docs/19 §5.2/步骤 3）：
+
+        - 组合规则直接复用 `initial_pattern_combos()`（`r` 只在末键，元音不作首字母）；
+          组合数超 `INITIAL_COMBO_PATTERN_LIMIT` 或任一键无可用首字母 → 整组不生成；
+        - 第一轮每个组合按读音字典序取第 1 条（保证每个组合都有代表），
+          第二轮再给每个组合补第 2 条；每轮内按 `combos` 顺序塞；
+        - 总行数达 `max_rows`（默认 `INITIAL_COMBO_MAX_ROWS`）即停。
+        - 键数不再做 `>4` 的硬限制，由 `INITIAL_COMBO_PATTERN_LIMIT` 自然封顶
+          （如 `5i4a57` 恰好 64 组仍生成，7 键以上通常超限）。
+        """
         codes = codes.replace("'", "")
-        if len(codes) < 2 or len(codes) > 4:
+        if len(codes) < 2:
             return []
-        combos: list[tuple[str, ...]] = [()]
-        for ch in codes:
-            letters = self.key_initial_letters(ch)
-            if not letters:
-                return []
-            combos = [pre + (x,) for pre in combos for x in letters]
-            if len(combos) > 24:
-                return []
+        combos = self.initial_pattern_combos(codes)
+        if not combos:
+            return []
+        # 先把每个组合的命中词条按读音字典序排好（跨組合輪轉時直接按序号取）
+        entries_by_combo = [
+            sorted(self.by_initials.get(combo) or [], key=lambda e: " ".join(e[0]))
+            for combo in combos
+        ]
         rows: list[tuple[str, list[str]]] = []
         seen: set[str] = set()
-        for combo in combos:
-            entries = self.by_initials.get(combo) or []
-            if not entries:
-                continue
-            # 每種首字母組合先取 1 條（詞條按讀音排序穩定），保證組合都有代表
-            for tokens, word in sorted(entries, key=lambda e: " ".join(e[0]))[:2]:
-                reading = " ".join(tokens)
-                if reading in seen:
-                    continue
-                seen.add(reading)
-                rows.append((reading, [word]))
-                if len(rows) >= max_rows:
-                    break
-            if len(rows) >= max_rows:
-                break
+        # 两轮：第 1 轮每组合 1 条，第 2 轮再补第 2 条（`ROWS_PER_PATTERN` 控制每轮条数）
+        for round_index in range(2):
+            start = round_index * INITIAL_COMBO_ROWS_PER_PATTERN
+            stop = start + INITIAL_COMBO_ROWS_PER_PATTERN
+            for entries in entries_by_combo:
+                for tokens, word in entries[start:stop]:
+                    reading = " ".join(tokens)
+                    if reading in seen:
+                        continue
+                    seen.add(reading)
+                    rows.append((reading, [word]))
+                    if len(rows) >= max_rows:
+                        return rows
         return rows
 
     def initials_for_prefix(self, code: str, limit: int = 2) -> list[str]:
@@ -1182,6 +1214,67 @@ def cmd_panel(args, data: Data) -> None:
             print(f"  {g['reading']:<16} {kind}  {preview}")
 
 
+def _row_items(g: dict) -> list[str]:
+    """一行里的文字：单字组取 `chars`，联想/词行取 `items`（json 输出用，只要文字）。"""
+    if g.get("segment") == 0:
+        return list(g.get("chars", []))
+    return list(g.get("items", []))
+
+
+def build_json_payload(data: Data, raw_codes: list[str]) -> dict:
+    """把若干码串算成 `{code: {codes, sources, merged}}`（json 子命令与 selftest 共用）。
+
+    五源划分严格镜像 App 侧流水线（docs/19 §3）：
+    - `synth`      = `segment_groups()` 里「整串码本身是一个完整音节」那一组（split 0、rest 空）；
+    - `split`      = `segment_groups()` 里其它切法的单字组（rest 非空）；
+    - `assoc`      = `segment_groups()` 里 `segment == 1` 且 `source == "assoc"` 的行；
+    - `combo`      = `segment_groups()` 里 `source == "initials"` 的行（`initial_pattern_rows` 产生）；
+    - `whole_word` = `prefix_word_rows()` 的整串码前缀词行。
+    `merged` 是 `panel(codes)` 的最终顺序（collapse + 分档排序后），只保留文字。
+    """
+    payload: dict[str, dict] = {}
+    for raw in raw_codes:
+        codes = parse_code(raw)
+        groups = data.segment_groups(codes)
+        sources = {
+            "synth": [
+                {"reading": g["reading"], "items": _row_items(g)}
+                for g in groups
+                if g.get("origin") == "synth"
+            ],
+            "split": [
+                {"reading": g["reading"], "items": _row_items(g)}
+                for g in groups
+                if g.get("origin") == "split"
+            ],
+            "assoc": [
+                {"reading": g["reading"], "items": _row_items(g)}
+                for g in groups
+                if g["segment"] == 1 and g.get("source") == "assoc"
+            ],
+            "combo": [
+                {"reading": g["reading"], "items": _row_items(g)}
+                for g in groups
+                if g.get("source") == "initials"
+            ],
+            "whole_word": [
+                {"reading": r["reading"], "items": list(r.get("items", []))}
+                for r in data.prefix_word_rows(codes)
+            ],
+        }
+        merged = [
+            {"reading": g["reading"], "segment": g["segment"], "items": _row_items(g)}
+            for g in data.panel(codes)
+        ]
+        payload[codes] = {"codes": codes, "sources": sources, "merged": merged}
+    return payload
+
+
+def cmd_json(args, data: Data) -> None:
+    """结构化输出（golden 单测用）：stdout 只有单个 JSON 对象，缩进 2。"""
+    print(json.dumps(build_json_payload(data, args.codes), ensure_ascii=False, indent=2))
+
+
 def cmd_selftest(args, data: Data) -> None:
     """把文档里的关键样例跑一遍，任何一条不符就退出码 1（可放进 CI / 本地回归）。"""
 
@@ -1363,6 +1456,58 @@ def cmd_selftest(args, data: Data) -> None:
     # 6) 单字：ji 全部字（>>100，验证「列全部」而不是 60 字截断）
     expect(len(data.syllable_chars.get("ji", [])) > 100, f"ji 字数 = {len(data.syllable_chars.get('ji', []))}")
 
+    # 7) json 输出 schema（App golden 单测对拍）：五源恒在、merged 读音不重复、档位升序
+    def tier_of(reading: str) -> int:
+        n = len([t for t in reading.split(" ") if t])
+        return 2 if n == 0 else (0 if n == 1 else 1)
+
+    payload = build_json_payload(data, ["5i4a57", "ia"])
+    for code, entry in payload.items():
+        sources = entry.get("sources") or {}
+        expect(
+            list(sources) == ["synth", "split", "assoc", "combo", "whole_word"],
+            f"json[{code}] sources 五个 key 均在且有序：{list(sources)}",
+        )
+        expect(
+            all(
+                isinstance(row.get("reading"), str) and isinstance(row.get("items"), list)
+                for part in sources.values()
+                for row in part
+            ),
+            f"json[{code}] 五源每行都有 reading(str)/items(list)",
+        )
+        merged = entry.get("merged") or []
+        readings = [row["reading"] for row in merged]
+        expect(len(readings) == len(set(readings)), f"json[{code}] merged 读音不重复")
+        tiers = [tier_of(r) for r in readings]
+        expect(tiers == sorted(tiers), f"json[{code}] merged 档位顺序 0(单音节)→1(多音节)→2(无读音)：{tiers}")
+
+    # 7.1) 首字母组合常量：组合数（PATTERN_LIMIT 内）与 `r` 仅末键
+    for prefix, expected_count in (("ia", 4), ("ia8", 8), ("ia8i3", 32)):
+        got = len(data.initial_pattern_combos(prefix))
+        expect(got == expected_count, f"{prefix} 组合数应为 {expected_count}，实际 {got}")
+    combos_3a = data.initial_pattern_combos("3a")  # vur 非末键：不得贡献 r
+    expect(
+        bool(combos_3a) and all("r" not in combo for combo in combos_3a),
+        f"3a（vur 非末键）组合不得含 r：{combos_3a}",
+    )
+    combos_a3 = data.initial_pattern_combos("a3")  # vur 末键：允许 r
+    expect(
+        any(combo[-1] == "r" for combo in combos_a3),
+        f"a3（vur 末键）应允许 r：{combos_a3}",
+    )
+    combo_rows = data.initial_pattern_rows("ia8i3")
+    expect(
+        len(combo_rows) <= INITIAL_COMBO_MAX_ROWS,
+        f"ia8i3 首字母组合行数 ≤ {INITIAL_COMBO_MAX_ROWS}（实际 {len(combo_rows)}）",
+    )
+    # 上一条在 ia8i3 上恰好是 0；再用真实有命中的 `5i` 守住「组合行能产出且不超上限」
+    combo_rows_5i = data.initial_pattern_rows("5i")
+    expect(
+        0 < len(combo_rows_5i) <= INITIAL_COMBO_MAX_ROWS,
+        f"5i 首字母组合行数应在 (0, {INITIAL_COMBO_MAX_ROWS}]（实际 {len(combo_rows_5i)}）",
+    )
+
     print(f"[selftest] {len(failures)} 条失败")
     if failures:
         sys.exit(1)
@@ -1399,6 +1544,10 @@ def main() -> None:
     p_panel = sub.add_parser("panel", help="整个左列（含联想/词行/收敛/排序）")
     p_panel.add_argument("codes")
     p_panel.set_defaults(func=cmd_panel)
+
+    p_json = sub.add_parser("json", help="结构化输出五源 + merged（App 侧 golden 单测对拍）")
+    p_json.add_argument("codes", nargs="+", help="一个或多个码串/键名，如 5i4a57 'kl ghi mno abc ps'")
+    p_json.set_defaults(func=cmd_json)
 
     p_bs = sub.add_parser("build-syllables", help="从 hakkaSyllables.js 同步标准音节集到 assets")
     p_bs.add_argument(
