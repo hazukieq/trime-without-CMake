@@ -224,17 +224,28 @@ object TwelveKeySnapshotBuilder {
         }
 
         val merged = CandidateRanking.panelGroups(baseSegmentGroups, engineGroups)
-        val groups = (CandidateRanking.mergeAssociationGroups(merged, assocGroups) + prefixWordRows)
+        // 多音節詞行要和已有行**按讀音合併**，不能直接 append：同一個讀音在引擎那邊
+        // 往往已經有一行（例如 `deepseek` 同時在引擎候選與 `hakka_zon` 詞典裡，
+        // 讀音都是 `di thok`），直接 append 會出現兩行一模一樣的 `di thok → deepseek`
+        // （用戶 2026-11-11）。
+        val groups = mergeRowsByReading(
+            CandidateRanking.mergeAssociationGroups(merged, assocGroups),
+            prefixWordRows,
+        )
             // 統一排序：單音節組 → 詞組 → 無讀音組，各檔內按讀音字典序；
             // 「無讀音組」（引擎沒給 comment）用第一條候選的首字讀音兜底，也要按字母排。
             .sortedWith(
                 compareBy(
                     {
+                        // 分檔只看「音節數」：單音節一檔、**所有多音節行一檔**、無讀音一檔。
+                        //
+                        // 以前把「App 聯想行（segment=1）」和「引擎詞組」分成兩檔，結果同一串
+                        // `li …` 的多音節行被劈成兩段（聯想行全部排在引擎詞組前面），
+                        // 用戶找 `li nak si` 時在 `li na` 後面找不到（2026-11-11）。
                         when {
-                            it.syllables.isEmpty() -> 3
-                            it.segment == 1 -> 1     // 聯想詞組單獨一檔
                             it.syllables.size == 1 -> 0
-                            else -> 2               // 引擎詞組
+                            it.syllables.size >= 2 -> 1
+                            else -> 2
                         }
                     },
                     {
@@ -317,8 +328,11 @@ object TwelveKeySnapshotBuilder {
         DiagLog.d(
             "snapshot",
             "build code=${input} wantGroups=$wantGroups groups=${groupsWithRecommend.size}" +
-                " [${groupsWithRecommend.take(6).joinToString("|") { "${it.reading}:${it.items.size}" }}]" +
-                " bar=${barEntries.size} prefixWords=${prefixWordRows.size}",
+                " bar=${barEntries.size} prefixWords=${prefixWordRows.size}" +
+                " prefixIdx=" + prefixWordRows.map { row ->
+                    groupsWithRecommend.indexOfFirst { it.reading == row.reading }
+                }.joinToString(",") +
+                " all=[" + groupsWithRecommend.joinToString(",") { it.reading.ifEmpty { "推荐" } } + "]",
         )
         return TwelveKeySnapshot(
             input = input,
@@ -544,6 +558,32 @@ object TwelveKeySnapshotBuilder {
         val bytes = input.toByteArray(Charsets.UTF_8)
         if (consumedEnd >= bytes.size) return ""
         return String(bytes, consumedEnd, bytes.size - consumedEnd, Charsets.UTF_8)
+    }
+
+    /**
+     * 把 [extra] 的行按讀音並進 [base]：同讀音就合併候選（文字不分大小寫去重），沒有才新增行。
+     *
+     * 用於「字典多音節詞行」：它們和引擎/聯想行可能同讀音，必須合併成一格，
+     * 否則面板會出現兩行相同的 `讀音 → 詞`（用戶 2026-11-11 的 `deepseek` 重複）。
+     */
+    private fun mergeRowsByReading(
+        base: List<SyllableGroup>,
+        extra: List<SyllableGroup>,
+    ): List<SyllableGroup> {
+        if (extra.isEmpty()) return base
+        val out = base.toMutableList()
+        for (row in extra) {
+            val idx = out.indexOfFirst { it.reading == row.reading }
+            if (idx < 0) {
+                out.add(row)
+                continue
+            }
+            val existing = out[idx]
+            val texts = existing.items.mapTo(HashSet()) { it.text.lowercase() }
+            val add = row.items.filter { texts.add(it.text.lowercase()) }
+            if (add.isNotEmpty()) out[idx] = existing.copy(items = existing.items + add)
+        }
+        return out
     }
 
     /** 12 鍵碼 → 拼音字母（只用於本地兜底上屏，不影響引擎）。 */
