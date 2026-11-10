@@ -19,10 +19,13 @@ import timber.log.Timber
  * 內容混雜、而且不保證覆蓋部署那一段。查「為什麼改了詞典不生效」時，最關鍵的就是
  * 「這次部署到底有沒有重建表、讀到了哪些詞典」，所以單獨留一份**每次部署覆蓋**的日誌。
  *
- * 內容分三塊：
+ * 內容分四塊：
  * 1. 頭部：時間、full/incremental、進程號、輸入法方案與詞典文件的 mtime/size（部署前）；
  * 2. 尾部：`build/` 下的 `*.bin` 的 mtime/size 對比，標出 **重建** 的表；
- * 3. logcat：本進程從部署開始那一刻起的全部日誌（librime 與 App 的都在裡面）。
+ * 3. **librime glog 全文**：這次部署期間 librime 自己寫出的 INFO/WARNING/ERROR 日誌
+ *    （`building table:`、`collecting entries ...`、`num entries:`、`dropping entry`、
+ *    `invalid syllable` …），完整抄錄、只取本次新增部分；這是判斷「詞典有沒有進表」的唯一可靠證據；
+ * 4. logcat：本進程從部署開始那一刻起的 App 側日誌（native 日誌已進 glog，這裡是補充）。
  *
  * 注意：這裡刻意**只**寫文件、不拋異常——部署日誌壞掉不能影響部署本身。
  */
@@ -40,6 +43,8 @@ object DeployLog {
         internal val before: Map<String, String>,
         internal val file: File?,
         internal val pid: Int,
+        /** 部署開始時 librime glog 各文件的大小（之後只追加新內容，避免把舊部署的日誌重複寫進來）。 */
+        internal val glogBefore: Map<String, Long>,
     )
 
     fun logFile(context: Context): File? = runCatching {
@@ -69,7 +74,8 @@ object DeployLog {
                 },
             )
         }.onFailure { Timber.w(it, "DeployLog: begin failed") }
-        return Session(startedAt, full, before, file, Process.myPid())
+        return Session(startedAt, full, before, file, Process.myPid(),
+            glogOffsets(userDir))
     }
 
     fun end(context: Context, session: Session, error: Throwable? = null) {
@@ -90,9 +96,64 @@ object DeployLog {
                     append('\n')
                 }
             }
-            file.appendText(header + "\n" + collectLogcat(session) + "\n")
+            val userDirForGlog = runCatching { File(AppPrefs.defaultInstance().conf.userDataDir) }.getOrNull()
+            file.appendText(
+                header + "\n" +
+                    "--- librime glog (complete, this deploy) ---\n" +
+                    collectGlog(userDirForGlog, session) + "\n" +
+                    "--- app logcat (this deploy) ---\n" +
+                    collectLogcat(session) + "\n",
+            )
         }.onFailure { Timber.w(it, "DeployLog: end failed") }
     }
+
+    /** librime glog 目錄：`<userDataDir>/logs/`，文件名形如 `com.hazukieq.hkrime.localhost.u0_a23.log.INFO.*`。 */
+    private fun glogFiles(userDir: File?): List<File> {
+        val dir = userDir?.resolve("logs") ?: return emptyList()
+        return dir.listFiles { f ->
+            f.isFile && f.name.contains(".log.") &&
+                (f.name.contains(".INFO.") || f.name.contains(".WARNING.") || f.name.contains(".ERROR."))
+        }?.sortedBy { it.name } ?: emptyList()
+    }
+
+    private fun glogOffsets(userDir: File?): Map<String, Long> =
+        glogFiles(userDir).associate { it.name to it.length() }
+
+    /**
+     * 把這次部署期間 librime 寫出的 glog **完整**抄進來（預設 INFO 級別，含 `building table:`、
+     * `collecting entries ...`、`num entries:`、`dropping entry`、`invalid syllable` 等）。
+     *
+     * 只抄「部署開始之後新增的部分」：同名文件用開始時的長度做偏移；部署期間新建的文件整份抄。
+     * 上游 glog 開着 `ENABLE_LOGGING`（見 `docs/15`），這是排查「詞典有沒有進表」的唯一可靠證據。
+     */
+    private fun collectGlog(userDir: File?, session: Session): String {
+        val files = glogFiles(userDir)
+        if (files.isEmpty()) return "(no librime glog files)"
+        val sb = StringBuilder()
+        for (f in files) {
+            val from = session.glogBefore[f.name] ?: 0L
+            val len = f.length()
+            if (len <= from) continue  // 這次部署沒碰過它
+            val text = runCatching {
+                java.io.RandomAccessFile(f, "r").use { raf ->
+                    raf.seek(from)
+                    val size = (len - from).toInt().coerceAtMost(GLOG_MAX_BYTES.toInt())
+                    val buf = ByteArray(size)
+                    raf.readFully(buf)
+                    String(buf, Charsets.UTF_8)
+                }
+            }.getOrElse { "(read failed: $it)" }
+            sb.append("### ").append(f.name).append(" (+")
+                .append(len - from).append(" bytes)\n")
+            sb.append(text)
+            if (!text.endsWith("\n")) sb.append('\n')
+            if (len - from > GLOG_MAX_BYTES) sb.append("(truncated at ").append(GLOG_MAX_BYTES).append(" bytes)\n")
+        }
+        return if (sb.isEmpty()) "(no new librime log during this deploy)" else sb.toString()
+    }
+
+    /** 單個 glog 文件最多抄 8MB（正常部署幾百 KB；防止異常日誌把部署日誌撐爆）。 */
+    private const val GLOG_MAX_BYTES = 8 * 1024 * 1024L
 
     /** 部署前後的 `build/` 下的 `*.bin` 快照（mtime+size）。 */
     private fun snapshot(userDir: File?): Map<String, String> {

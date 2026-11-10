@@ -20,16 +20,24 @@
 
 ## 1. 魔改总表（按影响面排序）
 
-| 补丁 | 提交 | 改动位置 | 一句话 | 影响面 |
+### 1.1 当前构建里**生效**的
+
+| 项 | 提交 | 改动位置 | 一句话 | 影响面 |
 |---|---|---|---|---|
 | `0001-12key-abbrev-perf` | librime `c3c5969` | `dict/table.cc`、`dict/dictionary.cc`、`gear/table_translator.cc`、`gear/script_translator.cc`、`algo/syllabifier.*` | 12 键简拼的性能补丁：table 展开预算、abbrev 时跳过 user_dict DFS、句子音节数上限 | **最大**：直接决定「哪些候选能够被枚举出来」 |
 | `0003-table-query-full-path-fallback` | librime `7ad3d56` | `dict/table.cc::Table::Query` | 0001 漏掉「整串路径」时的兜底：DFS 全码路径 + `QueryPhrases` 精确补查 | **大**：决定「长词条（≥3 音節）能不能出现」 |
 | `0002-switcher-empty-dir-guard` | librime `f5e1637` | `lever/switcher_settings.cc` | 空 `user_data_dir`（设置进程未初始化）不再 `directory_iterator(".")` 抛异常 → 不 abort | 中：只影响设置界面「选择方案」 |
-| `0004-librime-debug-probes` | librime `a67fb21` + 后续 | `engine.h/.cc`、`service.h` | 诊断 API：`ProbeDictEntry`（词典级）、`ProbeSyllable`（音節图级）、`Session::engine()` | 无（只在被调用时执行） |
-| `0005-rime-jni-debug-logging` | rime-jni `e3b68ca` | `CMakeLists.txt`、`cmake/FindGlog.cmake`、`glue/rime_jni.cc`、`script/build.sh` | 打开 librime glog 并把日志接到 `<userDataDir>/logs/` | 无（只多写日志文件） |
+| glog 日志（**非补丁，已进工程**） | rime-jni `e3b68ca` | `CMakeLists.txt`、`cmake/FindGlog.cmake`、`glue/rime_jni.cc`、`script/build.sh` | `ENABLE_LOGGING=ON`，librime 的 `LOG(...)` 写到 `<userDataDir>/logs/*.INFO.*`；部署时由 `DeployLog` **完整**抄进 `hkrime-deploy.log` | 无（只多写日志） |
 
-> App 侧配套（不在 native，已在 `hkrime` 仓库）：`CandidateProbe.kt`（候选/词典/音節图探针）、
-> `DeployLog.kt`（每次部署覆盖写 `hkrime-deploy.log`）、`Rime.probe_dict/probe_syllable` 两个 `native` 声明。
+### 1.2 只存在于 `patches/`、**当前构建未启用**的（排查时临时打上）
+
+| 补丁 | 提交 | 提供的能力 |
+|---|---|---|
+| `0004-librime-debug-probes` | librime `a67fb21` + 后续 | `ProbeDictEntry`（表里有没有词条/weight/prism 拼写）、`ProbeSyllable`（音節图 `edges/indices` + 分段 `Lookup` 的 chunk 统计）、`Session::engine()` |
+| `0005-rime-jni-debug-probes` | rime-jni 胶水 | 对应两个 JNI 入口 `probe_dict` / `probe_syllable` |
+
+> 这两个是**按需**的诊断补丁：默认不装；遇到「候选缺词 / 路径对不上 / 想确认表里到底有没有」时，
+> 再 `git am` 打上并重编 `.so`。用完可原样撤掉（不影响功能）。
 
 ## 2. 每处的行为与风险
 
@@ -90,13 +98,17 @@ Android 进程 cwd `/` 不可读 → `filesystem_error` 穿出 JNI → abort。
 | 只有长词（≥3 音節）没有，短词一切正常 | **0003 未生效 / 0001 的 48 桶与 12000 预算** |
 | 同码多音節（5i=ki｜li）只出其中一条路 | **0001 的分支排序 + 0003 兜底** |
 | 设置里点「选择方案」直接崩 | **0002** |
-| 部署日志 `build/` 没变、或 `hkrime-deploy.log` 里 logcat 段空 | **0005**（日志根本没编进去） |
+| 部署日志 `build/` 没变，或 `hkrime-deploy.log` 里 `librime glog` 段为空 | 日志是否被编译进去（`ENABLE_LOGGING=ON`、`<userDataDir>/logs/` 有没有 INFO 文件） |
 | 按键卡顿 / ANR | 0001 的预算；先跑 `docs/13` 的性能门禁 |
 | 候选条上字母/符号在面板里找不到 | App 侧（`CandidateRanking.panelGroups`），与本清单无关 |
 
 ## 4. 调试探针手册
 
-### 4.1 App 侧探针（`CandidateProbe.kt`，仅 debug 构建）
+### 4.1 App 侧探针（默认**不编进构建**；需先打 `0004`+`0005` 补丁并重编 `.so`）
+
+打完补丁后，`hkrime` 仓库里的 `CandidateProbe.kt`（`git log --all -- '*CandidateProbe.kt'` 可取回）
+按下面的协议触发；不打补丁时这两个 JNI 符号不存在，探针代码也不在构建里。
+
 
 请求文件：`/sdcard/hkrime/dbg_candidates.txt`（跑完改名 `.done`，结果写 `dbg_candidates.log`）。
 触发点：`TrimeApplication.onCreate` 与 `TextInputManager.onInitializeInputUi`。指令：
@@ -118,10 +130,20 @@ Android 进程 cwd `/` 不可读 → `filesystem_error` 穿出 JNI → abort。
 @li nak si
 ```
 
-### 4.2 部署日志
+### 4.2 部署日志（**完整 librime 输出**）
 
-`<userDataDir>/logs/hkrime-deploy.log`：每次部署**覆盖写**，含模式/耗时/`*.dict.yaml` 的 mtime+size /
-`build/*.bin` 前后对比（变化标 `<<< REBUILT`）/本进程部署期间 logcat 片段。
+`<userDataDir>/logs/hkrime-deploy.log`：每次部署**覆盖写**，含
+
+1. 头部：模式（full/incremental）、pid、`data_dir`、所有 `*.dict.yaml` 的 mtime+size、`build/*.bin` 快照；
+2. `build/*.bin` 前后对比（变化标 `<<< REBUILT`）；
+3. **`--- librime glog (complete, this deploy) ---`**：这次部署期间 librime 写出的
+   INFO/WARNING/ERROR 日志**全文**（按文件偏移只取本次新增部分，单文件上限 8MB），
+   含 `building table:`、`collecting entries from ...`、`Pass 1: total ...`、`num entries:`、
+   `dropping entry`、`invalid syllable` —— 判断「词条有没有进表」直接看这一段；
+4. `--- app logcat (this deploy) ---`：本进程部署期间的 App 侧 logcat（补充，最多 4000 行）。
+
+> 这是排查「改了词典不生效」的第一现场：先看 `sources (before)` 里 yaml 的 mtime 变没变，
+> 再看 glog 段里 `collecting entries` 有没有读到那份文件、`num entries` 有没有变。
 
 ### 4.3 librime glog
 

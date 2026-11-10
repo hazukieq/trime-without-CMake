@@ -49,13 +49,6 @@ class TrimeApplication : Application() {
             // 性能門禁（tools/perf-gate.py）用它切分出「本次進程」的按鍵延遲樣本，
             // 否則日誌跨進程累積，舊版本的慢樣本會讓門禁一直 FAIL。
             Timber.i("perfgate: process-start t=%d", System.currentTimeMillis())
-            // 引擎候選探針（debug）：/sdcard/hkrime/dbg_candidates.txt 排隊時，任何組件啟動
-            // 都會跑一次（不必等輸入法起來），結果寫 dbg_candidates.log。
-            if (BuildConfig.DEBUG) {
-                Thread {
-                    runCatching { com.hazukieq.hkrime.util.CandidateProbe.runIfRequested(this@TrimeApplication) }
-                }.apply { name = "hkrime-candidate-probe"; isDaemon = true }.start()
-            }
             runCatching { com.hazukieq.hkrime.util.LogFileTree.flushNow() }
             // 把本進程啟動前後的 logcat 也抓一段寫進文件（release 包同樣有效）。
             Thread {
