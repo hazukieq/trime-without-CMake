@@ -480,6 +480,7 @@ class TwelveKeyController(
 ### 8.5 用户词典
 
 `enable_user_dict: true` 保持不变；选中过的词条会进 `hakka.userdb`，下次候选前置 —— 快照机制自动吃到排序变化，无需额外处理。
+「用户自造的长串第二次就能直出拼音」也是靠这套引擎记忆（不是 App 侧另造记忆），细节见 §15.61 末尾。
 
 ---
 
@@ -2702,3 +2703,30 @@ comment 原樣採信、無 comment 才本地解碼 / 剝 `［…］` 包裝 / �
 `5i34i` 首條「理會」（詞）→ preedit `li voi`；`5i34iw` 首條「共產」→ `kiung than`、
 首條「窮酸」→ `kiung thon`；`744ii`（librime preedit `744 ii‸`，帶空格）→ 首條「船寄」`son gi`；
 `perf-gate.py` PASS（latency_p90 44.3ms，閾值 80）。
+
+### 記憶由引擎負責，App 側不再造一套（2026-11-10 確認）
+
+用戶指出：像「中國人民共和國」這種詞庫沒有的自造長串，**第一次**顯示原始編碼可以接受，
+但**重複出現時要記住**、直接顯示完整拼音。這個「記住」不需要 App 側新做記憶 —— 引擎本來就在做：
+
+| 開關（`hakka_jiugong.schema.yaml`） | 作用 |
+| --- | --- |
+| `translator.enable_user_dict: true` | 選中的詞條寫進 `hakka.userdb`，下次同碼時作為候選前置返回 |
+| `custom_phrase`（`user_dict: custom_phrase` + `encode_commit_history: true` + `initial_quality: 1000`） | 上屏過的文本被編碼成詞條（含長串），下次同碼直接作為高優先候選返回 |
+| `custom_phrase.enable_sentence: true` | custom_phrase 這一路自己還能拼句，長串不會被拆沒 |
+
+於是 preedit 的行為天然閉環（**沒有任何新代碼**）：
+
+- 第 1 次（詞庫沒有、也沒上屏過）：首條候選只覆蓋前面幾節 → `comment` + **原始編碼**（見上）；
+- 上屏過之後：首條候選就是記住的那條詞，`comment` 已是完整讀音 → 直接**直出**完整拼音。
+
+真機旁證：`/sdcard/hkrime/hakka.userdb` 在測試選詞當下就被寫（mtime 同步變化），`custom_phrase.txt` 存在。
+
+**邊界**：逐段選字上屏（中→國→人→民 一個一個點）時，引擎記的是**單字詞條**；
+因為 `translator.enable_sentence: false`，下次打整串 24 鍵它不會自動把單字拼成整句，
+preedit 又會回到「comment + 原碼」。所以「**整串一次上屏**」得到的記憶比逐字上屏完整。
+
+> 若以後要讓「逐字拼出來的自造長串」也第二次直出，有兩條備選路（暫不實施）：
+> ① 往詞典 / `custom_phrase.txt` 加詞條；② 重新評估 `enable_sentence: true`（2026-11-08 因簡拼分支爆炸
+> 導致主線程卡 20s+、ANR 才關掉，要先做限制或異步化）。App 側「碼段→讀音+文字」的鋪滿方案
+> 也能做到，但既然引擎已經在記，沒必要再造一套。

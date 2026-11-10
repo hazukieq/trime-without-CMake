@@ -251,6 +251,13 @@ if (barText != null && !barText.isEmpty()) {
    查證：引擎不給整句是因為 `translator.enable_sentence: false`（2026-11-08 ANR 後關掉），
    候選只來自詞典詞條 —— 「中國人民」在詞典（4 節）、「中國人民共和國」不在。
 
+6. **範圍界定：「記住」由引擎負責，App 側不另造記憶**（用戶 2026-11-10 指出）。
+   自造長串第一次顯示原始編碼可接受，第二次就該直出完整拼音 —— 這由引擎的
+   `translator.enable_user_dict` + `custom_phrase.encode_commit_history` 完成（選中/上屏的詞條
+   進 `hakka.userdb` / `custom_phrase`，下次同碼作為候選返回，comment 就是完整讀音），
+   App 側的 preedit 規則（comment 夠長就只用 comment）自動吃到它。詳見 docs/10 §15.61 末節。
+   邊界：逐段選字上屏只記單字詞條，`enable_sentence: false` 下不會自動拼句。
+
 其餘與方案一致：
 
 - `TwelveKeyPreedit`：新增 `@Volatile @JvmField preferredText / preferredComment`；
