@@ -495,6 +495,25 @@ class Data:
         )
         return initials
 
+    def initial_pattern_combos(self, codes: str) -> list[tuple[str, ...]]:
+        """首字母組合的**規則**（每鍵一個音節首字母、元音自由；不管詞條存不存在）。
+
+        `ghi+abc` → `g b / g c / h b / h c`；`ghi+abc+zj` → 8 組 `(g|h)(b|c)(z|j)`。
+        每鍵只貢獻「該鍵字母裡能作音節首字母」的字母（元音不作首字母）。
+        """
+        codes = codes.replace("'", "")
+        if not codes:
+            return []
+        combos: list[tuple[str, ...]] = [()]
+        for ch in codes:
+            letters = self.key_initial_letters(ch)
+            if not letters:
+                return []
+            combos = [pre + (x,) for pre in combos for x in letters]
+            if len(combos) > 64:
+                return []
+        return combos
+
     def initial_pattern_rows(self, codes: str, max_rows: int = 16) -> list[tuple[str, list[str]]]:
         """「每键一个音节首字母」的联想行：字母组合×真实词条，行标题仍是具体读音。"""
         codes = codes.replace("'", "")
@@ -961,6 +980,20 @@ def cmd_syllables(args, data: Data) -> None:
     for reading, length, kind in unique:
         print(f"  {reading:<18} {kind}  首现于 {length} 键")
 
+    # 首字母組合（規則層面，和詞條是否存在無關）
+    combos = data.initial_pattern_combos(args.codes)
+    if combos:
+        hits = {tuple(t[0] for t in tokens) for tokens, _w, _c in data.word_codes}
+        parts = []
+        for combo in combos:
+            pattern = " ".join(combo)
+            count = sum(1 for t, _w, _c in data.word_codes
+                        if len(t) == len(combo) and tuple(x[0] for x in t) == combo)
+            parts.append(f"{pattern}（{count} 詞）")
+        print()
+        print(f"# 首字母組合（規則，每鍵一個音節首字母、元音自由）：{len(combos)} 組")
+        print("  " + "  ".join(parts))
+
     # 實際存在讀音集（詞典全量反查、不受面板配額限制）
     shown = {r[0] for r in unique if " " not in r[0]} | {g["reading"] for g in data.segment_groups(args.codes)}
     print()
@@ -1130,6 +1163,22 @@ def cmd_selftest(args, data: Data) -> None:
     expect(
         all(unique[i][0] != unique[i + 1][0] for i in range(len(unique) - 1)),
         "累积去重后没有相邻重复读音",
+    )
+
+    # 4.45) 首字母組合規則（用戶 2026-11-11：「g.* z.*」，元音自由）
+    c2 = data.initial_pattern_combos("ia")
+    expect(
+        [tuple(c) for c in c2] == [("g", "b"), ("g", "c"), ("h", "b"), ("h", "c")],
+        f"ia 的首字母組合應為 g b/g c/h b/h c，實際 {c2}",
+    )
+    c3 = data.initial_pattern_combos("ia8")
+    expect(
+        sorted(" ".join(c) for c in c3)
+        == sorted(
+            f"{a} {b} {c}"
+            for a in ("g", "h") for b in ("b", "c") for c in ("j", "z")
+        ),
+        f"ia8 的首字母組合應為 (g|h)(b|c)(j|z) 共 8 組，實際 {c3}",
     )
 
     # 4.5) 實際存在讀音集：必須是詞典音節、且覆蓋面板已顯示的讀音
