@@ -209,6 +209,8 @@ class TextInputManager private constructor() :
             // Composition.setWindow() 會在 updateComposing() 內拋 StringIndexOutOfBoundsException。
             // 這裡保證：commit buffer 先落地；updateComposing 失敗只記日誌，進程不死，快照照常重建。
             onEngineChanged = {
+                // 引擎寫過（選字/上屏/重建）→ 之前緩存的候選快照可能已過期
+                twelveKeyController?.invalidateForEngine()
                 val committed = runCatching { Rime.getCommit() }.getOrDefault(false)
                 if (committed) {
                     val text = drainPendingPick() + foldUncommittedPrefix(Rime.getCommitText())

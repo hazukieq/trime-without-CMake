@@ -3229,6 +3229,31 @@ sum >= 輸入長  → 只顯示 comment（簡拼 `8 8`=ji jen、半截 `5i34i w`
 改這條規則前，舊實現（DP 邊界）在同一份語料上**當場報出 25+ 條不一致**——這就是反覆來回的原因。
 `AGENTS.md` §2.1.1 已寫死：**改 preedit / 面板分組必須先跑真實語料測試**。
 
+## 15.73 兜底快照被緩存 → 候選條/preedit 卡在「原碼」，開關面板才刷新（2026-11-11）
+
+**現象**（用戶：`ee5` 這條鏈路反覆出問題）：打字時 preedit 顯示原碼（`deek` 樣子的字母串），
+候選條第一條也是兜底項；**展開面板再關閉**之後才變成 `de` / `邸`。
+
+**日誌證據**（`hkrime-20261111.log`，同一輸入 `ee5`）：
+
+```
+05:06:32.623  twelvekey:build ee5|0,3,1|bar|m0|p0|o3|a1 cached=false ms=0.1     ← 0.1ms：引擎沒給候選，兜底
+05:06:33.255  twelvekey:build ee5|0,3,1|full|m0|p0|o3|a1 cached=false ms=21.5   ← 面板走 full，真實枚舉
+05:06:36.340  twelvekey:build ee5|0,3,1|bar|m0|p0|o3|a1 cached=true  ms=0.0     ← 又命中那條兜底緩存
+```
+
+`bar` 路徑首幀拿到的是**兜底快照**（引擎當時還沒給候選/剛重建），而快照緩存把兜底也存了：
+之後同一輸入直接命中緩存 → 候選條 + preedit 一直停在兜底；只有展開面板走 `full` 構建
+（不同的 cacheKey）才拿到真實候選，看起來就是「開關面板才變對」。
+
+**修法**（`TwelveKeyController` + `TextInputManager`）：
+
+1. **兜底/空快照不進緩存**（`cachePut` 只對 `hasCandidates == true` 生效）；
+2. **引擎寫過就讓快照緩存失效**：新增 `invalidateForEngine()`（`engineVersion` 併入 cacheKey），
+   在 `onEngineChanged`（選字/上屏/重建）時調用；
+3. **兜底自愈**：發出「無候選」快照後排一次 90ms 延遲刷新（帶 generation 保護、只在還在組字時），
+   等引擎就緒/候選落地後把候選條與 preedit 一起換成真實內容。
+
 ## 15.72 「設置裡點同步，hkrime 裡沒有 sync 文件夾」（2026-11-11）
 
 **現象**：設置 → 同步，`/sdcard/hkrime/` 下不生成 `sync/`。

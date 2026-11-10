@@ -64,6 +64,20 @@ class TwelveKeyController(
         optionsVersion++
     }
 
+    /**
+     * 引擎狀態變化（選字/上屏/重新初始化）後調用：讓候選快照緩存失效。
+     *
+     * 用戶 2026-11-11 報「打 `ee5` 候選條先顯示兜底 `deek`，開關面板後才變 `邸`」：
+     * 首幀枚舉時引擎還沒給出候選（或剛被 destroy/重建），兜底快照被**寫進緩存**，
+     * 之後同一輸入直接命中緩存 → 候選條/preedit 一直停在兜底，直到面板走了另一條
+     * `full` 構建路徑才刷新。
+     */
+    fun invalidateForEngine() {
+        engineVersion++
+    }
+
+    private var engineVersion = 0
+
     /** 最近 8 條快照（按 input+segments），退格/重打直接命中，不再枚舉。線程安全。 */
     private val snapshots = object :
         LinkedHashMap<String, TwelveKeySnapshot>(CACHE_CAPACITY, 0.75f, true) {
@@ -105,7 +119,8 @@ class TwelveKeyController(
                                 full,
                                 segmentAnchor,
                                 segmentMode,
-                            ) + "|o" + optionsVersion + "|a" + TwelveKeyPreedit.assocGeneration
+                            ) + "|o" + optionsVersion + "|e" + engineVersion +
+                                "|a" + TwelveKeyPreedit.assocGeneration
                             val cached = cacheLookup(key) { it }
                             val t0 = System.nanoTime()
                             val built = cached ?: TwelveKeySnapshotBuilder.build(
@@ -122,7 +137,9 @@ class TwelveKeyController(
                                 cached != null,
                                 (System.nanoTime() - t0) / 1e6,
                             )
-                            if (cached == null) cachePut(key, built)
+                            // 只缓存「真的有候選」的快照：兜底/空快照一旦進緩存，
+                            // 同一輸入之後永遠命中它（見 invalidateForEngine 註釋）。
+                            if (cached == null && built.hasCandidates) cachePut(key, built)
                             Triple(local, built, true)
                         }
                     }.getOrNull()
@@ -213,6 +230,21 @@ class TwelveKeyController(
     private fun emit(next: TwelveKeySnapshot) {
         snapshot = next
         onSnapshot(next)
+        // 兜底快照（引擎暫時拿不到候選）不緩存了，但也不會自己重試：
+        // 這裡排一次延遲刷新，等引擎就緒/候選落地後把候選條與 preedit 一起換成真實內容。
+        if (!next.isEmpty && !next.hasCandidates) scheduleFallbackRetry()
+    }
+
+    private var fallbackRetryJob: Job? = null
+    private fun scheduleFallbackRetry() {
+        fallbackRetryJob?.cancel()
+        val gen = generation
+        fallbackRetryJob = scope.launch {
+            delay(FALLBACK_RETRY_MS)
+            if (gen != generation) return@launch
+            if (!Rime.isComposing()) return@launch
+            refresh(immediate = true)
+        }
     }
 
     companion object {
@@ -231,6 +263,9 @@ class TwelveKeyController(
         val ENGINE_LOCK: Any = Rime.ENGINE_LOCK
 
         private const val CACHE_CAPACITY = 8
+
+        /** 兜底快照後的重試延遲（等引擎就緒/候選落地）。 */
+        private const val FALLBACK_RETRY_MS = 90L
 
         /** 連打期間不做全量枚舉，停手後再算。 */
         private const val DEBOUNCE_MS = 120L
