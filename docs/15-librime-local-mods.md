@@ -25,7 +25,7 @@
 | 项 | 提交 | 改动位置 | 一句话 | 影响面 |
 |---|---|---|---|---|
 | `0001-12key-abbrev-perf` | librime `c3c5969` | `dict/table.cc`、`dict/dictionary.cc`、`gear/table_translator.cc`、`gear/script_translator.cc`、`algo/syllabifier.*` | 12 键简拼的性能补丁：table 展开预算、abbrev 时跳过 user_dict DFS、句子音节数上限 | **最大**：直接决定「哪些候选能够被枚举出来」 |
-| `0003-table-query-full-path-fallback` | librime `7ad3d56` | `dict/table.cc::Table::Query` | 0001 漏掉「整串路径」时的兜底：DFS 全码路径 + `QueryPhrases` 精确补查 | **大**：决定「长词条（≥3 音節）能不能出现」 |
+| `0003-table-query-full-path-fallback` | librime `7ad3d56` + `8b8f341` | `dict/table.cc::Table::Query` | 终点桶配额放宽（×4）+ 简拼预算按需放大（检测 `kAbbreviation`）+ 全码路径兜底（总是补、按词面去重）；PC 端真实词库覆盖见 [16](16-librime-coverage-test.md) | **大**：决定「长词条（≥3 音節）与简拼组合能不能出现」 |
 | `0002-switcher-empty-dir-guard` | librime `f5e1637` | `lever/switcher_settings.cc` | 空 `user_data_dir`（设置进程未初始化）不再 `directory_iterator(".")` 抛异常 → 不 abort | 中：只影响设置界面「选择方案」 |
 | glog 日志（**非补丁，已进工程**） | rime-jni `e3b68ca` | `CMakeLists.txt`、`cmake/FindGlog.cmake`、`glue/rime_jni.cc`、`script/build.sh` | `ENABLE_LOGGING=ON`，librime 的 `LOG(...)` 写到 `<userDataDir>/logs/*.INFO.*`；部署时由 `DeployLog` **完整**抄进 `hkrime-deploy.log` | 无（只多写日志） |
 
@@ -37,7 +37,10 @@
 | `0005-rime-jni-debug-probes` | rime-jni 胶水 | 对应两个 JNI 入口 `probe_dict` / `probe_syllable` |
 
 > 这两个是**按需**的诊断补丁：默认不装；遇到「候选缺词 / 路径对不上 / 想确认表里到底有没有」时，
-> 再 `git am` 打上并重编 `.so`。用完可原样撤掉（不影响功能）。
+> 再 `git am` 打上并重编 `.so`。
+>
+> 另：`rime-jni/host-test` 是 **PC 端覆盖/性能测试工程**（真实词库 + 真实 librime，一万多条用例），
+> 用法与结果见 [16-librime-coverage-test.md](16-librime-coverage-test.md)。用完可原样撤掉（不影响功能）。
 
 ## 2. 每处的行为与风险
 

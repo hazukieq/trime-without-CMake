@@ -40,6 +40,7 @@
 | 13 | [13-perf-gate.md](13-perf-gate.md) | **12 键性能门禁**：一条命令触发微基准并判定（decode/segment/assoc/merge/engine/按键延迟/索引载入），阈值与排查顺序 | 改分组/联想词/排序/快照之后，或用户报「卡顿」时 |
 | 14 | [14-preedit-reading-fix-plan.md](14-preedit-reading-fix-plan.md) | 12 鍵 preedit 拼音與候選讀音對齊（**修復方案，待實施**） | 接這個 bug / 改 preedit 前 |
 | 15 | [12-candidate-ranking.md](12-candidate-ranking.md) | **候选排序规则**：固定候选区「词组优先」+ 展开面板「用户常用→权威字频→引擎序」、数据源与公式、调参位、调试日志、单测映射、历史决策与排查清单 | 改候选排序 / 出现「生僻字靠前」「词组被单字挤掉」时 |
+| 18 | [16-librime-coverage-test.md](16-librime-coverage-test.md) | **librime 12 键覆盖测试（PC 端）**：真实词库/全量音节/全编码与简拼组合、11962 条用例、通过率与性能、结论与缺口 | 改 librime 补丁 / 怀疑「候选缺词」/ 评估补丁影响时 |
 | 17 | [15-librime-local-mods.md](15-librime-local-mods.md) | **librime 本地魔改清单 + 调试探针手册**：5 个补丁的影响面/风险、症状→补丁对照、探针指令（`!schema`/`!deploy`/`!feed`/`@`/`%`）、排查铁律（App → librime 魔改） | 出现「候选缺词/长词消失/卡顿/设置崩」时**先读这篇** |
 | 16 | [reports/](reports/README.md) | 构建 / 改名 / 集成 / 真机报告（**原样存档**） | 要查证据/细节时 |
 
