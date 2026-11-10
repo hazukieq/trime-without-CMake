@@ -2919,3 +2919,20 @@ preedit 又會回到「comment + 原碼」。所以「**整串一次上屏**」�
 `app/src/test/.../twelvekey/PhraseMemoryTest.kt`（11 條）：碼串正規化、首次不生效/第二次生效、
 單字不記、時間衰減（7 天≈半）、同碼串上限、編解碼容錯、混排四種情形（無合成候選保持引擎序 /
 高分靠前 / 低分沉底 / 同分引擎優先 / 不破壞詞區配額）。全倉 94 tests / 0 failures。
+
+### 15.64.7 修復：候選條出現重複詞條（2026-11-11 第三輪）
+
+用戶回報「在展開面板重複兩次組詞路徑時，候選條出現了重複詞條」（真機截圖：候選條 `半截碼 半截碼 半截 …`）。
+
+兩個來源，兩處都補：
+
+1. **引擎自己也學到了同一條詞**：`translator.enable_user_dict` + `custom_phrase(encode_commit_history)`
+   會把整串提交記進 userdb；此時 App 側再補一條合成候選 → 同一個詞出現兩次。
+   → `TwelveKeySnapshotBuilder.mergeLearnedPhrases()` 先收集引擎候選的 text 集合，
+   **引擎已有的詞不再塞合成候選**（合成的職責只是補引擎給不出的）。
+2. **引擎自身也可能重複**（userdb / custom_phrase 各一份）：候選條不顯示 comment，
+   同文字就是視覺上的重複。
+   → `CandidateRanking.rankBar()` 先 `distinctBy { text }`（保留先出現那條），再做
+   「詞區 ≤4 + 單字區」的佈局；面板仍保留按讀音分組的原樣（組內不同讀音是有效信息）。
+
+單測 +2（引擎已有 → 不重複補；候選條同文字去重且保持順序）；全倉 99 tests / 0 failures。

@@ -104,7 +104,8 @@ class CandidateRankingTest {
         val bar = CandidateRanking.rankBar(words, barSize = 12)
         assertEquals(words.map { it.text }, bar.map { it.text })
         // 詞組數量超過候選條也照樣截斷
-        val many = (1..20).map { item("山水", index = it) } // 同 text 不影響長度測試
+        // 詞組數量超過候選條也照樣截斷（2026-11-11 起候選條按文字去重，所以要用不同文字）
+        val many = (1..20).map { item("詞" + it, index = it) }
         assertEquals(12, CandidateRanking.rankBar(many, barSize = 12).size)
     }
 

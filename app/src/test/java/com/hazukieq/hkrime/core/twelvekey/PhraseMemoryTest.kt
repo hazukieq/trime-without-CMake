@@ -189,4 +189,30 @@ class PhraseMemoryTest {
         assertEquals(ranked, TwelveKeySnapshotBuilder.mergeLearnedPhrases(ranked, "8i8e4", now))
         PhraseMemory.clear()
     }
+
+    // ---------- 去重（用戶 2026-11-11 報「候選條出現重複詞條」） ----------
+
+    @Test
+    fun `learned phrase already present in engine candidates is not duplicated`() {
+        PhraseMemory.clear()
+        val now = 2000L * day
+        PhraseMemory.putForTest("aa48e94a", listOf(PhraseMemory.Entry("半截碼", "ban zet ma", 3, now)))
+        // 引擎自己也學到了同一條詞
+        val ranked = listOf(item("半截碼", "ban zet ma", 0), item("半截", "ban zet", 1))
+        val merged = TwelveKeySnapshotBuilder.mergeLearnedPhrases(ranked, "aa48e94a", now)
+        assertEquals(listOf("半截碼", "半截"), merged.map { it.text })
+        PhraseMemory.clear()
+    }
+
+    @Test
+    fun `bar dedupes identical texts but keeps order`() {
+        val ranked = listOf(
+            item("半截碼", "ban zet ma", 0),
+            item("半截碼", "ban zet ma", 1),
+            item("半截", "ban zet", 2),
+            item("半", "ban", 3),
+        )
+        val bar = CandidateRanking.rankBar(ranked, barSize = 12)
+        assertEquals(listOf("半截碼", "半截", "半"), bar.map { it.text })
+    }
 }
