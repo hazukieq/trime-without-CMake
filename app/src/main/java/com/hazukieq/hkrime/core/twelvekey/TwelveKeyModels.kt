@@ -93,7 +93,13 @@ data class TwelveKeySnapshot(
     val inlineText: String = "",
 ) {
     val isEmpty: Boolean get() = input.isEmpty()
-    val hasCandidates: Boolean get() = groups.isNotEmpty()
+    /**
+     * 「這一幀有東西可選」。
+     *
+     * 面板關閉時 `groups` 是故意空的（省開銷），所以不能只看 groups —— 否則每一幀都被判成
+     * 「沒候選」，候選條/兜底重試/preedit 全都跟著走錯（用戶 2026-11-11 報 `ee5`）。
+     */
+    val hasCandidates: Boolean get() = barEntries.isNotEmpty() || groups.isNotEmpty()
 
     /**
      * 候選條展示的條目：優先「選單順序前 N 條」[barEntries]（長輸入時每個候選

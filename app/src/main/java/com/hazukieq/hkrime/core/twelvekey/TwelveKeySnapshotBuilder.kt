@@ -169,7 +169,15 @@ object TwelveKeySnapshotBuilder {
         // 之前 `'` 那套作廢，用這套按序推進的實現）。
         // 面板關閉時不需要分組（候選條只吃 ranked 順序）：跳過「音節桶輪轉 + 聯想詞 + 分組合併」，
         // 這是每次按鍵的主要開銷之一（用戶 2026-11-10：補聯想詞後按鍵卡頓）。
-        val segmentGroups = if (wantGroups) segmentGroupsFor(remaining, segmentAnchor) else emptyList()
+        // 引擎一條候選都沒給（`ee5` 這種碼串在詞典/方案裡裝不出來）時，**候選條不能退成字母**：
+        // 面板本來就會列「第一待選段的字典單字」（`de` 讀音下的 邸/的/地…），候選條也該用同一批。
+        // 這樣候選條、面板、preedit 三者同源（用戶 2026-11-11：候選詞不該一會字母一會 邸）。
+        val needDictionaryFallback = ordered.isEmpty() && remaining.isNotEmpty()
+        val segmentGroups = if (wantGroups || needDictionaryFallback) {
+            segmentGroupsFor(remaining, segmentAnchor)
+        } else {
+            emptyList()
+        }
         // 展開面板的「音節 → 漢字」列表：選哪些音節由常用度/字頻決定，
         // 但最終順序按讀音字典序（用戶 2026-11-10：「按首字母→次字母排，不然還是找得艱難」）。
         val engineGroups = if (!wantGroups) emptyList() else CandidateRanking.orderGroups(
@@ -213,11 +221,28 @@ object TwelveKeySnapshotBuilder {
         // 有 segmentAnchor（剛上屏的前一個字）時，與它關聯度高的字排前面。
         // 只剩最後一段時，用引擎候選（引擎本身按詞頻/用戶詞庫排序）再疊用戶關聯度，
         // 而不是繼續用字典順序 —— 否則「最後一個字」看起來完全不受詞頻影響（用戶 2026-11-09 反饋）。
-        val barEntries = barList(ordered)
+        val barEntries = if (ordered.isEmpty() && segmentGroups.isNotEmpty()) {
+            // 字典兜底：取「第一待選段」的音節組候選（與面板左列第 0 組同源），最多候選條格數。
+            segmentGroups.filter { it.segment != 1 }
+                .flatMap { g -> g.items }
+                .distinctBy { it.text }
+                .take(TwelveKeyTuning.BAR_ITEMS)
+        } else {
+            barList(ordered)
+        }
         // 候選條放不下的續頁 → 面板左列第一個「推薦」組（用戶 2026-11-11 定案）。
         // 順序與候選條同源（[CandidateRanking.fullBarOrder]），起點是候選條之後的那一條：
         // 這樣連「被 4 條詞組配額擠掉的第 5..N 個詞」也一起收進來，而不是只剩單字續頁。
-        val recommend = recommendFrom(ordered)
+        val recommend = if (ordered.isEmpty() && segmentGroups.isNotEmpty()) {
+            // 字典兜底時同樣把「沒上條的部分」放進推薦組（續頁語義不變）
+            segmentGroups.filter { it.segment != 1 }
+                .flatMap { g -> g.items }
+                .distinctBy { it.text }
+                .drop(barEntries.size)
+                .take(TwelveKeyTuning.RECOMMEND_ITEMS)
+        } else {
+            recommendFrom(ordered)
+        }
         // 推薦組固定排左列第一（reading 為空 + [RECOMMEND_SEGMENT] 標記）；空的就不插，
         // 這樣「候選全上了條」時段組自然回到第 0 組。
         val groupsWithRecommend = if (recommend.isEmpty()) {
@@ -243,7 +268,7 @@ object TwelveKeySnapshotBuilder {
         // 用它判斷會讓每一幀都掛上 fallback → 候選條顯示原始字母、preedit 也退成原碼，
         // 而開面板（wantGroups=true）時又正常 —— 用戶 2026-11-11 報的
         // 「打字顯示 dek，展開關閉後才是 de 5 / 邸」就是這條（docs/10 §15.74）。
-        val fallback = if (shouldShowFallback(ordered.size, remaining)) {
+        val fallback = if (shouldShowFallback(barEntries.size, remaining)) {
             val raw = remaining.takeLast(MAX_FALLBACK_CODE)
             val dbg = runCatching { Rime.debug_enumerate_info() }.getOrElse { "n/a(${it.javaClass.simpleName})" }
             Timber.i("twelvekey: fallback remaining=%s flat=%d composing=%b %s",

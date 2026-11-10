@@ -74,13 +74,32 @@ class SnapshotDecouplingTest {
         assertTrue("full 模式必須建出分組", full.groups.isNotEmpty())
     }
 
+    /**
+     * 用戶 2026-11-11：`ee5` 引擎裝不出候選時，候選條**不能退成字母**（`eek`），
+     * 應該用面板同源的字典段組（`de` 讀音下的 邸/的/地…），preedit 也就是 `de 5`。
+     */
     @Test
-    fun fallbackOnlyWhenEngineHasNoCandidates() {
-        val empty = TwelveKeySnapshotBuilder.build(
+    fun emptyEngineFallsBackToDictionaryNotLetters() {
+        val snap = TwelveKeySnapshotBuilder.build(
             local("ee5"), applyLearning = false, wantGroups = false,
             candidatesOverride = emptyList(),
         )
-        assertTrue("引擎沒候選時才兜底", empty.fallback != null)
+        assertTrue("引擎沒候選時候選條要用字典段組：${snap.barEntries.map { it.text }}",
+            snap.barEntries.isNotEmpty())
+        assertNull("有字典候選就不該顯示字母兜底", snap.fallback)
+        assertTrue("hasCandidates 要為真（bar 模式 groups 本來是空的）", snap.hasCandidates)
+        val first = snap.barEntries.first()
+        assertEquals("de 5", preedit.rewrite("ee5\u2038", first.text, first.comment))
+    }
+
+    @Test
+    fun fallbackOnlyWhenEngineHasNoCandidates() {
+        // 用字典裡也沒有音節的碼串（沒有段組可兜底）→ 才是真的只能顯示字母。
+        val empty = TwelveKeySnapshotBuilder.build(
+            local("qqqq"), applyLearning = false, wantGroups = false,
+            candidatesOverride = emptyList(),
+        )
+        assertTrue("引擎沒候選、字典也沒段組時才兜底", empty.fallback != null)
         assertFalse("兜底快照不該自稱有候選", empty.hasCandidates)
     }
 
