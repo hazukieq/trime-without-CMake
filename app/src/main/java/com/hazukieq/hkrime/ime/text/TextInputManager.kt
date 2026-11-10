@@ -450,6 +450,12 @@ class TextInputManager private constructor() :
                 twelveKeyController?.selectCandidate(engineIndex)
                 return
             }
+            // 引擎沒這個字，最常見的原因是「輸入還沒分段」：`88` 被當成一個詞，候選只有
+            // 醫院/這種…，單字（以/夜/就…）根本不在裡面。先按段插 `'` 重餵引擎再試一次：
+            // 命中就交給引擎「選中不提交」，逐段選字全程留在 preedit（用戶 2026-11-11：
+            // 「用户都没选完时不应该只在preedit 吗？怎么能突然commit」）。
+            if (resegmentAndSelect(item)) return
+            // 引擎重分段後仍然沒有這個字（詞庫確實沒收）：退回 App 側兜底（會逐段上屏）。
             pickSegmentedCandidate(item.text, item.restCode)
             return
         }
@@ -484,6 +490,43 @@ class TextInputManager private constructor() :
             }
         }
         return looseMatch
+    }
+
+    /**
+     * 把「還沒分段的輸入」按段插 `'` 重新餵給引擎，再把這個字交給引擎選中。
+     *
+     * 為什麼需要：librime 對 `88` 這種未分段輸入只給「組詞」候選，單字（以/夜/就…）不在候選裡，
+     * 於是面板段組點擊會落到 App 兜底——兜底是「上屏這個字 + 其餘碼重餵」，用戶會看到字先上屏了。
+     * 插 `'` 後引擎按段給單字候選，命中就能走原生 `select_candidate`：選中不提交、全部選完才上屏、
+     * 退格由引擎反悔、學習也走 librime。
+     *
+     * 返回 true = 已經由引擎選中（調用方直接 return）；false = 沒命中，調用方退回兜底。
+     */
+    private fun resegmentAndSelect(item: CandidatePanelAdapter.Item): Boolean {
+        val input = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
+        if (input.isEmpty() || input.contains('\'')) return false
+        val rest = item.restCode
+        if (rest.isEmpty() || input.length <= rest.length || !input.endsWith(rest)) return false
+        val head = input.dropLast(rest.length)
+        if (head.isEmpty()) return false
+        val segmented = head + "'" + rest
+        return runCatching {
+            withEngineLock { Rime.clearComposition() }
+            withEngineLock { Rime.onText(segmented) }
+            val engineIndex = resolveEngineIndexForSegment(item.text, item.comment)
+            if (engineIndex < 0) {
+                // 沒命中：把輸入還原成沒分段的形式，讓後續兜底走原路徑。
+                withEngineLock { Rime.clearComposition() }
+                withEngineLock { Rime.onText(input) }
+                false
+            } else {
+                twelveKeyController?.selectCandidate(engineIndex)
+                true
+            }
+        }.getOrElse {
+            Timber.e(it, "twelvekey: resegment failed")
+            false
+        }
     }
 
     /**

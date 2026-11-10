@@ -764,6 +764,23 @@ object TwelveKeyPreedit {
     }
 
     /** 候選 comment → 音節列表（剝掉 `［…］` 包裝；空/無 comment 回 null）。 */
+    /**
+     * librime preedit 裡的「已選中前綴」（`已選字 + 碼串 + ‸` 裡的那些漢字）。
+     *
+     * 舊寫法是「從尾部跳過 ASCII，剩下的就是前綴」——但末尾的光標 `‸`(U+2038) 本身就是非 ASCII，
+     * 於是 `8 8‸` 這種「一格都沒選」的 preedit 會被整串當成前綴，嵌入式預覽把它寫進輸入框，
+     * 上屏時就出現 `88˄以` 這種把原始碼串當文字提交的怪相（用戶 2026-11-11 報）。
+     * 碼串一定是 ASCII、光標一定是 `‸`，所以直接「只留非 ASCII 且非光標的字」最穩。
+     */
+    fun compositionPrefix(preedit: String?): String {
+        if (preedit.isNullOrEmpty()) return ""
+        val out = StringBuilder(preedit.length)
+        for (ch in preedit) {
+            if (ch.code >= 128 && ch != CARET_MARK[0]) out.append(ch)
+        }
+        return out.toString()
+    }
+
     private fun parseComment(comment: String?): List<String>? {
         val text = comment?.replace("\uFF3B", "")?.replace("\uFF3D", "")?.trim()
         if (text.isNullOrEmpty()) return null

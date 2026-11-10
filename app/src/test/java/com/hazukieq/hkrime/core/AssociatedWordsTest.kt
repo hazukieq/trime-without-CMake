@@ -271,4 +271,23 @@ class AssociatedWordsTest {
     fun rewriteReturnsNullWhenNoCode() {
         assertNull(preedit.rewrite("咧", null, null))
     }
+
+    @Test
+    fun `compositionPrefix keeps selected hanzi and drops codes and caret`() {
+        assertEquals("", TwelveKeyPreedit.compositionPrefix(null))
+        assertEquals("", TwelveKeyPreedit.compositionPrefix(""))
+        // 一格都沒選：碼串 + 光標 → 前綴必須是空（否則嵌入式預覽把原始碼寫進輸入框）
+        assertEquals("", TwelveKeyPreedit.compositionPrefix("8 8\u2038"))
+        assertEquals("", TwelveKeyPreedit.compositionPrefix("5i34i\u2038"))
+        // 選中一段：漢字 + 剩餘碼 + 光標
+        assertEquals("以", TwelveKeyPreedit.compositionPrefix("以8\u2038"))
+        assertEquals("以院", TwelveKeyPreedit.compositionPrefix("以院 8\u2038"))
+        // 漢字與碼串交錯（多段選字）
+        assertEquals("以院", TwelveKeyPreedit.compositionPrefix("以8院\u2038"))
+    }
+
+    @Test
+    fun `compositionPrefix ignores caret only preedit`() {
+        assertEquals("", TwelveKeyPreedit.compositionPrefix("\u2038"))
+    }
 }

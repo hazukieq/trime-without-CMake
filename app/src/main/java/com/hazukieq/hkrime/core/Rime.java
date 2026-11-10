@@ -486,11 +486,7 @@ public class Rime {
    */
   public static String getCompositionPrefix() {
     if (mContext == null || mContext.composition == null) return "";
-    String preedit = mContext.composition.preedit;
-    if (preedit == null || preedit.isEmpty()) return "";
-    int i = preedit.length();
-    while (i > 0 && preedit.charAt(i - 1) < 128) i--;
-    return preedit.substring(0, i);
+    return TwelveKeyPreedit.INSTANCE.compositionPrefix(mContext.composition.preedit);
   }
 
   public static String getCompositionText() {
