@@ -179,6 +179,11 @@ flowchart TD
 - 把 `remaining` 去 `'` 后，先试「整串是一个音节」（`we`=the），再按 `splitHeads` 拆首段；
 - 每种切法给一段配额：普通键 16、音节丰富的键 24（`SEGMENT_SYLLABLE_LIMIT(_RICH)`），
   备选切法减半（`SECONDARY_SPLIT_DIVISOR`）；
+- **段码恰好是一个完整音节时只列该音节**（`headIsCompleteSyllable` → `syllablesForSegment(exactOnly=true)`）：
+  `4i` 只给 `mi/mh/ni/nh`（4 组）、`ea` 只给 `fa/da`（2 组）、`74` 只给 `po/so`；
+  不再展开 `mia/min/miang…` 这些「同前缀但更长的音节」（用户 2026-11-11：理论上是噪音，
+  那些音节要打更多键才会命中）。只有「码只是前缀」（`7` = p/s，没有一个完整音节）时才做前缀展开；
+  若 exact 为空会自动回退到展开，避免段组直接空掉。
 - 每个音节 → `charsForSyllable(syllable, SEGMENT_CHARS_LIMIT=1000)`（**列全部字**，
   用户 2026-11-11：「要罗列完整，除非数量大到影响性能」；最大音节 `ji` 865 字）；
 - 每项 `segment=0`、`restCode=rest`（点了之后剩余码回引擎，面板接着列下一段）。
