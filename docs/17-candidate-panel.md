@@ -496,7 +496,7 @@ python3 tools/panel_probe.py panel "kl ghi mno abc ps"      # 等价 5i4a7（li 
 # 其余子命令（同样接受键名写法）
 python3 tools/panel_probe.py syllables 4i         # 段码 → 左列音节组（标 exact/prefix、切法、剩余码）
 python3 tools/panel_probe.py syllables "kl ghi mno abc kl ps"   # 逐键累积：2 键→3 键→…→整串，最后去重
-python3 tools/panel_probe.py syllables 5i4a57 --no-stages       # 只看去重汇总
+python3 tools/panel_probe.py syllables 5i4a57 --no-stages       # 只看去重汇总（+ 实际存在读音集）
 python3 tools/panel_probe.py chars ji             # 音节 → 全部单字（--limit 截断）
 python3 tools/panel_probe.py assoc li 4a5         # 联想词（第一音节 + 剩余码前缀）
 python3 tools/panel_probe.py prefix 5i4a57        # 整串码前缀（多音节词，如 li nak si → Linux）
@@ -523,6 +523,14 @@ $ python3 tools/panel_probe.py syllables "kl ghi mno abc kl ps"
   li   单字  首现于 2 键
   …
   li nak si   联想/词  首现于 6 键
+
+# 尾部还会打印「實際存在讀音集」：詞典全量反查、不受面板 16/24 配額限制，
+# 用来核对「规则少给了 / 配额截掉了」哪些读音：
+$ python3 tools/panel_probe.py syllables "mno ghi" --no-stages
+# 實際存在讀音集（碼串 '4i'，詞典全量，不受配額限制）
+  [single 4i|] 共 4: mi ni mh nh
+  [split  4|i] 共 70: ma mai mak man … nut
+# 去重後實際存在 70 個；面板規則已顯示 18 個；未顯示（多半被種子/配額截斷）: …
 
 $ python3 tools/panel_probe.py prefix 5i4a57
 li nak si   Linux linux

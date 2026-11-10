@@ -310,7 +310,12 @@ class Data:
         return n
 
     def syllables_for_segment(
-        self, code: str, limit: int = 12, exact_only: bool = False, allow_suffix_only: bool = False
+        self,
+        code: str,
+        limit: int = 12,
+        exact_only: bool = False,
+        allow_suffix_only: bool = False,
+        total_limit: int = MAX_SYLLABLES_TOTAL,
     ) -> list[str]:
         """镜像 TwelveKeyPreedit.syllablesForSegment（exact 优先 + 两级桶轮转前缀展开）。
 
@@ -349,7 +354,7 @@ class Data:
         ]
 
         distinct_exact = list(dict.fromkeys(exact_sorted))
-        total_cap = max(limit, min(limit * len(order), MAX_SYLLABLES_TOTAL))
+        total_cap = max(limit, min(limit * len(order), total_limit))
         diversified: list[str] = []
         per_initial: dict[str, int] = defaultdict(int)
         initial_count = max(1, sum(len(inner) for inner in order))
@@ -519,6 +524,48 @@ class Data:
                 out[target] = {**existing, "items": existing.get("items", []) + extra}
         return out
 
+    def existing_readings(self, codes: str) -> list[dict]:
+        """**實際存在**的讀音集：詞典裡真有字、且碼串能讀成它的全部音節（不受面板配額限制）。
+
+        用途（用戶 2026-11-11：「測試脚本 syllables 还应该输出一份实际存在读音集」）：
+        面板左列受 16/24 配額與輪轉限制，可能只顯示一部分；這裡給全量，方便對照
+        「規則漏了哪些」「配額截掉了哪些」。
+
+        每項：`{"split": i, "head": ..., "rest": ..., "kind": "single|split", "readings": [...]}`。
+        """
+        codes = codes.replace("'", "")
+        if not codes:
+            return []
+        single = [(codes, "")] if self.is_single_syllable(codes) else []
+        splits = list(single)
+        for h, r in self.split_heads(codes):
+            if h not in [x[0] for x in splits]:
+                splits.append((h, r))
+        if not splits:
+            splits = [(codes[:1], codes[1:])]
+        out: list[dict] = []
+        huge = 1_000_000
+        for index, (head, rest) in enumerate(splits):
+            head_complete = self.is_single_syllable(head)
+            allow_suffix_only = not rest
+            readings = self.syllables_for_segment(
+                head, huge, head_complete, allow_suffix_only, total_limit=huge
+            )
+            if not readings:
+                readings = self.syllables_for_segment(
+                    head, huge, False, allow_suffix_only, total_limit=huge
+                )
+            out.append(
+                {
+                    "split": index,
+                    "head": head,
+                    "rest": rest,
+                    "kind": "single" if index == 0 and not rest else "split",
+                    "readings": readings,
+                }
+            )
+        return out
+
     def cumulative(self, codes: str, min_len: int = 2) -> list[tuple[int, str, list[dict]]]:
         """逐键累积：2 键、3 键 … 直到整串，返回每个阶段的左列快照。
 
@@ -663,6 +710,27 @@ def cmd_syllables(args, data: Data) -> None:
     for reading, length, kind in unique:
         print(f"  {reading:<18} {kind}  首现于 {length} 键")
 
+    # 實際存在讀音集（詞典全量反查、不受面板配額限制）
+    shown = {r[0] for r in unique if " " not in r[0]} | {g["reading"] for g in data.segment_groups(args.codes)}
+    print()
+    print(f"# 實際存在讀音集（碼串 {args.codes!r}，詞典全量，不受配額限制）")
+    union: list[str] = []
+    for part in data.existing_readings(args.codes):
+        readings = part["readings"]
+        for r in readings:
+            if r not in union:
+                union.append(r)
+        if not readings:
+            print(f"  [{part['kind']:<6} {part['head']}|{part['rest']}] （無）")
+            continue
+        print(
+            f"  [{part['kind']:<6} {part['head']}|{part['rest']}] "
+            f"共 {len(readings)}: {' '.join(readings)}"
+        )
+    hidden = [r for r in union if r not in shown]
+    print(f"# 去重後實際存在 {len(union)} 個；面板規則已顯示 {len(union) - len(hidden)} 個"
+          + (f"；未顯示（多半被種子/配額截斷）: {' '.join(hidden)}" if hidden else "；無遗漏"))
+
 
 def cmd_build_syllables(args) -> None:
     """從 `hakkaSyllables.js` 抽出標準音節集，寫成 `assets/rime/hakka_syllables.txt`。"""
@@ -801,6 +869,23 @@ def cmd_selftest(args, data: Data) -> None:
     expect(
         all(unique[i][0] != unique[i + 1][0] for i in range(len(unique) - 1)),
         "累积去重后没有相邻重复读音",
+    )
+
+    # 4.5) 實際存在讀音集：必須是詞典音節、且覆蓋面板已顯示的讀音
+    exist4i = data.existing_readings("4i")
+    union4i = {r for part in exist4i for r in part["readings"]}
+    expect(bool(union4i), f"4i 實際存在讀音集非空（{len(union4i)}）")
+    expect(union4i <= set(data.syllable_freq), "實際存在讀音集全部來自詞典音節")
+    shown4i = {g["reading"] for g in data.segment_groups("4i") if g["segment"] == 0}
+    expect(
+        shown4i <= union4i,
+        f"面板顯示的讀音必須 ⊆ 實際存在集（漏: {sorted(shown4i - union4i)[:5]}）",
+    )
+    union57 = {r for part in data.existing_readings("5i4a57") for r in part["readings"]}
+    shown57 = {g["reading"] for g in data.segment_groups("5i4a57") if g["segment"] == 0}
+    expect(
+        union57 <= shown57 or shown57 <= union57,
+        f"5i4a57 面板與實際存在集應互相覆蓋（顯示 {len(shown57)} / 存在 {len(union57)}）",
     )
 
     # 4.55) 標準集必須覆蓋詞典音節（用戶 2026-11-11 定稿：字典並入後的就是標準集）
