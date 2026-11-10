@@ -3229,6 +3229,25 @@ sum >= 輸入長  → 只顯示 comment（簡拼 `8 8`=ji jen、半截 `5i34i w`
 改這條規則前，舊實現（DP 邊界）在同一份語料上**當場報出 25+ 條不一致**——這就是反覆來回的原因。
 `AGENTS.md` §2.1.1 已寫死：**改 preedit / 面板分組必須先跑真實語料測試**。
 
+## 15.77 尾码边界改为「按 comment 音節逐節吃掉输入前缀」（2026-11-11）
+
+§15.67.3 的尾码算法是「`Σ codeOf(comment 音節).length` 与输入长比较」。它能表达「comment 覆盖不到的码补原样」，
+但**遇到「首条候选把输入补全/补长」的情况就把多打的键吞掉**：用户打 `qqqqqq`（=`999999…`）时首条补全成 6 个
+`qa`（码长 12），第 7 个 `9` 永远显示不出来（用户原话：「再打一个 q 居然不显示了」）。
+
+改成**前綴匹配**（`TwelveKeyPreedit.coveredCodeLength`）：
+
+1. 逐節取 comment 的音節，先按完整碼 `codeOf(syllable)` 在输入码当前位置匹配；匹配不上按「简拼只吃 1 个碼位」退一步；
+2. 逐節吃下来得到 `consumed`；`consumed < 输入长` → `comment + 输入码.substring(consumed)`，否则只显示 comment；
+3. 第一節就完全匹配不上（既不完整也不简拼）→ `coveredCodeLength` 回 null，退回旧的「碼長之和」算法（不猜）。
+
+实例：`9999999` + comment `qa qa qa qa qa qa` → `qa qa qa qa qa qa 9`（补齐 + 尾键原样）；
+`5i4a57` + `ki mak` → `ki mak 7`；`5i34iw` + `li voi` → `li voi w`；`ee5` + `de` → `de 5`。
+
+回归：`AssociatedWordsTest.rewriteKeepsExtraKeysWhenCommentOnlyCoversPrefixByAbbreviation`；
+`RealCorpusTest` 的期望值同步改成同一语义（`coveredCodeLength`/`consumedCodeLength` 镜像一份在测试里，
+故意不共用实现代码）。全仓 `141 tests / 0 failures`。
+
 ## 15.76 `ee5` 的真正成因：引擎确实没有候选 → 候选条不该退成字母（2026-11-11）
 
 §15.73/§15.74/§15.75 之後仍然重現。這次加了 native 診斷（`Rime.debug_enumerate_info()`：

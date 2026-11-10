@@ -252,6 +252,17 @@ class AssociatedWordsTest {
     }
 
     /**
+     * 用戶 2026-11-11：打 `qqqqqq`（= `999999`…）時首條會補全成一串 `qa`，但**再按的鍵會被吞**。
+     * 逐節前綴匹配：`qa` 對不上 `99…` → 每節只吃 1 個碼位；超出的那個碼位要原樣顯示。
+     */
+    @Test
+    fun rewriteKeepsExtraKeysWhenCommentOnlyCoversPrefixByAbbreviation() {
+        val comment = List(6) { "qa" }.joinToString(" ")
+        assertEquals("qa qa qa qa qa qa 9", preedit.rewrite("9999999\u2038", "哈哈", comment))
+        assertEquals("qa qa qa qa qa qa", preedit.rewrite("999999\u2038", "哈哈", comment))
+    }
+
+    /**
      * 用戶 2026-11-11 報：`5i4a57`（ki mak + 半截 `7`）只顯示 `ki mak`，尾碼被吃掉。
      * 本地 DP 切不出完整音節（`7` 是單鍵），舊寫法算不出覆蓋長度 → 用 comment 自己的音節碼
      * 逐節吃碼位（ki→5i、mak→4a5 = 5 個），剩下的 `7` 原樣顯示。

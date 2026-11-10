@@ -822,8 +822,20 @@ object TwelveKeyPreedit {
         val commentCodeLen = engine?.sumOf { syl ->
             runCatching { codeOf(syl).length }.getOrDefault(0)
         } ?: 0
-        val rawTail = if (engine != null && commentCodeLen in 1 until cleanCodes.length) {
-            cleanCodes.substring(commentCodeLen)
+        // 尾碼邊界：優先「按 comment 的音節碼逐節吃掉輸入的前綴」——這樣才能處理
+        // 「打 `9999999`、首條補全 6 個 `qa`」這種**簡拼吃掉每個碼位元**的情況：
+        // 逐節匹配時 `qa` 對不上 `99…`，退一步只吃 1 個碼位 → 剩下第 7 個 `9` 原樣顯示
+        // （用戶 2026-11-11：「再打一個 q 居然不顯示了」＝尾碼被吞）。
+        // 對不上（第一節就匹配失敗）才退回「碼長之和」的舊算法。
+        val covered = coveredCodeLength(cleanCodes, engine)
+        val consumed = when {
+            engine == null -> cleanCodes.length
+            covered != null -> covered.coerceIn(0, cleanCodes.length)
+            commentCodeLen in 1..cleanCodes.length -> commentCodeLen
+            else -> cleanCodes.length
+        }
+        val rawTail = if (consumed in 1 until cleanCodes.length) {
+            cleanCodes.substring(consumed)
         } else {
             ""
         }
@@ -839,6 +851,27 @@ object TwelveKeyPreedit {
     @Volatile
     var lastRenderUsedRawCode: Boolean = false
         private set
+
+    /**
+     * comment 的音節依次吃掉輸入碼的多少碼位（前綴匹配）：
+     * 先按完整碼（[codeOf]）匹配，匹配不上再按「簡拼只吃一個碼位」退一步。
+     * 第一節就無法匹配 → 回 null（不猜，退回舊的長度算法）。
+     */
+    private fun coveredCodeLength(codes: String, engine: List<String>?): Int? {
+        if (engine.isNullOrEmpty() || codes.isEmpty()) return null
+        var pos = 0
+        for (syllable in engine) {
+            val full = runCatching { codeOf(syllable) }.getOrNull().orEmpty()
+            if (full.isEmpty()) return null
+            when {
+                codes.startsWith(full, pos) -> pos += full.length
+                pos < codes.length && codes[pos] == full[0] -> pos += 1
+                else -> return if (pos == 0) null else pos
+            }
+            if (pos > codes.length) return codes.length
+        }
+        return pos
+    }
 
     /** librime preedit 的光標標記 `‸`(U+2038)。 */
     private const val CARET_MARK = "\u2038"

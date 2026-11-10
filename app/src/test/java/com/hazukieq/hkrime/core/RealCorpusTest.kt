@@ -134,19 +134,50 @@ class RealCorpusTest {
         }
     }
 
-    /** comment 的音節碼長之和 = 它承諾吃掉的碼位數（ki→5i 兩位、mak→4a5 三位）。 */
+    /** comment 的音節碼長之和（`ki`→`5i` 兩位、`mak`→`4a5` 三位）。 */
     private fun commentCodeLength(comment: List<String>): Int =
         comment.sumOf { runCatching { TwelveKeyPreedit.codeOf(it).length }.getOrDefault(0) }
 
     /**
+     * comment 依序吃掉輸入碼多少碼位（**實現的鏡像，故意寫成第二份代碼**）：
+     * 每節先按完整碼匹配，對不上就只吃 1 個碼位（簡拼）；第一節就對不上 → 回 null 走舊的長度算法。
+     *
+     * 這條規則是為了 `9999999` / `qa qa qa qa qa qa` 這種「首條把 qa 補全了」的情況：
+     * 逐節匹配每節只吃 1 個碼位，多出來的第 7 個 `9` 必須原樣顯示（用戶 2026-11-11）。
+     */
+    private fun coveredCodeLength(comment: List<String>, cleanCode: String): Int? {
+        var pos = 0
+        for (syllable in comment) {
+            val full = runCatching { TwelveKeyPreedit.codeOf(syllable) }.getOrNull().orEmpty()
+            if (full.isEmpty()) return null
+            pos = when {
+                cleanCode.startsWith(full, pos) -> pos + full.length
+                pos < cleanCode.length && cleanCode[pos] == full[0] -> pos + 1
+                else -> return if (pos == 0) null else pos
+            }
+            if (pos > cleanCode.length) return cleanCode.length
+        }
+        return pos
+    }
+
+    /** 本用例裡 comment 實際吃掉的碼位數（前綴匹配優先，對不上退回碼長之和）。 */
+    private fun consumedCodeLength(comment: List<String>, cleanCode: String): Int {
+        val covered = coveredCodeLength(comment, cleanCode)
+        if (covered != null) return covered.coerceIn(0, cleanCode.length)
+        val sum = commentCodeLength(comment)
+        return if (sum in 1..cleanCode.length) sum else cleanCode.length
+    }
+
+    /**
      * 期望的 preedit（用戶 2026-11-11 定的規則）：
-     * - comment 的碼長 < 輸入長 → comment + 剩下的原始碼（一個字都不能少）；
+     * - comment 覆蓋的碼位 < 輸入長 → comment + 剩下的原始碼（一個字都不能少）；
      * - 否則（簡拼/半截/剛好覆蓋）→ 只顯示 comment，不補尾巴。
      */
     private fun expectedPreedit(comment: List<String>, cleanCode: String): String {
-        val sum = commentCodeLength(comment)
+        val consumed = consumedCodeLength(comment, cleanCode)
         val head = comment.joinToString(" ")
-        return if (sum in 1 until cleanCode.length) "$head ${cleanCode.substring(sum)}" else head
+        return if (consumed in 1 until cleanCode.length) "$head ${cleanCode.substring(consumed)}"
+        else head
     }
 
     private fun cleanCode(code: String) = code.replace(Regex("[\\s']"), "")
@@ -188,11 +219,11 @@ class RealCorpusTest {
             val first = rec.cands.firstOrNull() ?: continue
             if (first.comment.isBlank()) continue
             val comment = preedit.parseComment(first.comment) ?: continue
-            val sum = commentCodeLength(comment)
-            if (sum !in 1 until clean.length) continue
+            val consumed = consumedCodeLength(comment, clean)
+            if (consumed !in 1 until clean.length) continue
             checked++
             val rendered = preedit.rewrite(rec.preedit, first.text, first.comment) ?: rec.preedit
-            val tail = clean.substring(sum)
+            val tail = clean.substring(consumed)
             if (!rendered.endsWith(" $tail") && failures.size < 25) {
                 failures.add("code=$clean first=[${first.text}/${first.comment}] rendered=[$rendered] tail=[$tail]")
             }
