@@ -3151,6 +3151,41 @@ comment 不夠長時補原始碼／光標剝除）。改動任何一處都容易
   `5i34i w` → `kiung than`（共產）、`744 ii` → `son gi`（船寄）、
   `834i ie9 yi4 4i4 5i34i e4 ie9` → `zung get nzin min kiung fo get`（中國人民共和國）。
 
+#### 15.67.3 兩例「preedit 不一致」的收尾（2026-11-11 晚）
+
+用戶報：「`def def kl`（`ee5`）先顯示原碼、開關面板後才顯示 `de`；`kl ghi mno abc kl ps`
+（`5i4a57`）只顯示 `ki mak`，最後 `ps` 的碼丟了。」
+
+PC 探針（`rime-jni/host-test` 的 `--probe`，已加上 `preedit=` 與候選 comment）給出引擎側事實：
+
+```
+probe input='5i4a57' candidates=1907
+preedit='5i 4a57‸'
+  #0 '气脉' comment='ki mak'
+```
+
+真機日誌（`/sdcard/hkrime/logs/hkrime-20261111.log`）同樣是
+`dbgpre: raw=[5i 4a57] hint=[气脉] preferred=[ki mak] decoded=[ki mak]` —— 尾碼 `7` 被吃掉。
+
+**原因與修法（都在 App 側 `core/TwelveKeyPreedit.kt`）：**
+
+1. **尾碼丟失**：`rawTail` 的覆蓋長度原本用本地 DP `decodeSpans(codes)` 算，`5i4a57` 尾端只有
+   聲母鍵 `7`、切不出完整音節 → `decodeSpans` 回 `null` → 覆蓋長度算不出 → 只顯示 comment。
+   現在加 `coveredCodeLength(codes, engine)`：用 **comment 自己的音節碼**逐節吃碼位
+   （`ki`→`5i`、`mak`→`4a5`，共 5 位，剩 `7` 原樣顯示）；只有簡拼時每節吃 1 位。
+   規則收斂成：
+   - 本地能切出音節 → 沿用舊規則（comment 段數 < 本地段數才補尾碼）；
+   - 本地切不出（半截尾鍵）→ 用 `coveredCodeLength` 算，其餘原樣顯示。
+2. **首幀原碼**：候選尚未落地時 `render()` 拿不到 comment/本地解碼也失敗，只能回原始碼；
+   快照落地後原本只在「首條變化」時重畫，`ee5` 這種「首條沒變、但上一幀是原碼」就跳過了。
+   現在 `render()` 記 `lastRenderUsedRawCode`，`TextInputManager` 在
+   `首條變化 || (上一幀是原碼 && 首條有 comment)` 時都重畫一次。
+
+**測試**：`rewriteKeepsPartialTailAfterWordReading`（`5i 4a57` / `5i4a57` → `ki mak 7`）、
+`rewriteAddsNoTailWhenCommentCoversAllCode`、`rewriteConsumesOneCodePerSyllableForAbbreviation`、
+`rewriteTrustsFirstCandidateCommentAsIs`（`5i34iw` + `li voi` → `li voi w`，半截 `w` 也要顯示）；
+全倉 **132 tests / 0 failures**。
+
 ## 15.68 12 鍵的字表/詞表改讀共享目錄並展開 `import_tables`（2026-11-11）
 
 ### 15.68.1 問題（dsh mobile 反饋 2026-11-09）

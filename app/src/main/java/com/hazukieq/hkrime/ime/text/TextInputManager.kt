@@ -407,7 +407,12 @@ class TextInputManager private constructor() :
         }
         // 面板可能被 submit() 自動收起（上屏後無剩餘碼），箭頭方向要跟著回到 ▼
         candidateView?.setPanelOpen(candidatePanelController?.isShown == true)
-        if (preferredChanged && Rime.isComposing()) refreshPreeditAfterSnapshot()
+        // 首條變化要重畫；另外「上一幀連讀音都拿不出、直接回了原始碼」時也要補畫一次 ——
+        // 用戶 2026-11-11 報 `ee5` 先顯示原碼、開關面板後才顯示 `de`：那一幀候選還沒落地，
+        // 快照到了卻因為「首條沒變」跳過重畫，畫面就停在原碼上。
+        val needRedraw = preferredChanged ||
+            (TwelveKeyPreedit.lastRenderUsedRawCode && first?.comment.isNullOrEmpty().not())
+        if (needRedraw && Rime.isComposing()) refreshPreeditAfterSnapshot()
     }
 
     /**

@@ -770,7 +770,9 @@ object TwelveKeyPreedit {
         val hint = if (hasBarHint) preferredText else engineText
         val preferred = if (hasBarHint) preferredComment else engineComment
         // 2) 改寫（已選前綴保留、尾部碼段轉拼音、comment 不夠覆蓋時補原始碼）。
-        val decoded = rewrite(rawPreedit, hint, preferred) ?: rawPreedit
+        val rewritten = rewrite(rawPreedit, hint, preferred)
+        lastRenderUsedRawCode = rewritten == null
+        val decoded = rewritten ?: rawPreedit
         // 3) App 側暫存（兜底逐段選字，引擎候選裡沒有那些字）顯示在最前面。
         val pending = pendingPrefix
         val rendered = (if (pending.isNullOrEmpty()) "" else pending) + decoded
@@ -804,7 +806,12 @@ object TwelveKeyPreedit {
         val engine = parseComment(preferred)
         // 本地解碼的「字元跨度」：每個音節吃掉幾個碼位 —— 只用來算「comment 覆蓋到哪裡」，
         // 不用它的音節內容去拼湊顯示（用戶 2026-11-10：「不要試圖去拼湊」）。
+        // 但它切不出完整音節時（`5i4a57` 尾端 `7` 只是聲母鍵）會整串回 null，覆蓋長度就算不出來，
+        // 尾碼就丟了（用戶 2026-11-11 報 `ki mak` 少了 `7`）。所以先用 comment 自己的音節碼
+        // 逐節吃掉輸入碼位（[coveredCodeLength]）——那是「comment 承諾覆蓋的碼」的客觀長度，
+        // 跟本地切法無關；對不上才退回舊的 spans 算法。
         val spans = decodeSpans(cleanCodes)
+        val covered = coveredCodeLength(cleanCodes, engine)
         // 顯示規則（用戶 2026-11-10 定調，按優先級）：
         //  1. **按下的鍵必須全部顯示**（首要）—— 不能讓用戶覺得「打了這麼多鍵沒反應」；
         //  2. 音節正確是第二步：首條候選的 comment 是引擎給的精確拼音，且與候選條同源
@@ -812,9 +819,19 @@ object TwelveKeyPreedit {
         // 於是：comment 節數 >= 本地解碼節數 → 只用 comment；
         //       comment 更短 → comment + **原始編碼**（沒被覆蓋的那段碼原樣顯示，不猜音節）：
         //       中國人民共和國 → `zung get nzin min 5i34ie4ie9`。
-        val rawTail = if (engine != null && spans != null && engine.size < spans.size) {
-            val consumed = spans.take(engine.size).sumOf { it.first.length }
-            cleanCodes.substring(consumed.coerceIn(0, cleanCodes.length))
+        val consumed = when {
+            engine == null -> cleanCodes.length
+            // 舊規則：本地能切出音節時，只有「comment 比本地音節少」才補尾碼
+            // （comment 段數 >= 本地段數 → 認為它已覆蓋整串，`5i34iw` 的零碎 `w` 不顯示）。
+            spans != null ->
+                if (engine.size < spans.size) spans.take(engine.size).sumOf { it.first.length }
+                else cleanCodes.length
+            // 本地切不出完整音節（尾端只有聲母鍵，如 `5i4a57` 的 `7`）：改用 comment 自己的
+            // 音節碼算覆蓋長度，剩下的原樣顯示（用戶 2026-11-11 報尾碼被吃掉）。
+            else -> covered ?: cleanCodes.length
+        }
+        val rawTail = if (consumed in 1 until cleanCodes.length) {
+            cleanCodes.substring(consumed)
         } else {
             ""
         }
@@ -825,6 +842,35 @@ object TwelveKeyPreedit {
         } ?: return null
         return prefix + shown.joinToString(" ")
     }
+
+    /**
+     * comment 的每一節依次吃掉多少碼位：先按完整碼（[codeOf]）匹配，其次簡拼只吃一個碼位
+     * （用戶只按了一聲母鍵，如 `w` 對應 `than`）。任何一節對不上就回 null —— 不猜。
+     *
+     * 為什麼要它：`5i4a57`（氣脈 ki mak + 半截 `7`）用本地 DP 切不出完整音節，
+     * [decodeSpans] 回 null，舊寫法就算不出覆蓋長度 → 尾碼 `7` 被吃掉；
+     * 而 comment 的音節碼是確定的（ki→5i、mak→4a5），直接吃 5 個碼位，剩 `7` 原樣顯示。
+     */
+    private fun coveredCodeLength(codes: String, engine: List<String>?): Int? {
+        if (engine.isNullOrEmpty() || codes.isEmpty()) return null
+        var pos = 0
+        for (syllable in engine) {
+            val full = codeOf(syllable)
+            if (full.isEmpty()) return null
+            when {
+                codes.startsWith(full, pos) -> pos += full.length
+                pos < codes.length && codes[pos] == full[0] -> pos += 1
+                else -> return null
+            }
+            if (pos > codes.length) return null
+        }
+        return pos
+    }
+
+    /** 上一次 [render] 是否連本地解碼都拿不出讀音、直接回了原始碼（需要在快照到達後補畫）。 */
+    @Volatile
+    var lastRenderUsedRawCode: Boolean = false
+        private set
 
     /** librime preedit 的光標標記 `‸`(U+2038)。 */
     private const val CARET_MARK = "\u2038"

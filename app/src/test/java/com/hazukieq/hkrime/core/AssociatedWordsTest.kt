@@ -222,10 +222,13 @@ class AssociatedWordsTest {
     /**
      * 12 鍵多對多、沒有唯一解碼：comment 一律優先（它與候選條同源，是「用戶看到的第一條」的讀音）。
      * 這裡用一串「本地解碼完全對不上」的 comment 釘住契約：不做本地校驗，直接顯示。
+     *
+     * 尾端的半截鍵（`w`）仍要顯示：comment 只承諾了 `5i`+`34i` 六個碼位裡的五個，
+     * 剩下的按「按下的鍵必須全部顯示」原樣補上（與 `5i4a57` 的 `7` 同一條規則）。
      */
     @Test
     fun rewriteTrustsFirstCandidateCommentAsIs() {
-        assertEquals("li voi", preedit.rewrite("5i34iw", "理會", "li voi"))
+        assertEquals("li voi w", preedit.rewrite("5i34iw", "理會", "li voi"))
     }
 
     /**
@@ -246,6 +249,30 @@ class AssociatedWordsTest {
         val code = "834iie9yi44i45i34ie4ie9"
         val out = preedit.rewrite(code + "\u2038", "中国人民", "zung get nzin min")!!
         assertEquals("zung get nzin min 5i34ie4ie9", out)
+    }
+
+    /**
+     * 用戶 2026-11-11 報：`5i4a57`（ki mak + 半截 `7`）只顯示 `ki mak`，尾碼被吃掉。
+     * 本地 DP 切不出完整音節（`7` 是單鍵），舊寫法算不出覆蓋長度 → 用 comment 自己的音節碼
+     * 逐節吃碼位（ki→5i、mak→4a5 = 5 個），剩下的 `7` 原樣顯示。
+     */
+    @Test
+    fun rewriteKeepsPartialTailAfterWordReading() {
+        assertEquals("ki mak 7", preedit.rewrite("5i 4a57\u2038", "气脉", "ki mak"))
+        assertEquals("ki mak 7", preedit.rewrite("5i4a57\u2038", "气脉", "ki mak"))
+    }
+
+    /** comment 剛好覆蓋全部碼位時不該補尾巴（避免重複）。 */
+    @Test
+    fun rewriteAddsNoTailWhenCommentCoversAllCode() {
+        assertEquals("ki mak", preedit.rewrite("5i 4a5\u2038", "气脉", "ki mak"))
+    }
+
+    /** 用戶只按了一聲母鍵時（簡拼），comment 的每一節只吃一個碼位。 */
+    @Test
+    fun rewriteConsumesOneCodePerSyllableForAbbreviation() {
+        // 8 8 = 两个首字母键，首条候选读 ji jen → 全部吃完，不补尾码
+        assertEquals("ji jen", preedit.rewrite("8 8\u2038", "医院", "ji jen"))
     }
 
     /** 引擎沒給 comment（方案沒開 spelling_hints）時退回本地解碼。 */
