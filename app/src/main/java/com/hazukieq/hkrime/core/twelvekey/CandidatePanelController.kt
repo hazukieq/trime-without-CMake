@@ -19,6 +19,7 @@ import com.hazukieq.hkrime.ime.text.CandidatePanelAdapter
  * - 面板保持打開，直到 ▼/⌄/退格清空輸入。
  *
  * 連續消費手感（P1）：
+ * - 開面板 / 新按鍵一律落第 0 組（「推薦」組，候選條放不下的續頁），不跟候選條對齊；
  * - 上屏後 input 可能不變、groups 變了：若當前 reading 仍在新組列表裡就保持該組，
  *   否則回第 0 組；
  * - 不主動 scrollToPosition(0)，靠 ListAdapter + DiffUtil 原地更新，避免跳頂/閃爍；
@@ -85,14 +86,6 @@ class CandidatePanelController(
             return
         }
         activeGroup = 0
-        showFollowingBar()
-    }
-
-    /** 開面板時跟隨候選條第一條的讀音（而不是永遠第 0 組）。 */
-    private var followBarOnNextSubmit = false
-
-    fun showFollowingBar() {
-        followBarOnNextSubmit = true
         show()
     }
 
@@ -128,17 +121,17 @@ class CandidatePanelController(
         val inputChanged = next.input != lastInput
         if (inputChanged) lastInput = next.input
 
-        if (followBarOnNextSubmit) {
-            // 剛打開面板：與候選條第一條對齐（避免「條上是 nzin、面板開在 nzi」）。
-            followBarOnNextSubmit = false
-            activeGroup = preferredGroup(next)
-        } else if (inputChanged) {
-            // 新按鍵/新輸入：預設跟隨候選條第一條所在的組。
-            activeGroup = preferredGroup(next)
+        if (inputChanged) {
+            // 新按鍵 / 新輸入：一律回第 0 組（面板左列的「推薦」）——
+            // 不再跟候選條第一條的讀音對齊（用戶 2026-11-11 定案：取消滾動定位）。
+            activeGroup = 0
         } else {
             // 連續消費：input 不變、groups 變了；當前讀音還在就保持，否則回第 0 組。
-            val keep = if (previousReading != null) {
-                next.groups.indexOfFirst { it.reading == previousReading }
+            // 推薦組（reading 為空）不參與保持，否則逐段選字時會一直卡在推薦。
+            val keep = if (!previousReading.isNullOrEmpty()) {
+                next.groups.indexOfFirst {
+                    it.reading == previousReading && it.segment != RECOMMEND_SEGMENT
+                }
             } else {
                 -1
             }
@@ -153,23 +146,6 @@ class CandidatePanelController(
         if (!isShown) return
         // 不 scroll：DiffUtil 原地更新，保持用戶當前滾動位置。
         render(scrollGrid = false, scrollGroups = false)
-    }
-
-    /**
-     * 展開時默認選中的組。
-     *
-     * 分詞（`'`）輸入時 [TwelveKeySnapshot.groups] 前面是「按段選字」的字典組，
-     * 它們才是用戶當下要操作的部分 —— 若按候選條第一條去選，會落到某個引擎組，
-     * 看起來像「按段選字沒生效」。所以有段組時直接選第一個段組。
-     */
-    private fun preferredGroup(next: TwelveKeySnapshot): Int {
-        val segmentGroup = next.groups.indexOfFirst { it.segment >= 0 }
-        if (segmentGroup >= 0) return segmentGroup
-        val first = next.barEntries.firstOrNull() ?: return 0
-        val idx = next.groups.indexOfFirst { group ->
-            group.items.any { it.index == first.index && it.text == first.text }
-        }
-        return if (idx >= 0) idx else 0
     }
 
     private fun pickGroup(group: CandidateGroupAdapter.GroupItem) {

@@ -207,13 +207,31 @@ object TwelveKeySnapshotBuilder {
         // 只剩最後一段時，用引擎候選（引擎本身按詞頻/用戶詞庫排序）再疊用戶關聯度，
         // 而不是繼續用字典順序 —— 否則「最後一個字」看起來完全不受詞頻影響（用戶 2026-11-09 反饋）。
         val barEntries = barList(ordered)
+        // 候選條放不下的續頁 → 面板左列第一個「推薦」組（用戶 2026-11-11 定案）。
+        // 順序與候選條同源（[CandidateRanking.fullBarOrder]），起點是候選條之後的那一條：
+        // 這樣連「被 4 條詞組配額擠掉的第 5..N 個詞」也一起收進來，而不是只剩單字續頁。
+        val recommend = recommendFrom(ordered)
+        // 推薦組固定排左列第一（reading 為空 + [RECOMMEND_SEGMENT] 標記）；空的就不插，
+        // 這樣「候選全上了條」時段組自然回到第 0 組。
+        val groupsWithRecommend = if (recommend.isEmpty()) {
+            groups
+        } else {
+            listOf(
+                SyllableGroup(
+                    reading = "",
+                    syllables = emptyList(),
+                    items = recommend,
+                    segment = RECOMMEND_SEGMENT,
+                ),
+            ) + groups
+        }
         // 預覽文字與候選條第 0 條同源：一次算好，隨快照發佈。
         val previewText = barEntries.firstOrNull { it.text.isNotEmpty() }?.text ?: ""
         // 已選前綴（librime context 裡尚未 commit 的字）+ 第一條候選 = 嵌入式預覽全文
         // App 側暫存的字（兜底逐段選字）也要算進嵌入式預覽，否則選中的字在輸入框裡看不到。
         val inlineText = TwelveKeyPreedit.pendingPrefix +
             runCatching { Rime.getCompositionPrefix() }.getOrDefault("") + previewText
-        val fallback = if (groups.isEmpty() && remaining.isNotEmpty()) {
+        val fallback = if (groupsWithRecommend.isEmpty() && remaining.isNotEmpty()) {
             val raw = remaining.takeLast(MAX_FALLBACK_CODE)
             Fallback(rawCode = raw, letters = if (mapFallbackLetters) toLetters(raw) else raw)
         } else {
@@ -226,10 +244,11 @@ object TwelveKeySnapshotBuilder {
             input = input,
             consumedEnd = consumedEnd,
             remaining = remaining,
-            groups = groups,
+            groups = groupsWithRecommend,
             fallback = fallback,
             degradedToSinglePage = degraded,
             barEntries = barEntries,
+            recommend = recommend,
             previewText = previewText,
             inlineText = inlineText,
         )
@@ -510,4 +529,30 @@ object TwelveKeySnapshotBuilder {
 
     private fun barList(ranked: List<CandidateItem>): List<CandidateItem> =
         CandidateRanking.rankBar(ranked, BAR_ITEMS)
+
+    /**
+     * 面板「推薦」組的內容 = 候選條放不下的續頁。
+     *
+     * 純函數（便於單測）：與候選條共用 [CandidateRanking.fullBarOrder] 的順序，只取第
+     * `BAR_ITEMS+1` 條起的前 [TwelveKeyTuning.RECOMMEND_ITEMS] 條。
+     * 關鍵：必須用 `fullBarOrder` 而不是 `rankBar` 的結果 `drop`，否則被 4 條詞組配額
+     * 擠掉的第 5..N 個詞會永遠看不到（用戶 2026-11-11 定案要收進推薦）。
+     */
+    internal fun recommendFrom(ordered: List<CandidateItem>): List<CandidateItem> {
+        val order = CandidateRanking.fullBarOrder(ordered)
+        if (order.isEmpty()) return order
+        // 注意：不能用 `order.drop(BAR_ITEMS)` —— 候選條除「總條數 12」外還有「詞組區 ≤4」的配額，
+        // 被配額擠掉的第 5..N 個詞在 order 的前 12 條裡，`drop(12)` 會把它們一起跳過，
+        // 於是「推薦」就只剩單字續頁。這裡按「不在候選條裡」取補集。
+        val onBar = CandidateRanking.rankBar(ordered, BAR_ITEMS).mapTo(HashSet()) { it.text }
+        val rest = order.filterNot { onBar.contains(it.text) }
+        // 布局與候選條同源（用戶 2026-11-11）：詞組在前、單字在後；差別是詞組配額放寬到
+        // 「最多佔一半」（條上是 12 條裡的 4 條），其餘位置留給單字。
+        val words = rest.filter { CandidateRanking.isCjkWord(it.text) }
+        val singles = rest.filterNot { CandidateRanking.isCjkWord(it.text) }
+        // 特例與候選條一致：完全沒有單字時，詞組才可以佔滿整個推薦組。
+        if (singles.isEmpty()) return words.take(TwelveKeyTuning.RECOMMEND_ITEMS)
+        val wordCap = TwelveKeyTuning.RECOMMEND_ITEMS / 2
+        return (words.take(wordCap) + singles).take(TwelveKeyTuning.RECOMMEND_ITEMS)
+    }
 }

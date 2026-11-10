@@ -16,6 +16,14 @@ package com.hazukieq.hkrime.core.twelvekey
  */
 const val SYNTHETIC_SEGMENT = -2
 
+/**
+ * 展開面板「推薦」組的 [SyllableGroup.segment] 標記。
+ *
+ * 推薦組 = 候選條放不下的續頁（`fullBarOrder` 第 13 條起，見 [TwelveKeyTuning.RECOMMEND_ITEMS]），
+ * 它沒有讀音（reading 為空），在左列固定排第一。用負數與段組（>=0）、合成候選（-2）區分。
+ */
+const val RECOMMEND_SEGMENT = -3
+
 data class CandidateItem(
     val text: String,
     val comment: String,
@@ -63,6 +71,11 @@ data class TwelveKeySnapshot(
     val fallback: Fallback?,
     val degradedToSinglePage: Boolean = false,
     val barEntries: List<CandidateItem> = emptyList(),
+    /**
+     * 候選條放不下的續頁（按 [barEntries] 同一套排序的第 13 條起，最多
+     * [TwelveKeyTuning.RECOMMEND_ITEMS] 條），面板左列「推薦」組的內容。
+     */
+    val recommend: List<CandidateItem> = emptyList(),
     /**
      * 嵌入式預覽（inline preview）要顯示的文字。
      *

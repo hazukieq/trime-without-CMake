@@ -46,21 +46,37 @@ object CandidateRanking {
         barSize: Int = 12,
         wordSlots: Int = TwelveKeyTuning.BAR_WORD_SLOTS,
     ): List<CandidateItem> {
+        val order = fullBarOrder(ranked)
+        if (order.isEmpty()) return order
+        val words = order.filter { isCjkWord(it.text) }
+        val others = order.filterNot { isCjkWord(it.text) }
+        // 特例（用戶 2026-11-11 原話）：**完全沒有單字時**，詞組才可以佔滿整條候選條
+        // —— 只要存在任何單字（含 ASCII/顏文字等非詞組候選），詞組區仍然嚴格 ≤ wordSlots，
+        // 即使候選條因此變短也不拿詞組去補（用戶明確：不做「單字不夠就補詞」的推廣）。
+        if (others.isEmpty()) {
+            return order.take(barSize).filter { it.text.isNotEmpty() }
+        }
+        val head = if (wordSlots > 0) words.take(wordSlots) else emptyList()
+        return (head + others).take(barSize).filter { it.text.isNotEmpty() }
+    }
+
+    /**
+     * 詞/字的最終順序（候選條與面板「推薦」組的**唯一來源**）：去重 → 全部詞 → 全部單字，
+     * 各段保持 [ranked] 內的相對順序。
+     *
+     * 為什麼不直接拿 [rankBar] 的結果 `drop(12)`：`rankBar` 會把第 5 個起的詞丟掉
+     * （詞組區嚴格 ≤ `wordSlots`），那些詞如果只靠候選條，就永遠看不到；
+     * 面板「推薦」組要把「放不下的續頁」連同這些超額詞一起收進去（用戶 2026-11-11 定案）。
+     */
+    fun fullBarOrder(ranked: List<CandidateItem>): List<CandidateItem> {
         if (ranked.isEmpty()) return ranked
         // 候選條不顯示 comment，同一個詞出現兩次就是「重複詞條」（用戶 2026-11-11 報）。
         // 引擎本身也可能重複（userdb + custom_phrase 各學一份），這裡按文字去重、保留先出現的那條。
         val deduped = ranked.distinctBy { it.text }
         val words = ArrayList<CandidateItem>(deduped.size)
-        val others = ArrayList<CandidateItem>(ranked.size)
+        val others = ArrayList<CandidateItem>(deduped.size)
         deduped.forEach { if (isCjkWord(it.text)) words.add(it) else others.add(it) }
-        // 特例（用戶 2026-11-11 原話）：**完全沒有單字時**，詞組才可以佔滿整條候選條
-        // —— 只要存在任何單字（含 ASCII/顏文字等非詞組候選），詞組區仍然嚴格 ≤ wordSlots，
-        // 即使候選條因此變短也不拿詞組去補（用戶明確：不做「單字不夠就補詞」的推廣）。
-        if (others.isEmpty()) {
-            return words.take(barSize).filter { it.text.isNotEmpty() }
-        }
-        val head = if (wordSlots > 0) words.take(wordSlots) else emptyList()
-        return (head + others).take(barSize).filter { it.text.isNotEmpty() }
+        return if (others.isEmpty()) words else words + others
     }
 
     /**

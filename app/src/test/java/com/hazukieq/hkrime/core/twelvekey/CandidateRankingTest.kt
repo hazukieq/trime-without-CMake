@@ -472,4 +472,87 @@ class CandidateRankingTest {
         val ordered = CandidateRanking.orderGroups(groups, { 0 }, { 0 })
         assertEquals(groups.map { it.reading }, ordered.map { it.reading })
     }
+
+    // ------------------------------------------------------------------ 推薦組（候選條續頁）
+
+    @Test
+    fun `fullBarOrder puts all words before all singles and keeps relative order`() {
+        val ranked = listOf(
+            item("以", index = 0),
+            item("你好", index = 1),
+            item("爾雅", index = 2),
+            item("吧", index = 3),
+        )
+        assertEquals(listOf("你好", "爾雅", "以", "吧"), CandidateRanking.fullBarOrder(ranked).map { it.text })
+    }
+
+    @Test
+    fun `fullBarOrder dedupes by text keeping the first occurrence`() {
+        val ranked = listOf(
+            item("你好", index = 0),
+            item("以", index = 1),
+            item("你好", index = 2),
+        )
+        assertEquals(listOf("你好", "以"), CandidateRanking.fullBarOrder(ranked).map { it.text })
+    }
+
+    @Test
+    fun `recommend is the page after the bar and keeps words the bar dropped`() {
+        // 8 個詞 + 10 個單字：候選條只留 4 詞 + 8 字（12 條），第 5..8 個詞必須出現在推薦裡。
+        val wordTexts = listOf("你好", "爾雅", "學校", "電話", "電腦", "時間", "朋友", "老師")
+        val singleTexts = listOf("以", "夜", "就", "也", "有", "在", "要", "這", "呀", "真")
+        val words = wordTexts.mapIndexed { i, t -> item(t, index = i) }
+        val singles = singleTexts.mapIndexed { i, t -> item(t, index = 100 + i) }
+        val ordered = words + singles
+        val bar = CandidateRanking.rankBar(ordered, 12, 4)
+        val recommend = TwelveKeySnapshotBuilder.recommendFrom(ordered)
+        assertEquals(wordTexts.take(4), bar.take(4).map { it.text })
+        // 推薦第一條就是被詞組配額擠掉的「詞5」
+        assertEquals(wordTexts.drop(4), recommend.take(4).map { it.text })
+        // 推薦與候選條零重叠；條拿走 4 詞 + 8 字之後，剩下的單字續頁也在
+        assertTrue(bar.map { it.text }.toSet().intersect(recommend.map { it.text }.toSet()).isEmpty())
+        assertEquals(singleTexts.drop(8), recommend.drop(4).map { it.text })
+    }
+
+    @Test
+    fun `recommend is empty when everything fits in the bar`() {
+        val ordered = listOf(item("以", index = 0), item("夜", index = 1))
+        assertTrue(TwelveKeySnapshotBuilder.recommendFrom(ordered).isEmpty())
+    }
+
+    @Test
+    fun `recommend is capped by RECOMMEND_ITEMS`() {
+        val singles = (1..200).map { item("字$it", index = it) }
+        assertEquals(
+            TwelveKeyTuning.RECOMMEND_ITEMS,
+            TwelveKeySnapshotBuilder.recommendFrom(singles).size,
+        )
+    }
+
+    @Test
+    fun `recommend keeps words first but caps them at half of the slots`() {
+        // 40 個詞 + 40 個單字：條上拿走 4 詞 + 8 字；推薦裡詞最多 18 條（36 的一半），其餘給單字。
+        fun cjk(n: Int): Char = (0x4E00 + n).toChar()
+        val wordTexts = (1..40).map { "${cjk(it)}${cjk(it + 200)}" }
+        val singleTexts = (1..40).map { "${cjk(it + 400)}" }
+        val ordered = wordTexts.mapIndexed { i, t -> item(t, index = i) } +
+            singleTexts.mapIndexed { i, t -> item(t, index = 100 + i) }
+        val recommend = TwelveKeySnapshotBuilder.recommendFrom(ordered)
+        assertEquals(TwelveKeyTuning.RECOMMEND_ITEMS, recommend.size)
+        val words = recommend.filter { CandidateRanking.isCjkWord(it.text) }
+        val singles = recommend.filterNot { CandidateRanking.isCjkWord(it.text) }
+        // 詞組在前、單字在後，且詞組不超過一半
+        assertEquals(words.map { it.text }, recommend.take(words.size).map { it.text })
+        assertEquals(TwelveKeyTuning.RECOMMEND_ITEMS / 2, words.size)
+        assertEquals(TwelveKeyTuning.RECOMMEND_ITEMS / 2, singles.size)
+    }
+
+    @Test
+    fun `recommend lets words fill everything when there is no single char`() {
+        fun cjk(n: Int): Char = (0x4E00 + n).toChar()
+        val words = (1..50).map { i -> item("${cjk(i)}${cjk(i + 200)}", index = i) }
+        val recommend = TwelveKeySnapshotBuilder.recommendFrom(words)
+        assertTrue(recommend.all { CandidateRanking.isCjkWord(it.text) })
+        assertEquals(TwelveKeyTuning.RECOMMEND_ITEMS, recommend.size)
+    }
 }

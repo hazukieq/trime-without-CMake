@@ -3056,3 +3056,56 @@ rime 的 userdb 寫入先進 leveldb 的 `log::Writer`（默認 64KB 用戶態�
      所以新分支在結構上幾乎不可能命中，只在「候選條過期」這種邊角生效。
   2. 同文異讀時走引擎 = 按引擎的讀音記，未必是使用者要的那條。
   3. 用戶判斷「兩個（埋點、分支）都不需要」，放棄該方案；代碼保持現狀。
+
+## 15.66 展開面板「推薦」組：候選條放不下的續頁（2026-11-11）
+
+### 15.66.1 為什麼
+
+固定候選條一頁只有 12 條，而且詞組區嚴格 ≤4 條（§15.64.2）。這造成**兩處永久丟棄**：
+第 5 個及以後的詞（即使條上還有空位）、第 13 條起的單字。展開面板左列是「按讀音的索引」，
+被丟掉的詞從來沒進過任何一組，等於永遠看不到。
+
+用戶 2026-11-11 提出：把放不下的詞組和單字收進展開面板左列**第一個**條目「推薦」，並取消
+面板的滾動定位。補充定案（同日 01:31）：
+
+1. 推薦**永遠與當前按鍵相關**（隨每次按鍵重算，不是固定清單）；
+2. 顯示與候選條同規則：**詞組優先、單字次之**；
+3. 但詞組**最多只佔一半**（候選條是 12 條裡的 4 條，推薦放寬到 36 條裡的 18 條）。
+
+### 15.66.2 規則
+
+- 排序唯一來源：`CandidateRanking.fullBarOrder(ranked)` = 去重 → 全部詞 → 全部單字（各段保持
+  `ranked` 相對順序）。候選條 `rankBar` 與推薦 `recommendFrom` 都從這裡派生，規則不會漂移。
+- 推薦 = `fullBarOrder` 中**不在候選條裡**的項目（補集），詞組最多 `RECOMMEND_ITEMS / 2 = 18` 條，
+  其餘位置給單字，總數 ≤ `RECOMMEND_ITEMS = 36`。
+- **不能寫成 `fullBarOrder.drop(12)`**：候選條除「總 12 條」外還有「詞組區 ≤4」的配額，
+  被配額擠掉的第 5..N 個詞正好落在 `order` 的前 12 條裡，`drop(12)` 會連它們一起跳過
+  （單測 `recommend is the page after the bar and keeps words the bar dropped` 守住這條）。
+- 特例與候選條一致：**完全沒有單字時**，詞組可以佔滿整個推薦組。
+- 推薦為空（候選全上了條）時不插這一組，段組自然回到第 0 組。
+
+常量：`TwelveKeyTuning.RECOMMEND_ITEMS = 36`（面板網格可視約 3 行×4 列 = 3 屏；調大露得更全
+但翻頁變多、DiffUtil 變慢；調小又會被擠回「看不到」）。
+
+### 15.66.3 面板行為
+
+- 快照新增 `recommend: List<CandidateItem>`；`groups` 最前插入
+  `SyllableGroup(reading = "", items = recommend, segment = RECOMMEND_SEGMENT)`，`RECOMMEND_SEGMENT = -3`
+  （與段組 `>=0`、合成候選 `-2` 區分）。左列 `reading` 為空 → 顯示「推薦」+ 條數。
+- **取消跟候選條對齊**：刪掉 `CandidatePanelController.showFollowingBar()/followBarOnNextSubmit/preferredGroup()`，
+  開面板與每次新按鍵一律 `activeGroup = 0`（推薦）。
+- **保留**「連續消費保持當前組」（`previousReading` 命中就留在原組），否則逐段選字時每選一個字
+  面板都跳回推薦、要重新點段組；推薦組（reading 空）不參與保持。
+- 點擊路徑零改動：推薦項目的 `index` 就是引擎全局下標（合成候選仍帶 `SYNTHETIC_SEGMENT`），
+  沿用 `selectCandidate` / `commitPhrase`。
+
+### 15.66.4 驗收
+
+- 單測 +7（`fullBarOrder` 順序/去重、推薦=條後補集且含第 5 個詞、上限 36、全塞得下時為空、
+  詞組≤一半、無單字時詞佔滿、`rankBar` 語義不變）；全倉 **112 tests / 0 failures**。
+- perf-gate PASS（build_p90 37.4ms、latency_p90 58.4ms；首輪冷啟樣本曾超標，暖機後穩定）。
+- 真機（vivo V2520A / Keep 搜索框）：
+  - `8`（zj，j/z 開頭）→ 推薦 = j/z 開頭單字（用 做 又 再 找 中 走 者 一 着 与 转），隨鍵變化；
+  - `88`（ji jen，全是詞）→ 推薦 = 條上 6 條之後的續頁詞（指針 走走 要用 依然 遠弈…）；
+  - `5i34i`（kiung，詞+字混合）→ 推薦 = 詞（棄兒 琪兒）在前、單字（鍪 溜 邱 柳…）在後；
+  - 開面板恆落「推薦」（截圖 `artifacts/12key/verify/recommend-group-words.png`、`recommend-group-mixed.png`）。

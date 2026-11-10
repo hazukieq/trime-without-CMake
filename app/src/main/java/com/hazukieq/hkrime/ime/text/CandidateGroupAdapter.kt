@@ -145,7 +145,9 @@ class CandidateGroupAdapter(
         (holder.bar.background as GradientDrawable).setColor(
             if (item.selected) barColor else Color.TRANSPARENT,
         )
-        holder.text.text = item.reading
+        // 推薦組（候選條放不下的續頁）沒有讀音，左列顯示「推薦」；其餘照舊顯示拼音。
+        val label = if (item.reading.isBlank()) "推薦" else item.reading
+        holder.text.text = label
         holder.text.setTextColor(
             when {
                 item.converted -> withAlpha(ink, 0.38f)
@@ -162,7 +164,7 @@ class CandidateGroupAdapter(
         holder.root.setOnClickListener { onPick(item) }
         holder.root.isClickable = !item.converted
         holder.root.contentDescription =
-            if (item.count > 0) "${item.reading} ${item.count}" else item.reading
+            if (item.count > 0) "$label ${item.count}" else label
     }
 
     private fun dp(value: Float): Int = (value * density).toInt()
