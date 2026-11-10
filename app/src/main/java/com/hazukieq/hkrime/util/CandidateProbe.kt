@@ -59,7 +59,14 @@ object CandidateProbe {
             }.onFailure { out.append("deploy ERROR: ").append(it).append('\n') }
             out.append("deploy: done\n")
         }
-        codes.filterNot { it.startsWith("!") }.forEach { code ->
+        // `@li nak si` = 直接問詞典（不走輸入法譯碼路徑），看詞條到底在不在表裡
+        codes.filter { it.startsWith("@") }.forEach { line ->
+            val spaced = line.removePrefix("@").trim()
+            out.append("--- dict probe: ").append(spaced).append(" ---\n")
+            out.append(runCatching { Rime.probe_dict(spaced) }.getOrElse { "probe ERROR: $it" })
+            out.append('\n')
+        }
+        codes.filterNot { it.startsWith("!") || it.startsWith("@") }.forEach { code ->
         out.append("request=").append(code).append('\n')
         runCatching {
             Rime.clearComposition()

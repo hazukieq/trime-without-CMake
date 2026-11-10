@@ -1036,6 +1036,12 @@ public class Rime {
 
   public static native boolean start_maintenance(boolean full_check);
 
+  /**
+   * 診斷用：直接問詞典「這個音節序列（空格分隔，如 "li nak si"）建表時收進去了嗎、
+   * prism 認不認這些拼寫」。只在 debug 排查用（對應 librime ProbeDictEntry）。
+   */
+  public static native String probe_dict(String spacedSyllables);
+
   public static native boolean is_maintenance_mode();
 
   public static native void join_maintenance_thread();
