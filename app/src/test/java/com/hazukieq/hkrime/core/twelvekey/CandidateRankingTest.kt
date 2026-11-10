@@ -72,6 +72,67 @@ class CandidateRankingTest {
     }
 
     @Test
+    fun `rankBar caps the word zone and fills the rest with single chars`() {
+        // 用戶 2026-11-11：左邊詞組區嚴格 ≤ 4 條，右邊單字區（單字不再被詞組擠掉）
+        val wordTexts = listOf("山水", "風雨", "日月", "江河", "雲霧", "星辰", "花草", "樹木", "鳥獸")
+        val singleTexts = listOf("水", "風", "月", "河", "霧", "星", "花", "木", "鳥")
+        val words = wordTexts.mapIndexed { i, w -> item(w, index = i) }
+        val singles = singleTexts.mapIndexed { i, ch -> item(ch, index = 100 + i) }
+        val bar = CandidateRanking.rankBar(words + singles, barSize = 12)
+        // 詞組區嚴格 4 條（超額詞組不進候選條）
+        assertEquals(wordTexts.take(4), bar.take(4).map { it.text })
+        assertEquals(12, bar.size)
+        // 第 5 條起全部是單字，且保持原順序
+        assertEquals(singleTexts.take(8), bar.drop(4).map { it.text })
+    }
+
+    // ---- 候選條佈局的全部 case（用戶 2026-11-11：不能只假設最佳情況）----------------
+
+    @Test
+    fun `rankBar with only singles keeps them all`() {
+        val singles = (1..12).map { item("字$it", index = it) } // 注意：含數字 → 不算詞
+        val bar = CandidateRanking.rankBar(singles, barSize = 12)
+        assertEquals(singles.map { it.text }, bar.map { it.text })
+    }
+
+    @Test
+    fun `rankBar with only words shows at most word slots and nothing else`() {
+        // 純詞輸入（詞庫裡沒有對應單字候選）：詞組區嚴格 4 條，其餘不進候選條（面板仍可見）
+        val words = listOf("山水", "風雨", "日月", "江河", "雲霧", "星辰").mapIndexed { i, w ->
+            item(w, index = i)
+        }
+        val bar = CandidateRanking.rankBar(words, barSize = 12)
+        assertEquals(listOf("山水", "風雨", "日月", "江河"), bar.map { it.text })
+    }
+
+    @Test
+    fun `rankBar respects word slots when bar size is smaller`() {
+        val words = listOf("山水", "風雨", "日月").mapIndexed { i, w -> item(w, index = i) }
+        val singles = listOf("水", "風", "月").mapIndexed { i, ch -> item(ch, index = 10 + i) }
+        val bar = CandidateRanking.rankBar(words + singles, barSize = 2)
+        assertEquals(listOf("山水", "風雨"), bar.map { it.text })
+    }
+
+    @Test
+    fun `rankBar with fewer words than slots fills the rest with singles`() {
+        val bar = CandidateRanking.rankBar(
+            listOf(item("山水", index = 0), item("水", index = 1), item("風", index = 2)),
+            barSize = 12,
+        )
+        assertEquals(listOf("山水", "水", "風"), bar.map { it.text })
+    }
+
+    @Test
+    fun `rankBar on empty or blank input returns what remains`() {
+        assertEquals(emptyList<CandidateItem>(), CandidateRanking.rankBar(emptyList(), barSize = 12))
+        // 全是空文字：過濾後為空
+        assertEquals(
+            emptyList<CandidateItem>(),
+            CandidateRanking.rankBar(listOf(item("", index = 0), item("", index = 1)), barSize = 12),
+        )
+    }
+
+    @Test
     fun `rankBar keeps engine order among single chars`() {
         val ranked = (1..20).map { item("字$it", index = it) }
         val bar = CandidateRanking.rankBar(ranked, barSize = 12)
@@ -230,8 +291,8 @@ class CandidateRankingTest {
         val engine = singles.mapIndexed { i, ch -> item(ch, comment = "ji", index = i) } +
             words.mapIndexed { i, w -> item(w, comment = "ji ji", index = 100 + i) }
         val bar = CandidateRanking.rankBar(engine, barSize = 9)
-        // 前 N 條必須全是詞組（詞組數量不足時才輪到單字）
-        val groupCut = minOf(words.size, bar.size)
+        // 前 N 條必須全是詞組（詞組區上限 4；詞組數量不足時才輪到單字）
+        val groupCut = minOf(words.size, TwelveKeyTuning.BAR_WORD_SLOTS, bar.size)
         bar.take(groupCut).forEach { assertTrue("候選條前段應是詞組：${bar.map { it.text }}", CandidateRanking.isCjkWord(it.text)) }
         // 字表順序在單字之間保持
         val barSingles = bar.filter { !CandidateRanking.isCjkWord(it.text) }.map { it.text }

@@ -31,12 +31,28 @@ object CandidateRanking {
     }
 
     /**
-     * 固定候選區最終列表：詞組優先 → 取前 [barSize] 條 → 去掉空文字。
+     * 固定候選區最終列表：**左邊詞組區（嚴格 ≤[wordSlots] 條）+ 右邊單字區** → 取前 [barSize] 條。
+     *
+     * 用戶 2026-11-11：詞組優先不變（永遠在左），但數量要嚴格限制 —— 否則多音節輸入時
+     * 整個候選條被詞組佔滿，高頻單字一個都露不出來（24 鍵輸入實測「共产党 共产 理会 柳眉 球迷」全是詞）。
+     * 超額的詞組不進候選條（仍留在 [ranked] 裡，展開面板看得到）。
      *
      * @param ranked 已按「引擎詞頻 / 用戶記憶 / 關聯度」排好的候選（順序即最終順序）
+     * @param barSize 候選條總條數（詞組區 + 單字區）
+     * @param wordSlots 詞組區上限（見 [TwelveKeyTuning.BAR_WORD_SLOTS]）
      */
-    fun rankBar(ranked: List<CandidateItem>, barSize: Int = 12): List<CandidateItem> =
-        wordsFirst(ranked).take(barSize).filter { it.text.isNotEmpty() }
+    fun rankBar(
+        ranked: List<CandidateItem>,
+        barSize: Int = 12,
+        wordSlots: Int = TwelveKeyTuning.BAR_WORD_SLOTS,
+    ): List<CandidateItem> {
+        if (ranked.isEmpty()) return ranked
+        val words = ArrayList<CandidateItem>(ranked.size)
+        val others = ArrayList<CandidateItem>(ranked.size)
+        ranked.forEach { if (isCjkWord(it.text)) words.add(it) else others.add(it) }
+        val head = if (wordSlots > 0) words.take(wordSlots) else emptyList()
+        return (head + others).take(barSize).filter { it.text.isNotEmpty() }
+    }
 
     /**
      * 展開面板右側「音節 → 漢字」列表排序：
