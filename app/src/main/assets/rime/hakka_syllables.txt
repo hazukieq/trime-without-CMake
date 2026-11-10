@@ -1,7 +1,7 @@
 # 客家話合法音節標準集（定稿：JS 源檔 ∪ hakka.dict.yaml 自帶音節）
 #   權威來源 Hkdict/neo-frontend/src/data/hakkaSyllables.js；
 #   用戶 2026-11-11 定稿：「字典并入后的就是标准集」（JS 源檔漏收 ji 等，已確認屬人為遺漏）。
-# 共 842 個 = JS 787 ∪ 詞典 695 ∪ 補遺 0（由 panel_probe.py build-syllables 生成；App 側仍是本檔 ∪ 詞典的運行時並集）。
+# 共 841 個 = JS 787 ∪ 詞典 694 ∪ 補遺 0（由 panel_probe.py build-syllables 生成；App 側仍是本檔 ∪ 詞典的運行時並集）。
 ba
 bai
 bak
@@ -378,7 +378,6 @@ liu
 liuk
 liung
 lo
-lod
 loi
 lok
 lon

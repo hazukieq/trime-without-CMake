@@ -1,11 +1,11 @@
 # 詞典有、JS 標準集沒有的音節（審核記錄，已併入標準集）
 
 > **狀態：已審核結案（2026-11-11）**。用戶定稿：「字典并入后的就是标准集，就这么定了」——
-> 下表 55 個全部**已併入** `app/src/main/assets/rime/hakka_syllables.txt`（842 個）。
+> 下表 55 個全部**已併入** `app/src/main/assets/rime/hakka_syllables.txt`（841 個）。
 > 保留本檔作為審核憑證；JS 源檔漏收 `ji` 屬人為遺漏，已確認。
 
 JS 標準集：`Hkdict/neo-frontend/src/data/hakkaSyllables.js`（787 個）。
-定稿標準集 = JS 標準集 ∪ `hakka.dict.yaml` 自帶音節 = 842 個；下表即當年被漏掉的差集。
+定稿標準集 = JS 標準集 ∪ `hakka.dict.yaml` 自帶音節 = 841 個；下表即當年被漏掉的差集。
 
 共 **55** 個。詞表用例來自 `hakka.dict.yaml` 的 `import_tables`（9 份詞表），取前 2 條。
 

@@ -193,9 +193,9 @@ flowchart TD
 
 #### 7.2.0 只认**客家话音节集合**（2026-11-11 定，完整集 = 标准集 ∪ 词典音节）
 
-- **标准集（定稿，842 个）**：`app/src/main/assets/rime/hakka_syllables.txt`。
+- **标准集（定稿，841 个）**：`app/src/main/assets/rime/hakka_syllables.txt`。
   用户 2026-11-11 定稿：「**字典并入后的就是标准集，就这么定了**」——
-  842 = `Hkdict/neo-frontend/src/data/hakkaSyllables.js` 的 787 ∪ `hakka.dict.yaml` 自带的 695
+  841 = `Hkdict/neo-frontend/src/data/hakkaSyllables.js` 的 787 ∪ `hakka.dict.yaml` 自带的 694
   （JS 源档漏收 `ji` 等 55 个属人为遗漏，用户已审核确认）。用
   `python3 tools/panel_probe.py build-syllables` 重新生成（JS ∪ 词典 ∪ 可选补遗）；
 - App 运行时仍是「本档 ∪ 主词典音节」（`finishLoading()` 放词典、`loadSyllableSet()` 并入本档），
