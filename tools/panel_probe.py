@@ -983,23 +983,47 @@ def cmd_syllables(args, data: Data) -> None:
     unique = data.cumulative_unique(args.codes, args.min_len)
     if not args.no_stages:
         for length, prefix, rows in data.cumulative(args.codes, args.min_len):
-            seg0 = [g for g in rows if g["segment"] == 0]
-            others = [g for g in rows if g["segment"] != 0]
-            print(f"## {length} 键  {prefix}  → 单字组 {len(seg0)} + 联想/词行 {len(others)}")
-            if seg0:
-                print("   单字: " + " ".join(g["reading"] for g in seg0))
-            if others:
-                print("   联想: " + " ".join(g["reading"] for g in others))
-            stage_combos = data.initial_pattern_combos(prefix)
-            if stage_combos:
-                pattern = "  ".join("·".join(c) for c in stage_combos[:8])
-                more = "" if len(stage_combos) <= 8 else f" …共 {len(stage_combos)} 组"
-                print(f"   首字母组合 {len(stage_combos)} 组: {pattern}{more}")
-            words = data.prefix_word_rows(prefix)
-            if words:
+            print(f"## {length} 键  {prefix}")
+            # 1) 合成音节：整串码恰好是一个完整音节时（`ia` = ga/ha）
+            synth: list[str] = []
+            if data.is_single_syllable(prefix):
+                synth = list(
+                    dict.fromkeys(
+                        data.syllables_for_segment(prefix, 1_000_000, True, True, total_limit=1_000_000)
+                    )
+                )
+            print("   合成音节: " + (", ".join(synth) if synth else "（无）"))
+            # 2) 首字母组合（每键一个音节、元音自由；逐键累积）
+            combos = data.initial_pattern_combos(prefix)
+            shown = ", ".join("·".join(c) for c in combos[:8])
+            tail = "" if len(combos) <= 8 else f" …（共 {len(combos)} 组）"
+            print(f"   {length}键组合({len(combos)}): " + (shown + tail if combos else "（无）"))
+            # 3) 实际存在的词语：按组合 → 真实词条（行标题=具体读音）
+            words_by_combo: "OrderedDict[str, list[str]]" = OrderedDict()
+            for reading, words in data.initial_pattern_rows(prefix, max_rows=32):
+                combo = "·".join(t[0] for t in reading.split(" ")) if " " in reading else ""
+                combo = "·".join(t[0] for t in reading.split(" "))
+                words_by_combo.setdefault(combo, []).append(f"{reading}={','.join(words[:3])}")
+            if words_by_combo:
+                print("   实际存在词语:")
+                for combo, items in words_by_combo.items():
+                    print(f"     ({combo}) " + "；".join(items[:4]))
+            else:
+                print("   实际存在词语: （无）")
+            # 4) 联想行：合成音节选完之后的后缀联想（`ga` → `ga zi=挂纸`）
+            assoc_rows = [g for g in rows if g["segment"] == 1 and g.get("source") == "assoc"]
+            if assoc_rows:
                 print(
-                    "   词行: "
-                    + "；".join(f"{w['reading']}={'/'.join(w['items'][:3])}" for w in words)
+                    "   联想行(两音节，词典联想索引): "
+                    + ", ".join(f"{g['reading']}={','.join(g['items'][:2])}" for g in assoc_rows[:8])
+                    + (" …" if len(assoc_rows) > 8 else "")
+                )
+            # 5) 整串词行（多音节词条，未收敛）
+            word_rows = data.prefix_word_rows(prefix)
+            if word_rows:
+                print(
+                    "   整串词行: "
+                    + "；".join(f"{w['reading']}={','.join(w['items'][:3])}" for w in word_rows)
                 )
         print()
     print(f"# 码串 {args.codes!r} 累积去重后共 {len(unique)} 个读音（按首次出现的键数排序）")

@@ -513,6 +513,26 @@ python3 tools/panel_probe.py prefix "kl ghi mno abc kl ps"  # 等价 5i4a57（li
 python3 tools/panel_probe.py panel "kl ghi mno abc ps"      # 等价 5i4a7（li na s，查不到 Linux 是正常的）
 
 # 其余子命令（同样接受键名写法）
+python3 tools/panel_probe.py syllables "ghi abc"  # 逐键累积 + 分块输出（合成音节 / 首字母组合 / 真实词语 / 联想行 / 整串词行）
+
+# 输出分块（用户 2026-11-11 定的可读格式）：
+## 2 键  ia
+   合成音节: ga, ha
+   2键组合(4): g·b, g·c, h·b, h·c
+   实际存在词语:
+     (g·b) gang bung=挭嘣；get ben=结冰
+     (g·c) gan cak=惯尺；gat cok=刮凿
+     (h·b) ha boi=下背
+     (h·c) ha cun=下旬；han coi=苋菜
+   联想行(两音节，词典联想索引): gai dau=计倒, gau gan=高悭, ha boi=下背 …
+   整串词行: ga zi=挂纸；ha boi=下背
+# 各块的含义：
+#   合成音节   = 整串码恰好是一个完整音节（ia = ga/ha）
+#   N键组合    = 每键贡献的「可作音节首字母的字母」的笛卡尔积（元音自由；r 仅末键）
+#   实际存在词语 = 按组合首字母序列在词表里找到的真实词条（组合无词则跳过）
+#   联想行     = 两音节联想索引命中的行（ga → ga zi/挂纸 这类后缀联想）
+#   整串词行   = 整串码前缀命中的多音节词条（挂纸 ga zi，码 ia8i 以 ia 开头）
+
 python3 tools/panel_probe.py syllables 4i         # 段码 → 左列音节组（标 exact/prefix、切法、剩余码）
 python3 tools/panel_probe.py syllables "kl ghi mno abc kl ps"   # 逐键累积：2 键→3 键→…→整串，最后去重
 python3 tools/panel_probe.py syllables 5i4a57 --no-stages       # 只看去重汇总（+ 实际存在读音集）
