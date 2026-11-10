@@ -76,6 +76,28 @@ object CandidateProbe {
                 .append('\n')
             Thread.sleep(1200)
         }
+        // `!feed 5i4a57i` = 逐字餵鍵，印每個字符 onText 的返回值與當前 input（查「輸入被截斷」）
+        codes.filter { it.startsWith("!feed ") }.forEach { line ->
+            val text = line.removePrefix("!feed ").trim()
+            out.append("--- feed probe: ").append(text).append(" ---\n")
+            runCatching {
+                Rime.clearComposition()
+                for ((i, ch) in text.withIndex()) {
+                    val ok = Rime.onText(ch.toString())
+                    out.append("feed[").append(i).append("]='").append(ch)
+                        .append("' ok=").append(ok)
+                        .append(" input=").append(runCatching { Rime.RimeGetInput() }.getOrElse { "?" })
+                        .append('\n')
+                    // 模擬真實輸入：每鍵都取一次候選（真機鍵盤就是這麼刷新菜單的）
+                    runCatching { Rime.getCandidatesWithoutSwitch() }
+                }
+                val all = runCatching { Rime.enumerateCandidates(2000) }.getOrElse { emptyArray() }
+                out.append("feed candidates=").append(all.size)
+                    .append(" hasLinux=").append(all.any { it.contains("Linux") })
+                    .append('\n')
+                all.take(8).forEachIndexed { i, c -> out.append("  #").append(i).append(' ').append(c).append('\n') }
+            }.onFailure { out.append("feed ERROR: ").append(it).append('\n') }
+        }
         // `@li nak si` = 直接問詞典（不走輸入法譯碼路徑），看詞條到底在不在表裡
         codes.filter { it.startsWith("@") }.forEach { line ->
             val spaced = line.removePrefix("@").trim()
