@@ -290,4 +290,39 @@ class AssociatedWordsTest {
     fun `compositionPrefix ignores caret only preedit`() {
         assertEquals("", TwelveKeyPreedit.compositionPrefix("\u2038"))
     }
+
+    /** render()：preedit 的唯一入口（讀音來源 / 前綴 / 暫存 三件事的組合）。 */
+    @Test
+    fun `render prefers bar hint over engine hint`() {
+        TwelveKeyPreedit.preferredText = "共產"
+        TwelveKeyPreedit.preferredComment = "kiung than"
+        assertEquals("kiung than", TwelveKeyPreedit.render("5i34i w\u2038", "其它", "ki biet"))
+        TwelveKeyPreedit.preferredText = null
+        TwelveKeyPreedit.preferredComment = null
+    }
+
+    @Test
+    fun `render falls back to engine hint when bar snapshot is absent`() {
+        TwelveKeyPreedit.preferredText = null
+        TwelveKeyPreedit.preferredComment = null
+        assertEquals("kiung than", TwelveKeyPreedit.render("5i34i w\u2038", "共產", "kiung than"))
+    }
+
+    @Test
+    fun `render keeps selected prefix and appends pending first`() {
+        TwelveKeyPreedit.preferredText = null
+        TwelveKeyPreedit.preferredComment = null
+        TwelveKeyPreedit.pendingPrefix = "以"
+        // 已選前綴「以」保留；尾部碼 8 轉成本地解碼；暫存字在最前
+        val rendered = TwelveKeyPreedit.render("以8\u2038", "以", "ji")
+        assertTrue(rendered!!.startsWith("以"))
+        assertEquals("以", TwelveKeyPreedit.pendingPrefix.take(1))
+        TwelveKeyPreedit.pendingPrefix = ""
+    }
+
+    @Test
+    fun `render returns null when there is nothing to rewrite`() {
+        assertNull(TwelveKeyPreedit.render(null))
+        assertNull(TwelveKeyPreedit.render(""))
+    }
 }

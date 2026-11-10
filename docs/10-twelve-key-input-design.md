@@ -3109,3 +3109,36 @@ rime 的 userdb 寫入先進 leveldb 的 `log::Writer`（默認 64KB 用戶態�
   - `88`（ji jen，全是詞）→ 推薦 = 條上 6 條之後的續頁詞（指針 走走 要用 依然 遠弈…）；
   - `5i34i`（kiung，詞+字混合）→ 推薦 = 詞（棄兒 琪兒）在前、單字（鍪 溜 邱 柳…）在後；
   - 開面板恆落「推薦」（截圖 `artifacts/12key/verify/recommend-group-words.png`、`recommend-group-mixed.png`）。
+
+### 15.67 收口：不要把反饋算法伸進引擎；preedit 改單一入口（2026-11-11）
+
+#### 15.67.1 撤回「連引擎副本一起管」的改法（commit `7332d12` 反向修復 `9bbe231`）
+
+用戶定調：「**不能把手伸到 engine 部分，這會造成混亂**」——曝光/否決/清理這套 App 側算法
+**只適用於「App 記憶過、且引擎給不出」的創制詞**；引擎自己給的候選（含引擎 userdb 學到的）
+排序交給引擎，App 不覆蓋分數、不隱藏、不記曝光。`9bbe231` 裡給引擎條目打 `learnedCode`、
+覆蓋其排序、`dropTexts` 藏引擎副本、墓碑等做法全部撤回。
+
+保留的唯一修復：`PURGE_MAX_TYPED` 從 1 改成 2 —— 詞條要 `(typed + picked) ≥ MIN_COUNT(2)` 才會露面，
+寫 1 會讓「拼 2 次、看很多次沒人選」這種最常見誤造形態**永遠不滿足清理條件**（規則不可達）。
+
+#### 15.67.2 preedit 收成單一入口 `TwelveKeyPreedit.render()`
+
+原來的關聯散在兩邊：`Rime.getComposition()` 裡挑 hint（bar 首條 vs 引擎 menu 首條）、
+拼 pending 前綴、再調 `rewrite()`；`rewrite()` 裡又有 4 條規則（前綴保留／comment 優先／
+comment 不夠長時補原始碼／光標剝除）。改動任何一處都容易讓「preedit 讀音 ≠ 候選條第一條」重現
+（用戶 2026-11-11：「preedit 和候選區的關聯代碼維護性很差」）。
+
+現在：
+- `TwelveKeyPreedit.render(rawPreedit, engineText, engineComment)` 是**唯一入口**：
+  ① 讀音來源：App 快照發布的候選條第一條優先、引擎 menu 第一條兜底；
+  ② 改寫：保留已選前綴、尾部碼段轉拼音、comment 覆蓋不到時補原始碼；
+  ③ App 側暫存前綴拼最前；
+  ④ debug 日誌 `dbgpre:` 也在這裡打（Java 側不再有拼裝邏輯）。
+- `Rime.getComposition()` 的 12 鍵分支只剩：取引擎 menu 第一條 → 調 `render()` →
+  與原始 preedit 不同才寫回**返回給 UI 的副本**（`mContext.composition` 永不污染）。
+- 新增 4 條單測（bar 優先於引擎、無快照時退回引擎、暫存前綴拼接、空輸入回 null）；
+  全倉 **116 tests / 0 failures**。
+- 真機核對（日誌 `dbgpre ... decoded=` 與候選條第一條的 comment 逐個對齊）：
+  `5i34i w` → `kiung than`（共產）、`744 ii` → `son gi`（船寄）、
+  `834i ie9 yi4 4i4 5i34i e4 ie9` → `zung get nzin min kiung fo get`（中國人民共和國）。

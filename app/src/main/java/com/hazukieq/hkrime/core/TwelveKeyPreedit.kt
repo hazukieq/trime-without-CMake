@@ -692,6 +692,41 @@ object TwelveKeyPreedit {
      * @param preferred 首條候選的 comment（引擎精確拼音，可為 null）
      * @return 改寫後文本；若沒有可改寫的碼段（例如已全部選完 `咧`）回傳 null，保持 librime 原樣
      */
+    /**
+     * **preedit 的唯一入口**（Rime.getComposition() 只調用它，不再自己拼 hint/前綴）。
+     *
+     * 把「候選條第一條（App 排序）優先、引擎 menu 第一條兜底、App 暫存前綴、已選前綴、
+     * 尾部原始碼補齊」這幾件事收在一處，避免規則散落在 Java/Kotlin 兩邊漂移
+     * （用戶 2026-11-11：preedit 與候選區的關聯代碼維護性很差）。
+     *
+     * @param rawPreedit librime 原始 preedit（形如 `以8‸`）
+     * @param engineText 引擎 menu 第一條的文本（沒有 App 快照時的兜底）
+     * @param engineComment 引擎 menu 第一條的 comment
+     */
+    fun render(
+        rawPreedit: String?,
+        engineText: String? = null,
+        engineComment: String? = null,
+    ): String? {
+        if (rawPreedit.isNullOrEmpty() || table.isEmpty()) return null
+        // 1) 讀音來源：App 快照發布的「候選條第一條」優先（所見即所讀），否則退回引擎 menu 第一條。
+        val hasBarHint = !preferredText.isNullOrEmpty()
+        val hint = if (hasBarHint) preferredText else engineText
+        val preferred = if (hasBarHint) preferredComment else engineComment
+        // 2) 改寫（已選前綴保留、尾部碼段轉拼音、comment 不夠覆蓋時補原始碼）。
+        val decoded = rewrite(rawPreedit, hint, preferred) ?: rawPreedit
+        // 3) App 側暫存（兜底逐段選字，引擎候選裡沒有那些字）顯示在最前面。
+        val pending = pendingPrefix
+        val rendered = (if (pending.isNullOrEmpty()) "" else pending) + decoded
+        if (com.hazukieq.hkrime.BuildConfig.DEBUG) {
+            Timber.d(
+                "dbgpre: raw=[%s] hint=[%s] preferred=[%s] pending=[%s] decoded=[%s]",
+                rawPreedit, hint, preferred, pending, rendered,
+            )
+        }
+        return rendered
+    }
+
     fun rewrite(preedit: String?, hint: String? = null, preferred: String? = null): String? {
         if (preedit.isNullOrEmpty() || table.isEmpty()) return null
         // `‸`(U+2038) 是 librime 的光標標記，不屬於前綴也不屬於碼段，先整串剝掉再切。
