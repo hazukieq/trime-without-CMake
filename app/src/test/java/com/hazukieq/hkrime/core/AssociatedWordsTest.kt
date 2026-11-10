@@ -266,6 +266,19 @@ class AssociatedWordsTest {
      * 用戶 2026-11-11：打 `li nak s`（碼 `5i4a57`）時面板必須能出 `li nak si` → Linux。
      * 舊聯想索引只按前兩音節建 key，三音節詞打到第三節就查不到。
      */
+    /**
+     * 用戶 2026-11-11：真機 `hakka_zon.dict.yaml` 的寫法是 `Linux\tli nak si\t1000`（帶權重欄），
+     * 舊解析把權重算進最後一節 → 整串碼對不上輸入 → 面板查不到 Linux。
+     */
+    @Test
+    fun weightColumnInReadingDoesNotBreakLookup() {
+        TwelveKeyPreedit.loadWordLines(sequenceOf("Linux\tli nak si\t1000"))
+        TwelveKeyPreedit.finishWordIndex()
+        val rows = TwelveKeyPreedit.wordsByCodePrefix("5i4a57", 4, 6)
+        assertTrue("帶權重欄的詞條也要能查到：$rows",
+            rows.any { it.first == "li nak si" && "Linux" in it.second })
+    }
+
     @Test
     fun wordsByCodePrefixFindsThreeSyllableWord() {
         // assets 的 zon 詞表裡有 `网易云 / mong ji jun`（三音節）；`Linux / li nak si` 只在

@@ -270,9 +270,14 @@ object TwelveKeyPreedit {
             //  1) `詞<TAB>讀音`（hakka.dict / hakka_zon 這種）：讀音列直接可用，
             //     不必拿 charTable 反推——`Linux<TAB>li nak si` 這種**非漢字詞**也只能靠它；
             //  2) 純詞表（sougou/places/poems…）：只有詞面，用 charTable 反推前兩字讀音。
-            val reading = if (tab >= 0) line.substring(tab + 1).trim() else ""
+            // 第 2 欄是讀音，第 3 欄起是權重/頻次（`Linux\tli nak si\t1000`）——只取第 2 欄。
+            // 否則最後一節會變成 `si\t1000`，codeOf 出來的整串碼對不上輸入（用戶 2026-11-11：
+            // `li nak s` 面板沒有 Linux，根因正是權重欄污染了讀音）。
+            val reading = if (tab >= 0) line.substring(tab + 1).split('\t')[0].trim() else ""
             val syllables = if (reading.isNotEmpty()) {
-                reading.split(' ', '\u3000').filter { it.isNotEmpty() }
+                reading.split(' ', '\u3000')
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() && it.all(Char::isLetter) }
             } else {
                 if (word.length < 2) return@forEach
                 val r1 = charTable[word.substring(0, 1)] ?: return@forEach
