@@ -3297,3 +3297,53 @@ Abort message: 'terminating with uncaught exception of type
    兩處調用（字段初始化、`showPickerDialog` 刷新）都改走它。
 
 重編 `librime_jni.so`（`rime-jni/script/build.sh`）→ 裝到 `hkrime/app/libs/arm64-v8a/`。
+
+## 15.71 librime 日誌接進用戶目錄（2026-11-11）
+
+### 15.71.1 為什麼之前「部署日誌什麼都沒有」
+
+`rime-jni` 構建時 `ENABLE_LOGGING=OFF`（`build-arm64-v8a/CMakeCache.txt`），librime 的
+`LOG(INFO/ERROR)` 走 `no_logging.h` 宏 → **編譯期就是空操作**。所以
+`collecting entries from ...`、`dropping entry 'X' with invalid syllable: y`、
+`Pass 1: total N` 既不在 logcat、也不在任何文件 —— 查「詞典加詞不生效」時完全沒有線索。
+
+### 15.71.2 改法
+
+1. `rime-jni/CMakeLists.txt`：`ENABLE_LOGGING` 默認 **ON**，`add_subdirectory(librime/deps/glog)`，
+   補 `GLOG_USE_GLOG_EXPORT` / `GLOG_EXPORT=` / `GLOG_NO_EXPORT=` 定義，並把 glog 生成的
+   `<build>/librime/deps/glog` 加進 include 根（否則 `<glog/logging.h>` 找不到 `export.h`）。
+2. `cmake/FindGlog.cmake`：從空殼改成真的導出 `glog` target（librime 用單數變量
+   `${Glog_LIBRARY}`，兩個都要給）。
+3. `glue/rime_jni.cc`：`Rime_setup` 之後調 `rime::SetupLogging("hkrime", 0, <userDataDir>/logs)`，
+   因為 `RimeSetup` 內部那次 `SetupLogging(app_name)` 不帶目錄 → 默認寫 stderr（Android 丟棄）。
+4. `script/build.sh`：`-DENABLE_LOGGING=ON`。
+
+### 15.71.3 效果與用法
+
+部署後 `<userDataDir>/logs/` 出現 glog 文件：
+
+```
+com.hazukieq.hkrime.localhost.u0_a23.log.INFO.20261111-025645.30624.log
+com.hazukieq.hkrime.localhost.u0_a23.log.WARNING...
+com.hazukieq.hkrime.localhost.u0_a23.log.ERROR...
+```
+
+內容（實測一次重建）：
+
+```
+dict_compiler.cc:224   building table: /sdcard/hkrime/build/hakka.table.bin
+entry_collector.cc:58  collecting entries from /sdcard/hkrime/hakka_zon.dict.yaml
+entry_collector.cc:129 Pass 1: total 10637 entries collected.
+table.cc:340           num entries: 536084
+```
+
+用它查「某詞為什麼不進表」：先看 `collecting entries from <該詞典>` 有沒有出現，
+再看緊跟其後有沒有 `dropping entry '<詞>' with invalid syllable: <音節>`。
+
+### 15.71.4 已查到的事實（Linux 用例）
+
+一次完整重建（zon 3545 行，含 `Linux/linux li nak si 1000`）→ **無 `dropping entry`**、
+`num entries: 536084`，即**已收集進表**；但引擎對 `5i4a57i` 的全量候選（153 條）裡仍沒有 Linux。
+同文件 `chatgpt`（4 音節、ASCII）與 `猛劥`（2 音節）都能出 → 問題不在「非漢字」「多音節」，
+而在 `li nak si` 這個**拼寫序列的查詢路徑**（prism/segment 側），下一步用字典級 JNI 探針
+（`Dictionary::LookupWords` 直接查 `li nak si`）定位。
