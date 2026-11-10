@@ -177,6 +177,7 @@ object TwelveKeyPreedit {
         }.onFailure { Timber.w(it, "TwelveKeyPreedit: load char rank failed") }
 
         finishLoading(counts)
+        loadSyllableSet(context)
 
         // 兩字詞聯想索引（song gong 這類聯想行）——詞表只有詞條、沒有讀音，
         // 依賴上面 finishLoading 建好的 charTable 反推，所以必須放在它後面。
@@ -222,6 +223,39 @@ object TwelveKeyPreedit {
      *
      * 抽出來是為了單測：JVM 測試讀 assets 文件的行直接餵進來，驗證的正是 App 實際用的邏輯。
      */
+    /**
+     * 完整音節集 = **標準集（`assets/rime/hakka_syllables.txt`，787 個，來源
+     * `Hkdict/neo-frontend/src/data/hakkaSyllables.js`）∪ 主詞典自帶音節**。
+     *
+     * 用戶 2026-11-11 兩條指示：「最多最多的合法音节就是这么多了，请用这个标准集」→
+     * 「将 hakka.dict.yaml 所有音节并入标准集从而得到完整集」。詞表裡出現完整集之外音節
+     * （`li xing` 的 `xing`、`cn`、`打`…）的詞條整條丟棄；資產缺失時只用詞典音節。
+     */
+    private fun loadSyllableSet(context: Context) {
+        runCatching {
+            val text = context.assets.open("rime/hakka_syllables.txt")
+                .bufferedReader(Charsets.UTF_8).use { it.readText() }
+            val n = applySyllableSet(text)
+            Timber.i("TwelveKeyPreedit: syllables(total)=%d（標準集 ∪ 主詞典）", n)
+        }.onFailure { Timber.w(it, "TwelveKeyPreedit: canonical syllables missing, use dict set") }
+    }
+
+    /**
+     * 把標準集**并入** [syllableSet]（`finishLoading` 已先放進主詞典音節）；
+     * 返回并入後的總數（0 表示文本裡沒有音節，集合保持詞典音節不變）。
+     */
+    internal fun applySyllableSet(text: String): Int {
+        val parsed = LinkedHashSet<String>()
+        text.lineSequence().forEach { line ->
+            line.substringBefore('#').trim().split('\u0020', '\t')
+                .filter { it.isNotEmpty() && it.all(Char::isLetter) }
+                .forEach { parsed.add(it) }
+        }
+        if (parsed.isEmpty()) return 0
+        syllableSet.addAll(parsed)
+        return syllableSet.size
+    }
+
     internal fun loadDictLines(lines: Sequence<String>): HashMap<String, Int> {
         val counts = HashMap<String, Int>()
         lines.forEach { raw ->
@@ -515,6 +549,8 @@ object TwelveKeyPreedit {
         // 避免同一個碼位的音節被重複 append（會讓「輪轉取 limit 個」變少）。
         table.clear()
         codeToSyllables.clear()
+        // 音節集合的權威來源是 assets/rime/hakka_syllables.txt（見 [loadSyllableSet]）；
+        // 這裡先用詞典音節兜底，等 loadSyllableSet() 反手覆蓋（資產缺失時就只剩這份）。
         syllableSet.clear()
         syllableSet.addAll(counts.keys)
         counts.forEach { (syllable, freq) ->

@@ -191,7 +191,15 @@ flowchart TD
 
 ### 7.2 联想行（两音节，`associatedBySegmentCode` / `associatedByReading`）
 
-#### 7.2.0 只认**客家话音节集合**（2026-11-11 定）
+#### 7.2.0 只认**客家话音节集合**（2026-11-11 定，完整集 = 标准集 ∪ 词典音节）
+
+- **标准集**：`app/src/main/assets/rime/hakka_syllables.txt`（787 个，权威来源
+  `Hkdict/neo-frontend/src/data/hakkaSyllables.js`，用 `python3 tools/panel_probe.py build-syllables` 同步）；
+- **完整集** = 标准集 ∪ `hakka.dict.yaml` 自带音节（App 在 `finishLoading()` 放词典音节、
+  `loadSyllableSet()` 再并入标准集，当前 787+695=**842**）；
+- 词典有、标准集没有的 55 个音节列在 `docs/18-dict-only-syllables.md` 供人工审核
+  （已修 `nziamm→nziam`）；实测词表里仍在完整集之外的只有 7/1456 条（0.48%，`cn`、`打`、`r` 之类）。
+
 
 词表的第三列是读音，但词表来源不只客家话：`/sdcard/hkrime/` 里同时部署着 `luna_pinyin.dict.yaml` 这类别的方案词典（`例行 → li xing`），`xing` 不是客家话音节。规则：
 

@@ -128,6 +128,7 @@ class Data:
         if not os.path.isfile(main):
             sys.exit(f"[panel-probe] 找不到 {main}；先跑 `panel_probe.py pull` 或 --data 指定目录")
         self._load_dict(main)
+        self.syllables = self._load_syllables(data_dir)
         # 与 App 的 RimeDictSource.namesWithImports 一致：**只加载 hakka.dict.yaml 的
         # import_tables 展开出来的词表**。目录里可能还有 luna_pinyin 这类别的方案词典
         # （`li xing` 就是这么混进来的），12 键方案不该用它们。
@@ -155,6 +156,31 @@ class Data:
                     chars.append(ch)
         for syl in self.syllable_freq:
             self.code_to_syllables[code_of(syl)].append(syl)
+
+    def _load_syllables(self, data_dir: str) -> set[str]:
+        """完整音節集 = 標準集（assets/rime/hakka_syllables.txt）∪ 主詞典自帶音節。
+
+        用戶 2026-11-11：「最多最多的合法音节就是这么多了，请用这个标准集」+
+        「将 hakka.dict.yaml 所有音节并入标准集从而得到完整集」。
+        """
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        path = os.environ.get(
+            "HKRIME_SYLLABLES",
+            os.path.join(root, "app", "src", "main", "assets", "rime", "hakka_syllables.txt"),
+        )
+        canon: set[str] = set()
+        if os.path.isfile(path):
+            for line in open(path, encoding="utf-8"):
+                tok = line.split("#")[0].strip()
+                if tok and tok.isalpha():
+                    canon.add(tok)
+        union = canon | set(self.syllable_freq)
+        self.canonical_count = len(canon)
+        print(
+            f"# 音節集: 標準集 {len(canon)} ∪ 詞典 {len(self.syllable_freq)} = {len(union)}",
+            file=sys.stderr,
+        )
+        return union
 
     def _import_names(self, main_path: str, depth: int = 0, seen: "OrderedDict[str, None]" | None = None) -> list[str]:
         """展开 hakka.dict.yaml 的 import_tables（镜像 RimeDictSource.namesWithImports）。"""
@@ -219,7 +245,7 @@ class Data:
                 continue
             # 只认**客家话音节集合**里的音节：词表里可能混着普通话/粤语读音
             # （`例行 → li xing`），12 键方案不该把它们当音节用。
-            if any(t not in self.syllable_freq for t in tokens):
+            if any(t not in self.syllables for t in tokens):
                 continue
             # 联想索引：只收两音节词（与 App 的 assocWords 一致）
             if len(tokens) >= 2:
@@ -620,6 +646,22 @@ def cmd_syllables(args, data: Data) -> None:
         print(f"  {reading:<18} {kind}  首现于 {length} 键")
 
 
+def cmd_build_syllables(args) -> None:
+    """從 `hakkaSyllables.js` 抽出標準音節集，寫成 `assets/rime/hakka_syllables.txt`。"""
+    text = open(args.source, encoding="utf-8").read()
+    match = re.search(r"SYLLABLE_SOURCE\s*=\s*`(.*?)`", text, re.S)
+    body = match.group(1) if match else text
+    syllables = sorted(dict.fromkeys(t for t in body.split() if t.isalpha()))
+    lines = [
+        "# 客家話合法音節標準集（權威來源：Hkdict/neo-frontend/src/data/hakkaSyllables.js）",
+        "# 一行一個音節；完整集 = 本標準集 ∪ 主詞典自帶音節。",
+        f"# 共 {len(syllables)} 個（由 panel_probe.py build-syllables 同步）。",
+    ] + syllables
+    with open(args.out, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(lines) + "\n")
+    print(f"# 寫入 {args.out}：{len(syllables)} 個音節")
+
+
 def cmd_chars(args, data: Data) -> None:
     chars = data.syllable_chars.get(args.syllable, [])
     if not chars:
@@ -783,12 +825,32 @@ def main() -> None:
     p_panel.add_argument("codes")
     p_panel.set_defaults(func=cmd_panel)
 
+    p_bs = sub.add_parser("build-syllables", help="从 hakkaSyllables.js 同步标准音节集到 assets")
+    p_bs.add_argument(
+        "source",
+        nargs="?",
+        default="/home/hazukie/Projects/Hkdict/neo-frontend/src/data/hakkaSyllables.js",
+        help="含 SYLLABLE_SOURCE 的 JS 文件（默认 Hkdict 那份）",
+    )
+    p_bs.add_argument(
+        "--out",
+        default=os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "app", "src", "main", "assets", "rime", "hakka_syllables.txt",
+        ),
+        help="输出文件（默认 App assets 路径）",
+    )
+    p_bs.set_defaults(func=cmd_build_syllables)
+
     p_self = sub.add_parser("selftest", help="跑文档样例自检（CI 可用）")
     p_self.set_defaults(func=cmd_selftest)
 
     args = parser.parse_args()
     if args.cmd == "pull":
         cmd_pull(args)
+        return
+    if args.cmd == "build-syllables":
+        args.func(args)
         return
     data = Data(args.data)
     args.func(args, data)
