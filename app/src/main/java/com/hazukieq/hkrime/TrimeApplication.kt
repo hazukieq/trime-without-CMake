@@ -36,6 +36,8 @@ class TrimeApplication : Application() {
         instance = this
         try {
             if (BuildConfig.DEBUG) {
+                // 每次進程啟動清空診斷檔（用戶 2026-11-11：排查要能「通通寫進 hkrime/logs」）
+                runCatching { com.hazukieq.hkrime.util.DiagLog.reset() }
                 Timber.plant(Timber.DebugTree())
             }else{
                 Timber.plant(CrashReportingTree())

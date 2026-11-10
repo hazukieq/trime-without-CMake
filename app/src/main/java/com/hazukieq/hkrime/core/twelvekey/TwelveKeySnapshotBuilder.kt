@@ -1,5 +1,6 @@
 package com.hazukieq.hkrime.core.twelvekey
 
+import com.hazukieq.hkrime.util.DiagLog
 import com.hazukieq.hkrime.BuildConfig
 import com.hazukieq.hkrime.core.Rime
 import com.hazukieq.hkrime.core.TwelveKeyPreedit
@@ -190,8 +191,40 @@ object TwelveKeySnapshotBuilder {
         // 段組 = 單字組；另抽出的聯想詞組按「確切讀音」與引擎組合併（引擎優先、聯想詞去重補在後面）。
         val assocGroups = segmentGroups.filter { it.segment == 1 }
         val baseSegmentGroups = segmentGroups.filter { it.segment != 1 }
+        // 多音節（≥3 節）詞典詞的聯想行：`li nak si` → Linux。
+        //
+        // 走**輕路徑**：只按「整串碼前綴」查表（表只有 ~1.4k 條），按讀音排序後直接拼到左列
+        // 「推薦」之後，**不**進 `panelGroups`/`mergeAssociationGroups`/大排序那條重路徑
+        // （2026-11-11 實測：塞進那條路徑會讓面板全量構建卡死幾十秒）。
+        val prefixWordRows = if (wantGroups && remaining.isNotEmpty()) {
+            runCatching {
+                TwelveKeyPreedit.wordsByCodePrefix(
+                    remaining.replace("'", ""),
+                    TwelveKeyTuning.ASSOC_PREFIX_READINGS,
+                    ASSOC_WORDS,
+                ).map { (reading, words) ->
+                    SyllableGroup(
+                        reading = reading,
+                        syllables = reading.split(' '),
+                        items = words.map { word ->
+                            CandidateItem(text = word, comment = reading, index = -1, segment = 1)
+                        },
+                        segment = 1,
+                    )
+                }
+            }.getOrElse { emptyList() }
+        } else {
+            emptyList()
+        }
+        if (BuildConfig.DEBUG && prefixWordRows.isNotEmpty()) {
+            Timber.d(
+                "twelvekey: prefixWords %s",
+                prefixWordRows.joinToString(",") { "${it.reading}:${it.items.size}" },
+            )
+        }
+
         val merged = CandidateRanking.panelGroups(baseSegmentGroups, engineGroups)
-        val groups = CandidateRanking.mergeAssociationGroups(merged, assocGroups)
+        val groups = (CandidateRanking.mergeAssociationGroups(merged, assocGroups) + prefixWordRows)
             // 統一排序：單音節組 → 詞組 → 無讀音組，各檔內按讀音字典序；
             // 「無讀音組」（引擎沒給 comment）用第一條候選的首字讀音兜底，也要按字母排。
             .sortedWith(
@@ -245,8 +278,8 @@ object TwelveKeySnapshotBuilder {
         }
         // 推薦組固定排左列第一（reading 為空 + [RECOMMEND_SEGMENT] 標記）；空的就不插，
         // 這樣「候選全上了條」時段組自然回到第 0 組。
-        val groupsWithRecommend = if (recommend.isEmpty()) {
-            groups
+        val recommendRow = if (recommend.isEmpty()) {
+            emptyList()
         } else {
             listOf(
                 SyllableGroup(
@@ -255,8 +288,9 @@ object TwelveKeySnapshotBuilder {
                     items = recommend,
                     segment = RECOMMEND_SEGMENT,
                 ),
-            ) + groups
+            )
         }
+        val groupsWithRecommend = recommendRow + groups
         // 預覽文字與候選條第 0 條同源：一次算好，隨快照發佈。
         val previewText = barEntries.firstOrNull { it.text.isNotEmpty() }?.text ?: ""
         // 已選前綴（librime context 裡尚未 commit 的字）+ 第一條候選 = 嵌入式預覽全文
@@ -280,6 +314,12 @@ object TwelveKeySnapshotBuilder {
         if (degraded) {
             Timber.w("twelvekey: enumerate native missing, degraded to single page (%d)", flat.size)
         }
+        DiagLog.d(
+            "snapshot",
+            "build code=${input} wantGroups=$wantGroups groups=${groupsWithRecommend.size}" +
+                " [${groupsWithRecommend.take(6).joinToString("|") { "${it.reading}:${it.items.size}" }}]" +
+                " bar=${barEntries.size} prefixWords=${prefixWordRows.size}",
+        )
         return TwelveKeySnapshot(
             input = input,
             consumedEnd = consumedEnd,
@@ -336,43 +376,6 @@ object TwelveKeySnapshotBuilder {
         if (splits.isEmpty()) return emptyList()
         val result = ArrayList<SyllableGroup>()
         val seen = HashSet<String>()
-        // ---- 整串碼前綴聯想：三音節以上的詞（`li nak si` → Linux）只能靠這條 ----
-        // 舊邏輯的聯想索引只按前兩個音節建 key，打第三節（`li nak s`）時查不到；
-        // 用戶 2026-11-11：「詞庫是有 li nak si->linux，面板居然沒有」。
-        if (codes.length >= 2 && result.size < MAX_RESULT_GROUPS) {
-            // 這一段是「錦上添花」（三音節以上詞的聯想），**任何異常都不能帶崩整個面板**。
-            val prefixRows = runCatching {
-                TwelveKeyPreedit.wordsByCodePrefix(
-                    codes,
-                    TwelveKeyTuning.ASSOC_PREFIX_READINGS,
-                    ASSOC_WORDS,
-                )
-            }.getOrElse { emptyList() }
-            Timber.d(
-                "twelvekey: prefixRows codes=%s rows=%s %s",
-                codes,
-                prefixRows.map { it.first },
-                TwelveKeyPreedit.debugWordCodeEntries(),
-            )
-            for ((reading, words) in prefixRows) {
-                if (words.isEmpty()) continue
-                if (result.size >= MAX_RESULT_GROUPS) break
-                // 與現有聯想行去重：同一個讀音只要一份（兩音節詞通常已被上面的關聯行拿走）。
-                if (!seen.add("$reading|any")) continue
-                val items = words.map { word ->
-                    CandidateItem(text = word, comment = reading, index = -1, segment = 1)
-                }
-                result.add(
-                    SyllableGroup(
-                        reading = reading,
-                        syllables = reading.split(' '),
-                        items = items,
-                        segment = 1,
-                    ),
-                )
-            }
-        }
-
         splits.forEachIndexed { splitIndex, split ->
             val (head, rest) = split
             // 第一種切法吃完整配額；備選切法減半（面板不能被次要切法灌滿）。
