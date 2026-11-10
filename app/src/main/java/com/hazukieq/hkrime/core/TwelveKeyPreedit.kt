@@ -575,8 +575,17 @@ object TwelveKeyPreedit {
         return null
     }
 
-    /** 音節 → 該讀音的字（字典順序；需要按常用度排時用 [rankChars]）。 */
-    fun charsForSyllable(syllable: String, limit: Int = 60): List<String> =
+    /**
+     * 音節 → 該讀音的字（字典順序；需要按常用度排時用 [rankChars]）。
+     *
+     * [limit] 由調用方決定：面板段組要「列完整」，傳
+     * [com.hazukieq.hkrime.core.twelvekey.TwelveKeyTuning.SEGMENT_CHARS_LIMIT]；
+     * 別再用「60 字」這種小預設值截斷（用戶 2026-11-11 報「字沒列完整」）。
+     */
+    fun charsForSyllable(
+        syllable: String,
+        limit: Int = com.hazukieq.hkrime.core.twelvekey.TwelveKeyTuning.SEGMENT_CHARS_LIMIT,
+    ): List<String> =
         syllableToChars[syllable]?.take(limit) ?: emptyList()
 
     /** 單字的通用頻度（詞表統計；未收錄回 0）；多字詞取首字。 */

@@ -311,7 +311,10 @@ object TwelveKeySnapshotBuilder {
                 // 只留第一種切法那份，避免面板出現 `then` / `then·1` 這種重複行。
                 if (!seen.add(syllable)) continue
                 val chars = TwelveKeyPreedit.rankChars(
-                    TwelveKeyPreedit.charsForSyllable(syllable),
+                    TwelveKeyPreedit.charsForSyllable(
+                        syllable,
+                        TwelveKeyTuning.SEGMENT_CHARS_LIMIT,
+                    ),
                     anchor,
                 )
                 val items = chars.map { ch ->
