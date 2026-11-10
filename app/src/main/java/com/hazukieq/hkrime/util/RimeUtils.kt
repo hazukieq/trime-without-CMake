@@ -35,15 +35,28 @@ object RimeUtils {
             .onFailure { Timber.e(it, "SchemaCompat: rime.lua failed") }
         runCatching { SchemaCompat.ensureForEnabledSchemas() }
             .onFailure { Timber.e(it, "SchemaCompat failed before deploy") }
-        val t0 = System.nanoTime()
-        Rime.destroy()
-        val t1 = System.nanoTime()
-        Rime.get(context, full)
-        val t2 = System.nanoTime()
-        Timber.i(
-            "deploy: full=%b destroy=%dms reinit=%dms total=%dms",
-            full, (t1 - t0) / 1_000_000, (t2 - t1) / 1_000_000, (t2 - t0) / 1_000_000,
-        )
+        // 部署日誌（覆蓋寫 `<userDataDir>/logs/hkrime-deploy.log`）：librime 的
+        // `collecting entries from ...` / `rebuilding pack ...` / `Encode failure` 只在 logcat，
+        // 用戶查「改了詞典為什麼不生效」時拿不到；這裡把這次部署的 logcat 整段落盤。
+        val session = DeployLog.begin(context, full)
+        var failure: Throwable? = null
+        try {
+            val t0 = System.nanoTime()
+            Rime.destroy()
+            val t1 = System.nanoTime()
+            Rime.get(context, full)
+            val t2 = System.nanoTime()
+            Timber.i(
+                "deploy: full=%b destroy=%dms reinit=%dms total=%dms",
+                full, (t1 - t0) / 1_000_000, (t2 - t1) / 1_000_000, (t2 - t0) / 1_000_000,
+            )
+        } catch (t: Throwable) {
+            failure = t
+            throw t
+        } finally {
+            DeployLog.end(context, session, failure)
+            Timber.i("deploy log: %s", session.file?.path ?: "(unavailable)")
+        }
         ToastUtils.showLong(R.string.deploy_finish)
     }
 

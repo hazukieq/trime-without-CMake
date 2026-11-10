@@ -3218,3 +3218,41 @@ linux	li nak si
 `associatedWords("li", 'n') = [Linux, linux, 梨儿果, 鲤鱼]`，讀音行 `li` 有 `nak / ngh / nzi`。
 新增 3 條單測（非漢字詞帶讀音可入索引、漢字詞用自己讀音、純詞表仍回退 charTable）→
 全倉 **129 tests / 0 failures**。
+
+## 15.69 部署日誌落盤：`logs/hkrime-deploy.log`（每次覆蓋，2026-11-11）
+
+### 15.69.1 為什麼需要
+
+librime 部署時的關鍵信息（`collecting entries from <dict>.yaml`、`Pass 1: total N entries`、
+`rebuilding pack 'hakka'`、`Encode failure: '<詞>'`、`missing dict settings.`）只走 logcat：
+會被刷掉、普通用戶拿不到；App 的 `logs/hkrime-YYYYMMDD.log` 是「進程 logcat 快照」的副本，
+混雜且不保證覆蓋到部署那一段。排查「改了詞典為什麼不生效 / 引擎為什麼給不出某個詞」時，
+最需要的恰恰是這一段。
+
+### 15.69.2 做法：`util/DeployLog.kt`（`RimeUtils.deploy()` 內包住）
+
+寫 `<userDataDir>/logs/hkrime-deploy.log`（默認 `/sdcard/hkrime/logs/hkrime-deploy.log`），
+**每次部署 `writeText` 覆蓋**，內容三段：
+
+1. **頭部（部署前）**：時間、`mode=full|incremental`、pid、`data_dir`、
+   全部 `*.dict.yaml` 的 mtime/size（能一眼看出最近改了哪份詞表）、
+   全部 `build/*.bin` 的 mtime/size；
+2. **尾部（部署後）**：耗時、`result=ok|ERROR`（異常信息）、
+   `build/` 下每張表的前後對比，發生變化的標 `<<< REBUILT`（直接回答「這次到底重建了沒有」）；
+3. **logcat 片段**：`logcat -d --pid=<本進程> -v time` 裡**從部署開始那一刻起**的行
+   （按時間戳過濾，最多 4000 行）——librime 的 INFO/ERROR 和 App 的日誌都在裡面。
+
+設計約束：只寫文件、任何失敗都吞掉並 `Timber.w`，部署本身絕不能因為記日誌而失敗。
+
+### 15.69.3 用法
+
+```bash
+# 觸發一次全量部署（輸入法進程存活時有效）
+adb shell am broadcast -a com.hazukieq.hkrime.deploy -p com.hazukieq.hkrime
+# 看這次部署幹了什麼
+adb shell cat /sdcard/hkrime/logs/hkrime-deploy.log
+```
+
+真機驗收（2026-11-11）：一次全量部署後文件開頭是
+`===== hkrime deploy @ ... =====`、`mode=full`，`build tables (after)` 裡 `hakka.table.bin`
+帶 `<<< REBUILT`，logcat 段可看到 `Took ... to convert to OpenCCDictionary[...]` 等行。
