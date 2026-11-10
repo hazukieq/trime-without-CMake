@@ -50,6 +50,12 @@ object CandidateRanking {
         val words = ArrayList<CandidateItem>(ranked.size)
         val others = ArrayList<CandidateItem>(ranked.size)
         ranked.forEach { if (isCjkWord(it.text)) words.add(it) else others.add(it) }
+        // 特例（用戶 2026-11-11 原話）：**完全沒有單字時**，詞組才可以佔滿整條候選條
+        // —— 只要存在任何單字（含 ASCII/顏文字等非詞組候選），詞組區仍然嚴格 ≤ wordSlots，
+        // 即使候選條因此變短也不拿詞組去補（用戶明確：不做「單字不夠就補詞」的推廣）。
+        if (others.isEmpty()) {
+            return words.take(barSize).filter { it.text.isNotEmpty() }
+        }
         val head = if (wordSlots > 0) words.take(wordSlots) else emptyList()
         return (head + others).take(barSize).filter { it.text.isNotEmpty() }
     }

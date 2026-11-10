@@ -96,13 +96,26 @@ class CandidateRankingTest {
     }
 
     @Test
-    fun `rankBar with only words shows at most word slots and nothing else`() {
-        // 純詞輸入（詞庫裡沒有對應單字候選）：詞組區嚴格 4 條，其餘不進候選條（面板仍可見）
+    fun `rankBar with only words fills the whole bar`() {
+        // 特例（用戶 2026-11-11）：沒有單字時，詞組可以佔滿候選條（不再卡 4 條）
         val words = listOf("山水", "風雨", "日月", "江河", "雲霧", "星辰").mapIndexed { i, w ->
             item(w, index = i)
         }
         val bar = CandidateRanking.rankBar(words, barSize = 12)
-        assertEquals(listOf("山水", "風雨", "日月", "江河"), bar.map { it.text })
+        assertEquals(words.map { it.text }, bar.map { it.text })
+        // 詞組數量超過候選條也照樣截斷
+        val many = (1..20).map { item("山水", index = it) } // 同 text 不影響長度測試
+        assertEquals(12, CandidateRanking.rankBar(many, barSize = 12).size)
+    }
+
+    @Test
+    fun `rankBar does not top up with words while any single exists`() {
+        // 用戶 2026-11-11 原話：只有「完全沒有單字」時詞組才能佔滿。
+        // 只要有 1 條單字，詞組區就還是 4 條 —— 候選條變短也不拿詞組去補。
+        val wordTexts = listOf("山水", "風雨", "日月", "江河", "雲霧", "星辰")
+        val words = wordTexts.mapIndexed { i, w -> item(w, index = i) }
+        val bar = CandidateRanking.rankBar(words + listOf(item("水", index = 100)), barSize = 12)
+        assertEquals(wordTexts.take(4) + "水", bar.map { it.text })
     }
 
     @Test
