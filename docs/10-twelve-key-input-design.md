@@ -3378,3 +3378,22 @@ probe: prism.GetValue('7i')=1 value=163
 表里头还有 `T1 li nak si` 等测试条目时，`Linux` 也曾出现在候选第 2 位，说明「能出」本身成立）。
 下一步要查的是 `script_translator`/`Poet` 这一段对「多音節 + 同拼写歧义（5i→ki/li、4a5→mak/nak）」
 的组合枚举是否漏掉了该路径。
+
+### 15.71.6 插桩第二轮：探针必须切方案（2026-11-11）
+
+- 候选探针默认跑在**当前方案**；新装/重启后默认是 26 鍵 `hakka_qwerty`，用 12 鍵碼串去打，
+  自然 syllabify 不到（这也是上一轮 `hkrime-probe-syll` 一行都没有的原因）。
+  已给探针加 `!schema <id>` 指令（`Rime.selectSchema(i)` + `Rime.getSchemaId()` 校验）：
+  请求文件写成
+  ```
+  !schema hakka_jiugong
+  5i4a57i
+  ```
+- 切到 12 鍵後，`Syllabifier::BuildSyllableGraph` 的入口日志按**逐键**触发：
+  `5` → `5i` → `5i4` → `5i4a` → `5i4a5`（就这些，**没有 `5i4a57i`**）。
+  即本轮探针里 `Rime.onText("5i4a57i")` 只让翻译器看到前 5 个键；而更早一轮（同样 `5i4a57i`）
+  却出现过 `edges: 0->2, 2->5, 5->7` 的三段图 —— 说明**同一串输入在不同时机被截断到不同长度**，
+  这本身就是可疑点，需要先钉死「输入到底有没有完整进到 translator」。
+- 探针能力：`Rime.probe_dict`（词典级）、`!deploy`（部署后探）、`!schema`（切方案）、
+  全量候选 `enumerateCandidates(2000)`；debug 触发点 `TrimeApplication.onCreate` /
+  `TextInputManager.onInitializeInputUi`。
