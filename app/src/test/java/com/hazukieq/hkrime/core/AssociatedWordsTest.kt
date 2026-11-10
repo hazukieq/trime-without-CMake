@@ -228,6 +228,30 @@ class AssociatedWordsTest {
         assertEquals("li voi", preedit.rewrite("5i34iw", "理會", "li voi"))
     }
 
+    /**
+     * 首要規則（用戶 2026-11-10）：「輸入的編碼一定要顯示」。
+     * 首條候選只覆蓋前面幾節時，後面沒覆蓋的節要用本地解碼補上，不能讓 preedit 比輸入短。
+     */
+    @Test
+    fun rewriteAppendsLocalTailWhenFirstCandidateCoversOnlyPart() {
+        // 共產 / kiung than 之於三音節碼 5i34i wa4 e44i：第三節必須補上（音節用本地解碼，
+        // 用戶 2026-11-10：「輸入的編碼一定要顯示」是首要、音節正確是第二步）。
+        val out = preedit.rewrite("5i34iwa4e44i", "共产", "kiung than")!!
+        val syllables = out.split(' ')
+        assertEquals(3, syllables.size)
+        assertEquals("kiung than", syllables.take(2).joinToString(" "))
+        assertTrue(syllables[2].endsWith("ong"))
+    }
+
+    @Test
+    fun rewriteNeverShortensLongInput() {
+        // 中國人民共和國 = zung get nzin min kiung fo get（7 節），首條候選只有前 4 節
+        val code = "834iie9yi44i45i34ie4ie9"
+        val out = preedit.rewrite(code + "\u2038", "中国人民", "zung get nzin min")!!
+        assertEquals(7, out.split(' ').size)
+        assertEquals(listOf("zung", "get", "nzin", "min"), out.split(' ').take(4))
+    }
+
     /** 引擎沒給 comment（方案沒開 spelling_hints）時退回本地解碼。 */
     @Test
     fun rewriteFallsBackToOwnDecodeWithoutComment() {

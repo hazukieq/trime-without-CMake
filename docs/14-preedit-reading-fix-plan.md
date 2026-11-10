@@ -197,7 +197,7 @@ if (barText != null && !barText.isEmpty()) {
 ## 8. 交接檢查表
 
 - [x] 三個檔案改動完成，且沒有其它檔案被「順手」改到（`git status` 只有這三個 + 測試檔 + 本文檔 + 驗收產物）
-- [x] 新增 17 個測試，全量 `failures 0`（72 tests：基線 55 + 12 preedit + 5 排序）
+- [x] 新增 19 個測試，全量 `failures 0`（74 tests：基線 55 + 14 preedit + 5 排序）
 - [x] 真機 `5i34i` 顯示 `li voi`（首條是詞）、`5i34iw` 顯示 `kiung than`（截圖 + 日誌，見 `artifacts/12key/verify/`）
 - [x] `perf-gate.py` PASS
 - [x] `docs/10` 加 §15.61 指向本文件並標記 ✅
@@ -242,6 +242,13 @@ if (barText != null && !barText.isEmpty()) {
    效果：三音節輸入時「共產黨」一定在「共產」前；同深度內學習照舊生效
    （`5i34iw` 的首條仍是學過的「共產」）。新增 `CandidateRankingTest` 5 個用例。
 
+5. **追加修復（二）：按下的鍵必須全部顯示**（用戶 2026-11-10 定調）。
+   「輸入的編碼一定要顯示（暫且不管對不對，這是首要的），至於音節正確是第二步」。
+   症狀：打 7 節的中國人民共和國，preedit 只剩 `zung get nzin min`，後面 `kiung fo get` 被吞。
+   修法（`TwelveKeyPreedit.rewrite`）：comment 節數 >= 本地解碼節數 → 只顯示 comment；
+   否則 comment + 本地解碼的剩餘節。於是 preedit 永遠不短於輸入碼。
+   已知限制：尾部節由本地 DP 解出，音節可能不準（第二步待辦）。
+
 其餘與方案一致：
 
 - `TwelveKeyPreedit`：新增 `@Volatile @JvmField preferredText / preferredComment`；
@@ -253,7 +260,7 @@ if (barText != null && !barText.isEmpty()) {
   仍然只改 `composition.copy()`，**不寫回** `mContext.composition`。
 - 只在 `hakka_jiugong` 生效，26 鍵/其他方案零改動。
 
-驗收：72 tests / 0 failures；`perf-gate.py` PASS（latency_p90 50.7ms，閾值 80）；
+驗收：74 tests / 0 failures；`perf-gate.py` PASS（latency_p90 42.5ms，閾值 80）；
 真機 `5i34i wa4 e44i` → preedit `kiung than dong`（首條「共產黨」）；`5i34i` → preedit `li voi`（首條是詞「理會」）；`5i34iw` → preedit `kiung than`（首條「共產」）、`kiung thon`（首條「窮酸」）；
 `744ii`（preedit `744 ii‸`）→ 首條「船寄」`son gi`。
 

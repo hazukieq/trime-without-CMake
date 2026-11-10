@@ -368,6 +368,8 @@ class TextInputManager private constructor() :
         currentSnapshot = snapshot
         // preedit 讀音對齊（docs/14）：把「用戶看到的第一條候選」發布給 TwelveKeyPreedit，
         // 因為 getComposition() 裡無法知道候選條順序（那是 App 排的，不是引擎 menu 順序）。
+        // 讀音只取「候選條第一條」的 comment（所見即所得）；首條覆蓋不到全部碼位時，
+        // 由 TwelveKeyPreedit.rewrite() 用本地解碼把尾巴補上，保證按下的鍵全部顯示。
         val first = snapshot.barItems.firstOrNull()
         val preferredChanged = TwelveKeyPreedit.preferredText != first?.text ||
             TwelveKeyPreedit.preferredComment != first?.comment

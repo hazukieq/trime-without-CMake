@@ -691,21 +691,27 @@ object TwelveKeyPreedit {
         if (split == clean.length) return null          // 尾端沒有碼段：已選完
         val prefix = clean.substring(0, split)
         val codes = clean.substring(split)
-        // 12 鍵是**多對多**：同一串碼沒有唯一讀音（`5i34i` 既可以是 kiung 一個音節，
-        // 也可以是「理會」的 li+voi 兩個音節）。所以**不存在「正確的固定解碼」**，
-        // preedit 直接顯示「用戶看到的第一條候選」的讀音（用戶 2026-11-10 定調）：
-        // 它和候選條同源（同一份快照發布的 text/comment），不會出現「字是共產、拼音是 li voi」的錯位。
-        // 有 comment 時**完全不碰本地解碼**（本地 DP 只是猜測，還可能解不出來）。
-        parseComment(preferred)?.let { return prefix + it.joinToString(" ") }
-        // 引擎沒給 comment（方案沒開 spelling_hints）才退回本地解碼兜底。
-        val decoded = decodeWithPartialTail(codes, hint) ?: return null
-        // 半截碼 token（純 ASCII 碼位，如 `w`）先換成鍵盤字母：本地兜底也要顯示拼音字母，
-        // 不要回落成原始碼字元（`5i34i w` 的自解碼 `[kiung, w]` → `[kiung, th]`）。
-        val own = decoded.split(' ')
-            .filter { it.isNotEmpty() }
-            .map { if (it.all { ch -> ch in CODE_LETTERS }) codeLetters(it) else it }
-        if (own.isEmpty()) return null
-        return prefix + own.joinToString(" ")
+        // 本地解碼把整串碼「鋪滿」：逐段 decode，半截碼（只剩聲母，如 `w`=th）翻成鍵盤字母。
+        // 它的音節數 = 這串碼「能讀出幾節」，是「按下的鍵全部顯示」的保底。
+        val own = decodeWithPartialTail(codes, hint)
+            ?.split(' ')?.filter { it.isNotEmpty() }
+            ?.map { if (it.all { ch -> ch in CODE_LETTERS }) codeLetters(it) else it }
+            ?.takeIf { it.isNotEmpty() }
+        val engine = parseComment(preferred)
+        // 顯示規則（用戶 2026-11-10 兩條定調，按優先級）：
+        //  1. **按下的鍵必須全部顯示**（首要）—— 寧可音節不準，也不能讓用戶覺得「打了這麼多鍵沒反應」；
+        //  2. 音節正確是第二步：首條候選的 comment 是引擎給的精確拼音，且與候選條同源
+        //     （同一份快照發布），所以它能覆蓋全部碼位時就直接用它（`5i34i` → `li voi`）。
+        // 於是：comment 的節數 >= 本地解碼的節數 → comment 已覆蓋全部碼位，直接顯示；
+        //       comment 更短（首條只覆蓋前面幾節，例如「共產」之於 kiung than dong）→
+        //       把後面沒覆蓋的節用本地解碼補上，絕不讓 preedit 比輸入短。
+        val shown = when {
+            engine == null -> own
+            own == null -> engine
+            engine.size >= own.size -> engine
+            else -> engine + own.drop(engine.size)
+        } ?: return null
+        return prefix + shown.joinToString(" ")
     }
 
     /** librime preedit 的光標標記 `‸`(U+2038)。 */
