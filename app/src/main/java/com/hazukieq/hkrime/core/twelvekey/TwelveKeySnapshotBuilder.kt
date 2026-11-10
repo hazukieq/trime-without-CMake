@@ -410,8 +410,14 @@ object TwelveKeySnapshotBuilder {
             }
             // 備選切法：head 本身是完整音節時只取精確碼（避免和前綴重複）；
             // head 只是裸碼（`w`）時必須允許前綴展開，否則 th* 全被吃掉。
-            val exactOnly = splitIndex > 0 && TwelveKeyPreedit.isSingleSyllable(head)
-            val syllables = TwelveKeyPreedit.syllablesForSegment(head, quota, exactOnly)
+            // 這一段的碼**剛好就是一個完整音節**（`4i`=mi、`ea`=fa、`74`=po…）時，只列這個音節：
+            // 用戶已經把音節打全了，再展開 `mia/min/nia…`（同前綴的更長音節）屬於噪音——
+            // 那些音節要打得更多（用戶 2026-11-11：「其他 16 個前綴展開理論上並不需要」）。
+            // 只有「碼只是前綴」（如 `7` = p/s，一個完整音節都不是）時才做前綴展開。
+            val headIsCompleteSyllable = TwelveKeyPreedit.isSingleSyllable(head)
+            val syllables = TwelveKeyPreedit
+                .syllablesForSegment(head, quota, headIsCompleteSyllable)
+                .ifEmpty { TwelveKeyPreedit.syllablesForSegment(head, quota, false) }
             for (syllable in syllables) {
                 // 同一個音節可能由多種切法得到（`the` 既可整段、也可 w|e）：
                 // 只留第一種切法那份，避免面板出現 `then` / `then·1` 這種重複行。
