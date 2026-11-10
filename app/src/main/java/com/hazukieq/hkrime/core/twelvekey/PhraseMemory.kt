@@ -42,9 +42,15 @@ object PhraseMemory {
     /** 曝光折扣：展示算「弱负信号」，按 0.5 折算（位置/可见性差异，見 Google US8938463 的思路）。 */
     const val EXPOSURE_DISCOUNT = 0.5
 
-    /** 自動清理：曝光 ≥ 8 次、一次沒被選、手拼 ≤ 1 次 → 判定為誤造詞，直接刪。 */
+    /**
+     * 自動清理：曝光 ≥ 8 次、一次沒被選、手拼 ≤ 2 次 → 判定為誤造詞，直接刪。
+     *
+     * 門檻必须是「手拼 ≤ 2」，不能是 1：詞條要（typed + picked）≥ [MIN_COUNT] = 2 才會露面，
+     * 若這裡寫 1，`typed ≤ 1 && picked == 0` 的詞條永遠露不了面，清理規則**永遠不可能觸發**
+     * （2026-11-11 自查發現：手拼 2 次、露面 10 次沒人選的創制詞刪不掉，權重也不降）。
+     */
     const val PURGE_SHOWN = 8
-    const val PURGE_MAX_TYPED = 1
+    const val PURGE_MAX_TYPED = 2
 
     private const val SEP = '\u0001'
     private const val LINE = '\n'
@@ -60,6 +66,15 @@ object PhraseMemory {
         val shown: Int = 0,
         /** 從合成候選**點選**上屏多少次（強正信號）。 */
         val picked: Int = 0,
+        /**
+         * 墓碑：被判定為誤造詞（曝光很多、一次沒選）後**不刪條目**，只打標記。
+         *
+         * 為什麼不能刪：引擎自己也可能學到了同一條詞（去重後候選條上顯示的是引擎那條），
+         * 一旦 App 記憶被刪，「連引擎那條一起藏掉」就失去依據，詞條立刻復活且再無負反饋
+         * （2026-11-11 自查實測：清理後 `半截碼` 又被引擎原樣頂回第一位）。
+         * 墓碑同時是「這條被否決過」的記錄，用戶再手拼一次（[applyRecord]）會自動解除。
+         */
+        val purged: Boolean = false,
     )
 
     private var prefs: SharedPreferences? = null
@@ -136,6 +151,9 @@ object PhraseMemory {
                 merged = true
                 out.add(
                     e.copy(
+                        // 用戶又手拼了一次 = 重新表達需求：解除墓碑、曝光歸零重新觀察。
+                        purged = false,
+                        shown = 0,
                         typed = (e.typed + 1).coerceAtMost(MAX_COUNT),
                         lastUsedAt = now,
                         readings = readings.ifBlank { e.readings },
@@ -162,6 +180,7 @@ object PhraseMemory {
                 e.lastUsedAt.toString(),
                 e.shown.toString(),
                 e.picked.toString(),
+                if (e.purged) "1" else "0",
             ).joinToString(SEP.toString())
         }
 
@@ -177,6 +196,7 @@ object PhraseMemory {
                 val last = parts[3].toLongOrNull() ?: 0L
                 val shown = parts.getOrNull(4)?.toIntOrNull() ?: 0
                 val picked = parts.getOrNull(5)?.toIntOrNull() ?: 0
+                val purged = parts.getOrNull(6) == "1"
                 Entry(
                     text = text,
                     readings = parts[1],
@@ -184,6 +204,7 @@ object PhraseMemory {
                     lastUsedAt = last,
                     shown = shown.coerceAtLeast(0),
                     picked = picked.coerceAtLeast(0),
+                    purged = purged,
                 )
             }
             .take(MAX_PER_CODE)
@@ -231,8 +252,11 @@ object PhraseMemory {
         val entries = byCode[key] ?: return
         if (entries.none { it.text == text }) return
         val updated = entries.map { e ->
-            if (e.text == text) e.copy(shown = (e.shown + 1).coerceAtMost(MAX_COUNT * 4)) else e
-        }.filterNot { shouldPurge(it) }
+            if (e.text != text) return@map e
+            val bumped = e.copy(shown = (e.shown + 1).coerceAtMost(MAX_COUNT * 4))
+            // 曝光累積到門檻 → 打墓碑（保留條目，見 Entry.purged 的說明），不再刪。
+            if (shouldPurge(bumped)) bumped.copy(purged = true) else bumped
+        }
         write(key, updated, System.currentTimeMillis())
     }
 
@@ -249,6 +273,20 @@ object PhraseMemory {
     }
 
     /** 某碼串下可以作為合成候選的詞條（已按分數降序，次數未達標的被過濾）。 */
+    /** 某碼串下**全部**詞條（不過濾可見門檻）——曝光/清理需要看還沒露面的那些。 */
+    internal fun entriesFor(code: String): List<Entry> {
+        val key = normalizeCode(code)
+        if (key.isEmpty()) return emptyList()
+        return byCode[key]?.toList() ?: emptyList()
+    }
+
+    /** 這條詞是否已達「可以顯示」的門檻（累計 ≥ [MIN_COUNT]、文字 ≥2 字、沒被判誤造）。 */
+    fun isVisible(entry: Entry): Boolean =
+        entry.text.length >= 2 && !isBanned(entry) && (entry.typed + entry.picked) >= MIN_COUNT
+
+    /** 被否決過的詞（墓碑 或 剛好命中清理規則）：連引擎那條也要一起藏掉。 */
+    fun isBanned(entry: Entry): Boolean = entry.purged || shouldPurge(entry)
+
     fun candidatesFor(code: String, now: Long = System.currentTimeMillis()): List<Entry> {
         val key = normalizeCode(code)
         if (key.isEmpty()) return emptyList()

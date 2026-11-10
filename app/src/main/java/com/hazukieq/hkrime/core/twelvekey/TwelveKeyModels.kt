@@ -32,6 +32,12 @@ data class CandidateItem(
     val segment: Int = -1,
     /** 選中後要重新餵回引擎的剩餘碼（按段選字用；空表示沒有剩餘）。 */
     val restCode: String = "",
+    /**
+     * 非空表示「這條是 App 記憶過的創制詞（[PhraseMemory] 裡有同碼同文的詞條）」，
+     * 值是正規化碼串。曝光計數要靠它：引擎自己也學到了同一條時（去重後只顯示引擎那條），
+     * 若不標記，曝光永遠記不到它身上，創制詞就沒有任何負反饋（用戶 2026-11-11 報）。
+     */
+    val learnedCode: String = "",
 )
 
 /** 左列一個音節組：reading 是精確拼音（comment），items 是該讀音下的全部候選。 */

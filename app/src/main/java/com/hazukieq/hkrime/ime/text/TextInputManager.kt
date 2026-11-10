@@ -256,6 +256,7 @@ class TextInputManager private constructor() :
         if (!isTwelveKeyMode() || !Rime.isComposing()) return false
         val item = currentSnapshot.barItems.firstOrNull()
             ?: return false
+        noteLearnedPick(item.learnedCode, item.text)
         withEngineLock { twelveKeyController?.selectCandidate(item.index) }
         return true
     }
@@ -455,16 +456,18 @@ class TextInputManager private constructor() :
 
     /** 記下本輪真展示過的合成候選（候選條必算；展開面板打開時也算）。 */
     private fun collectPhraseExposure(snapshot: TwelveKeySnapshot) {
+        // 只要「App 記憶過的創制詞」露面就計曝光 —— 包括引擎自己也學到、去重後只剩引擎那條的情況
+        // （learnedCode 由 mergeLearnedPhrases 打上）。否則創制詞永遠沒有負反饋（用戶 2026-11-11 報）。
         snapshot.barItems.forEach { item ->
-            if (item.segment == SYNTHETIC_SEGMENT && item.text.isNotEmpty()) {
-                shownSynthetic[item.text] = item.restCode
+            if (item.learnedCode.isNotEmpty() && item.text.isNotEmpty()) {
+                shownSynthetic[item.text] = item.learnedCode
             }
         }
         if (panelWanted || isCandidatePanelShown()) {
             snapshot.groups.forEach { group ->
                 group.items.forEach { item ->
-                    if (item.segment == SYNTHETIC_SEGMENT && item.text.isNotEmpty()) {
-                        shownSynthetic[item.text] = item.restCode
+                    if (item.learnedCode.isNotEmpty() && item.text.isNotEmpty()) {
+                        shownSynthetic[item.text] = item.learnedCode
                     }
                 }
             }
@@ -492,6 +495,18 @@ class TextInputManager private constructor() :
      * 它不來自引擎，所以不能走 `select_candidate`；完整碼串放在 `restCode` 裡。
      * 上屏前先把暫存字 flush（保證「之前逐段選的字 + 這個詞」順序正確），再記一次學習。
      */
+    /**
+     * 點到「App 記憶過的創制詞」時記一次正反饋。
+     *
+     * 引擎自己也學到同一條時（去重後顯示的是引擎那條），點它走的還是 `selectCandidate`，
+     * 但學習要算在 App 記憶上，否則這條詞的 picked 永遠是 0、曝光越積越多會被誤清理。
+     */
+    private fun noteLearnedPick(learnedCode: String, text: String) {
+        if (learnedCode.isEmpty() || text.isEmpty()) return
+        pickedSynthetic.add(text)
+        PhraseMemory.bumpPicked(learnedCode, text)
+    }
+
     private fun commitPhrase(item: CandidateItem) {
         val code = item.restCode
         val text = item.text
@@ -593,6 +608,7 @@ class TextInputManager private constructor() :
             twelveKeyController?.snapshot?.fallback?.let { twelveKeyController?.commitFallback(it) }
             return
         }
+        noteLearnedPick(item.learnedCode, item.text)
         notePickedSegment(item.text, item.comment)
         twelveKeyController?.selectCandidate(item.index)
     }
@@ -1295,6 +1311,7 @@ class TextInputManager private constructor() :
                 pickSegmentedCandidate(item.text, item.restCode)
                 return
             }
+            noteLearnedPick(item.learnedCode, item.text)
             notePickedSegment(item.text, item.comment)
             twelveKeyController?.selectCandidate(item.index)
             return

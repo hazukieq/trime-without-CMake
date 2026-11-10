@@ -42,6 +42,8 @@ class CandidatePanelAdapter(
         val segment: Int = -1,
         /** 選中後要重新餵回引擎的剩餘碼（按段選字用；空表示沒有剩餘）。 */
         val restCode: String = "",
+        /** 非空 = 這條是 App 記憶過的創制詞（曝光/正反饋要記到它身上）。 */
+        val learnedCode: String = "",
     )
 
     private val density = context.resources.displayMetrics.density

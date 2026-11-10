@@ -189,6 +189,7 @@ class CandidatePanelController(
                     index = it.index,
                     segment = it.segment,
                     restCode = it.restCode,
+                    learnedCode = it.learnedCode,
                 )
             },
         )

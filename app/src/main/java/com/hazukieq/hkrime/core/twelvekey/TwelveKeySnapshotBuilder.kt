@@ -502,17 +502,23 @@ object TwelveKeySnapshotBuilder {
         now: Long,
     ): List<CandidateItem> {
         if (ranked.isEmpty() || code.isEmpty()) return ranked
-        val phrases = PhraseMemory.candidatesFor(code, now)
-        if (phrases.isEmpty()) return ranked
-        // 引擎自己也會學（userdb / custom_phrase）：同一條詞已經在引擎候選裡就不再塞合成候選，
-        // 否則候選條會出現兩個一模一樣的詞（用戶 2026-11-11 報「重複詞條」）。
+        val entries = PhraseMemory.entriesFor(code)
+        if (entries.isEmpty()) return ranked
+        // 可見門檻與「誤造詞」判定都來自 PhraseMemory（曝光感知 CTR，§15.64.8）。
+        val visible = entries.filter { PhraseMemory.isVisible(it) }
+        val scoreByText = visible.associate { it.text to PhraseMemory.score(it, now) }
+        // 被否決過的詞（墓碑或剛好命中清理規則）→ 連引擎那條一起藏，否則引擎的副本會把它頂回來。
+        val dropTexts = entries.filter { PhraseMemory.isBanned(it) }.mapTo(HashSet()) { it.text }
         val engineTexts = ranked.mapTo(HashSet()) { it.text }
-        val fresh = phrases.filterNot { engineTexts.contains(it.text) }
-        if (fresh.isEmpty()) return ranked
-        val scoreByText = fresh.associate { it.text to PhraseMemory.score(it, now) }
-        return CandidateRanking.mergePhraseCandidates(
-            ranked = ranked,
-            synthetic = fresh.map { e ->
+        // 引擎自己也學到了同一條時：不再塞合成候選（否則候選條出現重複詞條），
+        // 但要把 App 的分數（曝光感知 CTR）套到引擎那條上，並打上 learnedCode 讓曝光能記到它身上
+        // —— 否則創制詞被看 10 遍沒人選，引擎權重一點都不會掉（用戶 2026-11-11 報）。
+        val rankedTagged = ranked.map { item ->
+            if (scoreByText.containsKey(item.text)) item.copy(learnedCode = code) else item
+        }
+        val synthetic = visible
+            .filterNot { engineTexts.contains(it.text) }
+            .map { e ->
                 CandidateItem(
                     text = e.text,
                     comment = e.readings,
@@ -520,10 +526,24 @@ object TwelveKeySnapshotBuilder {
                     segment = SYNTHETIC_SEGMENT,
                     // 合成候選把「完整碼串」放在 restCode：點擊上屏後用它記學習
                     restCode = code,
+                    learnedCode = code,
                 )
-            },
-            syntheticScore = { item -> scoreByText[item.text] ?: 0.0 },
-            engineScore = { i -> 1.0 - i.toDouble() / ranked.size.coerceAtLeast(1) },
+            }
+        if (synthetic.isEmpty() && dropTexts.isEmpty() && scoreByText.isEmpty()) return ranked
+        if (BuildConfig.DEBUG) {
+            Timber.d(
+                "twelvekey:phrase merge code=%s memory=%s fresh=%s drop=%s",
+                code,
+                entries.map { "${it.text}(t${it.typed}/p${it.picked}/s${it.shown})" },
+                synthetic.map { it.text },
+                dropTexts,
+            )
+        }
+        return CandidateRanking.mergePhraseCandidates(
+            ranked = rankedTagged,
+            synthetic = synthetic,
+            scoreOf = { item, i -> scoreByText[item.text] ?: (1.0 - i.toDouble() / ranked.size.coerceAtLeast(1)) },
+            dropTexts = dropTexts,
         )
     }
 

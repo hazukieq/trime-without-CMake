@@ -3109,3 +3109,35 @@ rime 的 userdb 寫入先進 leveldb 的 `log::Writer`（默認 64KB 用戶態�
   - `88`（ji jen，全是詞）→ 推薦 = 條上 6 條之後的續頁詞（指針 走走 要用 依然 遠弈…）；
   - `5i34i`（kiung，詞+字混合）→ 推薦 = 詞（棄兒 琪兒）在前、單字（鍪 溜 邱 柳…）在後；
   - 開面板恆落「推薦」（截圖 `artifacts/12key/verify/recommend-group-words.png`、`recommend-group-mixed.png`）。
+
+### 15.64.9 修正：創制詞「看 10 遍沒人選，權重仍第三」的三個 bug（2026-11-11）
+
+用戶反饋：「當產生創制詞時，我已經連續 10 次都沒有選它，結果他的權重還是排在第三位」。
+查日誌 + 設備 prefs 定位到三處獨立缺陷（都不是公式本身錯）：
+
+1. **曝光記不到「引擎副本」身上**：引擎自己也學到了同一條詞時，`mergeLearnedPhrases` 的
+   去重（§15.64.7）會壓掉合成候選、只顯示引擎那條；而曝光埋點原來的條件是
+   `segment == SYNTHETIC_SEGMENT` → 引擎條目不算曝光。結果 `shown` 永遠 0，CTR 一直是先驗 1/3，
+   分數不降。若顯示的是引擎條目，`collectPhraseExposure` 之前也會把它漏掉。
+   - 修：`CandidateItem` 加 `learnedCode`（= 這條詞在 App 記憶裡的碼串），由 `mergeLearnedPhrases`
+     打在「引擎已有、App 也記得」的條目上；曝光埋點改為看 `learnedCode` 非空（合成候選同樣打）。
+   - 同時把 App 的分數（曝光感知 CTR）**套到引擎那條的排序**上：`mergePhraseCandidates` 改成
+     吃 `scoreOf(item, engineIndex)`，App 記得的詞用 App 分數、其餘用引擎偽分 `1 - i/n`。
+     這樣即使詞條來自引擎，也會隨曝光下沉、隨點選回升。
+2. **點引擎條目不算正反饋**：引擎條目的點擊走 `selectCandidate`，不會經過 `commitPhrase`，
+   所以 `picked` 不漲。修：新增 `noteLearnedPick(learnedCode, text)`，候選條 / 面板 / 空格上屏
+   三條點擊路徑在 `learnedCode` 非空時都調它（`bumpPicked` + 記入 `pickedSynthetic`）。
+3. **清理規則不可達**：`shouldPurge` 要求 `typed ≤ 1`，但詞條露面門檻是 `(typed+picked) ≥ 2`，
+   故 `typed ≤ 1 && picked == 0` 的詞根本露不了面 → 規則永遠不觸發。修：`PURGE_MAX_TYPED = 2`。
+4. **清理後引擎副本復活**：命中清理時原本直接刪除 App 記憶，但引擎 userdb 裡還有同一條，
+   下次查詢又被引擎原樣頂回第一位、且此後再無負反饋（實測 `半截碼` 立刻復活）。
+   修：清理不刪條目，改打**墓碑** `Entry.purged = true`（encode 第 7 欄，舊 6 欄格式兼容）：
+   `isVisible` 排除墓碑、`mergeLearnedPhrases` 把墓碑詞放進 `dropTexts`**連引擎那條一起藏掉**；
+   用戶再手拼一次（`applyRecord`）自動解除墓碑並把 `shown` 歸零。
+
+驗收：
+- 單測 +7（墓碑藏引擎副本、反覆曝光仍藏、手拼復活、清理門檻可達、引擎條目下沉、點選回升、
+  `learnedCode` 標記）；全倉 **118 tests / 0 failures**。
+- 真機（`aa48e94a` / 半截碼，引擎 userdb 也有同一條）：第 1 次露面後 `shown` 逐次 +1；
+  第 8 次（`typed=2/picked=0`）落墓碑 `purged=1`，候選條上「半截碼」立即消失、再打仍不出現
+  （日誌 `twelvekey:phrase merge ... drop=[半截碼]`）。
