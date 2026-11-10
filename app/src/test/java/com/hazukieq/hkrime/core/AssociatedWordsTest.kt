@@ -2,6 +2,7 @@ package com.hazukieq.hkrime.core
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.BeforeClass
 import org.junit.Test
@@ -168,5 +169,86 @@ class AssociatedWordsTest {
     fun initialsRespectLimit() {
         assertEquals(1, preedit.initialsForPrefix("i", limit = 1).size)
         assertFalse(preedit.initialsForPrefix("", limit = 2).isNotEmpty())
+    }
+
+    // ---- preedit 讀音對齊（docs/14）----
+
+    /** 候選條第一條有 comment 時，preedit 必須用它的精確讀音（`kiung than` 不是 `kiung the`）。 */
+    @Test
+    fun rewriteUsesFirstCandidateReading() {
+        assertEquals("kiung than", preedit.rewrite("5i34i w\u2038", "共产", "kiung than"))
+    }
+
+    /**
+     * 首條是**多字詞**、讀音段數與本地解碼不同：`5i34i` 本地切出 1 段 kiung，
+     * 但首條「理會」讀 `li voi`（2 段，5i|34i 正好吃完 5i34i）—— preedit 要顯示 `li voi`
+     * （用戶 2026-11-10 指出：只看段數相等的舊規則會把這種最常見的情況擋掉）。
+     */
+    @Test
+    fun rewriteUsesWordReadingWhenFirstCandidateIsAWord() {
+        assertEquals("li voi", preedit.rewrite("5i34i\u2038", "理会", "li voi"))
+    }
+
+    /** 同上但碼短一段：`5i34` 的首條「梨渦」讀 `li vo`。 */
+    @Test
+    fun rewriteUsesWordReadingForShorterCode() {
+        assertEquals("li vo", preedit.rewrite("5i34\u2038", "梨涡", "li vo"))
+    }
+
+    /** 首條是**單字**時讀音 1 段，同樣要對齊。 */
+    @Test
+    fun rewriteUsesSingleCharReading() {
+        assertEquals("kiung", preedit.rewrite("5i34i\u2038", "共", "kiung"))
+    }
+
+    /** 首條是 3 字詞、讀音 3 段（共產黨 = kiung than dong 正好吃完 5i34iwe）。 */
+    @Test
+    fun rewriteUsesThreeSyllableWordReading() {
+        assertEquals("kiung than dong", preedit.rewrite("5i34iwe", "共產黨", "kiung than dong"))
+    }
+
+    /** librime 的 `‸`(U+2038) 光標標記不能被當成「已選前綴」，要剝掉再切碼段。 */
+    @Test
+    fun rewriteStripsCaretMarker() {
+        assertEquals("kiung th", preedit.rewrite("5i34iw\u2038", "共产", null))
+    }
+
+    /** 半截碼（尾端 `w` 還不是完整音節）也要翻成鍵盤字母；空格分隔的半截碼同理。 */
+    @Test
+    fun rewriteMapsPartialTailCodeToLetters() {
+        assertEquals("kiung th", preedit.rewrite("5i34i w", "共产", null))
+    }
+
+    /**
+     * 12 鍵多對多、沒有唯一解碼：comment 一律優先（它與候選條同源，是「用戶看到的第一條」的讀音）。
+     * 這裡用一串「本地解碼完全對不上」的 comment 釘住契約：不做本地校驗，直接顯示。
+     */
+    @Test
+    fun rewriteTrustsFirstCandidateCommentAsIs() {
+        assertEquals("li voi", preedit.rewrite("5i34iw", "理會", "li voi"))
+    }
+
+    /** 引擎沒給 comment（方案沒開 spelling_hints）時退回本地解碼。 */
+    @Test
+    fun rewriteFallsBackToOwnDecodeWithoutComment() {
+        assertEquals("kiung th", preedit.rewrite("5i34iw", "共产", null))
+    }
+
+    /** comment 可能被包成 `［…］`（comment_format 的 xform），要剝掉再顯示。 */
+    @Test
+    fun rewriteStripsBracketWrappedComment() {
+        assertEquals("kiung than", preedit.rewrite("5i34i w\u2038", "共产", "［kiung than］"))
+    }
+
+    /** 已選中的前綴（咧）必須保留，只改寫尾部碼段。 */
+    @Test
+    fun rewriteKeepsSelectedPrefix() {
+        assertEquals("咧le", preedit.rewrite("咧5e", "咧", null))
+    }
+
+    /** 尾端沒有碼段（已全部選完）時回傳 null，保持 librime 原樣。 */
+    @Test
+    fun rewriteReturnsNullWhenNoCode() {
+        assertNull(preedit.rewrite("咧", null, null))
     }
 }

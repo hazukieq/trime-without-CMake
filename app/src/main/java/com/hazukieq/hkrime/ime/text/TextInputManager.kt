@@ -6,6 +6,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import com.hazukieq.hkrime.core.Rime
+import com.hazukieq.hkrime.core.TwelveKeyPreedit
 import com.hazukieq.hkrime.core.twelvekey.CandidateBarBinder
 import com.hazukieq.hkrime.core.twelvekey.CandidateItem
 import com.hazukieq.hkrime.core.twelvekey.Fallback
@@ -365,6 +366,13 @@ class TextInputManager private constructor() :
             lastKeyAtNs = 0L
         }
         currentSnapshot = snapshot
+        // preedit 讀音對齊（docs/14）：把「用戶看到的第一條候選」發布給 TwelveKeyPreedit，
+        // 因為 getComposition() 裡無法知道候選條順序（那是 App 排的，不是引擎 menu 順序）。
+        val first = snapshot.barItems.firstOrNull()
+        val preferredChanged = TwelveKeyPreedit.preferredText != first?.text ||
+            TwelveKeyPreedit.preferredComment != first?.comment
+        TwelveKeyPreedit.preferredText = first?.text
+        TwelveKeyPreedit.preferredComment = first?.comment
         candidateBarBinder?.bind(snapshot)
         candidatePanelController?.submit(snapshot)
         applyInlinePreview(snapshot)
@@ -373,6 +381,22 @@ class TextInputManager private constructor() :
         }
         // 面板可能被 submit() 自動收起（上屏後無剩餘碼），箭頭方向要跟著回到 ▼
         candidateView?.setPanelOpen(candidatePanelController?.isShown == true)
+        if (preferredChanged && Rime.isComposing()) refreshPreeditAfterSnapshot()
+    }
+
+    /**
+     * 快照落地後重畫一次編碼區（preedit）：`getComposition()` 讀的正是上面剛發布的
+     * 「候選條第一條」，而按鍵鏈路裡的 `updateComposing()` 在快照之前就跑了 —— 不補這一下，
+     * preedit 會永遠落後一個按鍵（顯示上一條候選的讀音）。只在首條變化時做，避免每鍵重畫。
+     *
+     * `updateComposing()` 內部會再走 [onCandidatesRefreshed]；這裡抑制那一次，因為當前快照
+     * 已經是最新的（再刷只是一次緩存命中 + 重複一次 bind）。
+     */
+    private fun refreshPreeditAfterSnapshot() {
+        suppressSnapshotRefresh = true
+        runCatching { trime.updateComposing() }
+            .onFailure { Timber.e(it, "twelvekey: preedit refresh failed") }
+        suppressSnapshotRefresh = false
     }
 
     /**
@@ -588,6 +612,11 @@ class TextInputManager private constructor() :
         if (isTwelveKeyMode()) {
             // 按鍵後立即重建快照（不 debounce）；面板關閉時只枚舉候選條需要的 16 條，
             // 面板打開才全量枚舉（按鍵卡頓的另一半原因：每鍵 600 條枚舉）。
+            if (suppressSnapshotRefresh) {
+                // 這次刷新是「快照落地後重畫 preedit」帶來的，當前快照已是最新，不必重建。
+                suppressSnapshotRefresh = false
+                return
+            }
             twelveKeyController?.refresh(
                 immediate = true,
                 full = panelWanted || isCandidatePanelShown(),
@@ -801,6 +830,12 @@ class TextInputManager private constructor() :
     /** 最近一次綁到候選條的條目（點擊下標必須按這份解析，保證所見即所得）。 */
     /** 最近一次發佈的快照：候選條、面板、preedit 預覽、空格上屏全部只讀這一份。 */
     private var currentSnapshot: TwelveKeySnapshot = TwelveKeySnapshot.EMPTY
+
+    /**
+     * 抑制「下一次候選刷新」：快照落地後重畫 preedit 會走 `updateComposing()`，
+     * 而它內部會調 [onCandidatesRefreshed] 再刷一次快照——那時快照已經是最新的，純屬重複。
+     */
+    private var suppressSnapshotRefresh = false
 
     /**
      * librime context 裡「已選中但尚未提交」的前綴（例如先選了一個多字詞「江蘇」）。

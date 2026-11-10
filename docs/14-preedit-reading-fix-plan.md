@@ -1,8 +1,10 @@
-# 14 · 12 鍵 preedit 拼音與候選讀音對齊（修復方案，待實施）
+# 14 · 12 鍵 preedit 拼音與候選讀音對齊（✅ 已實施，2026-11-10）
 
 > 交辦文檔：**先讀再動手**。基線 `b431ece`（2026-11-10），下文行號以該提交為準；
 > 改動前先 `git log -1` 確認，工作樹若有改動行號會偏移，**以內容為準**。
-> 這是「方案」，不是已實施記錄；實施完把本文件改成 ✅ 並在 `docs/10` 加 §15.x。
+> **已實施**：見文末 §9「實施記錄」，變更說明在 `docs/10` §15.61；真機驗收見
+> `artifacts/12key/verify/PREEDIT-READING-FIX.md`。原方案正文保留（作為設計依據），
+> 實施時與方案的差異在 §9 逐條列出。
 
 ## 1. 症狀
 
@@ -70,6 +72,9 @@ private fun codeLetters(code: String) = buildString {
     for (ch in code) append(CODE_LETTERS[ch] ?: ch.toString())
 }
 ```
+
+> 下段是**原方案提案**（含當時的採信校驗）。最終實現按 §9 第 3 點改為「comment 一律優先、
+> 不做本地校驗」，代碼以 `TwelveKeyPreedit.kt` 為準。
 
 改寫 `rewrite(preedit: String?, hint: String? = null, preferred: String? = null): String?`：
 
@@ -152,6 +157,10 @@ if (barText != null && !barText.isEmpty()) {
 | `rewriteKeepsSelectedPrefix` | `rewrite("咧5e","咧",null)` | `== "咧le"`（前綴不被吃） |
 | `rewriteReturnsNullWhenNoCode` | `rewrite("咧",null,null)` | `null` |
 
+> 註：上表第 5 個用例（`rewriteIgnoresCommentWithDifferentSyllableCount`）在實施時**被推翻**：
+> 共產黨 = kiung than dong 正好吃完 `5i34iwe`，引擎首條是它的話就該採信（見 §9 第 3 點）。
+> 實際測試清單以 `AssociatedWordsTest` 為準。
+
 先寫測試 → 確認紅 → 再改碼 → 全綠。全量 `./gradlew :app:testDebugUnitTest` 必須
 `failures 0`（基線 55 tests，新增後應 >55）。
 
@@ -187,8 +196,53 @@ if (barText != null && !barText.isEmpty()) {
 
 ## 8. 交接檢查表
 
-- [ ] 三個檔案改動完成，且沒有其它檔案被「順手」改到（`git status` 只能有這三個 + 測試檔 + 本文檔）
-- [ ] 新增 7 個測試，全量 `failures 0`
-- [ ] 真機 `5i34iw` 顯示 `kiung than`（截圖 + 日誌各一）
-- [ ] `perf-gate.py` PASS
-- [ ] `docs/10` 加 §15.x 指向本文件並標記 ✅
+- [x] 三個檔案改動完成，且沒有其它檔案被「順手」改到（`git status` 只有這三個 + 測試檔 + 本文檔 + 驗收產物）
+- [x] 新增 12 個測試，全量 `failures 0`（67 tests：基線 55 + 12）
+- [x] 真機 `5i34i` 顯示 `li voi`（首條是詞）、`5i34iw` 顯示 `kiung than`（截圖 + 日誌，見 `artifacts/12key/verify/`）
+- [x] `perf-gate.py` PASS
+- [x] `docs/10` 加 §15.61 指向本文件並標記 ✅
+
+## 9. 實施記錄（2026-11-10）
+
+與方案正文的**差異**（前兩點是靜態閱讀沒看到、真機跑出來才發現的；第三點是用戶對語義的糾正）：
+
+1. **多了「快照落地後重畫 preedit」這一步**（方案沒寫）。
+   `getComposition()` 在按鍵鏈路裡比快照先跑（`onEngineChanged().updateComposing()` →
+   之後才有 `onTwelveKeySnapshot()`），所以剛發布的鉤子要等下一次預編輯刷新才會生效 ——
+   preedit 會永遠**落後一個按鍵**（顯示上一條候選的讀音）。真機第一版日誌：
+   `raw=[5i34i w‸] hint=[理会] preferred=[li voi] decoded=[kiung th]`，而候選條第一條是「窮酸」。
+   修法：`TextInputManager.onTwelveKeySnapshot()` 比較首條 (text, comment) 是否變化，
+   變化且仍在組字時調一次 `trime.updateComposing()`；並用 `suppressSnapshotRefresh` 抑制
+   `updateComposing()` 內部那一輪重複的快照重建（快照已是最新）。
+2. **decode 要逐段做半截碼兜底**（方案只寫了「整串 decode 失敗再從尾部切」）。
+   librime 的 preedit 會用空格分隔「已消費前綴 / 半截碼」，且 `w`(th) 這種鍵本身不是完整音節，
+   整串 `decode("5i34i w")` 會走 decode() 的空格分支、把 `w` 原樣留在結果裡。
+   改成按空格逐段 `decodeOne()`：先 `decode()`，失敗再「最長可解碼頭部 + 尾部碼位字母」。
+
+3. **採信規則簡化成「comment 一律優先」**（方案 §4.1 寫的是「段數相同 + 首音節相同」，
+   中間一版又改成「讀音能否吃完輸入碼」，最後按用戶 2026-11-10 的定調去掉本地校驗）。
+   理由：12 鍵是多對多，同一串碼沒有唯一讀音 —— `5i34i` 既可以是 kiung（1 個音節），
+   也可以是「理會」的 `li voi`（li=5i、voi=34i，2 個音節）。任何「本地解碼 vs comment」的比對
+   都建立在「存在正確解碼」這個錯誤假設上，會把「首條是詞」這種最常見的情況擋掉。
+   最終實現：`rewrite()` 裡有 comment 就直接返回它（完全不跑本地解碼），
+   本地 DP 只在引擎沒給 comment（未開 `spelling_hints`）時兜底。
+   一致性由「comment 與候選條文字同源發布 + 快照落地後重畫 preedit」保證，不靠比對。
+   對應單測：`rewriteUsesWordReadingWhenFirstCandidateIsAWord`（雙字詞）、
+   `rewriteUsesThreeSyllableWordReading`（三字詞）、`rewriteTrustsFirstCandidateCommentAsIs`、
+   `rewriteFallsBackToOwnDecodeWithoutComment`。
+
+其餘與方案一致：
+
+- `TwelveKeyPreedit`：新增 `@Volatile @JvmField preferredText / preferredComment`；
+  `rewrite(preedit, hint, preferred)` 剝 `‸`、保留已選前綴、只改寫尾部碼段；
+  採信規則 = **comment 一律優先**（見上面第 3 點；方案原寫的「段數相同」已廢除）；
+  碼位→字母映射 `CODE_LETTERS` 與 `TwelveKeySnapshotBuilder.FALLBACK_LETTERS` 同值（註釋互相指向）。
+- `TextInputManager.onTwelveKeySnapshot()`：`snapshot.barItems.firstOrNull()` → 鉤子（空快照寫 null）。
+- `Rime.getComposition()`：12 鍵分支優先取鉤子，沒有快照才退回引擎 menu 第一條；
+  仍然只改 `composition.copy()`，**不寫回** `mContext.composition`。
+- 只在 `hakka_jiugong` 生效，26 鍵/其他方案零改動。
+
+驗收：67 tests / 0 failures；`perf-gate.py` PASS（latency_p90 44.3ms，閾值 80）；
+真機 `5i34i` → preedit `li voi`（首條是詞「理會」）；`5i34iw` → preedit `kiung than`（首條「共產」）、`kiung thon`（首條「窮酸」）；
+`744ii`（preedit `744 ii‸`）→ 首條「船寄」`son gi`。
+

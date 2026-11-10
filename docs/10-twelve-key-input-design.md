@@ -2632,3 +2632,51 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
 
 改参数后的验证顺序：`./gradlew :app:testDebugUnitTest`（55 tests：覆盖/排序/联想）
 → 装机 → `python3 tools/perf-gate.py`（看 `op=assoc`、`build_full_p90` 是否超阈值）。
+
+## 15.61 修復：preedit 拼音改用「候選條第一條的真實讀音」（2026-11-10）
+
+方案文檔：[`docs/14-preedit-reading-fix-plan.md`](14-preedit-reading-fix-plan.md)（✅ 已實施）；
+真機驗收：[`artifacts/12key/verify/PREEDIT-READING-FIX.md`](../../artifacts/12key/verify/PREEDIT-READING-FIX.md)。
+
+問題：12 鍵打 `5i34iw` 時，編碼區顯示 `kiung the`（本地 DP「音節少優先」的猜測），
+而候選條第一條「共產」/「窮酸」的真實讀音是 comment 裡的 `kiung than` / `kiung thon` ——
+**引擎給的 comment 從來沒被採用**。
+
+四層原因與修法：
+
+| # | 原因 | 修法 |
+| --- | --- | --- |
+| 1 | 本地 DP 猜讀音（音節少優先） | `TwelveKeyPreedit.rewrite(preedit, hint, preferred)`：**preferred（comment）一律優先**，有它時完全不碰本地解碼；只有引擎沒給 comment 才用本地解碼兜底 |
+| 2 | hint 取 `mContext.getCandidates()[0]`，那是引擎 menu 順序，不是候選條順序（App 重排過） | `TextInputManager.onTwelveKeySnapshot()` 把 `snapshot.barItems.firstOrNull()` 的 text/comment 發布到 `TwelveKeyPreedit.preferredText/preferredComment`；`Rime.getComposition()` 優先讀它們 |
+| 3 | `‸`(U+2038) 光標標記、空格分隔的半截碼沒處理 | `rewrite` 先剝 `‸` 再切「已選前綴 / 尾部碼段」；碼段按空格**逐段** decode，某段切不出完整音節時保留「最長可解碼頭部 + 尾部碼位字母」（`w`→`th`） |
+| 4 | 殘留 comment（上一條候選的讀音被套到這串碼上） | 不靠本地校驗，靠**同源 + 時序**：comment 與候選條文字在同一個 `onTwelveKeySnapshot()` 裡發布，快照落地後再重畫一次 preedit（見下），所以畫面上的拼音和畫面上的首條永遠是同一份快照 |
+
+> **為甚麼不拿本地解碼去校驗 comment**（用戶 2026-11-10 定調）：「12 鍵性質決定了多對多，
+> 根本不需要固定編碼」。同一串碼沒有唯一讀音 —— `5i34i` 既可以是 kiung（1 個音節），
+> 也可以是「理會」的 `li voi`（li=5i、voi=34i，2 個音節）。任何「本地解碼 vs comment」的比對
+> （段數相同、首音節相同、能否吃完…）都建立在「有一個正確解碼」的假設上，實際會把
+> **首條是詞**這種最常見的情況擋掉，preedit 又退回猜測。所以最終做法是：
+> **有 comment 就直接顯示 comment**，本地 DP 只在引擎不給 comment（未開 `spelling_hints`）時兜底。
+> 一致性的保證靠「同源 + 快照後重畫」，而不是靠比對。
+
+**為什麼還要「快照後重畫」**：按鍵鏈路是 `process_key → onEngineChanged().updateComposing()`
+（此時讀 preedit）**之後**才 `onTwelveKeySnapshot()`（此時才知道候選條第一條）。
+只發布鉤子而不重畫，preedit 會永遠落後一個按鍵（顯示上一條候選的讀音，實測
+`hint=[理会] preferred=[li voi]` 而首條是「窮酸」）。所以首條 (text, comment) 變化且仍在組字時，
+補一次 `trime.updateComposing()`；並用 `TextInputManager.suppressSnapshotRefresh`
+抑制它內部那一輪重複的快照重建（當前快照已是最新）。
+
+不變量（實作時守住）：
+
+- 只改「顯示」：改寫結果只進 `composition.copy()`，**不寫回** `mContext.composition`
+  （寫回會讓下一次讀到 `raw=[共the]`、`decoded=null`）。
+- 已選前綴（`咧5e` 的 `咧`）必須保留，只改寫尾部碼段。
+- 只在 `hakka_jiugong` 生效；26 鍵/其他方案走原路徑，零改動。
+- 不影響候選排序策略、熱門組、性能門禁閾值。
+
+新增 12 個單測（`AssociatedWordsTest`，全量 67 tests / 0 failures）：comment 優先（單字/雙字詞/三字詞）/
+comment 原樣採信、無 comment 才本地解碼 / 剝 `［…］` 包裝 / 剝 `‸` / 半截碼映射 / 保留前綴 / 無碼段回 null。
+
+真機：`5i34i` 首條「理會」（詞）→ preedit `li voi`；`5i34iw` 首條「共產」→ `kiung than`、
+首條「窮酸」→ `kiung thon`；`744ii`（librime preedit `744 ii‸`，帶空格）→ 首條「船寄」`son gi`；
+`perf-gate.py` PASS（latency_p90 44.3ms，閾值 80）。

@@ -648,23 +648,107 @@ object TwelveKeyPreedit {
         return aligned.joinToString(" ")
     }
 
+    // ---- 候選條第一條的發布快照（docs/14）----
+    //
+    // preedit 讀音要對齊「用戶看到的第一條候選」。候選條順序是 App 排過的（詞組優先 /
+    // SegmentMemory 記憶），`Rime.mContext.getCandidates()[0]` 是引擎 menu 順序，兩者可能不一致，
+    // 所以由快照發布點（TextInputManager.onTwelveKeySnapshot）把候選條第一條寫到這裡。
+    // 空快照時寫 null，自然退回「本地解碼」的舊行為。
+
+    /** 候選條第一條候選的文本；preedit 用它對齊讀音（歧義時對齊第一個字）。 */
+    @Volatile
+    @JvmField
+    var preferredText: String? = null
+
+    /** 候選條第一條候選的 comment = 引擎給的精確拼音（spelling_hints）。 */
+    @Volatile
+    @JvmField
+    var preferredComment: String? = null
+
     /**
      * 改寫 librime 給的 preedit：**保留已選中的前綴**，只把尾部「未選中的鍵碼」換成拼音。
      *
      * librime 的 preedit 形如 `咧5e`（咧 = 已選字，5e = 剩餘碼）；之前把整串都當碼去 decode，
      * 前綴被丟掉 → 用戶選完第一個字後「字消失了」。這裡只切尾部連續 ASCII 當碼段。
      *
+     * 讀音對齊（docs/14）：候選條第一條的 comment 是引擎給的**精確拼音**，
+     * 本地 DP 只會切出「音節數最少」的猜測（`5i34i w` → `kiung the`，而首條「共產」讀 `kiung than`）。
+     *
+     * 12 鍵是多對多的（同一串碼可對應多種音節切法），所以**沒有唯一正確解碼**：
+     * [preferred] 一律優先，只有它為空時才用本地解碼兜底。
+     *
+     * @param hint 首條候選文本（歧義時對齊第一個字的讀音）
+     * @param preferred 首條候選的 comment（引擎精確拼音，可為 null）
      * @return 改寫後文本；若沒有可改寫的碼段（例如已全部選完 `咧`）回傳 null，保持 librime 原樣
      */
-    fun rewrite(preedit: String?, hint: String? = null): String? {
+    fun rewrite(preedit: String?, hint: String? = null, preferred: String? = null): String? {
         if (preedit.isNullOrEmpty() || table.isEmpty()) return null
-        var split = preedit.length
-        while (split > 0 && preedit[split - 1].code < 128) split--
-        if (split == preedit.length) return null          // 尾端沒有碼段：已選完
-        val prefix = preedit.substring(0, split)
-        val codes = preedit.substring(split)
-        val decoded = decode(codes, hint) ?: return null
-        return prefix + decoded
+        // `‸`(U+2038) 是 librime 的光標標記，不屬於前綴也不屬於碼段，先整串剝掉再切。
+        val clean = preedit.replace(CARET_MARK, "")
+        if (clean.isEmpty()) return null
+        var split = clean.length
+        while (split > 0 && clean[split - 1].code < 128) split--
+        if (split == clean.length) return null          // 尾端沒有碼段：已選完
+        val prefix = clean.substring(0, split)
+        val codes = clean.substring(split)
+        // 12 鍵是**多對多**：同一串碼沒有唯一讀音（`5i34i` 既可以是 kiung 一個音節，
+        // 也可以是「理會」的 li+voi 兩個音節）。所以**不存在「正確的固定解碼」**，
+        // preedit 直接顯示「用戶看到的第一條候選」的讀音（用戶 2026-11-10 定調）：
+        // 它和候選條同源（同一份快照發布的 text/comment），不會出現「字是共產、拼音是 li voi」的錯位。
+        // 有 comment 時**完全不碰本地解碼**（本地 DP 只是猜測，還可能解不出來）。
+        parseComment(preferred)?.let { return prefix + it.joinToString(" ") }
+        // 引擎沒給 comment（方案沒開 spelling_hints）才退回本地解碼兜底。
+        val decoded = decodeWithPartialTail(codes, hint) ?: return null
+        // 半截碼 token（純 ASCII 碼位，如 `w`）先換成鍵盤字母：本地兜底也要顯示拼音字母，
+        // 不要回落成原始碼字元（`5i34i w` 的自解碼 `[kiung, w]` → `[kiung, th]`）。
+        val own = decoded.split(' ')
+            .filter { it.isNotEmpty() }
+            .map { if (it.all { ch -> ch in CODE_LETTERS }) codeLetters(it) else it }
+        if (own.isEmpty()) return null
+        return prefix + own.joinToString(" ")
+    }
+
+    /** librime preedit 的光標標記 `‸`(U+2038)。 */
+    private const val CARET_MARK = "\u2038"
+
+    /**
+     * 碼位 → 拼音字母（與 `TwelveKeySnapshotBuilder.FALLBACK_LETTERS` 同一套；
+     * 那份是 `private`，這裡保留一份並由 `rewriteMapsPartialTailCodeToLetters` 用例釘住語義）。
+     */
+    private val CODE_LETTERS = mapOf(
+        '3' to "u", '1' to "ng", 'w' to "th", 'y' to "nz",
+        '4' to "m", '5' to "k", '7' to "p", '8' to "z", '9' to "q",
+    )
+
+    private fun codeLetters(code: String) = buildString {
+        for (ch in code) append(CODE_LETTERS[ch] ?: ch.toString())
+    }
+
+    /**
+     * 碼串 → 拼音（本地兜底）。librime 的 preedit 會用空格分隔「已消費前綴 / 半截碼」（`5i34i w`），
+     * 所以逐段解碼；某一段切不出完整音節時退一步：找「最長可解碼頭部」，
+     * 剩下半截碼逐位翻成鍵盤字母（`5i34i w` → `kiung th`），而不是回落原始碼字元。
+     */
+    private fun decodeWithPartialTail(codes: String, hint: String?): String? {
+        val parts = codes.trim().split(MULTI_DELIMITER).filter { it.isNotEmpty() }
+        if (parts.isEmpty()) return null
+        return parts.joinToString(" ") { part -> decodeOne(part, hint) ?: part }
+    }
+
+    private fun decodeOne(code: String, hint: String?): String? {
+        decode(code, hint)?.let { return it }
+        for (cut in code.length - 1 downTo 1) {
+            val head = decode(code.substring(0, cut), hint) ?: continue
+            return "$head ${code.substring(cut)}"
+        }
+        return null
+    }
+
+    /** 候選 comment → 音節列表（剝掉 `［…］` 包裝；空/無 comment 回 null）。 */
+    private fun parseComment(comment: String?): List<String>? {
+        val text = comment?.replace("\uFF3B", "")?.replace("\uFF3D", "")?.trim()
+        if (text.isNullOrEmpty()) return null
+        return text.split(' ').filter { it.isNotEmpty() }.ifEmpty { null }
     }
 
     private val MULTI_DELIMITER = Regex("[\u0027\\s]+")

@@ -445,15 +445,26 @@ public class Rime {
     if (composition != null
         && composition.preedit != null
         && "hakka_jiugong".equals(getSchemaId())) {
-      String hint = null;
-      RimeCandidate[] cs = mContext.getCandidates();
-      if (cs != null && cs.length > 0) {
-        hint = cs[0].text;
+      // 讀音對齊的 hint/comment 必須取「用戶看到的第一條候選」（候選條順序是 App 排的，
+      // 不一定等於引擎 menu 第一條）：由 TextInputManager.onTwelveKeySnapshot 發布，
+      // 沒有快照（如剛開面板）時才退回引擎 menu 第一條。
+      String barText = TwelveKeyPreedit.INSTANCE.preferredText;
+      String barComment = TwelveKeyPreedit.INSTANCE.preferredComment;
+      String hint;
+      String preferred;
+      if (barText != null && !barText.isEmpty()) {
+        hint = barText;
+        preferred = barComment;
+      } else {
+        RimeCandidate[] cs = mContext.getCandidates();
+        hint = (cs != null && cs.length > 0) ? cs[0].text : null;
+        preferred = (cs != null && cs.length > 0) ? cs[0].comment : null;
       }
       // 保留 librime preedit 裡「已選中的前綴」（如 `咧5e` 的 `咧`），只把尾部碼段轉拼音；
       // 否則選完一段後前綴被整串替換掉，用戶看到「漢字消失了」。
-      String decoded = TwelveKeyPreedit.INSTANCE.rewrite(composition.preedit, hint);
-      Timber.d("dbgpre: raw=[%s] hint=[%s] decoded=[%s]", composition.preedit, hint, decoded);
+      String decoded = TwelveKeyPreedit.INSTANCE.rewrite(composition.preedit, hint, preferred);
+      Timber.d("dbgpre: raw=[%s] hint=[%s] preferred=[%s] decoded=[%s]",
+          composition.preedit, hint, preferred, decoded);
       if (decoded != null) {
         // 只改「返回給 UI 的副本」：mContext.composition 是 librime context 的鏡像，
         // 寫回去會讓下一次讀到的 raw 已經是被改寫過的拼音（日誌裡 raw=[共the]、
