@@ -564,6 +564,18 @@ class Data:
                     "readings": readings,
                 }
             )
+        # 整串碼前綴匹配到的多音節詞行（`li nak si → Linux`）也算「實際存在」
+        for row in self.prefix_word_rows(codes):
+            out.append(
+                {
+                    "split": -1,
+                    "head": row["reading"],
+                    "rest": "",
+                    "kind": "word",
+                    "readings": [row["reading"]],
+                    "items": row["items"],
+                }
+            )
         return out
 
     def cumulative(self, codes: str, min_len: int = 2) -> list[tuple[int, str, list[dict]]]:
@@ -705,6 +717,12 @@ def cmd_syllables(args, data: Data) -> None:
                 print("   单字: " + " ".join(g["reading"] for g in seg0))
             if others:
                 print("   联想: " + " ".join(g["reading"] for g in others))
+            words = data.prefix_word_rows(prefix)
+            if words:
+                print(
+                    "   词行: "
+                    + "；".join(f"{w['reading']}={'/'.join(w['items'][:3])}" for w in words)
+                )
         print()
     print(f"# 码串 {args.codes!r} 累积去重后共 {len(unique)} 个读音（按首次出现的键数排序）")
     for reading, length, kind in unique:
@@ -715,8 +733,12 @@ def cmd_syllables(args, data: Data) -> None:
     print()
     print(f"# 實際存在讀音集（碼串 {args.codes!r}，詞典全量，不受配額限制）")
     union: list[str] = []
+    word_parts: list[dict] = []
     for part in data.existing_readings(args.codes):
         readings = part["readings"]
+        if part["kind"] == "word":
+            word_parts.append(part)
+            continue
         for r in readings:
             if r not in union:
                 union.append(r)
@@ -728,8 +750,14 @@ def cmd_syllables(args, data: Data) -> None:
             f"共 {len(readings)}: {' '.join(readings)}"
         )
     hidden = [r for r in union if r not in shown]
-    print(f"# 去重後實際存在 {len(union)} 個；面板規則已顯示 {len(union) - len(hidden)} 個"
+    print(f"# 單音節：去重後實際存在 {len(union)} 個；面板規則已顯示 {len(union) - len(hidden)} 個"
           + (f"；未顯示（多半被種子/配額截斷）: {' '.join(hidden)}" if hidden else "；無遗漏"))
+    if word_parts:
+        print(f"# 整串詞行（多音節讀音，碼前綴匹配，面板會按「最長已有前綴」收斂）：{len(word_parts)} 條")
+        for part in word_parts:
+            print(f"  {part['readings'][0]:<18} 词: {'/'.join(part.get('items', [])[:6])}")
+    else:
+        print("# 整串詞行：無")
 
 
 def cmd_build_syllables(args) -> None:
@@ -872,7 +900,7 @@ def cmd_selftest(args, data: Data) -> None:
     )
 
     # 4.5) 實際存在讀音集：必須是詞典音節、且覆蓋面板已顯示的讀音
-    exist4i = data.existing_readings("4i")
+    exist4i = [p for p in data.existing_readings("4i") if p["kind"] != "word"]
     union4i = {r for part in exist4i for r in part["readings"]}
     expect(bool(union4i), f"4i 實際存在讀音集非空（{len(union4i)}）")
     expect(union4i <= set(data.syllable_freq), "實際存在讀音集全部來自詞典音節")
@@ -881,7 +909,13 @@ def cmd_selftest(args, data: Data) -> None:
         shown4i <= union4i,
         f"面板顯示的讀音必須 ⊆ 實際存在集（漏: {sorted(shown4i - union4i)[:5]}）",
     )
-    union57 = {r for part in data.existing_readings("5i4a57") for r in part["readings"]}
+    all57 = data.existing_readings("5i4a57")
+    union57 = {r for part in all57 if part["kind"] != "word" for r in part["readings"]}
+    words57 = [p for p in all57 if p["kind"] == "word"]
+    expect(
+        any(p["readings"][0] == "li nak si" for p in words57),
+        f"整串詞行應含 li nak si，實際 {[p['readings'][0] for p in words57]}",
+    )
     shown57 = {g["reading"] for g in data.segment_groups("5i4a57") if g["segment"] == 0}
     expect(
         union57 <= shown57 or shown57 <= union57,

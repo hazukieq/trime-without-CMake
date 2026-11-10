@@ -524,13 +524,16 @@ $ python3 tools/panel_probe.py syllables "kl ghi mno abc kl ps"
   …
   li nak si   联想/词  首现于 6 键
 
+# 每個階段會分三行打印：單字組 / 聯想行 / 詞行（整串碼前綴，如 `li nak si=Linux/linux`）；
 # 尾部还会打印「實際存在讀音集」：詞典全量反查、不受面板 16/24 配額限制，
 # 用来核对「规则少给了 / 配额截掉了」哪些读音：
 $ python3 tools/panel_probe.py syllables "mno ghi" --no-stages
 # 實際存在讀音集（碼串 '4i'，詞典全量，不受配額限制）
   [single 4i|] 共 4: mi ni mh nh
   [split  4|i] 共 70: ma mai mak man … nut
-# 去重後實際存在 70 個；面板規則已顯示 18 個；未顯示（多半被種子/配額截斷）: …
+# 單音節：去重後實際存在 70 個；面板規則已顯示 18 個；未顯示（多半被種子/配額截斷）: …
+# 整串詞行（多音節讀音，碼前綴匹配，面板會按「最長已有前綴」收斂）：1 條
+  li nak si          词: Linux/linux
 
 $ python3 tools/panel_probe.py prefix 5i4a57
 li nak si   Linux linux
