@@ -38,10 +38,11 @@
 | 11 | [10-twelve-key-input-design.md](10-twelve-key-input-design.md) | **12 键（九宫格）客家话输入设计与实现方案**：librime 能力实证、comment 分组架构、JNI 候选枚举、交互规格、P0/P1/P2 | 要动手实现/评审 12 键时 |
 | 12 | [11-librime-upgrade-performance.md](11-librime-upgrade-performance.md) | **librime 1.7.3→1.17 升级 + rime-jni 独立工程 + 12 键简拼性能补丁**（三处补丁、simpleperf 数据、升级检查清单、踩坑表） | 动 JNI / 升级 librime / 排查按键卡顿 |
 | 13 | [13-perf-gate.md](13-perf-gate.md) | **12 键性能门禁**：一条命令触发微基准并判定（decode/segment/assoc/merge/engine/按键延迟/索引载入），阈值与排查顺序 | 改分组/联想词/排序/快照之后，或用户报「卡顿」时 |
-| 14 | [14-preedit-reading-fix-plan.md](14-preedit-reading-fix-plan.md) | 12 鍵 preedit 拼音與候選讀音對齊（**修復方案，待實施**） | 接這個 bug / 改 preedit 前 |
+| 14 | [14-preedit-reading-fix-plan.md](14-preedit-reading-fix-plan.md) | 12 鍵 preedit 拼音與候選讀音對齊（**已實施**，見 §9 實施記錄） | 接這個 bug / 改 preedit 前 |
 | 15 | [12-candidate-ranking.md](12-candidate-ranking.md) | **候选排序规则**：固定候选区「词组优先」+ 展开面板「用户常用→权威字频→引擎序」、数据源与公式、调参位、调试日志、单测映射、历史决策与排查清单 | 改候选排序 / 出现「生僻字靠前」「词组被单字挤掉」时 |
 | 18 | [16-librime-coverage-test.md](16-librime-coverage-test.md) | **librime 12 键覆盖测试（PC 端）**：真实词库/全量音节/全编码与简拼组合、11962 条用例、通过率与性能、结论与缺口 | 改 librime 补丁 / 怀疑「候选缺词」/ 评估补丁影响时 |
 | 17 | [15-librime-local-mods.md](15-librime-local-mods.md) | **librime 本地魔改清单 + 调试探针手册**：5 个补丁的影响面/风险、症状→补丁对照、探针指令（`!schema`/`!deploy`/`!feed`/`@`/`%`）、排查铁律（App → librime 魔改） | 出现「候选缺词/长词消失/卡顿/设置崩」时**先读这篇** |
+| 19 | [17-candidate-panel.md](17-candidate-panel.md) | **展开面板（Expand Panel）开发文档**：数据流、`TwelveKeySnapshot` 模型、段组/联想/整串码词行来源、排序分档、点击链路、性能红线、日志与排障（`diag.log`）、不变量与踩坑清单 | 改面板/候选排序/分组、排查「面板没有某行」「面板卡顿」时**先读这篇** |
 | 16 | [reports/](reports/README.md) | 构建 / 改名 / 集成 / 真机报告（**原样存档**） | 要查证据/细节时 |
 
 **最短路径**：00 → 03（把包装上）→ 05 §4（发版）→ 07（改数据）→ 06（出问题）。

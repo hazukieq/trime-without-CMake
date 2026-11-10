@@ -3248,6 +3248,10 @@ sum >= 輸入長  → 只顯示 comment（簡拼 `8 8`=ji jen、半截 `5i34i w`
 `RealCorpusTest` 的期望值同步改成同一语义（`coveredCodeLength`/`consumedCodeLength` 镜像一份在测试里，
 故意不共用实现代码）。全仓 `141 tests / 0 failures`。
 
+> **面板相关改动请先读 [17-candidate-panel.md](17-candidate-panel.md)**：那里把展开面板的
+> 数据流、分组来源、排序分档、点击链路、性能红线、`diag.log` 排障与踩坑清单整理成了一份
+> 面向开发的完整说明；本文（10）只记录设计与决策沿革。
+
 ## 15.78 面板聯想：三音節以上的詞（`li nak si` → Linux）2026-11-11
 
 用戶：`li nak s` 展開面板沒有 `li nak si` 的聯想詞，可詞庫裡明明有 `Linux<TAB>li nak si`。
