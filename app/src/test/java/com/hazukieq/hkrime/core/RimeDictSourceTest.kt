@@ -53,3 +53,49 @@ class RimeDictSourceTest {
         assertEquals(listOf("a"), RimeDictSource.parseImports(lines))
     }
 }
+
+/**
+ * 詞表行解析（用戶 2026-11-11：「我輸入 li nak si 都沒見到 li nak si 的聯想詞組」）。
+ *
+ * 他在 `hakka_zon.dict.yaml` 第 3539-3540 行加了 `Linux`/`linux<TAB>li nak si`，
+ * 而舊的 `loadWordLines` 只認「2~4 字全漢字、讀音靠 charTable 反推」的詞，
+ * 非漢字詞、以及帶讀音列的詞全被丟掉。
+ */
+class WordLineParsingTest {
+
+    @org.junit.Before
+    fun setUp() {
+        TwelveKeyPreedit.finishLoading(
+            hashMapOf(
+                "li" to 30, "nak" to 20, "si" to 10,
+                "ngin" to 40, "mang" to 5, "kang" to 5,
+            ),
+        )
+    }
+
+    @org.junit.Test
+    fun `non cjk word with reading column is indexed`() {
+        TwelveKeyPreedit.loadWordLines(sequenceOf("Linux\tli nak si", "linux\tli nak si"))
+        TwelveKeyPreedit.finishWordIndex()
+        val got = TwelveKeyPreedit.associatedWords("li", 'n', 100)
+        org.junit.Assert.assertTrue("li|n 應該有 Linux/linux，實際=$got", got.contains("Linux"))
+        org.junit.Assert.assertTrue(got.contains("linux"))
+    }
+
+    @org.junit.Test
+    fun `cjk word with reading column is indexed by its own reading`() {
+        TwelveKeyPreedit.loadWordLines(sequenceOf("猛劥\tmang kang"))
+        TwelveKeyPreedit.finishWordIndex()
+        org.junit.Assert.assertTrue(
+            TwelveKeyPreedit.associatedWords("mang", 'k', 100).contains("猛劥"),
+        )
+    }
+
+    @org.junit.Test
+    fun `text only list still falls back to char table readings`() {
+        TwelveKeyPreedit.loadWordLines(sequenceOf("你人"))
+        TwelveKeyPreedit.finishWordIndex()
+        // 「你人」兩字不在 charTable 裡 → 這條被跳過（不崩、不亂配）
+        org.junit.Assert.assertFalse(TwelveKeyPreedit.associatedWords("li", 'n', 100).contains("你人"))
+    }
+}

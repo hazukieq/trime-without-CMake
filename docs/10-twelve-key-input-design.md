@@ -3193,3 +3193,28 @@ context.assets.open("rime/hakka.dict.yaml")   // 只讀打包進 APK 的那份
 - 新增 6 條單測（`RimeDictSourceTest`：`bodyStart` 兩種情形、block/inline `import_tables`、
   本體誤匹配與註釋、去重）→ 全倉 **126 tests / 0 failures**。
 - 排查日誌：`RimeDictSource: main=file:... imports=...`（每進程一次）。
+
+### 15.68.5 詞表行解析：帶讀音列的詞、非漢字詞（2026-11-11 追加）
+
+用戶在 `hakka_zon.dict.yaml` 第 3539-3540 行加了：
+
+```
+Linux	li nak si
+linux	li nak si
+```
+
+但輸入 `li nak si` 的聯想詞裡沒有它。原因是舊的 `loadWordLines()`：
+`val word = raw.trim()` → 帶 `<TAB>讀音` 的行整行長度超過 2~4、且 `all { isCjk }` 也不成立，
+於是被**全部丟掉**——只有「純詞表」（sougou/places/poems 這種沒有讀音列的）才進過索引。
+
+現在改成：
+1. 有讀音列（`詞<TAB>音節 音節…`）→ 直接用**詞條自己的讀音**建索引，不再用 `charTable` 反推；
+2. 沒有讀音列 → 仍用 `charTable` 反推前兩字讀音（純詞表照舊）；
+3. 詞長限制分流：漢字詞仍限 2~4 字（整詞上屏更有用），**非漢字詞放寬到 1~16 字**
+   （`Linux`、`iPhone` 這類只能靠讀音定位，沒有「字」的概念）。
+
+驗證（用設備上真實的 `/sdcard/hkrime` 兩份詞典跑 JVM）：
+`loadDictLines(hakka.dict.yaml)` + `loadWordLines(hakka_zon.dict.yaml)` →
+`associatedWords("li", 'n') = [Linux, linux, 梨儿果, 鲤鱼]`，讀音行 `li` 有 `nak / ngh / nzi`。
+新增 3 條單測（非漢字詞帶讀音可入索引、漢字詞用自己讀音、純詞表仍回退 charTable）→
+全倉 **129 tests / 0 failures**。

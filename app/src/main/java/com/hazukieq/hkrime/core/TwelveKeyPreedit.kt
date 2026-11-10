@@ -246,14 +246,33 @@ object TwelveKeyPreedit {
      */
     internal fun loadWordLines(lines: Sequence<String>) {
         lines.forEach { raw ->
-            // 收 2~4 字詞：三/四字詞（共產黨、共產主義…）整詞上屏更有用，
-            // 用戶 2026-11-10 反饋「共產黨三個字拿不到」。
-            val word = raw.trim()
-            if (word.length !in 2..4) return@forEach
-            if (!word.all { isCjk(it) }) return@forEach
-            val r1 = charTable[word.substring(0, 1)] ?: return@forEach
-            val r2 = charTable[word.substring(1, 2)] ?: return@forEach
+            val line = raw.trim().removeSuffix("\r")
+            if (line.isEmpty() || line.startsWith("#")) return@forEach
+            val tab = line.indexOf('\t')
+            val word = (if (tab >= 0) line.substring(0, tab) else line).trim()
+            if (word.isEmpty()) return@forEach
+            // 詞表有兩種格式：
+            //  1) `詞<TAB>讀音`（hakka.dict / hakka_zon 這種）：讀音列直接可用，
+            //     不必拿 charTable 反推——`Linux<TAB>li nak si` 這種**非漢字詞**也只能靠它；
+            //  2) 純詞表（sougou/places/poems…）：只有詞面，用 charTable 反推前兩字讀音。
+            val reading = if (tab >= 0) line.substring(tab + 1).trim() else ""
+            val syllables = if (reading.isNotEmpty()) {
+                reading.split(' ', '\u3000').filter { it.isNotEmpty() }
+            } else {
+                if (word.length < 2) return@forEach
+                val r1 = charTable[word.substring(0, 1)] ?: return@forEach
+                val r2 = charTable[word.substring(1, 2)] ?: return@forEach
+                listOf(r1, r2)
+            }
+            if (syllables.size < 2) return@forEach
+            val r1 = syllables[0]
+            val r2 = syllables[1]
             if (r1.isEmpty() || r2.isEmpty()) return@forEach
+            // 詞長：漢字詞 2~4 字（三/四字詞整詞上屏更有用，用戶 2026-11-10）；
+            // 非漢字詞（Linux、iPhone…）放寬——它們通常只有 1 個「詞」，靠讀音定位。
+            val cjkOnly = word.all { isCjk(it) }
+            if (cjkOnly && word.length !in 2..4) return@forEach
+            if (!cjkOnly && word.length !in 1..16) return@forEach
             val key = "$r1|$r2"
             val bucket = assocWords.getOrPut(key) { LinkedHashMap() }
             bucket[word] = (bucket[word] ?: 0) + 1
