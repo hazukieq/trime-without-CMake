@@ -185,7 +185,8 @@ flowchart TD
   那些音节要打更多键才会命中）。只有「码只是前缀」（`7` = p/s，没有一个完整音节）时才做前缀展开；
   若 exact 为空会自动回退到展开，避免段组直接空掉。
 - 每个音节 → `charsForSyllable(syllable, SEGMENT_CHARS_LIMIT=1000)`（**列全部字**，
-  用户 2026-11-11：「要罗列完整，除非数量大到影响性能」；最大音节 `ji` 865 字）；
+  用户 2026-11-11：「要罗列完整，除非数量大到影响性能」；实测最大音节 `ji` 122 字、
+  `ki` 83、`fu` 76 —— 用 `tools/panel_probe.py chars ji` 可复现）；
 - 每项 `segment=0`、`restCode=rest`（点了之后剩余码回引擎，面板接着列下一段）。
 
 ### 7.2 联想行（两音节，`associatedBySegmentCode` / `associatedByReading`）
@@ -211,6 +212,57 @@ flowchart TD
 - **单音节行不吸收词行**（否则 `ka then` 会跑进 `ka` 的単字格里，破坏「这一段能选的字」语义）；
 - 收進去的候選保留自己的 `comment`（网格里仍显示完整读音），行内文字不分大小写去重；
 - 没有任何前缀行可并时，才用完整读音单独成行。
+
+### 7.5 拼音规则（12 键 ↔ 字母 ↔ 音节）——这一节是「段组读音」的规范
+
+> 用户 2026-11-11 的要求：**拼音规则必须清晰**。下面是当前实现的完整规则，改任何一条都要同步
+> `tools/panel_probe.py` 与本文档，并跑 `panel_probe.py selftest`。
+
+#### 7.5.1 键位 → 字母组
+
+| 键（键面） | 码 | 覆盖字母 | 键（键面） | 码 | 覆盖字母 |
+|---|---|---|---|---|---|
+| `abc` | `a` | `a b c` | `nz` | `y` | `n z` |
+| `def` | `e` | `d e f` | `th` | `w` | `t h` |
+| `ghi` | `i` | `g h i` | `ng` | `1` | `n g` |
+| `kl` | `5` | `k l` | `mn` | `4` | `m n` |
+| `ps` | `7` | `p s` | `qt` | `9` | `q t` |
+| `vur` | `3` | `v u r` | `zj` | `8` | `z j` |
+
+实现：`TwelveKeyPreedit.keyLetters`（源码唯一来源）。
+
+#### 7.5.2 音节拼写 → 码串（`codeOf`）
+
+顺序执行三条变换，再按上表逐字母换成码：
+
+1. `nz**` → `y**`；`th**` → `w**`；`ng**` → `1**`（三个双字母声母单独规则）；
+2. `(字母)o` → `(字母)4`、`(字母)u` → `(字母)3`（介音跟在声母后时并入前一位）；
+3. 逐字母映射（`a/b/c→a`、`d/e/f→e`、`g/h/i→i`、`k/l→5`、`m/n→4`、`p/s→7`、`v/r→3`、`z/j→8`、`q/t→9`）。
+
+例：`li → 5i`、`nak → 4a5`、`si → 7i`、`Linux(li nak si) → 5i4a57i`、`thok → w4…`、`ngin → 1i4`。
+
+#### 7.5.3 段码 → 面板左列的音节（当前规则）
+
+设用户输入的**本段**码为 `C`（多段时是 `remaining` 的某一段）：
+
+1. **整段恰好是一个音节码**（存在音节 `s` 使 `codeOf(s) == C`）：
+   **只列这些音节**（`exactOnly=true`）。例：`4i`→`mi/mh/ni/nh`、`ea`→`da/fa`、`74`→`po/so`。
+   理由（用户 2026-11-11）：音節已经打全，再列 `mia/min/miang…` 是噪音，那些音节要打更多键。
+2. **整段只是一个前缀**（没有任何音节码等于它）：按**前缀展开**列出以 `C` 开头的所有音节，
+   两级分桶（外层「下一码位」、内层「音节首字母」）轮转选取，避免某个首字母占满；
+   配额：普通键 16、音节丰富的键 24（`SEGMENT_SYLLABLE_LIMIT(_RICH)`，丰富 = 该码覆盖 ≥16 个音节）；
+   例：`7`→`pa/pai/pak/…`（ps 键），`e`→`da/dai/…`。
+3. **多切法**（`splitHeads`）：额外给出「head 恰为完整音节」的切法（最多 2 种，由长到短），
+   备选切法配额减半（`SECONDARY_SPLIT_DIVISOR=2`）。例：`74ii` → `74i|i`（poi/soi）+ `74|ii`（po/so）；
+   一个切法都切不出时退化为「首码 + 其余」（`855` → `8|55`），让面板至少能列首字母对应的音节。
+4. **简拼的语义**（用户 2026-11-11 的规则说明）：
+   lio 引擎允许「每个音节只打首字母」——通配写法是 `m** g**`、`m** h**`、`n** g**`、`n** h**`；
+   **但展开面板里必须给出具体音节**（`man/mau/men…` 这些由 `m**` 展开出来的真实音节），
+   不能显示通配。这就是 §7.5.3-2/3 在做的事：通配在候选条/引擎里生效，面板负责把它「具体化」。
+5. `exact` 为空时自动回退到前缀展开（防止某个段组变空）。
+
+配额与总数上限：`limit` 是该切法里每个首字母的最小名额，总数再受
+`totalCap = max(limit, min(limit × 桶数, MAX_SYLLABLES_TOTAL))` 约束（`MAX_SYLLABLES_TOTAL = SEGMENT_SYLLABLE_LIMIT`）。
 
 ### 7.4 多音节词典词行（`wordsByCodePrefix`，2026-11-11 新增）
 
@@ -421,6 +473,37 @@ HH:mm:ss.SSS D/snapshot[thread] build code=5i4a57 wantGroups=true groups=215 bar
 
 > 注意：单元测试**覆盖不到**用户词典的真实形态（例如三层权重栏、同词多条读音）。
 > 因此面板类改动必须：跑完单测 + 装机 + 用 `diag.log` 在真机核一遍（用户 2026-11-11 明确要求）。
+
+### 15.4 离线复现脚本（`tools/panel_probe.py`）
+
+面板的左列音节、单字、联想词、整串码词行都能**不装机**复现，用于对照/回归：
+
+```bash
+python3 tools/panel_probe.py pull                 # 从真机 adb 拉词库到 /tmp/hkrime-real-data
+python3 tools/panel_probe.py syllables 4i         # 段码 → 左列音节组（标 exact/prefix、切法、剩余码）
+python3 tools/panel_probe.py chars ji             # 音节 → 全部单字（--limit 截断）
+python3 tools/panel_probe.py assoc li 4a5         # 联想词（第一音节 + 剩余码前缀）
+python3 tools/panel_probe.py prefix 5i4a57        # 整串码前缀（多音节词，如 li nak si → Linux）
+python3 tools/panel_probe.py panel 5we            # 整个左列（含联想/词行/收敛/排序）
+python3 tools/panel_probe.py selftest             # 文档样例自检（0 失败才提交）
+```
+
+脚本是**参考实现**（镜像 Kotlin 的 `codeOf`/`splitHeads`/`syllablesForSegment`/联想/整串码/
+`collapsePrefixRows`），规则改了必须同步改脚本 + 本文档 + `selftest` 用例。
+
+样例输出（真实词库）：
+
+```
+$ python3 tools/panel_probe.py syllables 4i
+mi  mh  ni  nh                       ← 整段是一个音节：只列它（exactOnly）
+man mau men min mo mu mui …          ← 另一切法 4|i：m**/n** 具体音节（配额内）
+
+$ python3 tools/panel_probe.py prefix 5i4a57
+li nak si   Linux linux
+
+$ python3 tools/panel_probe.py selftest
+7 条全部 ok，0 条失败
+```
 
 ### 15.2 PC 侧引擎覆盖测试
 
