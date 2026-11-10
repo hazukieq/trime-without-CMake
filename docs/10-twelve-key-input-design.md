@@ -2650,6 +2650,7 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
 | 2 | hint 取 `mContext.getCandidates()[0]`，那是引擎 menu 順序，不是候選條順序（App 重排過） | `TextInputManager.onTwelveKeySnapshot()` 把 `snapshot.barItems.firstOrNull()` 的 text/comment 發布到 `TwelveKeyPreedit.preferredText/preferredComment`；`Rime.getComposition()` 優先讀它們 |
 | 3 | `‸`(U+2038) 光標標記、空格分隔的半截碼沒處理 | `rewrite` 先剝 `‸` 再切「已選前綴 / 尾部碼段」；碼段按空格**逐段** decode，某段切不出完整音節時保留「最長可解碼頭部 + 尾部碼位字母」（`w`→`th`） |
 | 4 | 殘留 comment（上一條候選的讀音被套到這串碼上） | 不靠本地校驗，靠**同源 + 時序**：comment 與候選條文字在同一個 `onTwelveKeySnapshot()` 裡發布，快照落地後再重畫一次 preedit（見下），所以畫面上的拼音和畫面上的首條永遠是同一份快照 |
+| 5 | 首條本身只覆蓋**部分**輸入（打完整三音節，首條卻是兩音節的詞） | 修**候選排序**：`CandidateRanking.rankWithLearning` 讓「用戶用字記憶」只在**同一覆蓋深度**內重排（深度 = comment 音節數，封頂到引擎首條的深度），淺覆蓋的詞永遠排不到深覆蓋的前面 |
 
 > **為甚麼不拿本地解碼去校驗 comment**（用戶 2026-11-10 定調）：「12 鍵性質決定了多對多，
 > 根本不需要固定編碼」。同一串碼沒有唯一讀音 —— `5i34i` 既可以是 kiung（1 個音節），
@@ -2666,6 +2667,14 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
 補一次 `trime.updateComposing()`；並用 `TextInputManager.suppressSnapshotRefresh`
 抑制它內部那一輪重複的快照重建（當前快照已是最新）。
 
+> **為甚麼還要修排序**（用戶 2026-11-10 追加反饋：打完整 `5i34i wa4 e44i` = kiung than dong，
+> preedit 只剩 `kiung than`，最後一個 `dong` 被吃掉）：引擎給的候選順序本來是
+> `0:共产党/kiung than dong → 1:共产/kiung than → 2:穷/kiung …`，但 App 側學習記憶
+> （之前點過一次「共產」）把只覆蓋前兩音節的「共產」頂到了第一。preedit 忠實顯示首條讀音，
+> 於是第三個音節消失。preedit 這邊已經「顯示的必須是首條」，所以必須從排序下手：
+> 學習記憶只能在**同一覆蓋深度**內重排（`5i34iw` 首條仍是學過的「共產」，
+> 但三音節輸入時「共產黨」一定在「共產」前面）。
+
 不變量（實作時守住）：
 
 - 只改「顯示」：改寫結果只進 `composition.copy()`，**不寫回** `mContext.composition`
@@ -2674,9 +2683,10 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
 - 只在 `hakka_jiugong` 生效；26 鍵/其他方案走原路徑，零改動。
 - 不影響候選排序策略、熱門組、性能門禁閾值。
 
-新增 12 個單測（`AssociatedWordsTest`，全量 67 tests / 0 failures）：comment 優先（單字/雙字詞/三字詞）/
+新增 12 個單測（`AssociatedWordsTest`）+ 5 個排序單測（`CandidateRankingTest`，全量 72 tests / 0 failures）：comment 優先（單字/雙字詞/三字詞）/
 comment 原樣採信、無 comment 才本地解碼 / 剝 `［…］` 包裝 / 剝 `‸` / 半截碼映射 / 保留前綴 / 無碼段回 null。
 
-真機：`5i34i` 首條「理會」（詞）→ preedit `li voi`；`5i34iw` 首條「共產」→ `kiung than`、
+真機：打完整三音節 `5i34i wa4 e44i` → 首條「共產黨」、preedit `kiung than dong`（修好前被吃掉最後一節）；
+`5i34i` 首條「理會」（詞）→ preedit `li voi`；`5i34iw` 首條「共產」→ `kiung than`、
 首條「窮酸」→ `kiung thon`；`744ii`（librime preedit `744 ii‸`，帶空格）→ 首條「船寄」`son gi`；
 `perf-gate.py` PASS（latency_p90 44.3ms，閾值 80）。

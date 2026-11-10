@@ -323,6 +323,74 @@ class CandidateRankingTest {
         )
     }
 
+    // -------------------------------------------------- 學習排序（覆蓋深度優先）
+
+    @Test
+    fun rankWithLearningKeepsDeeperCandidateFirst() {
+        // 用戶 2026-11-10：「打完整 kiung than dong，最後一個 dong 被吃掉」。
+        // 候選條第一條必須是覆蓋三音節的「共產黨」，不能是以前選過、只覆蓋兩音節的「共產」。
+        val engine = listOf(
+            item("共产党", "kiung than dong", 0),
+            item("共产", "kiung than", 1),
+            item("穷", "kiung", 2),
+        )
+        val learned = mapOf("共产" to 9000, "穷" to 9000)
+        val ranked = CandidateRanking.rankWithLearning(engine, topSyllables = 3) { learned[it.text] ?: 0 }
+        assertEquals(listOf("共产党", "共产", "穷"), ranked.map { it.text })
+    }
+
+    @Test
+    fun rankWithLearningReordersWithinSameDepth() {
+        // 同一覆蓋深度（都是兩音節）：學習分數說話 —— 這是「選過的詞往前排」的本意。
+        val engine = listOf(
+            item("穷酸", "kiung thon", 0),
+            item("共产", "kiung than", 1),
+            item("穷", "kiung", 2),
+        )
+        val ranked = CandidateRanking.rankWithLearning(engine, topSyllables = 2) {
+            if (it.text == "共产") 9000 else 0
+        }
+        assertEquals(listOf("共产", "穷酸", "穷"), ranked.map { it.text })
+    }
+
+    @Test
+    fun rankWithLearningHandlesSingleCharDepth() {
+        // 兩音節輸入時單字是「淺一層」：學習過也要排在兩音節詞後面（詞組優先），
+        // 但同為單字時學習分數仍然有效。
+        val engine = listOf(
+            item("里", "li", 0),
+            item("理会", "li voi", 1),
+            item("柳眉", "liu mei", 2),
+            item("柳", "liu", 3),
+        )
+        val ranked = CandidateRanking.rankWithLearning(engine, topSyllables = 2) {
+            when (it.text) {
+                "里" -> 9000
+                "柳眉" -> 8000
+                else -> 0
+            }
+        }
+        assertEquals(listOf("柳眉", "理会", "里", "柳"), ranked.map { it.text })
+    }
+
+    @Test
+    fun rankWithLearningFallsBackToPureLearningWhenDepthUnknown() {
+        // 引擎沒給 comment（方案沒開 spelling_hints）→ 深度未知，退化為純學習排序。
+        val engine = listOf(item("甲", "", 0), item("乙", "", 1))
+        val ranked = CandidateRanking.rankWithLearning(engine, topSyllables = 0) {
+            if (it.text == "乙") 9000 else 0
+        }
+        assertEquals(listOf("乙", "甲"), ranked.map { it.text })
+    }
+
+    @Test
+    fun syllableCountCountsSpaces() {
+        assertEquals(3, CandidateRanking.syllableCount("kiung than dong"))
+        assertEquals(1, CandidateRanking.syllableCount("kiung"))
+        assertEquals(0, CandidateRanking.syllableCount(""))
+        assertEquals(0, CandidateRanking.syllableCount("   "))
+    }
+
     @Test
     fun orderGroupsKeepsEngineOrderWhenScoresTie() {
         val groups = (1..4).map { CandidateRanking.groupCandidates(listOf(item("字$it", "ji", it))).first() }

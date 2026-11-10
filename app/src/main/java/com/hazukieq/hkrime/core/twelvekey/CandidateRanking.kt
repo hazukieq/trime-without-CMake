@@ -74,6 +74,35 @@ object CandidateRanking {
             .thenByDescending { tieBreak(it) },
     )
 
+    /** comment 的音節數（空白分隔）；空 comment 記 0。 */
+    fun syllableCount(comment: String): Int =
+        if (comment.isBlank()) 0 else comment.split(' ').count { it.isNotBlank() }
+
+    /**
+     * 套用「用戶用字記憶」的排序（候選條用）。
+     *
+     * 主鍵 = **覆蓋深度**（候選讀音的音節數，封頂到引擎首條的深度），次鍵 = 學習分數，再次 = 引擎下標。
+     *
+     * 為甚麼要做覆蓋深度：`共產` 的讀音是 `kiung than`（2 音節），`共產黨` 是 `kiung than dong`（3 音節）。
+     * 用戶打的是三音節的碼，但因為以前選過「共產」，學習分數把它頂到第一 ——
+     * 候選條第一條變成只覆蓋前兩音節的詞，preedit 也就只顯示 `kiung than`，
+     * 第三個音節看起來「被吃掉」（用戶 2026-11-10 反饋）。
+     * 覆蓋更深的候選永遠排在前面，學習只在同一深度內決定先後。
+     *
+     * @param topSyllables 引擎首條候選的音節數（= 引擎認為這段碼最完整的讀法）；≤0 表示未知，退化為純學習排序
+     * @param score 學習分數（[SelectionMemory.score] 之類），分數高的排前
+     */
+    fun rankWithLearning(
+        items: List<CandidateItem>,
+        topSyllables: Int,
+        score: (CandidateItem) -> Int,
+    ): List<CandidateItem> = items.sortedWith(
+        compareByDescending<CandidateItem> {
+            if (topSyllables <= 0) 0 else minOf(syllableCount(it.comment), topSyllables)
+        }.thenByDescending { score(it) }
+            .thenBy { it.index },
+    )
+
     /**
      * 按 comment 分組（面板左列）：空白 comment 併成一組「…」並排在最後；
      * 其餘組順序 = 單音節組在前（先手動選單字，用戶 2026-11-08），再按音節數升序，同音節數按 reading。
