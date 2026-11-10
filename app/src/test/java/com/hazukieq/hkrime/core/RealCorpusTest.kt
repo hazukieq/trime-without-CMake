@@ -40,8 +40,12 @@ class RealCorpusTest {
             File(System.getenv("HKRIME_CORPUS") ?: "/tmp/hkrime-corpus.jsonl")
         }
 
-        private val records: List<Record> by lazy {
-            corpusFile.readLines().mapNotNull { line ->
+        /** 用戶詞庫（hakka.userdb）導出的語料：用戶真打出來的音節組合（2026-11-11 要求納入）。 */
+        private val userDbCorpusFile: File by lazy {
+            File(System.getenv("HKRIME_CORPUS_USERDB") ?: "/tmp/hkrime-corpus-userdb.jsonl")
+        }
+
+        private fun parse(file: File): List<Record> = file.readLines().mapNotNull { line ->
                 if (line.isBlank()) return@mapNotNull null
                 val code = field(line, "code") ?: return@mapNotNull null
                 val pre = field(line, "preedit") ?: ""
@@ -49,8 +53,11 @@ class RealCorpusTest {
                     .findAll(line)
                     .map { Cand(unescape(it.groupValues[1]), unescape(it.groupValues[2])) }
                     .toList()
-                Record(code, pre, cands)
-            }
+            Record(code, pre, cands)
+        }
+
+        private val records: List<Record> by lazy {
+            parse(corpusFile) + parse(userDbCorpusFile)
         }
 
         private fun field(line: String, name: String): String? =
@@ -85,6 +92,10 @@ class RealCorpusTest {
         fun loadRealDictionary() {
             assumeTrue("真實數據快照不存在：$realDataDir（跑 pull-real-data.sh）", realDataDir.isDirectory)
             assumeTrue("語料不存在：$corpusFile（跑 run-host-test.sh --corpus ...）", corpusFile.isFile)
+            assumeTrue(
+                "用戶詞庫語料不存在：$userDbCorpusFile（跑 run-host-test.sh --userdb … --corpus-userdb …）",
+                userDbCorpusFile.isFile,
+            )
 
             // 與 RimeDictSource 同樣的展開規則：主詞典 + import_tables（block / inline）。
             val main = File(realDataDir, "hakka.dict.yaml")

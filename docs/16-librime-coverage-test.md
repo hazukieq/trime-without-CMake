@@ -132,3 +132,21 @@ cd rime-jni/host-test
 - `abbrev-shadowed` 0% 是 rime 的设计（完整音節读法优先），**不是**缺陷；这类不需要修。
 - `custom_phrase.txt` 当前为空，用例为 0；用户一旦加词，测试会自动覆盖。
 - 真机侧只需在补丁更新后重编 `.so` + 装机；性能门禁（`docs/13`）可在真机上复核简拼的按键延迟。
+
+## 5. 用例来源补充：用戶詞庫（hakka.userdb）
+
+用戶 2026-11-11 要求「hakka.userdb 也加入測試集，裡面有最真實的音節組合」。
+`pull-real-data.sh` 現在會順便拉 `/sdcard/hkrime/sync/*/*.userdb.txt`（librime sync 的導出），
+覆蓋測試新增 `userdb` 類：**66236 條**（70258 行裡濾掉 `c<=0`，再按「碼串|文字」去重）。
+
+```
+userdb   total=  66236 found= 27750 ( 41.90%)
+```
+
+**這 41.9% 不是缺陷指標，不要當門檻**：userdb 的 key 是**音節拼寫**（`ba ba ma ma`），
+而 12 鍵輸入是數字串（`aaaa4a4a`）——`table_translator` 查 userdb 用的是原始輸入串，
+拼寫 key 命中不了；12 鍵的「記住」實際走 App 側 `PhraseMemory` 合成候選 / `custom_phrase` 編碼表。
+實測：`--dump aaaa4a4a` 有 51 條候選、`爸爸` 在列，但 `爸爸妈妈`（userdb 裡 c=1）不在。
+
+所以 userdb 的價值在**preedit / 面板的真實語料**（見 `docs/10` §15.67.4：
+`--corpus-userdb` 生成 30000 幀，全部通過），不是覆蓋率分母。

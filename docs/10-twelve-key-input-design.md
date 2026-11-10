@@ -3198,7 +3198,10 @@ preedit='5i 4a57‸'
 2. `run-host-test.sh --corpus /tmp/hkrime-corpus.jsonl`：把詞庫裡**每個詞**的碼串、
    簡拼（每節首鍵）、以及**逐鍵前綴**（打字過程的每一幀）餵進 PC 版 librime，
    記錄它給的原始 `preedit` + 前 40 條候選（含 comment）。
-   本次快照 **12954 幀**（11962 個真實詞條的 code × 變體）。
+   本次快照 **12954 幀**（11962 個真實詞條的 code × 變體）；
+3. 另外把**用戶詞庫**納入（用戶 2026-11-11："hakka.userdb 也加入測試集，裡面有最真實的音節組合"）：
+   `--userdb /tmp/hkrime-real-data/hakka.userdb.txt --corpus-userdb /tmp/hkrime-corpus-userdb.jsonl`
+   生成 **30000 幀**（15000 個用戶真實碼串的全碼 + 簡拼），與詞典語料一起斷言。
 
 **規則修正**：尾碼邊界原來用本地 DP（`decodeSpans`）或「逐節匹配 comment 的音節碼」算，
 兩者在 12 鍵「同碼多音節」下都不可靠：
