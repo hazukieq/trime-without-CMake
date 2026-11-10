@@ -237,15 +237,15 @@ object TwelveKeySnapshotBuilder {
             .sortedWith(
                 compareBy(
                     {
-                        // 分檔只看「音節數」：單音節一檔、**所有多音節行一檔**、無讀音一檔。
+                        // 分檔只看「**讀音**有幾個音節」：單音節一檔、多音節一檔、無讀音一檔。
                         //
-                        // 以前把「App 聯想行（segment=1）」和「引擎詞組」分成兩檔，結果同一串
-                        // `li …` 的多音節行被劈成兩段（聯想行全部排在引擎詞組前面），
-                        // 用戶找 `li nak si` 時在 `li na` 後面找不到（2026-11-11）。
-                        when {
-                            it.syllables.size == 1 -> 0
-                            it.syllables.size >= 2 -> 1
-                            else -> 2
+                        // 注意：不能用 `syllables.size` —— 引擎組的 `syllables` 只是
+                        // `listOf(reading)`（1 個元素），`ka then` 這種兩音節詞會被誤判成單音節，
+                        // 結果混進單音節檔裡（用戶 2026-11-11：`ko thiau` / `ko thiau fa` 不在同一段）。
+                        when (readingSyllableCount(it)) {
+                            0 -> 2
+                            1 -> 0
+                            else -> 1
                         }
                     },
                     {
@@ -566,6 +566,10 @@ object TwelveKeySnapshotBuilder {
      * 用於「字典多音節詞行」：它們和引擎/聯想行可能同讀音，必須合併成一格，
      * 否則面板會出現兩行相同的 `讀音 → 詞`（用戶 2026-11-11 的 `deepseek` 重複）。
      */
+    /** 一行的讀音有幾個音節（`ko thiau fa` = 3）；空白/「推薦」組回 0。 */
+    private fun readingSyllableCount(group: SyllableGroup): Int =
+        group.reading.split(' ').count { it.isNotBlank() }
+
     private fun mergeRowsByReading(
         base: List<SyllableGroup>,
         extra: List<SyllableGroup>,
@@ -573,7 +577,22 @@ object TwelveKeySnapshotBuilder {
         if (extra.isEmpty()) return base
         val out = base.toMutableList()
         for (row in extra) {
-            val idx = out.indexOfFirst { it.reading == row.reading }
+            // 先找**同讀音**；沒有就找「已有行是它的前綴」（`ko thiau` 之于 `ko thiau fa`）。
+            // 用戶 2026-11-11：整串碼是「開頭相同匹配」的，長詞就該落在那個更短的讀音行裡，
+            // 不該再單獨起一行，否則 `ko thiau` / `ko thiau fa` 看起來是兩個 list。
+            var idx = out.indexOfFirst { it.reading == row.reading }
+            if (idx < 0) {
+                val rowTokens = row.reading.split(' ').filter { it.isNotEmpty() }
+                var bestLen = 0
+                out.forEachIndexed { i, cand ->
+                    val candTokens = cand.reading.split(' ').filter { it.isNotEmpty() }
+                    if (candTokens.isEmpty() || candTokens.size >= rowTokens.size) return@forEachIndexed
+                    if (rowTokens.take(candTokens.size) == candTokens && candTokens.size > bestLen) {
+                        bestLen = candTokens.size
+                        idx = i
+                    }
+                }
+            }
             if (idx < 0) {
                 out.add(row)
                 continue
