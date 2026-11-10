@@ -998,6 +998,7 @@ def cmd_syllables(args, data: Data) -> None:
             shown = ", ".join("·".join(c) for c in combos[:8])
             tail = "" if len(combos) <= 8 else f" …（共 {len(combos)} 组）"
             print(f"   {length}键组合({len(combos)}): " + (shown + tail if combos else "（无）"))
+            print('     注：组合里每个字母都隐含「≥1 个字母」（如 g·b = g.* 与 b.*，元音不限）')
             # 3) 实际存在的词语：按组合 → 真实词条（行标题=具体读音）
             words_by_combo: "OrderedDict[str, list[str]]" = OrderedDict()
             for reading, words in data.initial_pattern_rows(prefix, max_rows=32):
@@ -1011,19 +1012,28 @@ def cmd_syllables(args, data: Data) -> None:
             else:
                 print("   实际存在词语: （无）")
             # 4) 联想行：合成音节选完之后的后缀联想（`ga` → `ga zi=挂纸`）
+            def combo_of(reading: str) -> str:
+                return "·".join(t[0] for t in reading.split(" "))
+
             assoc_rows = [g for g in rows if g["segment"] == 1 and g.get("source") == "assoc"]
             if assoc_rows:
                 print(
-                    "   联想行(两音节，词典联想索引): "
-                    + ", ".join(f"{g['reading']}={','.join(g['items'][:2])}" for g in assoc_rows[:8])
+                    "   联想行(两音节，词典联想索引; 方括号是它的首字母序列): "
+                    + ", ".join(
+                        f"{g['reading']}={','.join(g['items'][:2])} [{combo_of(g['reading'])}]"
+                        for g in assoc_rows[:8]
+                    )
                     + (" …" if len(assoc_rows) > 8 else "")
                 )
             # 5) 整串词行（多音节词条，未收敛）
             word_rows = data.prefix_word_rows(prefix)
             if word_rows:
                 print(
-                    "   整串词行: "
-                    + "；".join(f"{w['reading']}={','.join(w['items'][:3])}" for w in word_rows)
+                    "   整串词行(码前缀匹配; 方括号是它的首字母序列): "
+                    + "；".join(
+                        f"{w['reading']}={','.join(w['items'][:3])} [{combo_of(w['reading'])}]"
+                        for w in word_rows
+                    )
                 )
         print()
     print(f"# 码串 {args.codes!r} 累积去重后共 {len(unique)} 个读音（按首次出现的键数排序）")
