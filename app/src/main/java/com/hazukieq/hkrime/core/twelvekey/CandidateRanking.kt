@@ -15,6 +15,10 @@ object CandidateRanking {
     fun isCjkWord(text: String): Boolean =
         text.length >= 2 && text.all { it.code in 0x3400..0x4DBF || it.code in 0x4E00..0x9FFF }
 
+    /** 單個漢字（段組只會從字典拿這種字）。ASCII/符號/顏文字一律不算。 */
+    fun isSingleCjkChar(text: String): Boolean =
+        text.length == 1 && (text[0].code in 0x3400..0x4DBF || text[0].code in 0x4E00..0x9FFF)
+
     /**
      * 固定候選區的「詞組優先」：對**已排好序**的候選做穩定分區。
      *
@@ -213,8 +217,14 @@ object CandidateRanking {
         engineGroups: List<SyllableGroup>,
     ): List<SyllableGroup> {
         if (segmentGroups.isEmpty()) return engineGroups
-        val words = engineGroups.filter { it.syllables.size >= 2 }
-        return segmentGroups + words
+        // 有段組時只保留「段組不可能覆蓋」的引擎組：
+        // 1) 詞組組（≥2 音節），段組只管單字；
+        // 2) 含有**非漢字單字**的組（ASCII 字母/符號/顏文字）——段組的字全部來自字典，
+        //    這些候選永遠不會出現在段組裡；之前整組被丟掉，於是候選條上有 `a`/`A`、
+        //    展開面板卻找不到（用戶 2026-11-11 報「輸入 qe 面板裡沒有固定條上的字母」）。
+        return segmentGroups + engineGroups.filter { group ->
+            group.syllables.size >= 2 || group.items.any { !isSingleCjkChar(it.text) }
+        }
     }
 
     /**

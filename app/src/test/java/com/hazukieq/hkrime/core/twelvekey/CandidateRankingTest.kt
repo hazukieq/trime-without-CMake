@@ -555,4 +555,45 @@ class CandidateRankingTest {
         assertTrue(recommend.all { CandidateRanking.isCjkWord(it.text) })
         assertEquals(TwelveKeyTuning.RECOMMEND_ITEMS, recommend.size)
     }
+
+    @Test
+    fun `panelGroups keeps engine groups with non CJK singles when segment groups exist`() {
+        val segment = SyllableGroup(
+            reading = "ji",
+            syllables = listOf("ji"),
+            items = listOf(item("以", "ji", -1, segment = 0), item("而", "ji", -1, segment = 0)),
+            segment = 0,
+        )
+        val asciiGroup = SyllableGroup(
+            reading = "a",
+            syllables = listOf("a"),
+            items = listOf(item("a", "a", 3), item("A", "a", 4)),
+        )
+        val cjkDupGroup = SyllableGroup(
+            reading = "ji",
+            syllables = listOf("ji"),
+            items = listOf(item("已", "ji", 9)),
+        )
+        val wordGroup = SyllableGroup(
+            reading = "ji jen",
+            syllables = listOf("ji", "jen"),
+            items = listOf(item("醫院", "ji jen", 0)),
+        )
+        val merged = CandidateRanking.panelGroups(
+            listOf(segment),
+            listOf(asciiGroup, cjkDupGroup, wordGroup),
+        )
+        assertEquals(listOf("ji", "a", "ji jen"), merged.map { it.reading })
+        // ASCII 那組的內容原樣保留
+        assertEquals(listOf("a", "A"), merged[1].items.map { it.text })
+    }
+
+    @Test
+    fun `panelGroups returns engine groups untouched when there is no segment group`() {
+        val engine = listOf(
+            SyllableGroup("ji", listOf("ji"), listOf(item("以", "ji", 0))),
+            SyllableGroup("a", listOf("a"), listOf(item("a", "a", 1))),
+        )
+        assertEquals(engine, CandidateRanking.panelGroups(emptyList(), engine))
+    }
 }
