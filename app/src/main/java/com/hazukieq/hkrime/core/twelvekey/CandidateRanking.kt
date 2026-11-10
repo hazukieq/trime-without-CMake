@@ -90,26 +90,16 @@ object CandidateRanking {
     fun mergePhraseCandidates(
         ranked: List<CandidateItem>,
         synthetic: List<CandidateItem>,
-        scoreOf: (CandidateItem, Int) -> Double,
-        dropTexts: Set<String> = emptySet(),
+        syntheticScore: (CandidateItem) -> Double,
+        engineScore: (Int) -> Double,
     ): List<CandidateItem> {
-        if (synthetic.isEmpty() && dropTexts.isEmpty() && ranked.none { it.learnedCode.isNotEmpty() }) {
-            return ranked
-        }
+        if (synthetic.isEmpty()) return ranked
         val merged = ArrayList<Pair<CandidateItem, Double>>(ranked.size + synthetic.size)
-        ranked.forEachIndexed { i, item ->
-            // App 判為誤造（曝光很多、一次沒選、只拼過一次）→ 連引擎那條一起藏掉。
-            if (dropTexts.contains(item.text)) return@forEachIndexed
-            merged.add(item to scoreOf(item, i))
-        }
-        synthetic.forEach { item ->
-            if (dropTexts.contains(item.text)) return@forEach
-            merged.add(item to scoreOf(item, -1))
-        }
+        ranked.forEachIndexed { i, item -> merged.add(item to engineScore(i)) }
+        synthetic.forEach { merged.add(it to syntheticScore(it)) }
         return merged.sortedWith(
             compareByDescending<Pair<CandidateItem, Double>> { it.second }
-                .thenBy { if (it.first.segment == SYNTHETIC_SEGMENT) 1 else 0 }
-                .thenBy { it.first.index },
+                .thenBy { if (it.first.segment == SYNTHETIC_SEGMENT) 1 else 0 },
         ).map { it.first }
     }
 

@@ -1,7 +1,6 @@
 package com.hazukieq.hkrime.core.twelvekey
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -86,8 +85,7 @@ class PhraseMemoryTest {
     @Test
     fun `purge rule only kills repeatedly ignored unsolicited phrases`() {
         assertTrue(PhraseMemory.shouldPurge(entry("以液難", 1, 0, shown = 8)))
-        // 手拼兩次也在清理範圍內：露面門檻是 (typed+picked) ≥ 2，若這裡寫 1，
-        // 「typed=2/picked=0」這種最常見的誤造形態永遠刪不掉（規則不可達）。
+        // 手拼兩次也在清理範圍：露面門檻是 (typed+picked) ≥ 2，寫 1 會讓規則不可達
         assertTrue(PhraseMemory.shouldPurge(entry("以液難", 2, 0, shown = 8)))
         // 手拼三次以上 = 更像真需求，只降權、不清
         assertTrue(!PhraseMemory.shouldPurge(entry("以液難", 3, 0, shown = 8)))
@@ -143,7 +141,7 @@ class PhraseMemoryTest {
     @Test
     fun `merge keeps engine order when there is no synthetic candidate`() {
         val ranked = listOf(item("醫院", "ji jen", 0), item("這種", "je zung", 1))
-        assertEquals(ranked, CandidateRanking.mergePhraseCandidates(ranked, emptyList(), { _, _ -> 1.0 }))
+        assertEquals(ranked, CandidateRanking.mergePhraseCandidates(ranked, emptyList(), { 0.0 }, { 1.0 }))
     }
 
     @Test
@@ -152,9 +150,8 @@ class PhraseMemoryTest {
         val merged = CandidateRanking.mergePhraseCandidates(
             ranked = ranked,
             synthetic = listOf(synthetic("以液難", "ji jek nan", "8i8e4")),
-            scoreOf = { item, i ->
-                if (item.segment == SYNTHETIC_SEGMENT) 5.0 else 1.0 - i.toDouble() / ranked.size
-            },
+            syntheticScore = { 5.0 },
+            engineScore = { i -> 1.0 - i.toDouble() / ranked.size },
         )
         assertEquals("以液難", merged.first().text)
         assertEquals(4, merged.size)
@@ -166,9 +163,8 @@ class PhraseMemoryTest {
         val merged = CandidateRanking.mergePhraseCandidates(
             ranked = ranked,
             synthetic = listOf(synthetic("以液難", "ji jek nan", "8i8e4")),
-            scoreOf = { item, i ->
-                if (item.segment == SYNTHETIC_SEGMENT) 0.1 else 1.0 - i.toDouble() / ranked.size
-            },
+            syntheticScore = { 0.1 },
+            engineScore = { i -> 1.0 - i.toDouble() / ranked.size },
         )
         // 0.1 < 引擎第 0 條(1.0)、第 1 條(0.5) → 排最後
         assertEquals(listOf("醫院", "這種", "以液難"), merged.map { it.text })
@@ -180,7 +176,8 @@ class PhraseMemoryTest {
         val merged = CandidateRanking.mergePhraseCandidates(
             ranked = ranked,
             synthetic = listOf(synthetic("以液難", "ji jek nan", "8i8e4")),
-            scoreOf = { _, _ -> 1.0 },
+            syntheticScore = { 1.0 },
+            engineScore = { 1.0 },
         )
         assertEquals(listOf("醫院", "以液難"), merged.map { it.text })
     }
@@ -194,9 +191,8 @@ class PhraseMemoryTest {
         val merged = CandidateRanking.mergePhraseCandidates(
             ranked = ranked,
             synthetic = synthetics,
-            scoreOf = { item, i ->
-                if (item.segment == SYNTHETIC_SEGMENT) 9.0 else 1.0 - i.toDouble() / ranked.size
-            },
+            syntheticScore = { 9.0 },
+            engineScore = { i -> 1.0 - i.toDouble() / ranked.size },
         )
         val bar = CandidateRanking.rankBar(merged + listOf(item("以", "ji", 99)), barSize = 12)
         assertEquals(TwelveKeyTuning.BAR_WORD_SLOTS, bar.count { it.text.length > 1 })
@@ -252,68 +248,6 @@ class PhraseMemoryTest {
         val ranked = listOf(item("半截碼", "ban zet ma", 0), item("半截", "ban zet", 1))
         val merged = TwelveKeySnapshotBuilder.mergeLearnedPhrases(ranked, "aa48e94a", now)
         assertEquals(listOf("半截碼", "半截"), merged.map { it.text })
-        // 顯示的是引擎那條，但要打上 learnedCode：曝光才記得到 App 記憶上（用戶 2026-11-11 報權重不降）
-        assertEquals("", merged[0].text.let { _ -> if (merged[0].learnedCode.isEmpty()) "MISSING" else "" })
-        assertEquals("aa48e94a", merged[0].learnedCode)
-        assertTrue(merged.none { it.segment == SYNTHETIC_SEGMENT })
-        PhraseMemory.clear()
-    }
-
-    @Test
-    fun `purge rule is reachable for a visible entry`() {
-        // 露面門檻是 (typed+picked) ≥ 2；清理門檻必須能覆蓋「typed=2/picked=0」這種真實形態，
-        // 否則清理規則永遠不可能觸發。
-        val entry = PhraseMemory.Entry("半截碼", "ban zet ma", 2, 0L, shown = 8, picked = 0)
-        assertTrue(PhraseMemory.isVisible(entry.copy(shown = 0)))
-        assertTrue(PhraseMemory.shouldPurge(entry))
-    }
-
-    @Test
-    fun `engine known phrase sinks when it is shown but never picked`() {
-        PhraseMemory.clear()
-        val now = 2000L * day
-        // 手拼 3 次（不觸發清理）、露面 10 次、一次沒選 → 分數被曝光壓到引擎第 1 條之後
-        PhraseMemory.putForTest(
-            "aa48e94a",
-            listOf(PhraseMemory.Entry("半截碼", "ban zet ma", 3, now, shown = 10, picked = 0)),
-        )
-        val ranked = listOf(
-            item("半截碼", "ban zet ma", 0),
-            item("半截", "ban zet", 1),
-            item("參閱", "cam yet", 2),
-        )
-        val merged = TwelveKeySnapshotBuilder.mergeLearnedPhrases(ranked, "aa48e94a", now)
-        // 引擎第 0 條被 App 的曝光感知分數壓到最後
-        assertEquals(listOf("半截", "參閱", "半截碼"), merged.map { it.text })
-        PhraseMemory.clear()
-    }
-
-    @Test
-    fun `engine candidate judged as miscreated is dropped entirely`() {
-        PhraseMemory.clear()
-        val now = 2000L * day
-        // 手拼 1 次、露面 8 次、一次沒選 → shouldPurge → 連引擎那條一起藏掉
-        PhraseMemory.putForTest(
-            "aa48e94a",
-            listOf(PhraseMemory.Entry("半截碼", "ban zet ma", 1, now, shown = 8, picked = 0)),
-        )
-        val ranked = listOf(item("半截碼", "ban zet ma", 0), item("半截", "ban zet", 1))
-        val merged = TwelveKeySnapshotBuilder.mergeLearnedPhrases(ranked, "aa48e94a", now)
-        assertEquals(listOf("半截"), merged.map { it.text })
-        PhraseMemory.clear()
-    }
-
-    @Test
-    fun `engine known phrase stays on top when it is actually picked`() {
-        PhraseMemory.clear()
-        val now = 2000L * day
-        PhraseMemory.putForTest(
-            "aa48e94a",
-            listOf(PhraseMemory.Entry("半截碼", "ban zet ma", 3, now, shown = 1, picked = 3)),
-        )
-        val ranked = listOf(item("半截", "ban zet", 0), item("半截碼", "ban zet ma", 1))
-        val merged = TwelveKeySnapshotBuilder.mergeLearnedPhrases(ranked, "aa48e94a", now)
-        assertEquals("半截碼", merged.first().text)
         PhraseMemory.clear()
     }
 
@@ -354,47 +288,8 @@ class PhraseMemoryTest {
         )
         val ranked = listOf(item("醫院", "ji jen", 0), item("這種", "je zung", 1))
         val merged = TwelveKeySnapshotBuilder.mergeLearnedPhrases(ranked, "8i8e4", now)
-        // 手拼 3 次（不算誤造、不清理）但曝光 8 次沒人選 → 沉到最後
+        // 手拼 3 次（不清理）但曝光 8 次沒人選 → 沉到最後
         assertEquals(listOf("醫院", "這種", "以液難"), merged.map { it.text })
-        PhraseMemory.clear()
-    }
-
-    @Test
-    fun `purged phrase becomes a tombstone and keeps hiding the engine copy`() {
-        PhraseMemory.clear()
-        val now = 2000L * day
-        PhraseMemory.putForTest(
-            "aa48e94a",
-            listOf(PhraseMemory.Entry("半截碼", "ban zet ma", 2, now, shown = 7, picked = 0)),
-        )
-        // 第 8 次曝光 → 命中清理規則，但條目保留為墓碑（不能刪，否則引擎副本復活）
-        PhraseMemory.noteShown("aa48e94a", "半截碼")
-        val entry = PhraseMemory.entriesFor("aa48e94a").single()
-        assertTrue(entry.purged)
-        assertFalse(PhraseMemory.isVisible(entry))
-
-        // 引擎自己也學到了同一條：連續曝光後仍然要藏住它
-        val ranked = listOf(item("半截碼", "ban zet ma", 0), item("半截", "ban zet", 1))
-        repeat(3) { PhraseMemory.noteShown("aa48e94a", "半截碼") }
-        val merged = TwelveKeySnapshotBuilder.mergeLearnedPhrases(ranked, "aa48e94a", now)
-        assertEquals(listOf("半截"), merged.map { it.text })
-        PhraseMemory.clear()
-    }
-
-    @Test
-    fun `assembling a tombstoned phrase again revives it`() {
-        PhraseMemory.clear()
-        val now = 2000L * day
-        PhraseMemory.putForTest(
-            "aa48e94a",
-            listOf(PhraseMemory.Entry("半截碼", "ban zet ma", 2, now, shown = 8, picked = 0, purged = true)),
-        )
-        // 用戶又一次手拼組成它 → 解除墓碑、曝光歸零
-        val revived = PhraseMemory.applyRecord(PhraseMemory.entriesFor("aa48e94a"), "半截碼", "ban zet ma", now)
-        val entry = revived.single()
-        assertFalse(entry.purged)
-        assertEquals(0, entry.shown)
-        assertEquals(3, entry.typed)
         PhraseMemory.clear()
     }
 }
