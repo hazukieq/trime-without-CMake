@@ -3435,3 +3435,7 @@ feed candidates=308 hasLinux=true
 
 `Linux` 直接成了第一條候選（原來 153 條裡完全沒有）。單測/性能門禁：App 側無改動，
 perf-gate 需要真實鍵盤會話（本次未跑，待你正常打字時再確認 p90）。
+
+> **排查入口**：這類「詞庫有、候選沒有」的問題，先看
+> [15-librime-local-mods.md](15-librime-local-mods.md) —— 本地 librime 補丁（`0001`/`0003`）
+> 直接決定候選能不能被列舉出來，App 側排序只是其後的第二層。

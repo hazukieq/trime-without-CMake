@@ -1041,6 +1041,7 @@ public class Rime {
    * prism 認不認這些拼寫」。只在 debug 排查用（對應 librime ProbeDictEntry）。
    */
   public static native String probe_dict(String spacedSyllables);
+  public static native String probe_syllable(String input);
 
   public static native boolean is_maintenance_mode();
 

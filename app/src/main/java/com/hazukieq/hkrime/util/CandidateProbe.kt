@@ -98,6 +98,13 @@ object CandidateProbe {
                 all.take(8).forEachIndexed { i, c -> out.append("  #").append(i).append(' ').append(c).append('\n') }
             }.onFailure { out.append("feed ERROR: ").append(it).append('\n') }
         }
+        // `%5i4a57i` = 直接跑 syllabifier，印音節圖（邊/索引/歧義標記）
+        codes.filter { it.startsWith("%") }.forEach { line ->
+            val input = line.removePrefix("%").trim()
+            out.append("--- syllabify probe: ").append(input).append(" ---\n")
+            out.append(runCatching { Rime.probe_syllable(input) }.getOrElse { "probe ERROR: $it" })
+            out.append('\n')
+        }
         // `@li nak si` = 直接問詞典（不走輸入法譯碼路徑），看詞條到底在不在表裡
         codes.filter { it.startsWith("@") }.forEach { line ->
             val spaced = line.removePrefix("@").trim()

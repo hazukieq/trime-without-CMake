@@ -16,6 +16,7 @@
 ## 1. 四层定位法
 
 ```text
+L0 引擎魔改层 候选「有没有被枚举出来」？→ librime 本地补丁（见 [15](15-librime-local-mods.md)）
 L1 构建层   能不能编出来？        → gradlew / 环境 / NDK / 签名
 L2 装载层   .so 能不能加载？      → UnsatisfiedLinkError / dlopen / 符号 / 页对齐
 L3 运行层   键盘能不能出？        → IME 启用/选择、service 绑定、权限、递归卡死
@@ -23,6 +24,11 @@ L4 数据层   能不能出字？          → 方案、词典、OpenCC、部署
 ```
 
 从下往上排除，**不要跳层**：候选为空是 L4，但如果是 L2 崩了也会表现成「键盘空白」。
+
+> **L0 是新增的必查层**：`rime-jni` 里的 librime 不是官方 1.17.0，打了 5 个本地补丁，
+> 其中 `0001`（12 键简拼性能：table 展开预算 + 分支排序）和 `0003`（全码路径兜底）
+> **直接决定候选能不能被枚举出来**。症状是「词库里有的词候选里没有 / 长词消失 / 时好时坏」时，
+> 先看 [15-librime-local-mods.md](15-librime-local-mods.md) §3 的症状对照表，再往下查词库与部署。
 
 | 层 | 一句话判据 |
 |---|---|
@@ -50,6 +56,7 @@ L4 数据层   能不能出字？          → 方案、词典、OpenCC、部署
 | 首次启动卡在权限页，拒绝后循环弹 | L3 | `LauchAct.requestPermission()` 无退出路径 | 手动去系统设置授予「所有文件访问」+「悬浮窗」，或清 App 数据重启 |
 | **`am instrument` 卡住不返回** | L3/L4 | 权限被拒触发 `Config.setTheme`↔`init` 无限递归（§4.2） | 先 `appops set` 授权；命令套 `timeout 300` |
 | 装 debug 包时弹「Android 应用兼容性…（可调试应用）」 | — | Android 16 对 **debug 包**的常规提醒 | 非 bug；release 包不会弹；16 KB 弹窗与之不同（§4.6） |
+| **词库里有的词，候选里没有（尤其 ≥3 音節长词）；单字/短词正常；重建后时好时坏** | **L0** | librime 本地补丁 `0001` 的 BFS 预算/分支排序把长词条那条路饿死，或 `0003` 兜底未生效 | 看 [15](15-librime-local-mods.md) §3/§6；用探针 `%码串` + `@音节序列` 确认 |
 | 词库不生效 / 改了 assets 没反应 | L4 | `Config` 只在「目录不存在」或「版本变化」时复制 assets | 清 App 数据；或提 `versionCode` 重装；或 `am broadcast -a com.hazukieq.hkrime.deploy` |
 | 点输入法「设置」崩溃 | L3 | `res/xml/method.xml:24` 的 `settingsActivity` 与真实类名不符 | 应为 `com.hazukieq.hkrime.settings.PrefMainActivity` |
 | 点「评价」跳到别的 app | — | `about_preference.xml:116/121` 仍是上游 `com.osfans.trime` 商店链接（故意保留） | 已知残留，非 bug |
