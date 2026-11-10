@@ -810,28 +810,20 @@ object TwelveKeyPreedit {
         // 尾碼就丟了（用戶 2026-11-11 報 `ki mak` 少了 `7`）。所以先用 comment 自己的音節碼
         // 逐節吃掉輸入碼位（[coveredCodeLength]）——那是「comment 承諾覆蓋的碼」的客觀長度，
         // 跟本地切法無關；對不上才退回舊的 spans 算法。
-        val spans = decodeSpans(cleanCodes)
-        val covered = coveredCodeLength(cleanCodes, engine)
-        // 顯示規則（用戶 2026-11-10 定調，按優先級）：
-        //  1. **按下的鍵必須全部顯示**（首要）—— 不能讓用戶覺得「打了這麼多鍵沒反應」；
-        //  2. 音節正確是第二步：首條候選的 comment 是引擎給的精確拼音，且與候選條同源
-        //     （同一份快照發布），能覆蓋全部碼位時就直接用它（`5i34i` → `li voi`）。
-        // 於是：comment 節數 >= 本地解碼節數 → 只用 comment；
-        //       comment 更短 → comment + **原始編碼**（沒被覆蓋的那段碼原樣顯示，不猜音節）：
-        //       中國人民共和國 → `zung get nzin min 5i34ie4ie9`。
-        val consumed = when {
-            engine == null -> cleanCodes.length
-            // 舊規則：本地能切出音節時，只有「comment 比本地音節少」才補尾碼
-            // （comment 段數 >= 本地段數 → 認為它已覆蓋整串，`5i34iw` 的零碎 `w` 不顯示）。
-            spans != null ->
-                if (engine.size < spans.size) spans.take(engine.size).sumOf { it.first.length }
-                else cleanCodes.length
-            // 本地切不出完整音節（尾端只有聲母鍵，如 `5i4a57` 的 `7`）：改用 comment 自己的
-            // 音節碼算覆蓋長度，剩下的原樣顯示（用戶 2026-11-11 報尾碼被吃掉）。
-            else -> covered ?: cleanCodes.length
-        }
-        val rawTail = if (consumed in 1 until cleanCodes.length) {
-            cleanCodes.substring(consumed)
+        // 尾碼邊界：**用 comment 音節的「標準碼長」之和**，不用本地 DP。
+        //
+        // 12 鍵是同碼多音節（`5i`→ki|li、`ia9`→gap|kiap…），本地 DP 的切法與 comment
+        // 給的讀音根本不是同一個世界：`ii4yia44`（gin nziamm）本地能切 3 節，於是誤補 `a44`；
+        // 而 `5i4a57`（ki mak + 半截 `7`）本地又切不出來，尾巴整段丟掉。
+        // comment 的音節碼長度是確定的（ki→5i 兩位、mak→4a5 三位），加起來就是它承諾吃掉的碼位：
+        //   - 和 < 輸入長 → 剩下的原樣顯示（`ki mak` + `7`）；
+        //   - 和 >= 輸入長 → 簡拼/半截（`8 8` = ji jen、`5i34i w`），comment 已解釋整串，不補尾碼。
+        // 用戶 2026-11-11：「按下的鍵必須全部顯示」+ 不要重複/多餘的碼。
+        val commentCodeLen = engine?.sumOf { syl ->
+            runCatching { codeOf(syl).length }.getOrDefault(0)
+        } ?: 0
+        val rawTail = if (engine != null && commentCodeLen in 1 until cleanCodes.length) {
+            cleanCodes.substring(commentCodeLen)
         } else {
             ""
         }
@@ -841,30 +833,6 @@ object TwelveKeyPreedit {
             else -> engine + rawTail
         } ?: return null
         return prefix + shown.joinToString(" ")
-    }
-
-    /**
-     * comment 的每一節依次吃掉多少碼位：先按完整碼（[codeOf]）匹配，其次簡拼只吃一個碼位
-     * （用戶只按了一聲母鍵，如 `w` 對應 `than`）。任何一節對不上就回 null —— 不猜。
-     *
-     * 為什麼要它：`5i4a57`（氣脈 ki mak + 半截 `7`）用本地 DP 切不出完整音節，
-     * [decodeSpans] 回 null，舊寫法就算不出覆蓋長度 → 尾碼 `7` 被吃掉；
-     * 而 comment 的音節碼是確定的（ki→5i、mak→4a5），直接吃 5 個碼位，剩 `7` 原樣顯示。
-     */
-    private fun coveredCodeLength(codes: String, engine: List<String>?): Int? {
-        if (engine.isNullOrEmpty() || codes.isEmpty()) return null
-        var pos = 0
-        for (syllable in engine) {
-            val full = codeOf(syllable)
-            if (full.isEmpty()) return null
-            when {
-                codes.startsWith(full, pos) -> pos += full.length
-                pos < codes.length && codes[pos] == full[0] -> pos += 1
-                else -> return null
-            }
-            if (pos > codes.length) return null
-        }
-        return pos
     }
 
     /** 上一次 [render] 是否連本地解碼都拿不出讀音、直接回了原始碼（需要在快照到達後補畫）。 */
@@ -929,7 +897,7 @@ object TwelveKeyPreedit {
         return out.toString()
     }
 
-    private fun parseComment(comment: String?): List<String>? {
+    internal fun parseComment(comment: String?): List<String>? {
         val text = comment?.replace("\uFF3B", "")?.replace("\uFF3D", "")?.trim()
         if (text.isNullOrEmpty()) return null
         return text.split(' ').filter { it.isNotEmpty() }.ifEmpty { null }

@@ -3186,6 +3186,46 @@ preedit='5i 4a57‸'
 `rewriteTrustsFirstCandidateCommentAsIs`（`5i34iw` + `li voi` → `li voi w`，半截 `w` 也要顯示）；
 全倉 **132 tests / 0 failures**。
 
+#### 15.67.4 尾碼規則改成「comment 音節碼長」＋真實語料不變量測試（2026-11-11）
+
+用戶對「又一個音節組合報一次 bug」很不滿意："app 端的測試用例數據我嚴重懷疑了，
+必須改用全部真實數據（可以從真機拿），每個用例都要盡可能考慮所有 cases"。
+於是這條鏈路的驗證方式整體換掉：**不再手寫樣例，改成真機詞庫 + 真 librime 產生的語料**。
+
+**語料怎麼來**（`rime-jni/host-test`，新增 `--corpus`）：
+
+1. `pull-real-data.sh` 拉真機 `/sdcard/hkrime/*.dict.yaml|*.txt`（含用戶自加詞條）；
+2. `run-host-test.sh --corpus /tmp/hkrime-corpus.jsonl`：把詞庫裡**每個詞**的碼串、
+   簡拼（每節首鍵）、以及**逐鍵前綴**（打字過程的每一幀）餵進 PC 版 librime，
+   記錄它給的原始 `preedit` + 前 40 條候選（含 comment）。
+   本次快照 **12954 幀**（11962 個真實詞條的 code × 變體）。
+
+**規則修正**：尾碼邊界原來用本地 DP（`decodeSpans`）或「逐節匹配 comment 的音節碼」算，
+兩者在 12 鍵「同碼多音節」下都不可靠：
+
+- `ii4yia44` / `gin nziamm`：本地 DP 切成 3 節 → 誤補 `a44`（多餘碼）；
+- `5i4a57` / `ki mak`：本地 DP 切不出來 → 回 `null` → 尾碼 `7` 整段丟掉。
+
+現在只用一條算術：**`Σ codeOf(comment 音節).length`** 就是 comment 承諾吃掉的碼位數。
+
+```
+sum < 輸入長   → comment + 輸入碼的原樣後綴（一個碼位都不能少）
+sum >= 輸入長  → 只顯示 comment（簡拼 `8 8`=ji jen、半截 `5i34i w`=kiung than 都属此列）
+```
+
+不再有 `decodeSpans`/`coveredCodeLength` 兩套邊界算法（`decodeSpans` 只留給本地解碼兜底）。
+
+**回歸**（`app/src/test/java/com/hazukieq/hkrime/core/RealCorpusTest.kt`，讀真實語料）：
+
+| 不變量 | 內容 | 結果 |
+|---|---|---|
+| 1 | `preedit == comment + 未覆蓋的原樣碼` | 12954 幀全過 |
+| 2 | 有尾碼的 case，尾碼必須是輸入碼的原樣後綴 | 全過 |
+| 3 | 面板：段組同讀音必須合併、詞組/非漢字組必須保留、讀音不重複 | 全過（按 §15.62 規則丟棄的組不算丟） |
+
+改這條規則前，舊實現（DP 邊界）在同一份語料上**當場報出 25+ 條不一致**——這就是反覆來回的原因。
+`AGENTS.md` §2.1.1 已寫死：**改 preedit / 面板分組必須先跑真實語料測試**。
+
 ## 15.68 12 鍵的字表/詞表改讀共享目錄並展開 `import_tables`（2026-11-11）
 
 ### 15.68.1 問題（dsh mobile 反饋 2026-11-09）
