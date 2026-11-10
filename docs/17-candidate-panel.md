@@ -191,6 +191,14 @@ flowchart TD
 
 ### 7.2 联想行（两音节，`associatedBySegmentCode` / `associatedByReading`）
 
+#### 7.2.0 只认**客家话音节集合**（2026-11-11 定）
+
+词表的第三列是读音，但词表来源不只客家话：`/sdcard/hkrime/` 里同时部署着 `luna_pinyin.dict.yaml` 这类别的方案词典（`例行 → li xing`），`xing` 不是客家话音节。规则：
+
+1. **只加载 `hakka.dict.yaml` 及其 `import_tables` 展开出来的词表**（`RimeDictSource.namesWithImports`；实测名单：`hakka_places / hakka_sougou_words / hakka_poems / hakka_zon / hakka_mobilewords / hakka_oftenwords / hakka_website / hakka_cn_en`），目录里其它 `*.dict.yaml` 一律不读；
+2. 即使在这 9 份词表里，只要某条词条的读音中有**任意一节不在客家话音节集合**（集合由主词典的「字→读音」建立，`syllableSet`），**整条丢弃**——不做「去掉坏音节再凑」；
+3. 脚本 `tools/panel_probe.py` 必须镜像同一规则（`_import_names()` + `_load_words` 里的音节校验），`selftest` 有断言：累积读音与联想行读音必须全是客家话音节，且不得出现 `li xing`。
+
 - 索引在 `TwelveKeyPreedit.loadWordLines`/`finishWordIndex` 建：`(第一音节, 第二音节) → 词表`，
   桶内按热度降序（selection），显示时按词面字典序（display）；
 - 每行 ≤ `ASSOC_WORDS=6` 条，整轮 ≤ `ASSOC_MAX_ROWS=4` 行（`segment=1`）；
@@ -214,6 +222,8 @@ flowchart TD
 - 没有任何前缀行可并时，才用完整读音单独成行。
 
 ### 7.5 拼音规则（12 键 ↔ 字母 ↔ 音节）——这一节是「段组读音」的规范
+
+> 范围提醒：本节所有规则**只对客家话音节集合内**的音节成立（见 §7.2.0）。别家方案的读音既不加载、也不参与任何展开。
 
 > 用户 2026-11-11 的要求：**拼音规则必须清晰**。下面是当前实现的完整规则，改任何一条都要同步
 > `tools/panel_probe.py` 与本文档，并跑 `panel_probe.py selftest`。

@@ -128,10 +128,13 @@ class Data:
         if not os.path.isfile(main):
             sys.exit(f"[panel-probe] 找不到 {main}；先跑 `panel_probe.py pull` 或 --data 指定目录")
         self._load_dict(main)
-        for name in sorted(os.listdir(data_dir)):
-            if not name.endswith(".dict.yaml") or name == "hakka.dict.yaml":
-                continue
-            self._load_words(os.path.join(data_dir, name))
+        # 与 App 的 RimeDictSource.namesWithImports 一致：**只加载 hakka.dict.yaml 的
+        # import_tables 展开出来的词表**。目录里可能还有 luna_pinyin 这类别的方案词典
+        # （`li xing` 就是这么混进来的），12 键方案不该用它们。
+        for name in self._import_names(main):
+            path = os.path.join(data_dir, name + ".dict.yaml")
+            if os.path.isfile(path):
+                self._load_words(path)
         self._sort_assoc()
 
     # -- 载入 ------------------------------------------------------------
@@ -153,6 +156,56 @@ class Data:
         for syl in self.syllable_freq:
             self.code_to_syllables[code_of(syl)].append(syl)
 
+    def _import_names(self, main_path: str, depth: int = 0, seen: "OrderedDict[str, None]" | None = None) -> list[str]:
+        """展开 hakka.dict.yaml 的 import_tables（镜像 RimeDictSource.namesWithImports）。"""
+        if seen is None:
+            seen = OrderedDict()
+        if depth > 4:
+            return []
+        head: list[str] = []
+        with open(main_path, encoding="utf-8") as handle:
+            for line in handle:
+                head.append(line.rstrip("\n"))
+                if line.strip() == "...":
+                    break
+                if len(head) >= 200:
+                    break
+        names: list[str] = []
+        i = 0
+        while i < len(head):
+            bare = head[i].split("#")[0].strip()
+            if not bare.startswith("import_tables"):
+                i += 1
+                continue
+            inline = bare.split(":", 1)[1].strip() if ":" in bare else ""
+            if inline:
+                for part in inline.strip("[] ").split(","):
+                    part = part.strip().strip("\"'")
+                    if part:
+                        names.append(part.removesuffix(".dict.yaml"))
+                i += 1
+                continue
+            i += 1
+            while i < len(head):
+                item = head[i].split("#")[0].strip()
+                if not item:
+                    i += 1
+                    continue
+                if not item.startswith("-"):
+                    break
+                names.append(item.lstrip("-").strip().strip("\"'").removesuffix(".dict.yaml"))
+                i += 1
+        out: list[str] = []
+        for name in names:
+            if name in seen:
+                continue
+            seen[name] = None
+            out.append(name)
+            sub = os.path.join(os.path.dirname(main_path), name + ".dict.yaml")
+            if os.path.isfile(sub):
+                out.extend(self._import_names(sub, depth + 1, seen))
+        return out
+
     def _load_words(self, path: str) -> None:
         for line in _iter_body(path):
             if "\t" not in line:
@@ -163,6 +216,10 @@ class Data:
             reading = rest.split("\t")[0].strip()
             tokens = [t for t in reading.split(" ") if t and t.isalpha()]
             if not word or len(tokens) < 2:
+                continue
+            # 只认**客家话音节集合**里的音节：词表里可能混着普通话/粤语读音
+            # （`例行 → li xing`），12 键方案不该把它们当音节用。
+            if any(t not in self.syllable_freq for t in tokens):
                 continue
             # 联想索引：只收两音节词（与 App 的 assocWords 一致）
             if len(tokens) >= 2:
@@ -650,13 +707,33 @@ def cmd_selftest(args, data: Data) -> None:
         f"累积阶段键数 = {[st[0] for st in stages]}",
     )
     unique = data.cumulative_unique("5i4a57", 2)
+    last_rows = data.cumulative("5i4a57", 2)[-1][2]
+    merged = [g for g in last_rows if "linux" in {t.lower() for t in g.get("items", [])}]
     expect(
-        any(r[0] == "li nak si" for r in unique),
-        f"累积去重含 li nak si（{len(unique)} 个读音）",
+        bool(merged) and merged[0]["reading"] == "li nak",
+        f"整串阶段 Linux 被收敛进 li nak 行（{merged[0]['reading'] if merged else 'NONE'}）",
+    )
+    expect(
+        "li nak" in [r[0] for r in unique],
+        f"累积去重含 li nak（{len(unique)} 个读音）",
     )
     expect(
         all(unique[i][0] != unique[i + 1][0] for i in range(len(unique) - 1)),
         "累积去重后没有相邻重复读音",
+    )
+
+    # 4.6) 只认客家话音节：词表里混进来的普通话读音（`例行 → li xing`）必须被过滤掉
+    unique_readings = [r[0] for r in data.cumulative_unique("5i4a57", 2)]
+    alien = [
+        r for r in unique_readings
+        if any(tok not in data.syllable_freq for tok in r.split())
+    ]
+    expect(not alien, f"累积读音全是客家话音节（越界: {alien[:5]}）")
+    expect("li xing" not in unique_readings, "不应出现普通话读音 li xing")
+    assoc_readings = [r for r, _ in data.assoc_rows("li", "n")]
+    expect(
+        all(all(tok in data.syllable_freq for tok in r.split()) for r in assoc_readings),
+        f"联想行读音全是客家话音节：{assoc_readings}",
     )
 
     # 5) 联想：li + 4a5（= nak）→ 至少一行 li nak（含 Linux）

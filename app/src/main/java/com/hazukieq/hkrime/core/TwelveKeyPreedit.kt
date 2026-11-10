@@ -61,6 +61,9 @@ object TwelveKeyPreedit {
 
     private val wordCodeEntries = ArrayList<WordCodeEntry>()
 
+    /** 客家話音節集合（由主詞典「字→讀音」建立）；詞表解析只認集合內的音節。 */
+    private val syllableSet = HashSet<String>()
+
     /**
      * 已發布的整串碼索引（**不可變**，[finishWordIndex] 時整體替換）。
      *
@@ -295,6 +298,10 @@ object TwelveKeyPreedit {
                 listOf(r1, r2)
             }
             if (syllables.size < 2) return@forEach
+            // 只認**客家話音節集合**裡的音節：目錄裡可能還有 luna_pinyin 這類別的方案詞表
+            // （`例行 → li xing`），把它們當音節用會讓面板長出根本不是客家話的聯想行。
+            // 主詞典沒載入（syllableSet 為空，例如單測只餵詞表）時跳過校驗。
+            if (syllableSet.isNotEmpty() && syllables.any { it !in syllableSet }) return@forEach
             val r1 = syllables[0]
             val r2 = syllables[1]
             if (r1.isEmpty() || r2.isEmpty()) return@forEach
@@ -508,6 +515,8 @@ object TwelveKeyPreedit {
         // 避免同一個碼位的音節被重複 append（會讓「輪轉取 limit 個」變少）。
         table.clear()
         codeToSyllables.clear()
+        syllableSet.clear()
+        syllableSet.addAll(counts.keys)
         counts.forEach { (syllable, freq) ->
             val code = codeOf(syllable)
             val old = table[code]
