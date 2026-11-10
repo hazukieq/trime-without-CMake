@@ -113,20 +113,38 @@ object TwelveKeyPreedit {
     }
 
     private fun load(context: Context) {
-        val counts = context.assets.open("rime/hakka.dict.yaml")
-            .bufferedReader(Charsets.UTF_8)
-            .useLines { lines -> loadDictLines(lines) }
+        // 共享目錄（/sdcard/hkrime）優先、assets 兜底；並展開 import_tables（見 [RimeDictSource]）。
+        // 用戶 2026-11-09 反饋「往詞庫加新條目不生效」，根因就是這裡只讀 APK 內置字典。
+        val t0 = System.nanoTime()
+        var counts = loadDictLines(RimeDictSource.body(context, MAIN_DICT).asSequence())
+        if (counts.isEmpty()) {
+            // 共享目錄那份讀到了卻解析不出音節（文件半截/格式壞了）：退回 APK 內置字典，
+            // 否則段組/讀音/聯想詞會整片消失，比「看不到新詞」糟得多。
+            Timber.e("TwelveKeyPreedit: shared dict unusable, falling back to assets")
+            runCatching {
+                context.assets.open("rime/$MAIN_DICT.dict.yaml").bufferedReader(Charsets.UTF_8)
+                    .use { r -> counts = loadDictLines(r.readLines().asSequence()) }
+            }.onFailure { Timber.w(it, "TwelveKeyPreedit: assets dict fallback failed") }
+        }
+        Timber.i(
+            "TwelveKeyPreedit: dict=%s lines=%d load=%dms",
+            RimeDictSource.describe(context, MAIN_DICT),
+            counts.size,
+            (System.nanoTime() - t0) / 1_000_000,
+        )
         // 通用字頻（可選資源，缺失不影響主流程）
         runCatching {
-            context.assets.open("rime/hakka_char_freq.txt").bufferedReader(Charsets.UTF_8)
-                .useLines { lines -> loadCharFreqLines(lines) }
+            RimeDictSource.textLines(context, "hakka_char_freq.txt")?.let { lines ->
+                loadCharFreqLines(lines.asSequence())
+            }
             Timber.i("TwelveKeyPreedit: charFreq=%d", charFreq.size)
         }.onFailure { Timber.w(it, "TwelveKeyPreedit: load char freq failed") }
 
         // 權威字頻（可選資源；缺失時退回只用詞表統計）
         runCatching {
-            context.assets.open("rime/hakka_char_rank.txt").bufferedReader(Charsets.UTF_8)
-                .useLines { lines -> loadCharRankLines(lines) }
+            RimeDictSource.textLines(context, "hakka_char_rank.txt")?.let { lines ->
+                loadCharRankLines(lines.asSequence())
+            }
             Timber.i("TwelveKeyPreedit: charRank=%d", charRank.size)
         }.onFailure { Timber.w(it, "TwelveKeyPreedit: load char rank failed") }
 
@@ -140,14 +158,20 @@ object TwelveKeyPreedit {
         Thread({
             val t0 = System.nanoTime()
             runCatching {
-                WORD_LISTS.forEach { name ->
-                    appContext.assets.open("rime/$name.dict.yaml").bufferedReader(Charsets.UTF_8)
-                        .useLines { lines -> loadWordLines(lines) }
+                // 詞表清單 = 主詞典 `import_tables` 展開後的其餘詞典（共享目錄優先），
+                // 讀不到就退回內置的 [DEFAULT_WORD_LISTS]——這樣用戶新建詞表掛進
+                // import_tables 也能被聯想索引看到，不必改代碼。
+                val names = RimeDictSource.namesWithImports(appContext, MAIN_DICT)
+                    .filter { it != MAIN_DICT }
+                    .ifEmpty { DEFAULT_WORD_LISTS }
+                names.forEach { name ->
+                    loadWordLines(RimeDictSource.body(appContext, name).asSequence())
                 }
                 finishWordIndex()
                 Timber.i(
-                    "TwelveKeyPreedit: assoc keys=%d byFirst=%d load=%dms",
-                    assocWords.size, assocByFirst.size, (System.nanoTime() - t0) / 1_000_000,
+                    "TwelveKeyPreedit: assoc keys=%d byFirst=%d lists=%s load=%dms",
+                    assocWords.size, assocByFirst.size, names.joinToString(","),
+                    (System.nanoTime() - t0) / 1_000_000,
                 )
             }.onFailure { Timber.w(it, "TwelveKeyPreedit: load word lists failed") }
         }, "twelvekey-assoc").apply {
@@ -156,7 +180,11 @@ object TwelveKeyPreedit {
         }
     }
 
-    private val WORD_LISTS = listOf(
+    /** 主詞典名（`hakka.dict.yaml`）；它自己的 `import_tables` 決定聯想詞要讀哪些詞表。 */
+    private const val MAIN_DICT = "hakka"
+
+    /** 讀不到共享目錄基準詞典時的內置詞表清單（發佈版原樣行為）。 */
+    private val DEFAULT_WORD_LISTS = listOf(
         "hakka_sougou_words", "hakka_mobilewords", "hakka_oftenwords", "hakka_places",
         "hakka_poems", "hakka_website", "hakka_zon", "hakka_cn_en",
     )

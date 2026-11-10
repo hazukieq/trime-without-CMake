@@ -3150,3 +3150,46 @@ comment 不夠長時補原始碼／光標剝除）。改動任何一處都容易
 - 真機核對（日誌 `dbgpre ... decoded=` 與候選條第一條的 comment 逐個對齊）：
   `5i34i w` → `kiung than`（共產）、`744 ii` → `son gi`（船寄）、
   `834i ie9 yi4 4i4 5i34i e4 ie9` → `zung get nzin min kiung fo get`（中國人民共和國）。
+
+## 15.68 12 鍵的字表/詞表改讀共享目錄並展開 `import_tables`（2026-11-11）
+
+### 15.68.1 問題（dsh mobile 反饋 2026-11-09）
+
+「往詞庫裡加新條目不生效」。根因不是 librime（引擎本來就讀 `/sdcard/hkrime`、也自己展開
+`import_tables`），而是 **App 側那份字典只讀 APK 內置 assets**：
+
+```kotlin
+// 改之前
+context.assets.open("rime/hakka.dict.yaml")   // 只讀打包進 APK 的那份
+```
+
+於是磁盤上 `hakka.dict.yaml` / `hakka_zon.dict.yaml` 加了新詞（如 `猛劥`、`迒过`）之後：
+引擎候選能看到，但 12 鍵的**段組字表**（`syllableToChars`）、**聯想詞索引**（`assocWords`）、
+**字頻排序**（`charFreq`/`charRank`）全都還是 APK 打包時的老內容。
+
+### 15.68.2 做法：新增 `core/RimeDictSource.kt`
+
+1. **共享目錄優先**：`<userDataDir>/<name>.dict.yaml` 存在就用它（默認 `/sdcard/hkrime`），
+   否則退回 `assets/rime/<name>.dict.yaml` —— 發佈版不帶用戶改動時行為與之前完全一致。
+2. **自己展開 `import_tables`**：支持 block（`- hakka_zon`）與 inline（`[a, b]`）兩種寫法，
+   遞歸上限 4 層、按名字去重；展開時**只讀 YAML 頭**（到 `...` 為止，上限 200 行），
+   不去讀幾萬行的本體。
+3. **只取字典本體**：跳過 `---`…`...` 之間的 YAML 元數據，`version:`/`name:` 不再餵給解析器。
+4. 詞表清單不再硬編碼：`TwelveKeyPreedit` 用 `namesWithImports(context, "hakka")` 得到
+   「主詞典 `import_tables` 展開後的其餘詞典」，`DEFAULT_WORD_LISTS` 只作讀不到時的兜底
+   —— 用戶新建一個詞表掛進 `import_tables` 也能被聯想索引看到，不必改代碼。
+
+### 15.68.3 性能
+
+- 同步路徑仍是「主詞典本體」一份（`hakka.dict.yaml` 約 80KB），與改之前同量級，
+  啟動日誌 `TwelveKeyPreedit: dict=file:/sdcard/hkrime/hakka.dict.yaml ... load=?ms` 可核。
+- 8 個詞表（合計 2MB+）仍在 `twelvekey-assoc` 後台線程讀，只是來源換成共享目錄；
+  日誌 `TwelveKeyPreedit: assoc keys=... lists=hakka_places,... load=?ms` 會列出實際讀到的表。
+- 展開 `import_tables` 的頭部讀取是 9 次小文件讀（每次到 `...` 即停）。
+
+### 15.68.4 生效時機與測試
+
+- 字典在輸入法進程啟動時讀入，**改完 yaml 需要重開輸入法/重啟 App** 才生效（deploy 本身不通知 App）。
+- 新增 6 條單測（`RimeDictSourceTest`：`bodyStart` 兩種情形、block/inline `import_tables`、
+  本體誤匹配與註釋、去重）→ 全倉 **126 tests / 0 failures**。
+- 排查日誌：`RimeDictSource: main=file:... imports=...`（每進程一次）。
