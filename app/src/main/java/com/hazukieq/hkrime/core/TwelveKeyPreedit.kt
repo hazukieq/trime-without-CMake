@@ -691,31 +691,44 @@ object TwelveKeyPreedit {
         if (split == clean.length) return null          // 尾端沒有碼段：已選完
         val prefix = clean.substring(0, split)
         val codes = clean.substring(split)
-        // 本地解碼把整串碼「鋪滿」：逐段 decode，半截碼（只剩聲母，如 `w`=th）翻成鍵盤字母。
-        // 它的音節數 = 這串碼「能讀出幾節」，是「按下的鍵全部顯示」的保底。
+        // 去掉 librime 的分段分隔符（`5i34i wa4`、`5i34i'w`）：那些不是用戶按下的鍵。
+        val cleanCodes = codes.replace(CODE_SEPARATORS, "")
+        // 本地解碼：逐段 decode，半截碼（只剩聲母，如 `w`=th）翻成鍵盤字母。
+        // 它的音節數 = 這串碼「能讀出幾節」，用來判斷「首條候選的讀音夠不夠長」。
         val own = decodeWithPartialTail(codes, hint)
             ?.split(' ')?.filter { it.isNotEmpty() }
             ?.map { if (it.all { ch -> ch in CODE_LETTERS }) codeLetters(it) else it }
             ?.takeIf { it.isNotEmpty() }
         val engine = parseComment(preferred)
-        // 顯示規則（用戶 2026-11-10 兩條定調，按優先級）：
-        //  1. **按下的鍵必須全部顯示**（首要）—— 寧可音節不準，也不能讓用戶覺得「打了這麼多鍵沒反應」；
+        // 本地解碼的「字元跨度」：每個音節吃掉幾個碼位 —— 只用來算「comment 覆蓋到哪裡」，
+        // 不用它的音節內容去拼湊顯示（用戶 2026-11-10：「不要試圖去拼湊」）。
+        val spans = decodeSpans(cleanCodes)
+        // 顯示規則（用戶 2026-11-10 定調，按優先級）：
+        //  1. **按下的鍵必須全部顯示**（首要）—— 不能讓用戶覺得「打了這麼多鍵沒反應」；
         //  2. 音節正確是第二步：首條候選的 comment 是引擎給的精確拼音，且與候選條同源
-        //     （同一份快照發布），所以它能覆蓋全部碼位時就直接用它（`5i34i` → `li voi`）。
-        // 於是：comment 的節數 >= 本地解碼的節數 → comment 已覆蓋全部碼位，直接顯示；
-        //       comment 更短（首條只覆蓋前面幾節，例如「共產」之於 kiung than dong）→
-        //       把後面沒覆蓋的節用本地解碼補上，絕不讓 preedit 比輸入短。
+        //     （同一份快照發布），能覆蓋全部碼位時就直接用它（`5i34i` → `li voi`）。
+        // 於是：comment 節數 >= 本地解碼節數 → 只用 comment；
+        //       comment 更短 → comment + **原始編碼**（沒被覆蓋的那段碼原樣顯示，不猜音節）：
+        //       中國人民共和國 → `zung get nzin min 5i34ie4ie9`。
+        val rawTail = if (engine != null && spans != null && engine.size < spans.size) {
+            val consumed = spans.take(engine.size).sumOf { it.first.length }
+            cleanCodes.substring(consumed.coerceIn(0, cleanCodes.length))
+        } else {
+            ""
+        }
         val shown = when {
             engine == null -> own
-            own == null -> engine
-            engine.size >= own.size -> engine
-            else -> engine + own.drop(engine.size)
+            rawTail.isEmpty() -> engine
+            else -> engine + rawTail
         } ?: return null
         return prefix + shown.joinToString(" ")
     }
 
     /** librime preedit 的光標標記 `‸`(U+2038)。 */
     private const val CARET_MARK = "\u2038"
+
+    /** preedit 裡的分段分隔符（librime 的 `5i34i wa4`、分詞鍵產生的 `'`）——不是用戶按下的鍵。 */
+    private val CODE_SEPARATORS = Regex("[\\s']")
 
     /**
      * 碼位 → 拼音字母（與 `TwelveKeySnapshotBuilder.FALLBACK_LETTERS` 同一套；
@@ -760,7 +773,15 @@ object TwelveKeyPreedit {
     private val MULTI_DELIMITER = Regex("[\u0027\\s]+")
 
     /** 單段碼串 → 音節列表；切不出完整音節回傳 null。 */
-    internal fun decodeSingle(input: String): List<String>? {
+    internal fun decodeSingle(input: String): List<String>? = decodeSpans(input)?.map { it.second }
+
+    /**
+     * 單段碼串 → [(佔用的碼串, 音節)]；切不出完整音節回傳 null。
+     *
+     * 只給 [rewrite] 判斷「comment 覆蓋到第幾個碼位元」用：沒被覆蓋的尾部要原樣顯示碼，
+     * 不能拿這裡的音節去拼（用戶 2026-11-10）。
+     */
+    private fun decodeSpans(input: String): List<Pair<String, String>>? {
         if (input.isEmpty()) return null
         val n = input.length
         // 先比「音節數量少」，再比「詞頻高」：避免被 ngh/mi 這類高頻短音節切碎
@@ -791,12 +812,12 @@ object TwelveKeyPreedit {
         if (bestSeg[n] == Int.MAX_VALUE) {
             return null
         }
-        val out = ArrayList<String>()
+        val out = ArrayList<Pair<String, String>>()
         var p = n
         while (p > 0) {
             val q = prev[p]
             if (q < 0) return null
-            out.add(pick[p] ?: return null)
+            out.add(input.substring(q, p) to (pick[p] ?: return null))
             p = q
         }
         out.reverse()

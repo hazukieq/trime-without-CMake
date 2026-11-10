@@ -246,8 +246,10 @@ if (barText != null && !barText.isEmpty()) {
    「輸入的編碼一定要顯示（暫且不管對不對，這是首要的），至於音節正確是第二步」。
    症狀：打 7 節的中國人民共和國，preedit 只剩 `zung get nzin min`，後面 `kiung fo get` 被吞。
    修法（`TwelveKeyPreedit.rewrite`）：comment 節數 >= 本地解碼節數 → 只顯示 comment；
-   否則 comment + 本地解碼的剩餘節。於是 preedit 永遠不短於輸入碼。
-   已知限制：尾部節由本地 DP 解出，音節可能不準（第二步待辦）。
+   否則 comment + **原始編碼**（未覆蓋的碼位原樣顯示）。本地解碼只用來算
+   「comment 覆蓋到第幾個字元」，不用它的音節去拼尾巴（用戶：「不要試圖去拼湊」）。
+   查證：引擎不給整句是因為 `translator.enable_sentence: false`（2026-11-08 ANR 後關掉），
+   候選只來自詞典詞條 —— 「中國人民」在詞典（4 節）、「中國人民共和國」不在。
 
 其餘與方案一致：
 

@@ -2646,7 +2646,7 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
 
 | # | 原因 | 修法 |
 | --- | --- | --- |
-| 1 | 本地 DP 猜讀音（音節少優先） | `TwelveKeyPreedit.rewrite(preedit, hint, preferred)`：**preferred（comment）能覆蓋全部碼位時一律優先**；comment 只覆蓋前幾節（首條是短詞/引擎只解析了前半段）時，用本地解碼把**剩下的節**補齊；引擎沒給 comment 才全部用本地解碼 |
+| 1 | 本地 DP 猜讀音（音節少優先） | `TwelveKeyPreedit.rewrite(preedit, hint, preferred)`：**preferred（comment）能覆蓋全部碼位時一律優先**；comment 只覆蓋前幾節時，把**沒被覆蓋的那段原始編碼**原樣接在後面（不猜音節）；引擎沒給 comment 才全部用本地解碼 |
 | 2 | hint 取 `mContext.getCandidates()[0]`，那是引擎 menu 順序，不是候選條順序（App 重排過） | `TextInputManager.onTwelveKeySnapshot()` 把 `snapshot.barItems.firstOrNull()` 的 text/comment 發布到 `TwelveKeyPreedit.preferredText/preferredComment`；`Rime.getComposition()` 優先讀它們 |
 | 3 | `‸`(U+2038) 光標標記、空格分隔的半截碼沒處理 | `rewrite` 先剝 `‸` 再切「已選前綴 / 尾部碼段」；碼段按空格**逐段** decode，某段切不出完整音節時保留「最長可解碼頭部 + 尾部碼位字母」（`w`→`th`） |
 | 4 | 殘留 comment（上一條候選的讀音被套到這串碼上） | 不靠本地校驗，靠**同源 + 時序**：comment 與候選條文字在同一個 `onTwelveKeySnapshot()` 裡發布，快照落地後再重畫一次 preedit（見下），所以畫面上的拼音和畫面上的首條永遠是同一份快照 |
@@ -2655,9 +2655,13 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
 > **首要：按下的鍵一定要顯示**（用戶 2026-11-10 第二次定調）：「輸入的編碼一定要顯示
 > （暫且不管對不對，這是首要的，否則用戶會奇怪明明打了這麼按鍵都沒有顯示），至於音節正確是第二步」。
 > 所以 comment 再權威，也不能讓 preedit 比輸入短：comment 節數 >= 本地解碼節數 → 只顯示 comment；
-> 否則 comment + 本地解碼的剩餘節。例：`5i34i wa4 e44i` 的首條「共產黨」（3 節）覆蓋全部碼位 →
-> `kiung than dong`；24 鍵的中國人民共和國首條只有「中國人民」（4 節）→
-> `zung get nzin min` + 本地解碼補 3 節 = 7 節全顯示（尾部音節可能不準，屬第二步）。
+> 否則 comment + **原始編碼**（未覆蓋的碼位原樣顯示；用戶：「不要試圖去拼湊」）。
+> 例：`5i34i wa4 e44i` 的首條「共產黨」（3 節）覆蓋全部碼位 → `kiung than dong`；
+> 24 鍵的中國人民共和國首條只有「中國人民」（4 節，詞典裡沒有 7 節的詞條）→
+> `zung get nzin min 5i34ie4ie9`（10 個碼位原樣顯示）。
+>
+> **引擎為甚麼不給整句**：`translator.enable_sentence: false`（簡拼分支爆炸 → 句子裝配會主線程卡 20s+，
+> 2026-11-08 因 ANR 關掉），候選只來自詞典詞條。只打後三節 `5i34ie4ie9` 時引擎會給「共和國 / kiung fo get」。
 >
 > **為甚麼不拿本地解碼去校驗 comment**（用戶 2026-11-10 定調）：「12 鍵性質決定了多對多，
 > 根本不需要固定編碼」。同一串碼沒有唯一讀音 —— `5i34i` 既可以是 kiung（1 個音節），
@@ -2693,7 +2697,7 @@ i → gi(71) gau(51) gin(44) ga(43) gen(43) gu(42) gai(40) gon(39) | hai(29) ...
 新增 14 個單測（`AssociatedWordsTest`）+ 5 個排序單測（`CandidateRankingTest`，全量 74 tests / 0 failures）：comment 優先（單字/雙字詞/三字詞）/
 comment 原樣採信、無 comment 才本地解碼 / 剝 `［…］` 包裝 / 剝 `‸` / 半截碼映射 / 保留前綴 / 無碼段回 null。
 
-真機：24 鍵（中國人民共和國）→ preedit 顯示 7 節 `zung get nzin min kiun gen get`（全部按鍵都有顯示）；
+真機：24 鍵（中國人民共和國）→ preedit `zung get nzin min 5i34ie4ie9`（所有按鍵都有顯示，尾部原樣顯示碼）；
 打完整三音節 `5i34i wa4 e44i` → 首條「共產黨」、preedit `kiung than dong`；
 `5i34i` 首條「理會」（詞）→ preedit `li voi`；`5i34iw` 首條「共產」→ `kiung than`、
 首條「窮酸」→ `kiung thon`；`744ii`（librime preedit `744 ii‸`，帶空格）→ 首條「船寄」`son gi`；
