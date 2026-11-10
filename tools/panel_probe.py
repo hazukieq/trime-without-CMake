@@ -602,12 +602,19 @@ class Data:
         return stages
 
     def cumulative_unique(self, codes: str, min_len: int = 2) -> list[tuple[str, int, str]]:
-        """累积去重：(reading, 首次出现的键数, 类别)。"""
+        """累积去重：(reading, 首次出现的键数, 类别)。
+
+        用户 2026-11-11：「那你可以这么列呀，li nak, li nak si」——面板会把 3 音节词行
+        `li nak si` 收敛进 `li nak` 联想行，但脚本要**两者都列**（各自一行、互不吞并）。
+        """
         seen: "OrderedDict[str, tuple[int, str]]" = OrderedDict()
-        for length, _prefix, rows in self.cumulative(codes, min_len):
+        for length, prefix, rows in self.cumulative(codes, min_len):
             for g in rows:
                 kind = {0: "单字", 1: "联想/词"}.get(g["segment"], "?")
                 seen.setdefault(g["reading"], (length, kind))
+            # 未收敛的整串词行（`li nak si`）也单独列一条，不和 `li nak` 合并
+            for row in self.prefix_word_rows(prefix):
+                seen.setdefault(row["reading"], (length, "词行"))
         return [(reading, length, kind) for reading, (length, kind) in seen.items()]
 
     def panel(self, codes: str) -> list[dict]:
@@ -920,6 +927,18 @@ def cmd_selftest(args, data: Data) -> None:
     expect(
         union57 <= shown57 or shown57 <= union57,
         f"5i4a57 面板與實際存在集應互相覆蓋（顯示 {len(shown57)} / 存在 {len(union57)}）",
+    )
+
+    # 4.52) 汇总里 `li nak` 与 `li nak si` 必须各列一条（用戶 2026-11-11：「那你可以这么列呀」）
+    uniq = data.cumulative_unique("5i4a57", 2)
+    readings_only = [r[0] for r in uniq]
+    expect(
+        "li nak" in readings_only and "li nak si" in readings_only,
+        f"应同时列出 li nak 与 li nak si：{[r for r in readings_only if r.startswith('li nak')]}",
+    )
+    expect(
+        [r[2] for r in uniq if r[0] == "li nak si"] == ["词行"],
+        "li nak si 的类别应为「词行」",
     )
 
     # 4.55) 標準集必須覆蓋詞典音節（用戶 2026-11-11 定稿：字典並入後的就是標準集）
