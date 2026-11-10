@@ -231,8 +231,14 @@ object TwelveKeySnapshotBuilder {
         // App 側暫存的字（兜底逐段選字）也要算進嵌入式預覽，否則選中的字在輸入框裡看不到。
         val inlineText = TwelveKeyPreedit.pendingPrefix +
             runCatching { Rime.getCompositionPrefix() }.getOrDefault("") + previewText
-        val fallback = if (groupsWithRecommend.isEmpty() && remaining.isNotEmpty()) {
+        // 兜底的判據只能是「**引擎一條候選都沒有**」（ordered 為空），不能用 groups：
+        // 面板關閉時 wantGroups=false，groups 本來就是空的（故意不建分組），
+        // 用它判斷會讓每一幀都掛上 fallback → 候選條顯示原始字母、preedit 也退成原碼，
+        // 而開面板（wantGroups=true）時又正常 —— 用戶 2026-11-11 報的
+        // 「打字顯示 dek，展開關閉後才是 de 5 / 邸」就是這條（docs/10 §15.74）。
+        val fallback = if (shouldShowFallback(ordered.size, remaining)) {
             val raw = remaining.takeLast(MAX_FALLBACK_CODE)
+            Timber.i("twelvekey: fallback remaining=%s flat=%d", remaining, flat.size)
             Fallback(rawCode = raw, letters = if (mapFallbackLetters) toLetters(raw) else raw)
         } else {
             null
@@ -253,6 +259,16 @@ object TwelveKeySnapshotBuilder {
             inlineText = inlineText,
         )
     }
+
+    /**
+     * 是否該顯示「引擎沒候選」的兜底：判據只能是**引擎候選數為 0**。
+     *
+     * 不能用面板分組數（`groups`）判斷：面板關閉時 `wantGroups=false`，groups 恆為空，
+     * 用它判斷會讓每一幀都掛上 fallback → 候選條/preedit 顯示原始字母，
+     * 開面板卻正常（用戶 2026-11-11：「打字顯示 dek，展開關閉後才是 de 5 / 邸」）。
+     */
+    internal fun shouldShowFallback(engineCandidateCount: Int, remaining: String): Boolean =
+        engineCandidateCount == 0 && remaining.isNotEmpty()
 
     /**
      * 多音節輸入 → 「第一個待選段」的音節→單字組。

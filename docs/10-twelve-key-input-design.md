@@ -3229,6 +3229,34 @@ sum >= 輸入長  → 只顯示 comment（簡拼 `8 8`=ji jen、半截 `5i34i w`
 改這條規則前，舊實現（DP 邊界）在同一份語料上**當場報出 25+ 條不一致**——這就是反覆來回的原因。
 `AGENTS.md` §2.1.1 已寫死：**改 preedit / 面板分組必須先跑真實語料測試**。
 
+## 15.74 「兜底」判據用錯對象 → 每一幀都顯示原始字母（2026-11-11）
+
+**現象**：打 `ee5`，preedit/候選條顯示原始字母 `dek`；**展開面板再關閉**才變成 `de 5` / `邸`。
+§15.73 的緩存修完後仍然重現（日誌裡每 90ms 重刷一次、每次 `cached=false ms=0.2` 都是兜底）。
+
+**根因**（`TwelveKeySnapshotBuilder.build`）：
+
+```kotlin
+val fallback = if (groupsWithRecommend.isEmpty() && remaining.isNotEmpty()) …
+```
+
+面板關閉時 `wantGroups=false` → `segmentGroups`/`engineGroups` 都是 **空**（故意不建分組省按鍵開銷）
+→ `groups` 恆為空 → **每一幀都掛上 fallback**。候選條與 preedit 見到 fallback 就顯示原始字母
+（`ee5` → `dek`）；開面板時 `wantGroups=true`，groups 不空，於是「開關面板才正常」。
+
+**修法**：判據改成「**引擎候選數為 0**」：
+
+```kotlin
+internal fun shouldShowFallback(engineCandidateCount: Int, remaining: String) =
+    engineCandidateCount == 0 && remaining.isNotEmpty()
+val fallback = if (shouldShowFallback(ordered.size, remaining)) …
+```
+
+並把「為什麼不能用 groups」寫進註釋；新增單測 `fallbackOnlyWhenEngineHasNoCandidates`
+（500/1 條候選 → 不兜底；0 條且有剩餘碼 → 兜底；0 條但無剩餘碼 → 不兜底）。
+這條規則與 §15.73 的「兜底不進緩存、引擎變更失效、90ms 自愈」互補：前者保證**判定正確**，
+後者保證**狀態不殘留**。
+
 ## 15.73 兜底快照被緩存 → 候選條/preedit 卡在「原碼」，開關面板才刷新（2026-11-11）
 
 **現象**（用戶：`ee5` 這條鏈路反覆出問題）：打字時 preedit 顯示原碼（`deek` 樣子的字母串），

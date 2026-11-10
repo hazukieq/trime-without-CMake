@@ -294,6 +294,20 @@ class AssociatedWordsTest {
     }
 
     /** 尾端沒有碼段（已全部選完）時回傳 null，保持 librime 原樣。 */
+    /**
+     * 用戶 2026-11-11：打 `ee5` 時 preedit/候選條顯示原始字母（dek），展開面板再關閉才變成
+     * `de 5`/`邸`。根因是「兜底」判據用了面板分組數（bar 模式下恆為空），
+     * 於是每一幀都掛 fallback。這裡釘住正確判據：只有**引擎候選為 0** 才兜底。
+     */
+    @Test
+    fun fallbackOnlyWhenEngineHasNoCandidates() {
+        val builder = com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder
+        assertFalse(builder.shouldShowFallback(500, "ee5"))
+        assertFalse(builder.shouldShowFallback(1, "ee5"))
+        assertTrue(builder.shouldShowFallback(0, "ee5"))
+        assertFalse(builder.shouldShowFallback(0, ""))
+    }
+
     @Test
     fun rewriteReturnsNullWhenNoCode() {
         assertNull(preedit.rewrite("咧", null, null))
