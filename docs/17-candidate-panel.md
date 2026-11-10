@@ -234,6 +234,19 @@ flowchart TD
 
 ### 7.5 拼音规则（12 键 ↔ 字母 ↔ 音节）——这一节是「段组读音」的规范
 
+#### 7.5.0 特殊规则：儿化后缀 `r` 只能出现在词尾
+
+用户 2026-11-11：「关于 r，这是一个儿后缀的读音。所以它默认不做首字母拼，只能出现在后面，这是特殊规则」。
+
+- `r` 在标准集里（`r` 也是 `儿` 的读音），但属**后缀音节**（`TwelveKeyPreedit.SUFFIX_ONLY_SYLLABLES`）；
+- **不参与首字母简拼展开**：不能当第一段/中间段的音节候选（`syllablesForSegment(..., allowSuffixOnly = false)` 会滤掉）；
+- **只能当这次输入的最后一个音节的候选**：`TwelveKeySnapshotBuilder.segmentGroupsFor()` 用 `allowSuffixOnly = rest.isEmpty()` 判断，
+  本地解码 `decodeSpans()` 里也要求 `i + len == input.length` 才允许 `r`；
+- 例：`到下儿 = dau ha r`（码 `ea3ia3`）第一段只给 `dau/fa/da`，打到最后 `3` 时面板才给 `r`；
+  `r` 夹在中间（如码 `35i`）时既不展开也不会被本地解码切成 `r + li`；
+- 脚本同名实现：`panel_probe.py` 的 `SUFFIX_ONLY_SYLLABLES`/`syllables_for_segment(allow_suffix_only)`，
+  `selftest` 有 3 条断言（最后一段出现、非结尾不出现、真实词 `dau ha r` 第一段不含 r）。
+
 > 范围提醒：本节所有规则**只对客家话音节集合内**的音节成立（见 §7.2.0）。别家方案的读音既不加载、也不参与任何展开。
 
 > 用户 2026-11-11 的要求：**拼音规则必须清晰**。下面是当前实现的完整规则，改任何一条都要同步

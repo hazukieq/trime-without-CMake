@@ -415,9 +415,16 @@ object TwelveKeySnapshotBuilder {
             // 那些音節要打得更多（用戶 2026-11-11：「其他 16 個前綴展開理論上並不需要」）。
             // 只有「碼只是前綴」（如 `7` = p/s，一個完整音節都不是）時才做前綴展開。
             val headIsCompleteSyllable = TwelveKeyPreedit.isSingleSyllable(head)
+            // 兒化後綴 `r`：只有「這段之後沒有碼了」（rest 空）才允許當音節；
+            // 打在中間/開頭時不參與展開（用戶 2026-11-11 特殊規則）。
+            val allowSuffixOnly = rest.isEmpty()
             val syllables = TwelveKeyPreedit
-                .syllablesForSegment(head, quota, headIsCompleteSyllable)
-                .ifEmpty { TwelveKeyPreedit.syllablesForSegment(head, quota, false) }
+                .syllablesForSegment(head, quota, headIsCompleteSyllable, allowSuffixOnly = allowSuffixOnly)
+                .ifEmpty {
+                    TwelveKeyPreedit.syllablesForSegment(
+                        head, quota, false, allowSuffixOnly = allowSuffixOnly,
+                    )
+                }
             for (syllable in syllables) {
                 // 同一個音節可能由多種切法得到（`the` 既可整段、也可 w|e）：
                 // 只留第一種切法那份，避免面板出現 `then` / `then·1` 這種重複行。

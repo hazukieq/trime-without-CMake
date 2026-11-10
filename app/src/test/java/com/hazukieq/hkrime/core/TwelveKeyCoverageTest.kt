@@ -75,22 +75,42 @@ class TwelveKeyCoverageTest {
 
     @Test
     fun multiLetterKeysCoverEveryAvailableInitial() {
+        // 後綴音節（兒化 `r`，用戶 2026-11-11 特殊規則）不參與首字母拼、只能落在詞尾，
+        // 所以「鍵 → 首字母覆蓋」要分兩種口徑：非結尾段不含 r，結尾段才含。
+        val suffixInitials = TwelveKeyPreedit.SUFFIX_ONLY_SYLLABLES.map { it.first() }.toSet()
         val multiLetter = listOf('a', 'e', 'i', '5', '4', '7', '3', '8', '9')
         for (code in multiLetter) {
             val initials = availableInitials[code]?.toSet().orEmpty()
             assertTrue("[$code] 詞典裡應有以該鍵開頭的整首字母", initials.isNotEmpty())
+            val plainInitials = initials - suffixInitials
+
+            // ① 非結尾段（默認 allowSuffixOnly=false）：不得出現後綴音節
             val got = preedit.syllablesForSegment(code.toString(), 16)
             val gotInitials = got.map { it.first() }.toSet()
-            for (initial in initials) {
+            assertTrue(
+                "[$code] 非結尾段不得出現後綴音節（r），實際 $got",
+                got.none { TwelveKeyPreedit.isSuffixOnlySyllable(it) },
+            )
+            for (initial in plainInitials) {
                 assertTrue(
                     "[$code] 應覆蓋首字母 $initial，實際 $gotInitials（$got）",
                     initial in gotInitials,
                 )
             }
+
+            // ② 結尾段（allowSuffixOnly=true）：後綴音節要能選到
+            val gotAsLast = preedit.syllablesForSegment(
+                code.toString(), 16, allowSuffixOnly = true,
+            )
+            assertTrue(
+                "[$code] 結尾段應覆蓋全部首字母 $initials，實際 ${gotAsLast.map { it.first() }.toSet()}",
+                gotAsLast.map { it.first() }.toSet().containsAll(initials),
+            )
+
             val viaPrefix = preedit.initialsForPrefix(code.toString(), 4).toSet()
             assertTrue(
-                "[$code] initialsForPrefix 應含全部可用首字母 $initials，實際 $viaPrefix",
-                viaPrefix.containsAll(initials),
+                "[$code] initialsForPrefix 應含全部可用首字母 $plainInitials，實際 $viaPrefix",
+                viaPrefix.containsAll(plainInitials),
             )
         }
     }

@@ -103,6 +103,33 @@ class AssociatedWordsTest {
     }
 
     @Test
+    fun suffixOnlySyllableRAppearsOnlyAtWordEnd() {
+        // 用戶 2026-11-11：「关于 r，这是一个儿后缀的读音。所以它默认不做首字母拼，
+        // 只能出现在后面，这是特殊规则」。
+        val rCode = TwelveKeyPreedit.codeOf("r")
+        assertTrue("r 的碼不應為空", rCode.isNotEmpty())
+
+        // ① r 在最後一段 → 允許（面板要能選「兒」）
+        val asLast = com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder
+            .debugSegmentGroups(rCode).map { it.reading }
+        assertTrue("r 作為最後一段應出現，實際 $asLast", asLast.contains("r"))
+
+        // ② r 不在最後一段 → 不得出現
+        val notLast = com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder
+            .debugSegmentGroups(rCode + "5i").map { it.reading }
+        assertTrue("r 不在結尾時不得出現，實際 $notLast", notLast.none { it == "r" })
+
+        // ③ 真實詞「到下儿 = dau ha r」：第一段不得把 r 當音節
+        val phrase = listOf("dau", "ha", "r").joinToString("") { TwelveKeyPreedit.codeOf(it) }
+        val first = com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder
+            .debugSegmentGroups(phrase).filter { it.segment == 0 }.map { it.reading }
+        assertTrue("第一段不得含 r，實際 $first", first.none { it == "r" })
+
+        // ④ 本地解碼同一規則：r 夾在中間就整串不切（寧可保留原碼）
+        assertNull("r 不在結尾時本地解碼應失敗", TwelveKeyPreedit.decodeSingle(rCode + "5i"))
+    }
+
+    @Test
     fun associatedBySegmentCodeUsesExactSyllables() {
         // 用戶 2026-11-10：行標題必須是兩個完整讀音（`than dung`），不能是 `than d`。
         val rows = preedit.associatedBySegmentCode("than", "e", perRow = 6, maxRows = 2)

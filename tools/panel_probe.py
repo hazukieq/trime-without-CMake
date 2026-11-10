@@ -305,19 +305,28 @@ class Data:
         return n
 
     def syllables_for_segment(
-        self, code: str, limit: int = 12, exact_only: bool = False
+        self, code: str, limit: int = 12, exact_only: bool = False, allow_suffix_only: bool = False
     ) -> list[str]:
-        """镜像 TwelveKeyPreedit.syllablesForSegment（exact 优先 + 两级桶轮转前缀展开）。"""
+        """镜像 TwelveKeyPreedit.syllablesForSegment（exact 优先 + 两级桶轮转前缀展开）。
+
+        [allow_suffix_only]：後綴音節（兒化 `r`）只允許落在輸入結尾；見
+        `SUFFIX_ONLY_SYLLABLES`（用戶 2026-11-11 特殊規則）。
+        """
         if not code:
             return []
+
+        def allowed(syl: str) -> bool:
+            return allow_suffix_only or syl not in SUFFIX_ONLY_SYLLABLES
+
         exact: list[str] = []
         prefix: list[tuple[str, str]] = []
         for sc, syllables in self.code_to_syllables.items():
             if sc == code:
-                exact.extend(syllables)
+                exact.extend(s for s in syllables if allowed(s))
             elif not exact_only and len(sc) > len(code) and sc.startswith(code):
                 for syl in syllables:
-                    prefix.append((sc[len(code)], syl))
+                    if allowed(syl):
+                        prefix.append((sc[len(code)], syl))
         exact_sorted = sorted(exact, key=lambda s: -self.syllable_freq.get(s, 0))
 
         outer: OrderedDict[str, OrderedDict[str, list[str]]] = OrderedDict()
@@ -382,9 +391,10 @@ class Data:
             base = SEGMENT_SYLLABLE_LIMIT_RICH if pool >= RICH_SYLLABLE_THRESHOLD else SEGMENT_SYLLABLE_LIMIT
             quota = base if index == 0 else base // SECONDARY_SPLIT_DIVISOR
             head_complete = self.is_single_syllable(head)
-            syllables = self.syllables_for_segment(head, quota, head_complete)
+            allow_suffix_only = not rest
+            syllables = self.syllables_for_segment(head, quota, head_complete, allow_suffix_only)
             if not syllables:
-                syllables = self.syllables_for_segment(head, quota, False)
+                syllables = self.syllables_for_segment(head, quota, False, allow_suffix_only)
             source = "exact" if head_complete else "prefix"
             for syl in syllables:
                 if syl in seen:
@@ -554,6 +564,9 @@ KEY_NAME_TO_CODE = {
     "ng": "1", "ghi": "i", "kl": "5", "mno": "4",
     "th": "w", "ps": "7", "vur": "3", "zj": "8",
 }
+
+# 後綴音節（兒化 `r`）：不做首字母拼、只能出現在詞尾（用戶 2026-11-11 特殊規則）
+SUFFIX_ONLY_SYLLABLES = {"r"}
 
 CODE_CHARS = set("1234567890aeiwy5")
 
@@ -798,6 +811,17 @@ def cmd_selftest(args, data: Data) -> None:
         all(all(tok in data.syllable_freq for tok in r.split()) for r in assoc_readings),
         f"联想行读音全是客家话音节：{assoc_readings}",
     )
+
+    # 4.7) 後綴音節 r：只能落在詞尾（用戶 2026-11-11 特殊規則）
+    r_code = code_of("r")
+    expect(bool(r_code), f"r 的碼 = {r_code}")
+    as_last = [g["reading"] for g in data.segment_groups(r_code)]
+    expect("r" in as_last, f"r 作最後一段應出現：{as_last}")
+    not_last = [g["reading"] for g in data.segment_groups(r_code + "5i")]
+    expect("r" not in not_last, f"r 不在結尾時不得出現：{not_last}")
+    phrase = "".join(code_of(s) for s in ("dau", "ha", "r"))
+    first = [g["reading"] for g in data.segment_groups(phrase) if g["segment"] == 0]
+    expect("r" not in first, f"「到下儿」第一段不得含 r：{first}")
 
     # 5) 联想：li + 4a5（= nak）→ 至少一行 li nak（含 Linux）
     assoc = data.assoc_rows("li", "4a5")

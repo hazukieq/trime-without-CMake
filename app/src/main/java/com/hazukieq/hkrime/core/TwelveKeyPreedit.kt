@@ -61,6 +61,17 @@ object TwelveKeyPreedit {
 
     private val wordCodeEntries = ArrayList<WordCodeEntry>()
 
+    /**
+     * 只能出現在**詞尾**的音節（用戶 2026-11-11：「关于 r，这是一个儿后缀的读音。
+     * 所以它默认不做首字母拼，只能出现在后面，这是特殊规则」）。
+     *
+     * 規則：`r` 不參與首字母簡拼展開、不能當第一段/中間段；只有「該段後面已經沒有碼」
+     * （即它是這次輸入的最後一個音節）時才允許出現。
+     */
+    internal val SUFFIX_ONLY_SYLLABLES = setOf("r")
+
+    internal fun isSuffixOnlySyllable(syllable: String): Boolean = syllable in SUFFIX_ONLY_SYLLABLES
+
     /** 客家話音節集合（由主詞典「字→讀音」建立）；詞表解析只認集合內的音節。 */
     private val syllableSet = HashSet<String>()
 
@@ -619,17 +630,20 @@ object TwelveKeyPreedit {
         limit: Int = 12,
         exactOnly: Boolean = false,
         totalLimit: Int = MAX_SYLLABLES_TOTAL,
+        allowSuffixOnly: Boolean = false,
     ): List<String> {
         if (code.isEmpty()) return emptyList()
+        // 後綴音節（`r`）只在「這一段就是輸入的結尾」時才允許；見 [SUFFIX_ONLY_SYLLABLES]。
+        fun allowed(e: Entry): Boolean = allowSuffixOnly || !isSuffixOnlySyllable(e.syllable)
         val exact = ArrayList<Entry>()
         // 前綴命中記住「code 之後的下一個碼位」：分桶時用它，`w`（th 鍵）才能同時給出
         // than（下一個 a）與 the（下一個 e）；只按音節首字母分桶時 th* 全是 t、the 系列會擠掉 than。
         val prefix = ArrayList<Pair<Char, Entry>>()
         codeToSyllables.forEach { (syllableCode, list) ->
             when {
-                syllableCode == code -> exact.addAll(list)
+                syllableCode == code -> exact.addAll(list.filter(::allowed))
                 !exactOnly && syllableCode.length > code.length && syllableCode.startsWith(code) ->
-                    list.forEach { prefix.add(syllableCode[code.length] to it) }
+                    list.filter(::allowed).forEach { prefix.add(syllableCode[code.length] to it) }
             }
         }
         val exactSorted = exact.sortedByDescending { it.freq }
@@ -1087,6 +1101,8 @@ object TwelveKeyPreedit {
             val maxLen = minOf(6, n - i)
             for (len in 1..maxLen) {
                 val entry = table[input.substring(i, i + len)] ?: continue
+                // 兒化後綴 `r` 只能落在整串的最後（見 [SUFFIX_ONLY_SYLLABLES]）。
+                if (isSuffixOnlySyllable(entry.syllable) && i + len != n) continue
                 val seg = bestSeg[i] + 1
                 val freq = bestFreq[i] + entry.freq
                 val better = seg < bestSeg[i + len] ||
