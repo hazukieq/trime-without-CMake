@@ -106,6 +106,8 @@ object TwelveKeySnapshotBuilder {
         segmentAnchor: Char? = null,
         segmented: Boolean = false,
         wantGroups: Boolean = true,
+        /** 單測注入：非 null 時不碰引擎，直接用這份候選（text/comment/index）。 */
+        candidatesOverride: List<CandidateItem>? = null,
     ): TwelveKeySnapshot {
         if (local.isEmpty) return TwelveKeySnapshot.EMPTY
         val input = local.input
@@ -117,7 +119,11 @@ object TwelveKeySnapshotBuilder {
         // 點擊時要回傳原始下標（否則就是「貨不對版」）。
         val flat: List<CandidateItem>
         var degraded = false
-        val snapshot = runCatching { Rime.candidatesSnapshot(maxCandidates) }.getOrNull()
+        if (candidatesOverride != null) {
+            // 單測：完全繞開引擎（bar/full 兩條構建路徑要對同一份候選給出同一份「候選條 + 預覽 + 兜底」）。
+            flat = candidatesOverride
+        } else {
+            val snapshot = runCatching { Rime.candidatesSnapshot(maxCandidates) }.getOrNull()
         if (snapshot != null) {
             flat = snapshot.mapIndexed { index, row ->
                 CandidateItem(
@@ -127,9 +133,10 @@ object TwelveKeySnapshotBuilder {
                 )
             }
         } else {
-            degraded = true
-            flat = singlePageFallback().mapIndexed { index, (text, comment) ->
-                CandidateItem(text, cleanComment(comment), index)
+                degraded = true
+                flat = singlePageFallback().mapIndexed { index, (text, comment) ->
+                    CandidateItem(text, cleanComment(comment), index)
+                }
             }
         }
 

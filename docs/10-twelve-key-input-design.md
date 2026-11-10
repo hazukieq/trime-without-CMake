@@ -3229,6 +3229,22 @@ sum >= 輸入長  → 只顯示 comment（簡拼 `8 8`=ji jen、半截 `5i34i w`
 改這條規則前，舊實現（DP 邊界）在同一份語料上**當場報出 25+ 條不一致**——這就是反覆來回的原因。
 `AGENTS.md` §2.1.1 已寫死：**改 preedit / 面板分組必須先跑真實語料測試**。
 
+## 15.75 快照解耦：候選條/preedit 不得受面板狀態影響（2026-11-11）
+
+用戶：「編碼怎麼能讓展開面板給影響到呢？你這是解耦嗎？候選詞也是，`deek` 也會被展開面板影響到變為 `邸`。」
+
+這是 §15.74 的上位問題：`build()` 裡面板關閉走 `wantGroups=false`（不建分組），而「有沒有候選/兜底」
+「候選條內容」「preedit 首條」一度被這些**呈現層的中間產物**（`groups`）牽著走。現在明確三條不變量：
+
+1. **候選條與預覽只看引擎候選**（`ordered` 排序結果）：`barEntries` / `previewText` / `inlineText` /
+   `fallback` 的計算都不讀 `groups`；
+2. `wantGroups` 只影響 `groups`（面板左列）與其排序，**不影響**候選條與 preedit；
+3. `fallback` 的唯一判據是「引擎候選數為 0」（§15.74 的 `shouldShowFallback`）。
+
+回歸（`SnapshotDecouplingTest`，注入候選、不碰 librime）：
+`bar` 與 `full` 兩次構建必須給出同一份 `barEntries/previewText/inlineText`、同樣 `fallback == null`；
+引擎給 0 條時才兜底；`preedit` 用候選條第一條渲染，面板開關不改變結果。
+
 ## 15.74 「兜底」判據用錯對象 → 每一幀都顯示原始字母（2026-11-11）
 
 **現象**：打 `ee5`，preedit/候選條顯示原始字母 `dek`；**展開面板再關閉**才變成 `de 5` / `邸`。
