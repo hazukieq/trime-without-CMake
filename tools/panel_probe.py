@@ -158,10 +158,14 @@ class Data:
             self.code_to_syllables[code_of(syl)].append(syl)
 
     def _load_syllables(self, data_dir: str) -> set[str]:
-        """完整音節集 = 標準集（assets/rime/hakka_syllables.txt）∪ 主詞典自帶音節。
+        """詞表校驗用的音節集 = **主詞典自帶音節**（與 App 運行時完全一致）。
 
-        用戶 2026-11-11：「最多最多的合法音节就是这么多了，请用这个标准集」+
-        「将 hakka.dict.yaml 所有音节并入标准集从而得到完整集」。
+        用戶 2026-11-11：「實際上 hakka 字典沒有的音節，注定不會有字，所以為了減少性能消耗，
+        默認獲取 hakka 字典的音節集合」——App 端不再讀標準集資產，腳本鏡像同一口徑。
+
+        標準集資產（`assets/rime/hakka_syllables.txt`，841）另行載入到
+        [self.standard_syllables]，用途是**約束與校驗**（selftest 斷言：詞典音節必須 ⊆ 標準集），
+        不是運行時資料源。
         """
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         path = os.environ.get(
@@ -174,13 +178,14 @@ class Data:
                 tok = line.split("#")[0].strip()
                 if tok and tok.isalpha():
                     canon.add(tok)
-        union = canon | set(self.syllable_freq)
-        self.canonical_count = len(canon)
+        self.standard_syllables = canon
+        self.syllable_file = path
         print(
-            f"# 音節集: 標準集 {len(canon)} ∪ 詞典 {len(self.syllable_freq)} = {len(union)}",
+            f"# 音節集: 詞典 {len(self.syllable_freq)}（運行時口徑）"
+            f" / 標準集 {len(canon)}（約束腳本與測試）",
             file=sys.stderr,
         )
-        return union
+        return set(self.syllable_freq)
 
     def _import_names(self, main_path: str, depth: int = 0, seen: "OrderedDict[str, None]" | None = None) -> list[str]:
         """展开 hakka.dict.yaml 的 import_tables（镜像 RimeDictSource.namesWithImports）。"""
@@ -796,6 +801,13 @@ def cmd_selftest(args, data: Data) -> None:
     expect(
         all(unique[i][0] != unique[i + 1][0] for i in range(len(unique) - 1)),
         "累积去重后没有相邻重复读音",
+    )
+
+    # 4.55) 標準集必須覆蓋詞典音節（用戶 2026-11-11 定稿：字典並入後的就是標準集）
+    missing = sorted(set(data.syllable_freq) - set(data.standard_syllables))
+    expect(
+        not missing,
+        f"標準集缺詞典音節 {missing[:8]}（共 {len(missing)} 個）",
     )
 
     # 4.6) 只认客家话音节：词表里混进来的普通话读音（`例行 → li xing`）必须被过滤掉

@@ -191,49 +191,21 @@ flowchart TD
 
 ### 7.2 联想行（两音节，`associatedBySegmentCode` / `associatedByReading`）
 
-#### 7.2.0 只认**客家话音节集合**（2026-11-11 定，完整集 = 标准集 ∪ 词典音节）
+#### 7.2.0 只认**客家话音节集合**（2026-11-11 定）
 
-- **标准集（定稿，841 个）**：`app/src/main/assets/rime/hakka_syllables.txt`。
-  用户 2026-11-11 定稿：「**字典并入后的就是标准集，就这么定了**」——
-  841 = `Hkdict/neo-frontend/src/data/hakkaSyllables.js` 的 787 ∪ `hakka.dict.yaml` 自带的 694
-  （JS 源档漏收 `ji` 等 55 个属人为遗漏，用户已审核确认）。用
-  `python3 tools/panel_probe.py build-syllables` 重新生成（JS ∪ 词典 ∪ 可选补遗）；
-- App 运行时仍是「本档 ∪ 主词典音节」（`finishLoading()` 放词典、`loadSyllableSet()` 并入本档），
-  这样用户往 `/sdcard/hkrime/hakka.dict.yaml` 加带新音节的词条也立刻生效；
-- 审核记录：`docs/18-dict-only-syllables.md`（55 个词典独有音节，已审核无误；已修 `nziamm→nziam`）。
-  实测词表里仍在标准集之外的只有 7/1456 条（0.48%，`cn`、`打`、`hop` 之类）。
+**运行时（App）只用主词典音節集合**——用户 2026-11-11 定调：
+「實際上 hakka 字典沒有的音節，注定不會有字，所以為了減少性能消耗，默認獲取 hakka 字典的音節集合」。
 
-
-词表的第三列是读音，但词表来源不只客家话：`/sdcard/hkrime/` 里同时部署着 `luna_pinyin.dict.yaml` 这类别的方案词典（`例行 → li xing`），`xing` 不是客家话音节。规则：
-
-1. **只加载 `hakka.dict.yaml` 及其 `import_tables` 展开出来的词表**（`RimeDictSource.namesWithImports`；实测名单：`hakka_places / hakka_sougou_words / hakka_poems / hakka_zon / hakka_mobilewords / hakka_oftenwords / hakka_website / hakka_cn_en`），目录里其它 `*.dict.yaml` 一律不读；
-2. 即使在这 9 份词表里，只要某条词条的读音中有**任意一节不在客家话音节集合**（集合由主词典的「字→读音」建立，`syllableSet`），**整条丢弃**——不做「去掉坏音节再凑」；
-3. 脚本 `tools/panel_probe.py` 必须镜像同一规则（`_import_names()` + `_load_words` 里的音节校验），`selftest` 有断言：累积读音与联想行读音必须全是客家话音节，且不得出现 `li xing`。
-
-- 索引在 `TwelveKeyPreedit.loadWordLines`/`finishWordIndex` 建：`(第一音节, 第二音节) → 词表`，
-  桶内按热度降序（selection），显示时按词面字典序（display）；
-- 每行 ≤ `ASSOC_WORDS=6` 条，整轮 ≤ `ASSOC_MAX_ROWS=4` 行（`segment=1`）；
-- 行标题 = 两个完整读音（`song hau`），不用 `h**` 通配。
-
-### 7.3 引擎组合并（`CandidateRanking.panelGroups` / `mergeAssociationGroups`）
-
-- `panelGroups(段组, 引擎组)`：按 **reading** 把引擎组并进同名段组（汉字在前、非汉字补后、
-  按文字去重）；没有同名段组的引擎组只保留「≥2 音节」或「含非汉字」的，避免左列被几十个
-  单音节读音行灌满；
-- `mergeAssociationGroups(基准, 联想行)`：**同 reading 就合并进现有行**，没有才新建行。
-
-### 7.3.1 多音节行按「开头相同」收敛（`collapsePrefixRows`）
-
-引擎每个候选词都带自己的完整 comment，所以 `ka thu`（两音节词组）与 `ka thu di`（三音节词组）
-天然会各成一行。但整串码查询/用户心智都是「**开头相同就是一个 list**」，于是最终组装后还要收一遍：
-
-- 只收**多音节行之间**（≥2 音节）：`ko thiau fa` 并入 `ko thiau`、`ka thu di` 并入 `ka thu`；
-- **单音节行不吸收词行**（否则 `ka then` 会跑进 `ka` 的単字格里，破坏「这一段能选的字」语义）；
-- 收進去的候選保留自己的 `comment`（网格里仍显示完整读音），行内文字不分大小写去重；
-- 没有任何前缀行可并时，才用完整读音单独成行。
-
-### 7.5 拼音规则（12 键 ↔ 字母 ↔ 音节）——这一节是「段组读音」的规范
-
+- App：`finishLoading(counts)` 里 `syllableSet = counts.keys`（`hakka.dict.yaml` 的「字→讀音」）；
+  `loadWordLines()` 用它校驗詞表讀音，含集合外音節（`li xing` 的 `xing`）的詞條整條丟棄。
+  **不再讀任何音節集資產**（少一次 asset 讀取+解析）。
+- **標準集（定稿 841 個）= `app/src/main/assets/rime/hakka_syllables.txt`**：
+  JS 源檔 787 ∪ `hakka.dict.yaml` 694（用户：「字典并入后的就是标准集」；JS 漏收 `ji` 等 55 個屬人為遺漏）。
+  它的用途是**約束腳本與測試**，不是 App 運行時數據源：
+  - `tools/panel_probe.py` 的詞表校驗與 App 同口徑（詞典音節），`selftest` 斷言「詞典音節 ⊆ 標準集」；
+  - `build-syllables` 可從 JS 重新生成（JS ∪ 詞典 ∪ 可選補遺）；
+  - 審核記錄：`docs/18-dict-only-syllables.md`（55 個詞典獨有音節，已審核結案；`nziamm→nziam`、`lod→lot` 已修）。
+- 实测词表里仍在词典音節集之外的只有 7/1456 条（0.48%，`cn`、`打`、`hop` 之类）。
 #### 7.5.0 特殊规则：儿化后缀 `r` 只能出现在词尾
 
 用户 2026-11-11：「关于 r，这是一个儿后缀的读音。所以它默认不做首字母拼，只能出现在后面，这是特殊规则」。

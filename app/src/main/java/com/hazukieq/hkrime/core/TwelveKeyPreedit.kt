@@ -188,7 +188,6 @@ object TwelveKeyPreedit {
         }.onFailure { Timber.w(it, "TwelveKeyPreedit: load char rank failed") }
 
         finishLoading(counts)
-        loadSyllableSet(context)
 
         // 兩字詞聯想索引（song gong 這類聯想行）——詞表只有詞條、沒有讀音，
         // 依賴上面 finishLoading 建好的 charTable 反推，所以必須放在它後面。
@@ -235,25 +234,14 @@ object TwelveKeyPreedit {
      * 抽出來是為了單測：JVM 測試讀 assets 文件的行直接餵進來，驗證的正是 App 實際用的邏輯。
      */
     /**
-     * 完整音節集 = **標準集（`assets/rime/hakka_syllables.txt`，787 個，來源
-     * `Hkdict/neo-frontend/src/data/hakkaSyllables.js`）∪ 主詞典自帶音節**。
+     * 音節集合**只從主詞典取**（`finishLoading(counts)` 的 counts.keys）。
      *
-     * 用戶 2026-11-11 兩條指示：「最多最多的合法音节就是这么多了，请用这个标准集」→
-     * 「将 hakka.dict.yaml 所有音节并入标准集从而得到完整集」。詞表裡出現完整集之外音節
-     * （`li xing` 的 `xing`、`cn`、`打`…）的詞條整條丟棄；資產缺失時只用詞典音節。
-     */
-    private fun loadSyllableSet(context: Context) {
-        runCatching {
-            val text = context.assets.open("rime/hakka_syllables.txt")
-                .bufferedReader(Charsets.UTF_8).use { it.readText() }
-            val n = applySyllableSet(text)
-            Timber.i("TwelveKeyPreedit: syllables(total)=%d（標準集 ∪ 主詞典）", n)
-        }.onFailure { Timber.w(it, "TwelveKeyPreedit: canonical syllables missing, use dict set") }
-    }
-
-    /**
-     * 把標準集**并入** [syllableSet]（`finishLoading` 已先放進主詞典音節）；
-     * 返回并入後的總數（0 表示文本裡沒有音節，集合保持詞典音節不變）。
+     * 用戶 2026-11-11 定調：「實際上 hakka 字典沒有的音節，注定不會有字，所以為了減少性能消耗，
+     * 默認獲取 hakka 字典的音節集合」——
+     * - 詞表解析（聯想/整串詞行）用它做校驗：讀音含集合外音節（`li xing` 的 `xing`）整條丟棄；
+     * - 不再讀 `assets/rime/hakka_syllables.txt`：那份是**標準集定稿（841 個）**，用途是
+     *   **約束 `tools/panel_probe.py` / `RealCorpusTest` 等腳本與測試**，不是 App 運行時資料源；
+     * - 這樣少一次 asset 讀取+解析，也天然保證「有字 ⇒ 有音節 ⇒ 可用」。
      */
     internal fun applySyllableSet(text: String): Int {
         val parsed = LinkedHashSet<String>()
@@ -263,8 +251,9 @@ object TwelveKeyPreedit {
                 .forEach { parsed.add(it) }
         }
         if (parsed.isEmpty()) return 0
+        syllableSet.clear()
         syllableSet.addAll(parsed)
-        return syllableSet.size
+        return parsed.size
     }
 
     internal fun loadDictLines(lines: Sequence<String>): HashMap<String, Int> {
@@ -560,8 +549,8 @@ object TwelveKeyPreedit {
         // 避免同一個碼位的音節被重複 append（會讓「輪轉取 limit 個」變少）。
         table.clear()
         codeToSyllables.clear()
-        // 音節集合的權威來源是 assets/rime/hakka_syllables.txt（見 [loadSyllableSet]）；
-        // 這裡先用詞典音節兜底，等 loadSyllableSet() 反手覆蓋（資產缺失時就只剩這份）。
+        // 音節集合 = 主詞典自帶音節（用戶 2026-11-11：「字典沒有的音節注定不會有字，
+        // 為減少性能消耗，默認取 hakka 字典的音節集合」）。標準集資產只約束腳本/測試。
         syllableSet.clear()
         syllableSet.addAll(counts.keys)
         counts.forEach { (syllable, freq) ->
