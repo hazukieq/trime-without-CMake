@@ -103,6 +103,22 @@ class AssociatedWordsTest {
     }
 
     @Test
+    fun wordsByCodePrefixRequiresFirstSyllableFullyTyped() {
+        // 用戶 2026-11-11：`ia8i3` 面板只看到 `ga j/z*`，腳本卻列出 `gam se`——
+        // 因為 `ia` 只是 `gam`（= ia4）的第一段前綴，詞行的第一段必須是**打完的音節**。
+        val word = "网易云"
+        val firstCode = TwelveKeyPreedit.codeOf("mong")
+        val fullCode = listOf("mong", "ji", "jun").joinToString("") { TwelveKeyPreedit.codeOf(it) }
+        assertTrue("[mong] 應命中 $word", preedit.wordsByCodePrefix(firstCode).any { it.second.contains(word) })
+        assertTrue("[$fullCode] 應命中 $word", preedit.wordsByCodePrefix(fullCode).any { it.second.contains(word) })
+        // 第一段沒打全（少了最後一個碼）→ 不得當成詞行
+        assertFalse(
+            "[${firstCode.dropLast(1)}] 第一段未打全時不應命中 $word",
+            preedit.wordsByCodePrefix(firstCode.dropLast(1)).any { it.second.contains(word) },
+        )
+    }
+
+    @Test
     fun suffixOnlySyllableRAppearsOnlyAtWordEnd() {
         // 用戶 2026-11-11：「关于 r，这是一个儿后缀的读音。所以它默认不做首字母拼，
         // 只能出现在后面，这是特殊规则」。

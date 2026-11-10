@@ -427,6 +427,11 @@ object TwelveKeyPreedit {
         val rows = LinkedHashMap<String, LinkedHashSet<String>>()
         for (entry in entries) {
             if (entry.tokens.size < 2) continue
+            // 第一個音節必須**打全**：詞行的第一段是「已完成的音節」，後面的碼才算第二段前綴。
+            // 否則打 `ia`（= ga）時會把 `gam se`（= ia4|7e）這類「第一段還沒打完」的詞也列出來
+            // （用戶 2026-11-11：`ia8i3` 面板只看到 `ga j/z*`，腳本卻列出 gam se）。
+            val firstCode = codeOf(entry.tokens[0])
+            if (firstCode.isEmpty() || !prefix.startsWith(firstCode)) continue
             if (!entry.code.startsWith(prefix)) continue
             rows.getOrPut(entry.tokens.joinToString(" ")) { LinkedHashSet() }.add(entry.word)
         }
