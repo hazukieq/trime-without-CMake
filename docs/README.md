@@ -37,10 +37,10 @@
 | 10 | [09-candidate-ui-evaluation.md](09-candidate-ui-evaluation.md) | **候选区改造评估**（单行+展开面板 / 九宫格，参考搜狗等实现，含可交互 mock） | 改候选栏、做展开页、评估成本时 |
 | 11 | [10-twelve-key-input-design.md](10-twelve-key-input-design.md) | **12 键（九宫格）客家话输入设计与实现方案**：librime 能力实证、comment 分组架构、JNI 候选枚举、交互规格、P0/P1/P2 | 要动手实现/评审 12 键时 |
 | 12 | [11-librime-upgrade-performance.md](11-librime-upgrade-performance.md) | **librime 1.7.3→1.17 升级 + rime-jni 独立工程 + 12 键简拼性能补丁**（三处补丁、simpleperf 数据、升级检查清单、踩坑表） | 动 JNI / 升级 librime / 排查按键卡顿 |
-| 14 | [13-perf-gate.md](13-perf-gate.md) | **12 键性能门禁**：一条命令触发微基准并判定（decode/segment/assoc/merge/engine/按键延迟/索引载入），阈值与排查顺序 | 改分组/联想词/排序/快照之后，或用户报「卡顿」时 |
+| 13 | [13-perf-gate.md](13-perf-gate.md) | **12 键性能门禁**：一条命令触发微基准并判定（decode/segment/assoc/merge/engine/按键延迟/索引载入），阈值与排查顺序 | 改分组/联想词/排序/快照之后，或用户报「卡顿」时 |
 | 14 | [14-preedit-reading-fix-plan.md](14-preedit-reading-fix-plan.md) | 12 鍵 preedit 拼音與候選讀音對齊（**修復方案，待實施**） | 接這個 bug / 改 preedit 前 |
-| 13 | [12-candidate-ranking.md](12-candidate-ranking.md) | **候选排序规则**：固定候选区「词组优先」+ 展开面板「用户常用→权威字频→引擎序」、数据源与公式、调参位、调试日志、单测映射、历史决策与排查清单 | 改候选排序 / 出现「生僻字靠前」「词组被单字挤掉」时 |
-| 14 | [reports/](reports/README.md) | 构建 / 改名 / 集成 / 真机报告（**原样存档**） | 要查证据/细节时 |
+| 15 | [12-candidate-ranking.md](12-candidate-ranking.md) | **候选排序规则**：固定候选区「词组优先」+ 展开面板「用户常用→权威字频→引擎序」、数据源与公式、调参位、调试日志、单测映射、历史决策与排查清单 | 改候选排序 / 出现「生僻字靠前」「词组被单字挤掉」时 |
+| 16 | [reports/](reports/README.md) | 构建 / 改名 / 集成 / 真机报告（**原样存档**） | 要查证据/细节时 |
 
 **最短路径**：00 → 03（把包装上）→ 05 §4（发版）→ 07（改数据）→ 06（出问题）。
 改候选排序：读 **12**（两块排序的比较键 + `./gradlew :app:testDebugUnitTest` + `tools/rank-sanity.py`）。
