@@ -28,6 +28,7 @@ import com.hazukieq.hkrime.util.RimeUtils.sync
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -65,6 +66,25 @@ class IntentReceiver : BroadcastReceiver(), CoroutineScope by MainScope() {
                 com.hazukieq.hkrime.ime.core.Trime.getService()
                     ?.textInputManager?.hideCandidatePanel()
             }
+            COMMAND_DEBUG_CANDIDATES -> launch(Dispatchers.IO) {
+                // 排查「引擎為什麼給不出某個詞」：
+                //   adb shell am broadcast -a com.hazukieq.hkrime.debug.candidates \
+                //     --es input 5i4a57i -p com.hazukieq.hkrime
+                // 只餵碼串、列引擎候選，不動用戶當前組合（結束時清掉）。
+                val input = intent.getStringExtra(EXTRA_INPUT) ?: return@launch
+                runCatching {
+                    Rime.clearComposition()
+                    val ok = Rime.onText(input)
+                    val composing = Rime.getComposition()
+                    val cands = Rime.getCandidatesWithoutSwitch()
+                    Timber.i(
+                        "dbgcand: input=%s feedOk=%b composing=%s n=%d %s",
+                        input, ok, composing, cands.size,
+                        cands.take(40).joinToString(" | ") { "${it.text}/${it.comment}" },
+                    )
+                    Rime.clearComposition()
+                }.onFailure { Timber.e(it, "dbgcand failed") }
+            }
             COMMAND_DEBUG_PERF_GATE -> {
                 // 測試/性能門禁：adb shell am broadcast -a com.hazukieq.hkrime.debug.perfgate
                 com.hazukieq.hkrime.core.twelvekey.PerfGate.run()
@@ -92,6 +112,8 @@ class IntentReceiver : BroadcastReceiver(), CoroutineScope by MainScope() {
 
     companion object {
         private const val COMMAND_DEPLOY = "com.hazukieq.hkrime.deploy"
+        private const val COMMAND_DEBUG_CANDIDATES = "com.hazukieq.hkrime.debug.candidates"
+        private const val EXTRA_INPUT = "input"
         private const val COMMAND_SYNC = "com.hazukieq.hkrime.sync"
         private const val COMMAND_DEBUG_TOGGLE_PANEL = "com.hazukieq.hkrime.debug.togglepanel"
         private const val COMMAND_DEBUG_CARET_PROBE = "com.hazukieq.hkrime.debug.caretprobe"

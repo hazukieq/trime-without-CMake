@@ -155,6 +155,11 @@ class TextInputManager private constructor() :
 
     override fun onInitializeInputUi(uiBinding: InputRootBinding) {
         super.onInitializeInputUi(uiBinding)
+        // 排查「引擎為什麼給不出某個詞」：/sdcard/hkrime/dbg_candidates.txt 裡寫一行碼串，
+        // 下次輸入法起來就把引擎候選寫到 dbg_candidates.log 並把請求文件改名 .done。
+        // 為什麼用文件而不是廣播：設置界面崩潰排查時 IME 進程還沒起來、動態廣播收不到。
+        if (com.hazukieq.hkrime.BuildConfig.DEBUG) runCatching { com.hazukieq.hkrime.util.CandidateProbe.runIfRequested(trime) }
+            .onFailure { Timber.w(it, "CandidateProbe failed") }
         // Initialize main keyboard view
         mainKeyboardView = uiBinding.main.mainKeyboardView.also {
             it.setOnKeyboardActionListener(this)
