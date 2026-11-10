@@ -340,10 +340,19 @@ object TwelveKeySnapshotBuilder {
         // 舊邏輯的聯想索引只按前兩個音節建 key，打第三節（`li nak s`）時查不到；
         // 用戶 2026-11-11：「詞庫是有 li nak si->linux，面板居然沒有」。
         if (codes.length >= 2 && result.size < MAX_RESULT_GROUPS) {
-            val prefixRows = TwelveKeyPreedit.wordsByCodePrefix(
+            // 這一段是「錦上添花」（三音節以上詞的聯想），**任何異常都不能帶崩整個面板**。
+            val prefixRows = runCatching {
+                TwelveKeyPreedit.wordsByCodePrefix(
+                    codes,
+                    TwelveKeyTuning.ASSOC_PREFIX_READINGS,
+                    ASSOC_WORDS,
+                )
+            }.getOrElse { emptyList() }
+            Timber.d(
+                "twelvekey: prefixRows codes=%s rows=%s %s",
                 codes,
-                TwelveKeyTuning.ASSOC_PREFIX_READINGS,
-                ASSOC_WORDS,
+                prefixRows.map { it.first },
+                TwelveKeyPreedit.debugWordCodeEntries(),
             )
             for ((reading, words) in prefixRows) {
                 if (words.isEmpty()) continue

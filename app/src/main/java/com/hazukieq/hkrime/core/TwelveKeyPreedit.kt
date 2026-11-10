@@ -62,6 +62,16 @@ object TwelveKeyPreedit {
     private val wordCodeEntries = ArrayList<WordCodeEntry>()
 
     /**
+     * 已發布的整串碼索引（**不可變**，[finishWordIndex] 時整體替換）。
+     *
+     * 不能在查詢端直接遍歷 [wordCodeEntries]：詞表在後台線程邊讀邊加，按鍵線程同時遍歷會
+     * `ConcurrentModificationException` —— 那會讓整個 `segmentGroupsFor` 拋異常、面板所有組
+     * 一起消失（用戶 2026-11-11：「連單音節和聯想詞分組全部消失了」）。
+     */
+    @Volatile
+    private var wordCodeIndex: List<WordCodeEntry> = emptyList()
+
+    /**
      * 聯想詞的**查詢索引**：第一音節 → (第二音節 → 詞列表)。
      *
      * 面板每次按鍵都會重建快照，如果查詢時還要遍歷所有 8 千多個「第一音節|第二音節」鍵
@@ -297,11 +307,26 @@ object TwelveKeyPreedit {
             val bucket = assocWords.getOrPut(key) { LinkedHashMap() }
             bucket[word] = (bucket[word] ?: 0) + 1
             // 整串碼索引（三音節以上的詞只能靠它）；簡拼/半截由查詢端做前綴匹配。
-            val fullCode = syllables.joinToString("") { codeOf(it) }
-            if (fullCode.isNotEmpty()) {
-                wordCodeEntries.add(WordCodeEntry(syllables, word, fullCode))
+            //
+            // **只收「詞表自帶讀音」的詞條**（第 2 欄）。純詞表（sougou/places…）是用
+            // `charTable` 反推前兩字讀音的，本來就是兩音節、聯想索引已覆蓋，再存一份只會
+            // 把条目数从 2 千撑到 17 萬（真机上詞表加载 1s → 18s、内存暴涨，用戶 2026-11-11
+            // 撞到的「面板分组全消失」就是加载线程与按键线程抢这份大表）。
+            if (reading.isNotEmpty()) {
+                val fullCode = syllables.joinToString("") { codeOf(it) }
+                if (fullCode.isNotEmpty()) {
+                    wordCodeEntries.add(WordCodeEntry(syllables, word, fullCode))
+                }
             }
         }
+    }
+
+    /** 診斷：整串碼表裡到底有沒有某個詞（真機排查「面板查不到」用；數量小，開銷可忽略）。 */
+    fun debugWordCodeEntries(probeWord: String = "Linux"): String {
+        val entries = wordCodeIndex
+        val hits = entries.filter { it.word.contains(probeWord, ignoreCase = true) }
+        return "wordCodes=${entries.size} " +
+            "hits=" + hits.take(4).joinToString(";") { "${it.code}<-${it.tokens.joinToString(" ")}" }
     }
 
     /** 詞表載入完後把索引整理成「按熱度降序」的列表，避免每次查詢都排序。 */
@@ -328,6 +353,8 @@ object TwelveKeyPreedit {
         }
         assocByFirst = index
         assocReady = index.isNotEmpty()
+        // 整體替換（讀者看到的是舊或新的完整列表，不會看到半截）
+        wordCodeIndex = ArrayList(wordCodeEntries)
         assocGeneration++
     }
 
@@ -354,9 +381,10 @@ object TwelveKeyPreedit {
         perReading: Int = 6,
     ): List<Pair<String, List<String>>> {
         val prefix = codes.replace("'", "").replace(" ", "")
-        if (prefix.isEmpty() || wordCodeEntries.isEmpty()) return emptyList()
+        val entries = wordCodeIndex
+        if (prefix.isEmpty() || entries.isEmpty()) return emptyList()
         val rows = LinkedHashMap<String, LinkedHashSet<String>>()
-        for (entry in wordCodeEntries) {
+        for (entry in entries) {
             if (entry.tokens.size < 2) continue
             if (!entry.code.startsWith(prefix)) continue
             rows.getOrPut(entry.tokens.joinToString(" ")) { LinkedHashSet() }.add(entry.word)
