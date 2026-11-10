@@ -228,9 +228,11 @@ object TwelveKeySnapshotBuilder {
         // 往往已經有一行（例如 `deepseek` 同時在引擎候選與 `hakka_zon` 詞典裡，
         // 讀音都是 `di thok`），直接 append 會出現兩行一模一樣的 `di thok → deepseek`
         // （用戶 2026-11-11）。
-        val groups = mergeRowsByReading(
-            CandidateRanking.mergeAssociationGroups(merged, assocGroups),
-            prefixWordRows,
+        val groups = collapsePrefixRows(
+            mergeRowsByReading(
+                CandidateRanking.mergeAssociationGroups(merged, assocGroups),
+                prefixWordRows,
+            ),
         )
             // 統一排序：單音節組 → 詞組 → 無讀音組，各檔內按讀音字典序；
             // 「無讀音組」（引擎沒給 comment）用第一條候選的首字讀音兜底，也要按字母排。
@@ -558,6 +560,50 @@ object TwelveKeySnapshotBuilder {
         val bytes = input.toByteArray(Charsets.UTF_8)
         if (consumedEnd >= bytes.size) return ""
         return String(bytes, consumedEnd, bytes.size - consumedEnd, Charsets.UTF_8)
+    }
+
+    /**
+     * 多音節行按「開頭相同」收斂：`ko thiau fa` 並進 `ko thiau`、`ka thu di` 並進 `ka thu`。
+     *
+     * 為什麼需要（用戶 2026-11-11）：「整串碼查詢是按開頭匹配的，那 `ko thiau` 和 `ko thiau fa`
+     * 就是同一個 list，為什麼面板裡是兩行」——引擎的每個候選詞都有自己的完整 comment，
+     * 組出來就是 `ka thu` 一行、`ka thu di` 再一行；既然查詢語義是前綴，顯示也該收斂到最短前綴行。
+     *
+     * 限制：**只收斂多音節行（≥2 音節）之間**，單音節行（`ka`）不吸收詞行 ——
+     * 否則 `ka then` 這種詞會跑到單字格里，破壞「單音節組 = 這一段能選的字」的語義。
+     */
+    private fun collapsePrefixRows(rows: List<SyllableGroup>): List<SyllableGroup> {
+        if (rows.size < 2) return rows
+        fun tokens(g: SyllableGroup) = g.reading.split(' ').filter { it.isNotBlank() }
+
+        val out = ArrayList<SyllableGroup>(rows.size)
+        // 1) 單音節/無讀音行原樣保留（順序不變）
+        rows.forEach { if (tokens(it).size < 2) out.add(it) }
+        // 2) 多音節行按音節數從短到長處理：短的先就位，長的才有前綴可並
+        rows.filter { tokens(it).size >= 2 }
+            .sortedBy { tokens(it).size }
+            .forEach { row ->
+                val rowTokens = tokens(row)
+                var target = -1
+                var bestLen = 0
+                out.forEachIndexed { i, cand ->
+                    val candTokens = tokens(cand)
+                    if (candTokens.size < 2 || candTokens.size >= rowTokens.size) return@forEachIndexed
+                    if (rowTokens.take(candTokens.size) == candTokens && candTokens.size > bestLen) {
+                        bestLen = candTokens.size
+                        target = i
+                    }
+                }
+                if (target < 0) {
+                    out.add(row)
+                    return@forEach
+                }
+                val existing = out[target]
+                val texts = existing.items.mapTo(HashSet()) { it.text.lowercase() }
+                val add = row.items.filter { texts.add(it.text.lowercase()) }
+                if (add.isNotEmpty()) out[target] = existing.copy(items = existing.items + add)
+            }
+        return out
     }
 
     /**
