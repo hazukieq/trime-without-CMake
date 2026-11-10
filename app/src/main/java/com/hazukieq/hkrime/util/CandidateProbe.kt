@@ -59,6 +59,23 @@ object CandidateProbe {
             }.onFailure { out.append("deploy ERROR: ").append(it).append('\n') }
             out.append("deploy: done\n")
         }
+        // `!schema hakka_jiugong` = 先切方案再探（默認可能是 26 鍵 hakka_qwerty）
+        codes.filter { it.startsWith("!schema ") }.forEach { line ->
+            val id = line.removePrefix("!schema ").trim()
+            val switched = runCatching {
+                var ok = false
+                for (i in 0 until 32) {
+                    if (Rime.getSchemaId() == id) { ok = true; break }
+                    if (!Rime.selectSchema(i)) continue
+                    Thread.sleep(400)
+                }
+                ok
+            }.getOrElse { "ERROR: $it" }
+            out.append("schema: ").append(id).append(" -> ").append(switched)
+                .append(" current=").append(runCatching { Rime.getSchemaId() }.getOrNull())
+                .append('\n')
+            Thread.sleep(1200)
+        }
         // `@li nak si` = 直接問詞典（不走輸入法譯碼路徑），看詞條到底在不在表裡
         codes.filter { it.startsWith("@") }.forEach { line ->
             val spaced = line.removePrefix("@").trim()
