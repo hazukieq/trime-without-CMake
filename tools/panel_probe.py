@@ -958,6 +958,7 @@ def cmd_pull(args) -> None:
 
 def cmd_syllables(args, data: Data) -> None:
     """逐键累积地列左列音节（2 键 → 3 键 → … → 整串），最后去重汇总。"""
+    raw_input = args.codes
     args.codes = parse_code(args.codes)
     unique = data.cumulative_unique(args.codes, args.min_len)
     if not args.no_stages:
@@ -983,16 +984,31 @@ def cmd_syllables(args, data: Data) -> None:
     # 首字母組合（規則層面，和詞條是否存在無關）
     combos = data.initial_pattern_combos(args.codes)
     if combos:
-        hits = {tuple(t[0] for t in tokens) for tokens, _w, _c in data.word_codes}
-        parts = []
-        for combo in combos:
-            pattern = " ".join(combo)
-            count = sum(1 for t, _w, _c in data.word_codes
-                        if len(t) == len(combo) and tuple(x[0] for x in t) == combo)
-            parts.append(f"{pattern}（{count} 詞）")
+        keys = args.codes.replace("'", "")
+        # 每種首字母序列命中的詞條數（一次掃描建表，避免 O(組數×詞條數)）
+        counts: dict[tuple[str, ...], int] = {}
+        for tokens, _w, _c in data.word_codes:
+            if len(tokens) != len(keys):
+                continue
+            key = tuple(t[0] for t in tokens)
+            counts[key] = counts.get(key, 0) + 1
         print()
-        print(f"# 首字母組合（規則，每鍵一個音節首字母、元音自由）：{len(combos)} 組")
-        print("  " + "  ".join(parts))
+        shown_input = (
+            f"{raw_input} = 碼 {' '.join(keys)}" if raw_input.replace(" ", "") != keys else f"碼 {' '.join(keys)}"
+        )
+        print(
+            f"# 首字母組合（規則）：{len(combos)} 組 × {len(keys)} 個首字母（輸入 {len(keys)} 鍵：{shown_input}）"
+        )
+        print("# 每行一組，`g·b·j` 這種點號分隔的是**同一組**的首字母序列；末尾是該組合命中的詞條數。")
+        width = max(len("·".join(c)) for c in combos)
+        for index, combo in enumerate(combos, 1):
+            pattern = "·".join(combo)
+            print(f"  [{index:>2}] {pattern:<{width}}  → {counts.get(combo, 0)} 詞")
+        hit = sum(1 for c in combos if counts.get(c))
+        print(
+            f"# 有命中：{hit} 組 / {len(combos)} 組"
+            + ("（0 詞的組合在實際代碼裡直接跳過，不往面板塞空行）" if hit < len(combos) else "")
+        )
 
     # 實際存在讀音集（詞典全量反查、不受面板配額限制）
     shown = {r[0] for r in unique if " " not in r[0]} | {g["reading"] for g in data.segment_groups(args.codes)}
