@@ -263,6 +263,22 @@ class AssociatedWordsTest {
     }
 
     /**
+     * 用戶 2026-11-11：打 `li nak s`（碼 `5i4a57`）時面板必須能出 `li nak si` → Linux。
+     * 舊聯想索引只按前兩音節建 key，三音節詞打到第三節就查不到。
+     */
+    @Test
+    fun wordsByCodePrefixFindsThreeSyllableWord() {
+        // assets 的 zon 詞表裡有 `网易云 / mong ji jun`（三音節）；`Linux / li nak si` 只在
+        // 真機 `hakka_zon.dict.yaml`（用戶自己加的），所以單測用前者，真機另驗後者。
+        val code = TwelveKeyPreedit.codeOf("mong") + TwelveKeyPreedit.codeOf("ji") +
+            TwelveKeyPreedit.codeOf("jun").take(1)
+        val rows = TwelveKeyPreedit.wordsByCodePrefix(code, 4, 6)
+        assertTrue("整串碼前綴應查到 `mong ji jun` 行：code=$code rows=$rows",
+            rows.any { it.first == "mong ji jun" && it.second.isNotEmpty() })
+    }
+
+
+    /**
      * 用戶 2026-11-11 報：`5i4a57`（ki mak + 半截 `7`）只顯示 `ki mak`，尾碼被吃掉。
      * 本地 DP 切不出完整音節（`7` 是單鍵），舊寫法算不出覆蓋長度 → 用 comment 自己的音節碼
      * 逐節吃碼位（ki→5i、mak→4a5 = 5 個），剩下的 `7` 原樣顯示。

@@ -336,6 +336,34 @@ object TwelveKeySnapshotBuilder {
         if (splits.isEmpty()) return emptyList()
         val result = ArrayList<SyllableGroup>()
         val seen = HashSet<String>()
+        // ---- 整串碼前綴聯想：三音節以上的詞（`li nak si` → Linux）只能靠這條 ----
+        // 舊邏輯的聯想索引只按前兩個音節建 key，打第三節（`li nak s`）時查不到；
+        // 用戶 2026-11-11：「詞庫是有 li nak si->linux，面板居然沒有」。
+        if (codes.length >= 2 && result.size < MAX_RESULT_GROUPS) {
+            val prefixRows = TwelveKeyPreedit.wordsByCodePrefix(
+                codes,
+                TwelveKeyTuning.ASSOC_PREFIX_READINGS,
+                ASSOC_WORDS,
+            )
+            for ((reading, words) in prefixRows) {
+                if (words.isEmpty()) continue
+                if (result.size >= MAX_RESULT_GROUPS) break
+                // 與現有聯想行去重：同一個讀音只要一份（兩音節詞通常已被上面的關聯行拿走）。
+                if (!seen.add("$reading|any")) continue
+                val items = words.map { word ->
+                    CandidateItem(text = word, comment = reading, index = -1, segment = 1)
+                }
+                result.add(
+                    SyllableGroup(
+                        reading = reading,
+                        syllables = reading.split(' '),
+                        items = items,
+                        segment = 1,
+                    ),
+                )
+            }
+        }
+
         splits.forEachIndexed { splitIndex, split ->
             val (head, rest) = split
             // 第一種切法吃完整配額；備選切法減半（面板不能被次要切法灌滿）。
@@ -399,7 +427,7 @@ object TwelveKeySnapshotBuilder {
                         syllable, rest, ASSOC_WORDS, ASSOC_INITIAL_ROWS,
                     ).forEach { (reading, words) ->
                         if (words.isEmpty() || assocAdded >= ASSOC_MAX_ROWS) return@forEach
-                        if (!seen.add("$reading|assoc")) return@forEach
+                        if (!seen.add("$reading|any")) return@forEach
                         val items = words.map { word ->
                             CandidateItem(text = word, comment = reading, index = -1, segment = 1)
                         }
@@ -417,7 +445,7 @@ object TwelveKeySnapshotBuilder {
                         .forEach { (second, words) ->
                             if (words.isEmpty() || assocAdded >= ASSOC_MAX_ROWS) return@forEach
                             val reading = "$syllable $second"
-                            if (!seen.add("$reading|assoc")) return@forEach
+                            if (!seen.add("$reading|any")) return@forEach
                             val items = words.map { word ->
                                 CandidateItem(
                                     text = word,
@@ -443,7 +471,18 @@ object TwelveKeySnapshotBuilder {
         // 組之間一律按讀音字典序（用戶 2026-11-10：先首字母、再次字母）；
         // 之前按「與上一字的關聯度」排，會讓同一段內的同音節組跳來跳去、難以掃讀。
         // anchor 只影響組內字的順序（rankChars），不再影響組的順序。
-        return result.sortedWith(
+        // 聯想行（segment=1）總數封頂：整串碼前綴行先佔位（它們對當前輸入更具體），
+        // 其餘按原順序補；超過 [ASSOC_MAX_ROWS] 的行直接丟掉（用戶 2026-11-10 定的配額）。
+        var assocRows = 0
+        val capped = ArrayList<SyllableGroup>(result.size)
+        for (group in result) {
+            if (group.segment == 1) {
+                if (assocRows >= ASSOC_MAX_ROWS) continue
+                assocRows++
+            }
+            capped.add(group)
+        }
+        return capped.sortedWith(
             compareBy(
                 { if (it.syllables.isEmpty()) 2 else if (it.syllables.size == 1) 0 else 1 },
                 { it.reading.lowercase() },
@@ -459,6 +498,9 @@ object TwelveKeySnapshotBuilder {
     private const val ASSOC_MAX_ROWS = TwelveKeyTuning.ASSOC_MAX_ROWS
     private const val ASSOC_INITIALS = TwelveKeyTuning.ASSOC_INITIALS
     private const val ASSOC_READINGS = TwelveKeyTuning.ASSOC_READINGS
+
+    /** 面板組數硬上限（防止字典前綴聯想把左列灌爆；正常一屏 ~10 行）。 */
+    private const val MAX_RESULT_GROUPS = 40
 
     /** 兼容舊調用：同步一次做完（UI 線程慎用）。 */
     fun build(): TwelveKeySnapshot = build(local())

@@ -3248,6 +3248,31 @@ sum >= 輸入長  → 只顯示 comment（簡拼 `8 8`=ji jen、半截 `5i34i w`
 `RealCorpusTest` 的期望值同步改成同一语义（`coveredCodeLength`/`consumedCodeLength` 镜像一份在测试里，
 故意不共用实现代码）。全仓 `141 tests / 0 failures`。
 
+## 15.78 面板聯想：三音節以上的詞（`li nak si` → Linux）2026-11-11
+
+用戶：`li nak s` 展開面板沒有 `li nak si` 的聯想詞，可詞庫裡明明有 `Linux<TAB>li nak si`。
+
+根因：聯想索引 `assocWords`/`assocByFirst` 的 key 是**前兩個音節**（`"$r1|$r2"`，見
+`TwelveKeyPreedit.loadWordLines`），所以三音節詞只有在打到第二節（`li nak`）時才可能出現；
+打到第三節（`li nak s`）時 `associatedBySegmentCode("li", "4a57")` 拿 `syllablesForSegment("4a57")`
+去查，而 `4a57` 不是任何單音節的碼 → 空。
+
+修法：另建一張「整串碼」表
+
+- `TwelveKeyPreedit`：`private data class WordCodeEntry(tokens, word, code)` + `wordCodeEntries`；
+  `loadWordLines` 里對每個合法詞條算 `code = Σ codeOf(音節)`（如 `Linux → 5i4a57i`）；
+- 查詢 `wordsByCodePrefix(codes, maxReadings, perReading)`：`entry.code.startsWith(輸入碼)`
+  → 天然支援任意音節數、簡拼與**半截末節**（`5i4a57` 命中 `5i4a57i`）；
+- `TwelveKeySnapshotBuilder.segmentGroupsFor` 里**先**加這批行（`segment = 1`，與既有聯想行同構：
+  `reading` = 完整讀音、`items` = 詞面），再走原來的段組/聯想邏輯；
+  去重 key 統一成 `"$reading|any"`；
+- 聯想行總數仍受 `ASSOC_MAX_ROWS`（4）封頂：前綴行先佔位（對當前輸入更具體），其餘按原順序補。
+
+結果：`li nak s` → 面板出現行 `li nak si` → `Linux / linux`（字典用共享目錄 `/sdcard/hkrime/hakka_zon.dict.yaml`，
+測試用 assets 裡的 `网易云 / mong ji jun` 做替身，因為 Linux 只在真機詞庫裡）。
+
+單測：`AssociatedWordsTest.wordsByCodePrefixFindsThreeSyllableWord`；全倉 `142 tests / 0 failures`。
+
 ## 15.76 `ee5` 的真正成因：引擎确实没有候选 → 候选条不该退成字母（2026-11-11）
 
 §15.73/§15.74/§15.75 之後仍然重現。這次加了 native 診斷（`Rime.debug_enumerate_info()`：

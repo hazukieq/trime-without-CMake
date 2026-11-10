@@ -47,6 +47,21 @@ object TwelveKeyPreedit {
     private val assocWords = HashMap<String, LinkedHashMap<String, Int>>()
 
     /**
+     * 詞條的整串碼：`Linux` → tokens `[li, nak, si]` → `5i4a57i`。
+     *
+     * 聯想索引（assocByFirst）只按「前兩個音節」建 key，三音節以上的詞（`Linux` = `li nak si`）
+     * 打到第三節就查不到（用戶 2026-11-11：`li nak s` 面板沒有 Linux）。這裡額外保一份
+     * 「整串碼 + 讀音 + 詞面」的表，查詢端直接做碼串前綴匹配，天然支援任意音節數與半截碼。
+     */
+    private data class WordCodeEntry(
+        val tokens: List<String>,
+        val word: String,
+        val code: String,
+    )
+
+    private val wordCodeEntries = ArrayList<WordCodeEntry>()
+
+    /**
      * 聯想詞的**查詢索引**：第一音節 → (第二音節 → 詞列表)。
      *
      * 面板每次按鍵都會重建快照，如果查詢時還要遍歷所有 8 千多個「第一音節|第二音節」鍵
@@ -276,6 +291,11 @@ object TwelveKeyPreedit {
             val key = "$r1|$r2"
             val bucket = assocWords.getOrPut(key) { LinkedHashMap() }
             bucket[word] = (bucket[word] ?: 0) + 1
+            // 整串碼索引（三音節以上的詞只能靠它）；簡拼/半截由查詢端做前綴匹配。
+            val fullCode = syllables.joinToString("") { codeOf(it) }
+            if (fullCode.isNotEmpty()) {
+                wordCodeEntries.add(WordCodeEntry(syllables, word, fullCode))
+            }
         }
     }
 
@@ -316,6 +336,34 @@ object TwelveKeyPreedit {
      *
      * 用戶 2026-11-10：面板要列 `song g**` / `song h**` 這種聯想詞，而不是另一種切法標籤。
      */
+    /**
+     * 依「輸入碼前綴」查整詞（任意音節數，容許最後一節半截）：
+     * `5i4a57` → 讀音 `li nak si` → `[Linux, linux]`。
+     *
+     * 只回傳音節數 ≥ 2 的詞（單字由段組負責）。行內按詞面字典序、行之間按行內詞數降序取前 [maxReadings]，
+     * 與其它聯想行同構，面板可照同樣方式渲染。
+     */
+    fun wordsByCodePrefix(
+        codes: String,
+        maxReadings: Int = 4,
+        perReading: Int = 6,
+    ): List<Pair<String, List<String>>> {
+        val prefix = codes.replace("'", "").replace(" ", "")
+        if (prefix.isEmpty() || wordCodeEntries.isEmpty()) return emptyList()
+        val rows = LinkedHashMap<String, LinkedHashSet<String>>()
+        for (entry in wordCodeEntries) {
+            if (entry.tokens.size < 2) continue
+            if (!entry.code.startsWith(prefix)) continue
+            rows.getOrPut(entry.tokens.joinToString(" ")) { LinkedHashSet() }.add(entry.word)
+        }
+        if (rows.isEmpty()) return emptyList()
+        return rows.entries
+            .sortedWith(compareByDescending<Map.Entry<String, LinkedHashSet<String>>> { it.value.size })
+            .take(maxReadings)
+            .map { it.key to it.value.sorted().take(perReading) }
+            .sortedBy { it.first }
+    }
+
     fun associatedWords(syllable: String, initial: Char, limit: Int = 6): List<String> {
         if (!assocReady) return emptyList()
         val bySecond = assocByFirst[syllable] ?: return emptyList()

@@ -111,6 +111,9 @@ object TwelveKeyTuning {
     const val ASSOC_INITIALS = 2
 
     /** `associatedByReading` 最多幾行（確切讀音行，與 [ASSOC_INITIAL_ROWS] 共用總上限）。 */
+    /** 整串碼前綴聯想（三音節以上詞，如 `li nak si` → Linux）最多幾行；行內詞數沿用 ASSOC_WORDS。 */
+    const val ASSOC_PREFIX_READINGS = 4
+
     const val ASSOC_READINGS = 4
 
     // ---------- 兜底 ----------
