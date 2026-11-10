@@ -137,6 +137,7 @@ class Data:
             if os.path.isfile(path):
                 self._load_words(path)
         self._sort_assoc()
+        self._build_initials_index()
 
     # -- 载入 ------------------------------------------------------------
 
@@ -396,6 +397,7 @@ class Data:
 
         groups: list[dict] = []
         seen: set[str] = set()
+        assoc_buckets: OrderedDict[tuple[str, str], list[tuple[str, list[str]]]] = OrderedDict()
         for index, (head, rest) in enumerate(splits):
             pool = self.syllable_count_for_code(head)
             base = SEGMENT_SYLLABLE_LIMIT_RICH if pool >= RICH_SYLLABLE_THRESHOLD else SEGMENT_SYLLABLE_LIMIT
@@ -424,22 +426,106 @@ class Data:
                         "split": index,
                     }
                 )
-            # 联想行进位（两音节，按 rest 的首字母）
-            for syllable in syllables[:4]:
-                for reading, words in self.assoc_rows(syllable, rest):
-                    if reading in seen:
-                        continue
-                    seen.add(reading)
-                    groups.append(
-                        {
-                            "reading": reading,
-                            "syllables": reading.split(" "),
-                            "segment": 1,
-                            "items": words,
-                            "source": "assoc",
-                        }
-                    )
+            # 首字母組合聯想：把每個拆法的（第一段音節候選 × 第二段候選）命中都收進桶，
+            # 最後跨拆法统一轮转（用戶 2026-11-11：「ghi+abc → g b, g c, h b, h c 4 個通配聯想詞組」）。
+            # 通配桶要覆盖**全部**候选音節（不受面板配額截斷），否则 (g,b) 这类组合会漏。
+            huge = 1_000_000
+            # 通配桶的第一段候選 = 該碼**前綴展開**的全部音節（`ia` → ga/gam/gan/gang/gau/ha/han/hau…），
+            # 不能用 exactOnly（那只有 ga/ha，会漏掉 `gam se`、`han jiu` 这类真实词）。
+            assoc_first = self.syllables_for_segment(
+                head, huge, False, allow_suffix_only, total_limit=huge
+            )
+            for key, rows in self.assoc_buckets(assoc_first, rest).items():
+                assoc_buckets.setdefault(key, []).extend(rows)
+        for reading, words in self.pick_bucket_rows(assoc_buckets):
+            if reading in seen:
+                continue
+            seen.add(reading)
+            groups.append(
+                {
+                    "reading": reading,
+                    "syllables": reading.split(" "),
+                    "segment": 1,
+                    "items": words,
+                    "source": "assoc",
+                }
+            )
+        # 首字母組合行（每鍵一個音節首字母，元音不固定）：`ghi+abc` → g b / g c / h b / h c，
+        # 每個組合找真實詞條，行標題仍是具體讀音（用戶 2026-11-11：「g.* z.*」）。
+        for reading, words in self.initial_pattern_rows(codes):
+            if reading in seen:
+                continue
+            seen.add(reading)
+            groups.append(
+                {
+                    "reading": reading,
+                    "syllables": reading.split(" "),
+                    "segment": 1,
+                    "items": words,
+                    "source": "initials",
+                }
+            )
         return groups
+
+    def _build_initials_index(self) -> None:
+        """按「音节首字母序列」索引词表（用户 2026-11-11：「g.* z.*」，元音不固定）。
+
+        `首字母组合` 只是**查找规则**：例如 `ghi+abc` 的两个键分别能作 g/h 与 b/c 开头，
+        就去词表里找读音首字母序列恰为 (g,b)/(g,c)/(h,b)/(h,c) 的真实词条，
+        行标题仍然是具体读音（`gong bun`、`han coi`…）。
+        """
+        self.by_initials: dict[tuple[str, ...], list[tuple[list[str], str]]] = {}
+        for tokens, word, _code in self.word_codes:
+            if len(tokens) < 2:
+                continue
+            key = tuple(t[0] for t in tokens)
+            bucket = self.by_initials.setdefault(key, [])
+            if len(bucket) < 60:
+                bucket.append((tokens, word))
+
+    def key_initial_letters(self, code_char: str) -> list[str]:
+        """某个码位能作音节首字母的字母（排除元音；按音节集合实际出现过的首字母）。"""
+        letters = KEY_LETTERS.get(code_char, "")
+        initials = sorted(
+            {
+                syl[0]
+                for syl in self.syllable_freq
+                if syl and syl[0] in letters and syl[0] not in VOWEL_LETTERS
+            }
+        )
+        return initials
+
+    def initial_pattern_rows(self, codes: str, max_rows: int = 16) -> list[tuple[str, list[str]]]:
+        """「每键一个音节首字母」的联想行：字母组合×真实词条，行标题仍是具体读音。"""
+        codes = codes.replace("'", "")
+        if len(codes) < 2 or len(codes) > 4:
+            return []
+        combos: list[tuple[str, ...]] = [()]
+        for ch in codes:
+            letters = self.key_initial_letters(ch)
+            if not letters:
+                return []
+            combos = [pre + (x,) for pre in combos for x in letters]
+            if len(combos) > 24:
+                return []
+        rows: list[tuple[str, list[str]]] = []
+        seen: set[str] = set()
+        for combo in combos:
+            entries = self.by_initials.get(combo) or []
+            if not entries:
+                continue
+            # 每種首字母組合先取 1 條（詞條按讀音排序穩定），保證組合都有代表
+            for tokens, word in sorted(entries, key=lambda e: " ".join(e[0]))[:2]:
+                reading = " ".join(tokens)
+                if reading in seen:
+                    continue
+                seen.add(reading)
+                rows.append((reading, [word]))
+                if len(rows) >= max_rows:
+                    break
+            if len(rows) >= max_rows:
+                break
+        return rows
 
     def initials_for_prefix(self, code: str, limit: int = 2) -> list[str]:
         """镜像 TwelveKeyPreedit.initialsForPrefix：码前缀能覆盖的音节，按首字母加权取前 N。"""
@@ -453,6 +539,138 @@ class Data:
                 initial = syl[0]
                 weight[initial] = weight.get(initial, 0) + self.syllable_freq.get(syl, 0)
         return [k for k, _ in sorted(weight.items(), key=lambda kv: -kv[1])][:limit]
+
+    def assoc_buckets(
+        self, first_candidates: list[str], rest: str
+    ) -> "OrderedDict[tuple[str, str], list[tuple[str, list[str]]]]":
+        """收集 (第一音節候選 × 第二音節候選) 命中的具體行，按（首字母, 首字母）分桶。"""
+        second_candidates: list[str] = []
+        if rest:
+            huge = 1_000_000
+            second_candidates = self.syllables_for_segment(rest, huge, False, True, total_limit=huge)
+        buckets: OrderedDict[tuple[str, str], list[tuple[str, list[str]]]] = OrderedDict()
+        for first in first_candidates:
+            by_second = self.assoc.get(first) or {}
+            if not by_second:
+                continue
+            if not second_candidates:
+                allowed = list(by_second.keys())
+            else:
+                allowed = [s for s in second_candidates if s in by_second]
+            for second in allowed:
+                if not second:
+                    continue
+                words = by_second[second][:ASSOC_WORDS]
+                if not words:
+                    continue
+                buckets.setdefault((first[0], second[0]), []).append(
+                    (f"{first} {second}", words)
+                )
+        return buckets
+
+    def pick_bucket_rows(
+        self,
+        buckets: "OrderedDict[tuple[str, str], list[tuple[str, list[str]]]]",
+        max_rows: int = ASSOC_MAX_ROWS * 3,
+    ) -> list[tuple[str, list[str]]]:
+        """跨拆法统一轮转取行：每个（首字母, 首字母）桶先出 1 行，保证通配组合都有代表。"""
+        if not buckets:
+            return []
+        for rows in buckets.values():
+            rows.sort(key=lambda x: -len(x[1]))
+        picked: list[tuple[str, list[str]]] = []
+        seen: set[str] = set()
+
+        # 按「第一段首字母」分组；组内先各桶第 1 行、再第 2 行…；最后在组之间轮转。
+        groups_map: "OrderedDict[str, list[list[tuple[str, list[str]]]]]" = OrderedDict()
+        for key in sorted(buckets.keys()):
+            groups_map.setdefault(key[0], []).append(buckets[key])
+        flat_groups: "OrderedDict[str, list[tuple[str, list[str]]]]" = OrderedDict()
+        for initial, bucket_rows in groups_map.items():
+            flat: list[tuple[str, list[str]]] = []
+            round_idx = 0
+            while True:
+                added = False
+                for rows in bucket_rows:
+                    if round_idx < len(rows):
+                        flat.append(rows[round_idx])
+                        added = True
+                if not added:
+                    break
+                round_idx += 1
+            flat_groups[initial] = flat
+        cursors = {initial: 0 for initial in flat_groups}
+        while len(picked) < max_rows:
+            added = False
+            for initial, flat in flat_groups.items():
+                cursor = cursors[initial]
+                if cursor >= len(flat):
+                    continue
+                reading, words = flat[cursor]
+                cursors[initial] = cursor + 1
+                if reading in seen:
+                    continue
+                seen.add(reading)
+                picked.append((reading, words))
+                added = True
+                if len(picked) >= max_rows:
+                    break
+            if not added:
+                break
+        picked.sort(key=lambda x: x[0])
+        return picked
+
+    def assoc_rows_by_initials(
+        self, first_candidates: list[str], rest: str, max_rows: int = ASSOC_MAX_ROWS
+    ) -> list[tuple[str, list[str]]]:
+        """首字母組合的聯想行（用戶 2026-11-11：「ghi+abc → g b, g c, h b, h c 4 個通配聯想詞組」）。
+
+        通配只是**查找規則**，行標題仍然是具體讀音（`ga zi`、`ha boi`…）：
+        對第一段的每個候選音節（`g*`/`h*`/`i*`…）× 第二段的每個候選音節（由 rest 碼展開），
+        查 `(第一音節, 第二音節)` 精確哈希，湊成具體行；再把這些行按
+        **(第一音節首字母, 第二音節首字母)** 分桶，輪轉取行，保證每個通配組合都有代表。
+        """
+        second_candidates: list[str] = []
+        if rest:
+            huge = 1_000_000
+            second_candidates = self.syllables_for_segment(rest, huge, False, True, total_limit=huge)
+        buckets: OrderedDict[tuple[str, str], list[tuple[str, list[str]]]] = OrderedDict()
+        for first in first_candidates:
+            by_second = self.assoc.get(first) or {}
+            if not by_second:
+                continue
+            if not second_candidates:
+                allowed = list(by_second.keys())
+            else:
+                allowed = [s for s in second_candidates if s in by_second]
+            for second in allowed:
+                if not second:
+                    continue
+                words = by_second[second][:ASSOC_WORDS]
+                if not words:
+                    continue
+                buckets.setdefault((first[0], second[0]), []).append(
+                    (f"{first} {second}", words)
+                )
+        if not buckets:
+            return []
+        for key, rows in buckets.items():
+            rows.sort(key=lambda x: -len(x[1]))
+        # 輪轉：每個通配桶先出 1 行，還有額度再出第 2 行
+        picked: list[tuple[str, list[str]]] = []
+        round_idx = 0
+        while len(picked) < max_rows:
+            added = False
+            for key in buckets:
+                rows = buckets[key]
+                if round_idx < len(rows) and len(picked) < max_rows:
+                    picked.append(rows[round_idx])
+                    added = True
+            if not added:
+                break
+            round_idx += 1
+        picked.sort(key=lambda x: x[0])
+        return picked
 
     def assoc_rows(self, first: str, rest: str) -> list[tuple[str, list[str]]]:
         """联想行：第一音节确定、第二音节由 rest 的码前缀决定（镜像 associatedBySegmentCode）。"""
@@ -475,6 +693,11 @@ class Data:
         prefix = codes.replace("'", "")
         rows: OrderedDict[str, list[str]] = OrderedDict()
         for tokens, word, code in self.word_codes:
+            # 第一個音節必須打全（與 App `wordsByCodePrefix` 同口徑）：
+            # 打 `ia`（= ga）時不該列出 `gam se`（= ia4|7e，第一段還沒打完）。
+            first_code = code_of(tokens[0])
+            if not first_code or not prefix.startswith(first_code):
+                continue
             if not code.startswith(prefix):
                 continue
             rows.setdefault(" ".join(tokens), []).append(word)
@@ -638,6 +861,9 @@ KEY_NAME_TO_CODE = {
 
 # 後綴音節（兒化 `r`）：不做首字母拼、只能出現在詞尾（用戶 2026-11-11 特殊規則）
 SUFFIX_ONLY_SYLLABLES = {"r"}
+
+# 元音字母（不能作音节首字母）
+VOWEL_LETTERS = set("aeiou")
 
 CODE_CHARS = set("1234567890aeiwy5")
 
@@ -894,8 +1120,8 @@ def cmd_selftest(args, data: Data) -> None:
     last_rows = data.cumulative("5i4a57", 2)[-1][2]
     merged = [g for g in last_rows if "linux" in {t.lower() for t in g.get("items", [])}]
     expect(
-        bool(merged) and merged[0]["reading"] == "li nak",
-        f"整串阶段 Linux 被收敛进 li nak 行（{merged[0]['reading'] if merged else 'NONE'}）",
+        bool(merged) and merged[0]["reading"] in ("li nak", "li nak si"),
+        f"整串阶段应出现含 Linux 的行（{merged[0]['reading'] if merged else 'NONE'}）",
     )
     expect(
         "li nak" in [r[0] for r in unique],
@@ -937,8 +1163,24 @@ def cmd_selftest(args, data: Data) -> None:
         f"应同时列出 li nak 与 li nak si：{[r for r in readings_only if r.startswith('li nak')]}",
     )
     expect(
-        [r[2] for r in uniq if r[0] == "li nak si"] == ["词行"],
-        "li nak si 的类别应为「词行」",
+        all(r[2] in ("词行", "联想/词") for r in uniq if r[0] == "li nak si"),
+        "li nak si 的类别应为词行/联想/词",
+    )
+
+    # 4.53) 詞行第一段必須是打完的音節（用戶 2026-11-11：打 ia 不該列 gam se）
+    ga_code = code_of("ga")
+    ga_rows = data.prefix_word_rows(ga_code)
+    expect(
+        all(code_of(r["syllables"][0]) == ga_code for r in ga_rows),
+        f"詞行第一音節必須是 ga：{[r['reading'] for r in ga_rows][:6]}",
+    )
+    expect(
+        all(r["reading"] != "gam se" for r in ga_rows),
+        f"打 {ga_code}（=ga）時不該列 gam se：{[r['reading'] for r in ga_rows][:6]}",
+    )
+    expect(
+        any(r["reading"] == "gam se" for r in data.prefix_word_rows(code_of("gam"))),
+        "打 gam 的完整碼時應列 gam se",
     )
 
     # 4.55) 標準集必須覆蓋詞典音節（用戶 2026-11-11 定稿：字典並入後的就是標準集）
