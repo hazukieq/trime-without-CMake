@@ -2834,3 +2834,32 @@ preedit 又會回到「comment + 原碼」。所以「**整串一次上屏**」�
 
 回歸：83 unit tests / 0 failures；`tools/perf-gate.py` PASS（build_p90 27.2ms、latency_p90 62.0ms）。
 26 鍵不受影響（路徑仍由 `schemaId` 門控，本次只動 12 鍵 preedit 前綴與面板段組字）。
+
+### 15.63.4 追加：兜底路徑也不再「選一個就上屏一個」（2026-11-11 第二輪）
+
+用戶第二輪回報「可是還是上屏呀…選擇完兩個讀音後就突然上屏了」，給的是真機日誌：
+
+```
+00:29:05.655 twelvekey: no commit buffer after select, prefix=[以]   ← 引擎選中「以」，留在 preedit ✓
+00:29:05.681 dbgpre: raw=[以8e4‸] … decoded=[以jen]                  ← 剩餘碼 8e4（jen）
+00:29:07.161 pickSegmentedCandidate(TextInputManager.kt:561)         ← 面板段組字落到 App 兜底
+00:29:07.161 cacheDraft() 以液                                       ← 兜底直接 commitText，輸入框出現「以液」
+00:29:09.658 commit buffer=[难] / cacheDraft() 以液难                ← 最後一段再上屏
+```
+
+也就是：**兜底路徑（引擎候選裡沒有那個字）每選一個字就 `commitText` 一次**，於是「以液」先上屏、
+剩下的「4」再繼續 —— 這正是用戶說的「沒選完就突然 commit」。
+
+修法（`TextInputManager`）：兜底不再立刻上屏，改成 **App 側暫存前綴** `pendingPick`：
+
+| 環節 | 行為 |
+| --- | --- |
+| 兜底選字 | `pendingPick.append(引擎已選前綴).append(字)`，清組合、把剩餘碼餵回引擎，**不 commit** |
+| preedit 顯示 | `Rime.getComposition()` 在改寫後的拼音前拼上 `TwelveKeyPreedit.pendingPrefix`（嵌入式預覽同樣包含，見 `TwelveKeySnapshotBuilder.inlineText`） |
+| 最後一段選完 | `rest` 為空 → `flushPendingPick()` 一次性上屏（含前面暫存的字） |
+| 引擎自己 commit | `drainPendingPick() + foldUncommittedPrefix(...)`，保證只上屏一次、順序正確 |
+| 退格 | 暫存字優先被撤（`onKey(KEYCODE_DEL)` 攔在最前面），撤完再交給引擎反悔 |
+| 安全網 | `refreshTwelveKey()` 發現「暫存非空且引擎已不組合」（如按了回車/焦點切走）→ 立刻 flush，避免殘留串到下一次輸入 |
+
+這樣：面板逐段選字全程只在 preedit，最後一段選完才一次 commit；暫存的字在輸入框裡也看得見（嵌入式預覽）。
+83 unit tests / 0 failures。真機回歸待用戶複測（同一組操作：`8i8e4` → 面板 ji→以 → 次切法組 → 再選最後一個字）。

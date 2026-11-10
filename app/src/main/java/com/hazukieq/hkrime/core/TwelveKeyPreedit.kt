@@ -13,6 +13,17 @@ import java.util.HashMap
  * 切成最可能的音節串；切不出來就回傳 null，維持原本的 preedit。
  */
 object TwelveKeyPreedit {
+    /**
+     * App 側「已選但還沒上屏」的字（面板段組字在引擎候選裡找不到時走兜底，先累積在這裡）。
+     *
+     * 用戶 2026-11-11：「用戶都沒選完時不應該只在 preedit 嗎？怎麼能突然 commit」——
+     * 於是兜底不再立刻 `commitText`，而是把字暫存進來、由 [Rime.getComposition] 拼在 preedit 前面，
+     * 等整串選完（或引擎 commit）再一次性上屏。
+     */
+    @Volatile
+    @JvmField
+    var pendingPrefix: String = ""
+
 
     private class Entry(val syllable: String, val freq: Int)
 

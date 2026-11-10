@@ -466,6 +466,10 @@ public class Rime {
       Timber.d("dbgpre: raw=[%s] hint=[%s] preferred=[%s] decoded=[%s]",
           composition.preedit, hint, preferred, decoded);
       if (decoded != null) {
+        // App 側暫存（兜底逐段選字，引擎候選裡沒有那些字）要顯示在 preedit 最前面，
+        // 否則用戶選完第一段就看不到它了。
+        String pending = TwelveKeyPreedit.INSTANCE.pendingPrefix;
+        if (pending != null && !pending.isEmpty()) decoded = pending + decoded;
         // 只改「返回給 UI 的副本」：mContext.composition 是 librime context 的鏡像，
         // 寫回去會讓下一次讀到的 raw 已經是被改寫過的拼音（日誌裡 raw=[共the]、
         // decoded=[null] 就是這個污染），也會讓 getCompositionPrefix() 之類的調用看到殘留。

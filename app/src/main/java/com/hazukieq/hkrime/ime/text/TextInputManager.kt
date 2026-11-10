@@ -206,7 +206,7 @@ class TextInputManager private constructor() :
             onEngineChanged = {
                 val committed = runCatching { Rime.getCommit() }.getOrDefault(false)
                 if (committed) {
-                    val text = foldUncommittedPrefix(Rime.getCommitText())
+                    val text = drainPendingPick() + foldUncommittedPrefix(Rime.getCommitText())
                     Timber.i("twelvekey: commit buffer=[%s]", text)
                     runCatching { activeEditorInstance.commitText(text, false) }
                         .onFailure { Timber.e(it, "twelvekey: commitText failed") }
@@ -289,6 +289,12 @@ class TextInputManager private constructor() :
      * 關掉再開才恢復（用戶 2026-11-10 反饋）。
      */
     private fun refreshTwelveKey() {
+        // 暫存的字不能漏：引擎這邊已經沒有組合了（例如用戶按了回車/焦點切走），
+        // 就立刻把它上屏，否則它會殘留在 preedit 裡串到下一次輸入。
+        if (pendingPick.isNotEmpty() && runCatching { !Rime.isComposing() }.getOrDefault(false)) {
+            flushPendingPick()
+            return
+        }
         twelveKeyController?.refresh(
             immediate = true,
             full = panelWanted || isCandidatePanelShown(),
@@ -551,16 +557,54 @@ class TextInputManager private constructor() :
             val remembered = uncommittedPrefix
             uncommittedPrefix = ""
             val prefix = remembered.ifEmpty { withEngineLock { compositionPrefix() } }
+            // 用戶 2026-11-11：兜底**不能**立刻上屏（「用戶都沒選完時不應該只在 preedit 嗎？
+            // 怎麼能突然 commit」）。選中的字先暫存到 pendingPick，由 Rime.getComposition()
+            // 拼在 preedit 前面；整串選完（rest 空）才一次性 commit。
+            pendingPick.append(prefix).append(text)
+            updatePendingPick()
             withEngineLock { Rime.clearComposition() }
-            activeEditorInstance.commitText(prefix + text, false)
             // 記住剛上屏的字：下一段的候選條按「與它的關聯度」排序（區 → 域）。
             setSegmentAnchor(text.firstOrNull())
             if (rest.isNotEmpty()) {
                 withEngineLock { Rime.onText(rest.joinToString("'")) }
+                trime.updateComposing()
+                refreshTwelveKey()
+            } else {
+                // 最後一段也選完了 → 現在才上屏（含前面暫存的字）。
+                flushPendingPick()
             }
-            trime.updateComposing()
-            refreshTwelveKey()
         }.onFailure { Timber.e(it, "twelvekey: segmented pick failed") }
+    }
+
+    /** 把 App 側暫存前綴同步給 preedit 顯示（Rime.getComposition() 會拼在最前面）。 */
+    private fun updatePendingPick() {
+        TwelveKeyPreedit.pendingPrefix = pendingPick.toString()
+    }
+
+    /**
+     * 把暫存的字一次性上屏。
+     *
+     * 只在「最後一段也選完」或「引擎自己 commit」時調用 —— 用戶 2026-11-11 的要求：
+     * 逐段選字時字只能待在 preedit，全部選完才上屏。
+     */
+    private fun flushPendingPick() {
+        if (pendingPick.isEmpty()) return
+        val text = pendingPick.toString()
+        pendingPick.setLength(0)
+        updatePendingPick()
+        runCatching { activeEditorInstance.commitText(text, false) }
+            .onFailure { Timber.e(it, "twelvekey: flush pending failed") }
+        trime.updateComposing()
+        refreshTwelveKey()
+    }
+
+    /** 取出並清空暫存的字（引擎 commit 時用，保證「暫存 + 引擎提交」一次上屏）。 */
+    private fun drainPendingPick(): String {
+        if (pendingPick.isEmpty()) return ""
+        val text = pendingPick.toString()
+        pendingPick.setLength(0)
+        updatePendingPick()
+        return text
     }
 
     /** librime preedit 裡已選前綴（不含碼串）。調用方需持有引擎鎖。 */
@@ -891,6 +935,9 @@ class TextInputManager private constructor() :
      */
     private var uncommittedPrefix: String = ""
 
+    /** App 側「已選但還沒上屏」的字（兜底路徑用；見 flushPendingPick）。 */
+    private val pendingPick = StringBuilder()
+
     override fun onEvent(event: Event?) {
         lastKeyAtNs = System.nanoTime()
         withEngineLock { onEventLocked(event) }
@@ -980,6 +1027,15 @@ class TextInputManager private constructor() :
 
     override fun onKey(keyEventCode: Int, metaState: Int) {
         printModifierKeyState(metaState, "keyEventCode=" + keyEventCode)
+        // 逐段選字時暫存的字還沒上屏，退格先撤它（與引擎 preedit 的退格語義一致）。
+        if (keyEventCode == KeyEvent.KEYCODE_DEL && pendingPick.isNotEmpty()) {
+            pendingPick.setLength(pendingPick.length - 1)
+            updatePendingPick()
+            setSegmentAnchor(pendingPick.lastOrNull())
+            trime.updateComposing()
+            refreshTwelveKey()
+            return
+        }
         if (trime.handleKey(keyEventCode, metaState)) return
         if (Keycode.hasSymbolLabel(keyEventCode)) {
             needSendUpRimeKey = false
