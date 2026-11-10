@@ -17,8 +17,10 @@
     # 1) 准备数据（默认读 /tmp/hkrime-real-data；也可 --data 指定）
     python3 tools/panel_probe.py pull          # 从真机 adb 拉一份到 /tmp/hkrime-real-data
 
-    # 2) 左列音节组（最常用）：给码串，按 App 同一套规则列读音
+    # 2) 左列音节组（最常用）：给码串**或键名**，按 App 同一套规则列读音
     python3 tools/panel_probe.py syllables 4i
+    python3 tools/panel_probe.py syllables "mno ghi"          # 等价于 4i
+    python3 tools/panel_probe.py prefix "kl ghi mno abc ps"   # 等价于 5i4a7
     python3 tools/panel_probe.py syllables ea
     python3 tools/panel_probe.py syllables 74ii
     python3 tools/panel_probe.py syllables 5i4a57
@@ -431,6 +433,48 @@ class Data:
         return sorted(groups, key=lambda g: (tier(g), g["reading"].lower()))
 
 
+# 键名（键面标签）→ 码：允许直接写键盘上的键名，如 `"kl ghi mno abc ps"`
+KEY_NAME_TO_CODE = {
+    "nz": "y", "qt": "9", "abc": "a", "def": "e",
+    "ng": "1", "ghi": "i", "kl": "5", "mno": "4",
+    "th": "w", "ps": "7", "vur": "3", "zj": "8",
+}
+
+CODE_CHARS = set("1234567890aeiwy5")
+
+
+def parse_code(text: str) -> str:
+    """把用户输入解析成 12 键码串。
+
+    支持三种写法（可混用，用空格/`+`/`'` 分隔）::
+
+        "5i4a57"              # 直接写码
+        "kl ghi mno abc ps"   # 写键面（kl=5, ghi=i, mno=4, abc=a, ps=7 → 5i4a7）
+        "kl ghi mno abc ps 7i"# 混写
+
+    键面按 12 键标签识别（`nz/qt/abc/def/ng/ghi/kl/mno/th/ps/vur/zj`）。
+    """
+    raw = text.strip()
+    if not raw:
+        return ""
+    tokens = [t for t in re.split(r"[\s'+]+", raw.lower()) if t]
+    out: list[str] = []
+    for token in tokens:
+        if token in KEY_NAME_TO_CODE:
+            out.append(KEY_NAME_TO_CODE[token])
+            continue
+        # 允许「键名连写」：abc→a 之类已在上面处理；其余按码字符逐字收
+        for ch in token:
+            if ch not in CODE_CHARS:
+                sys.exit(
+                    f"[panel-probe] 无法识别的码/键名: {ch!r}（可用键名："
+                    + "/".join(KEY_NAME_TO_CODE)
+                    + "，或直接写码如 5i4a57）"
+                )
+            out.append(ch)
+    return "".join(out)
+
+
 def _iter_body(path: str):
     """只读 YAML 本體（跳過 `...` 之前的頭），與 RimeDictSource.body 一致。"""
     with open(path, encoding="utf-8") as handle:
@@ -469,6 +513,7 @@ def cmd_pull(args) -> None:
 
 
 def cmd_syllables(args, data: Data) -> None:
+    args.codes = parse_code(args.codes)
     groups = data.segment_groups(args.codes)
     print(f"# 码串 {args.codes!r} → 左列音节组 {len(groups)} 个")
     for g in groups:
@@ -503,6 +548,7 @@ def cmd_assoc(args, data: Data) -> None:
 
 
 def cmd_prefix(args, data: Data) -> None:
+    args.codes = parse_code(args.codes)
     rows = data.prefix_word_rows(args.codes)
     print(f"# 整串码前缀 {args.codes!r} → 多音节词行 {len(rows)} 行")
     for row in rows:
@@ -510,6 +556,7 @@ def cmd_prefix(args, data: Data) -> None:
 
 
 def cmd_panel(args, data: Data) -> None:
+    args.codes = parse_code(args.codes)
     groups = data.panel(args.codes)
     print(f"# 码串 {args.codes!r} → 面板左列（不含「推荐」）共 {len(groups)} 行")
     for g in groups:
@@ -544,6 +591,14 @@ def cmd_selftest(args, data: Data) -> None:
     panel = [g["reading"] for g in data.panel("74ii")]
     expect({"poi", "soi"} <= set(panel), f"74ii 含 poi/soi：{panel}")
     expect({"po", "so"} <= set(panel), f"74ii 含 po/so：{panel}")
+
+    # 3.5) 键名写法（键面标签）要能和码串等价
+    expected = {"mno ghi": "4i", "kl ghi mno abc kl ps": "5i4a57", "5i4a57": "5i4a57"}
+    for text, code in expected.items():
+        got = parse_code(text)
+        expect(got == code, f"parse_code({text!r}) = {got!r}（期望 {code!r}）")
+    ok = any(r["reading"] == "li nak si" for r in data.prefix_word_rows(parse_code("kl ghi mno abc kl ps")))
+    expect(ok, "键名写法 kl ghi mno abc kl ps 也能查到 li nak si")
 
     # 4) 整串码前缀：5i4a57 → li nak si → Linux
     rows = data.prefix_word_rows("5i4a57")

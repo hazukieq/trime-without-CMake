@@ -480,12 +480,20 @@ HH:mm:ss.SSS D/snapshot[thread] build code=5i4a57 wantGroups=true groups=215 bar
 
 ```bash
 python3 tools/panel_probe.py pull                 # 从真机 adb 拉词库到 /tmp/hkrime-real-data
+
+# 码串可以写「码」，也可以直接写**键面标签**（空格/+ 分隔，两者可混写）：
+python3 tools/panel_probe.py syllables 4i
+python3 tools/panel_probe.py syllables "mno ghi"            # 等价 4i
+python3 tools/panel_probe.py prefix "kl ghi mno abc kl ps"  # 等价 5i4a57（li nak si → Linux）
+python3 tools/panel_probe.py panel "kl ghi mno abc ps"      # 等价 5i4a7（li na s，查不到 Linux 是正常的）
+
+# 其余子命令（同样接受键名写法）
 python3 tools/panel_probe.py syllables 4i         # 段码 → 左列音节组（标 exact/prefix、切法、剩余码）
 python3 tools/panel_probe.py chars ji             # 音节 → 全部单字（--limit 截断）
 python3 tools/panel_probe.py assoc li 4a5         # 联想词（第一音节 + 剩余码前缀）
 python3 tools/panel_probe.py prefix 5i4a57        # 整串码前缀（多音节词，如 li nak si → Linux）
 python3 tools/panel_probe.py panel 5we            # 整个左列（含联想/词行/收敛/排序）
-python3 tools/panel_probe.py selftest             # 文档样例自检（0 失败才提交）
+python3 tools/panel_probe.py selftest             # 文档样例自检（0 失败才提交；含键名解析用例）
 ```
 
 脚本是**参考实现**（镜像 Kotlin 的 `codeOf`/`splitHeads`/`syllablesForSegment`/联想/整串码/
