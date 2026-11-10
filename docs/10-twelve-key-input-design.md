@@ -3226,6 +3226,42 @@ sum >= 輸入長  → 只顯示 comment（簡拼 `8 8`=ji jen、半截 `5i34i w`
 改這條規則前，舊實現（DP 邊界）在同一份語料上**當場報出 25+ 條不一致**——這就是反覆來回的原因。
 `AGENTS.md` §2.1.1 已寫死：**改 preedit / 面板分組必須先跑真實語料測試**。
 
+## 15.72 「設置裡點同步，hkrime 裡沒有 sync 文件夾」（2026-11-11）
+
+**現象**：設置 → 同步，`/sdcard/hkrime/` 下不生成 `sync/`。
+
+**日誌證據**（`adb logcat` + glog）：
+
+```
+I/Rime-JNI(4018): sync user data...                     # 04:41:48.198 JNI 確實被調到
+I ... deployment_tasks.cc:83] updating rime installation info.
+I ... deployment_tasks.cc:112] sync dir: /sdcard/hkrime/sync
+I ... deployment_tasks.cc:190] updating schemas.        # 立刻轉去全量部署了
+```
+
+只跑完 `installation_update` 就沒了 —— `backup_config_files` / `user_dict_sync` 都沒跑。
+
+**根因**：`RimeSyncUserData()` 的語義是「排任務 + `StartMaintenance()` 啟動後台線程」，
+真正的寫盤在維護線程裡。舊的 `RimeUtils.sync()`：
+
+```kotlin
+Rime.sync_user_data().also { Rime.destroy(); Rime.get(context, true) }
+```
+
+排完任務**立刻 `destroy()`**，維護線程還沒跑到 `user_dict_sync` 就被拆掉 → `sync/` 目錄自然不存在。
+（`Rime.syncUserData(Context)` 也是同樣寫法。）
+
+**修法**：排任務後 `join_maintenance_thread()` 等寫盤完成，再 destroy + 全量部署；
+並在日誌裡打 `sync: scheduled=… syncDir=… exists=… files(…)`，以後出問題直接看日誌。
+
+**PC 側回歸**：`rime-jni/host-test` 新增 `--sync-test`，用真 librime + 真實數據跑
+「排三個任務 → JoinMaintenanceThread → 列 sync 目錄」：
+
+```
+sync-test: started=1 sync_dir=/tmp/hkrime-host-run/user/sync
+sync-test: files=41 exists=1     # sync/<installation_id>/ 下配置 + 詞表 + userdb.txt
+```
+
 ## 15.68 12 鍵的字表/詞表改讀共享目錄並展開 `import_tables`（2026-11-11）
 
 ### 15.68.1 問題（dsh mobile 反饋 2026-11-09）

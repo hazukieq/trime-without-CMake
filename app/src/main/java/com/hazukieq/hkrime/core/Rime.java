@@ -1018,7 +1018,12 @@ public class Rime {
   }
 
   public static boolean syncUserData(Context context) {
+    // 同 RimeUtils.sync：sync_user_data() 只排任務，必須等維護線程寫完盤再 destroy，
+    // 否則 sync/ 目錄永遠不會出現（用戶 2026-11-11 報）。
+    get(context, false);
     boolean b = sync_user_data();
+    Timber.i("syncUserData: scheduled=%b", b);
+    join_maintenance_thread();
     destroy();
     get(context, true);
     return b;

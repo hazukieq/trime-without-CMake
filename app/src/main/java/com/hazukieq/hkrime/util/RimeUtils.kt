@@ -6,6 +6,7 @@ import com.hazukieq.hkrime.R
 import com.hazukieq.hkrime.core.Rime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 import kotlin.system.exitProcess
 import timber.log.Timber
 
@@ -60,12 +61,38 @@ object RimeUtils {
         ToastUtils.showLong(R.string.deploy_finish)
     }
 
-    /** Sync the user data.
-     * @return `true` if successfully **/
+    /**
+     * 同步用戶數據（librime 的 `sync_user_data`）。
+     *
+     * **注意時序**（用戶 2026-11-11 報「設置裡點同步，hkrime 裡沒有 sync 文件夾」）：
+     * `RimeSyncUserData()` 只是「排任務（installation_update / backup_config_files /
+     * user_dict_sync）+ 啟動 maintenance 線程」，真正的寫盤在後台線程裡。
+     * 舊實現排完任務立刻 `destroy()`，維護線程還沒跑就被拆掉 → `sync/` 永遠不會出現。
+     *
+     * 所以：先確保 librime 按 App 的目錄初始化（設置界面可能是冷啟動進程），
+     * 排任務後 `join_maintenance_thread()` 等它跑完，再 destroy + 全量部署。
+     *
+     * @return `true` 表示同步任務已排隊並執行完成（librime 的語義）
+     */
     suspend fun sync(context: Context): Boolean = withContext(Dispatchers.IO) {
-        Rime.sync_user_data().also {
-            Rime.destroy()
-            Rime.get(context, true)
-        }
+        Rime.get(context, false)          // 冷啟動時先按 App 的 shared/user dir 初始化
+        val scheduled = Rime.sync_user_data()
+        val syncDir = runCatching { Rime.get_sync_dir() }.getOrNull()
+        Timber.i("sync: scheduled=%b syncDir=%s", scheduled, syncDir ?: "(null)")
+        // 無論 scheduled 真假都 join：可能是別的 maintenance 正在跑，等它收尾；
+        // 沒有線程時 join 是 no-op。
+        Rime.join_maintenance_thread()
+        val files = syncDir?.let { dir ->
+            runCatching {
+                File(dir).walkTopDown().filter { it.isFile }.take(20).map { it.name }.toList()
+            }.getOrNull()
+        } ?: emptyList()
+        Timber.i(
+            "sync: finished dir=%s exists=%b files(%d)=%s",
+            syncDir ?: "(null)", syncDir?.let { File(it).isDirectory } == true, files.size, files,
+        )
+        Rime.destroy()
+        Rime.get(context, true)
+        scheduled
     }
 }
