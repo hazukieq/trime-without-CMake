@@ -381,6 +381,7 @@ public class Trime extends LifecycleInputMethodService {
     com.hazukieq.hkrime.core.TwelveKeyPreedit.INSTANCE.init(this);
     com.hazukieq.hkrime.core.twelvekey.SegmentMemory.INSTANCE.init(this);
     com.hazukieq.hkrime.core.twelvekey.SelectionMemory.INSTANCE.init(this);
+    com.hazukieq.hkrime.core.twelvekey.PhraseMemory.INSTANCE.init(this);
 
     StrictMode.setVmPolicy(
         new StrictMode.VmPolicy.Builder(StrictMode.getVmPolicy())

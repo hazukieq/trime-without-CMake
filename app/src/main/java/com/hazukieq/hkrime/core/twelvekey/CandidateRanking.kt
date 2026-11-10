@@ -61,6 +61,30 @@ object CandidateRanking {
     }
 
     /**
+     * 把 App 側學到的合成候選與引擎候選**混排**（用戶 2026-11-11 選擇的口徑）。
+     *
+     * - 合成候選分數 = (次數-1) × 時間衰減（見 [PhraseMemory.score]）；
+     * - 引擎候選的偽分數 = `1 - i/n`（引擎第 0 條 ≈1，越往後越低）——讓「學過的詞」能與
+     *   「引擎自己排的詞」放在同一把尺上比；
+     * - 分數高者在前；**同分時引擎候選在前**（用戶明確：同分引擎優先，學到的詞不無條件霸榜）。
+     */
+    fun mergePhraseCandidates(
+        ranked: List<CandidateItem>,
+        synthetic: List<CandidateItem>,
+        syntheticScore: (CandidateItem) -> Double,
+        engineScore: (Int) -> Double,
+    ): List<CandidateItem> {
+        if (synthetic.isEmpty()) return ranked
+        val merged = ArrayList<Pair<CandidateItem, Double>>(ranked.size + synthetic.size)
+        ranked.forEachIndexed { i, item -> merged.add(item to engineScore(i)) }
+        synthetic.forEach { merged.add(it to syntheticScore(it)) }
+        return merged.sortedWith(
+            compareByDescending<Pair<CandidateItem, Double>> { it.second }
+                .thenBy { if (it.first.segment == SYNTHETIC_SEGMENT) 1 else 0 },
+        ).map { it.first }
+    }
+
+    /**
      * 展開面板右側「音節 → 漢字」列表排序：
      * 用戶常用字 → 綜合通用頻度（詞表統計 + 權威 8105 字頻）→ 引擎原順序（穩定）。
      *

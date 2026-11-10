@@ -10,6 +10,8 @@ import com.hazukieq.hkrime.core.TwelveKeyPreedit
 import com.hazukieq.hkrime.core.twelvekey.CandidateBarBinder
 import com.hazukieq.hkrime.core.twelvekey.CandidateItem
 import com.hazukieq.hkrime.core.twelvekey.Fallback
+import com.hazukieq.hkrime.core.twelvekey.PhraseMemory
+import com.hazukieq.hkrime.core.twelvekey.SYNTHETIC_SEGMENT
 import com.hazukieq.hkrime.core.twelvekey.CandidatePanelController
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeyController
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshot
@@ -210,6 +212,7 @@ class TextInputManager private constructor() :
                     Timber.i("twelvekey: commit buffer=[%s]", text)
                     runCatching { activeEditorInstance.commitText(text, false) }
                         .onFailure { Timber.e(it, "twelvekey: commitText failed") }
+                    maybeRecordPhrase()
                 } else {
                     // 多字詞被選中：buffer 空、但 preedit 前綴已有字，先記住，下一次提交一起上屏。
                     uncommittedPrefix = compositionPrefix()
@@ -371,6 +374,14 @@ class TextInputManager private constructor() :
             }
             lastKeyAtNs = 0L
         }
+        if (snapshot.isEmpty) {
+            // 新一輪輸入：上一輪的逐段累積作廢（上屏時已經記過了）
+            pickedText.setLength(0)
+            pickedReadings.setLength(0)
+            pickedCode = ""
+            pickedMissingReading = false
+            pickedPieces = 0
+        }
         currentSnapshot = snapshot
         // preedit 讀音對齊（docs/14）：把「用戶看到的第一條候選」發布給 TwelveKeyPreedit，
         // 因為 getComposition() 裡無法知道候選條順序（那是 App 排的，不是引擎 menu 順序）。
@@ -438,6 +449,63 @@ class TextInputManager private constructor() :
         }.onFailure { Timber.e(it, "twelvekey: association pick failed") }
     }
 
+    /**
+     * 點合成候選（App 側學到的整串詞，[SYNTHETIC_SEGMENT]）：整串一次上屏。
+     *
+     * 它不來自引擎，所以不能走 `select_candidate`；完整碼串放在 `restCode` 裡。
+     * 上屏前先把暫存字 flush（保證「之前逐段選的字 + 這個詞」順序正確），再記一次學習。
+     */
+    private fun commitPhrase(item: CandidateItem) {
+        val code = item.restCode
+        val text = item.text
+        if (text.isEmpty()) return
+        flushPendingPick()
+        runCatching { activeEditorInstance.commitText(text, false) }
+            .onFailure { Timber.e(it, "twelvekey: phrase commit failed") }
+        if (code.isNotEmpty()) PhraseMemory.bump(code, text, item.comment)
+        withEngineLock { Rime.clearComposition() }
+        setSegmentAnchor(text.lastOrNull())
+        trime.updateComposing()
+        refreshTwelveKey()
+    }
+
+    /** 記下「這一段選了哪個字、什麼讀音」；整串上屏時一併寫進 PhraseMemory。 */
+    private fun notePickedSegment(text: String, reading: String) {
+        if (text.isEmpty()) return
+        val input = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
+        // 只認**第一次**選段時的完整碼串：選完一段後 librime 的 input 只剩剩下的碼，
+        // 用它當 key 會把「以液難」記到只剩尾巴的碼串上（下次打同樣的碼就查不到）。
+        val code = PhraseMemory.normalizeCode(input)
+        if (pickedCode.isEmpty() && code.isNotEmpty()) pickedCode = code
+        pickedPieces += 1
+        pickedText.append(text)
+        val r = reading.trim()
+        pickedReadings.append(r).append(' ')
+        if (r.isEmpty()) pickedMissingReading = true
+    }
+
+    /**
+     * 逐段拼出的整串上屏後記一條「碼串 → 詞」。
+     *
+     * 只記「用戶自己一段段選出來的」多字串：引擎能一次裝出來的詞它自己會進 userdb，這裡再記是重複。
+     */
+    private fun maybeRecordPhrase() {
+        val text = pickedText.toString()
+        val readings = pickedReadings.toString().trim()
+        val code = pickedCode
+        val missing = pickedMissingReading
+        val pieces = pickedPieces
+        pickedText.setLength(0)
+        pickedReadings.setLength(0)
+        pickedCode = ""
+        pickedMissingReading = false
+        pickedPieces = 0
+        // 只記「逐段拼出來」的（≥2 次選）：一次選中的詞是引擎自己會學的，App 再記一份是重複。
+        if (text.length < 2 || code.isEmpty() || missing || pieces < 2) return
+        PhraseMemory.record(code, text, readings)
+        Timber.i("twelvekey: phrase record code=[%s] text=[%s] readings=[%s]", code, text, readings)
+    }
+
     private fun onPickPanelCandidate(item: CandidatePanelAdapter.Item) {
         if (!isTwelveKeyMode()) {
             pickLegacyPanelCandidate(item)
@@ -447,7 +515,20 @@ class TextInputManager private constructor() :
             pickAssociationWord(item.text)
             return
         }
+        if (item.segment == SYNTHETIC_SEGMENT) {
+            commitPhrase(
+                CandidateItem(
+                    text = item.text,
+                    comment = item.comment,
+                    index = -1,
+                    segment = SYNTHETIC_SEGMENT,
+                    restCode = item.restCode,
+                ),
+            )
+            return
+        }
         if (item.segment >= 0) {
+            notePickedSegment(item.text, item.comment)
             // 段組字：優先解析成引擎候選下標，走 librime 原生 select_candidate ——
             // 引擎自己會「選中不提交」，preedit 保留、全部選完才上屏、退格可反悔（用戶 2026-11-10 要求）。
             // 引擎確實沒有這個字（字表有、詞庫沒收）時才退回 App 側兜底。
@@ -470,6 +551,7 @@ class TextInputManager private constructor() :
             twelveKeyController?.snapshot?.fallback?.let { twelveKeyController?.commitFallback(it) }
             return
         }
+        notePickedSegment(item.text, item.comment)
         twelveKeyController?.selectCandidate(item.index)
     }
 
@@ -594,6 +676,7 @@ class TextInputManager private constructor() :
         updatePendingPick()
         runCatching { activeEditorInstance.commitText(text, false) }
             .onFailure { Timber.e(it, "twelvekey: flush pending failed") }
+        maybeRecordPhrase()
         trime.updateComposing()
         refreshTwelveKey()
     }
@@ -938,6 +1021,15 @@ class TextInputManager private constructor() :
     /** App 側「已選但還沒上屏」的字（兜底路徑用；見 flushPendingPick）。 */
     private val pendingPick = StringBuilder()
 
+    // ---- 逐段拼詞的累積（記進 PhraseMemory：文字 + 各段讀音 + 完整碼串）----
+    private val pickedText = StringBuilder()
+    private val pickedReadings = StringBuilder()
+    private var pickedCode: String = ""
+    private var pickedMissingReading = false
+
+    /** 一共「分幾次選」把這串拼出來：≥2 才算逐段拼出的詞（一次選中的詞由引擎自己學）。 */
+    private var pickedPieces: Int = 0
+
     override fun onEvent(event: Event?) {
         lastKeyAtNs = System.nanoTime()
         withEngineLock { onEventLocked(event) }
@@ -1138,9 +1230,15 @@ class TextInputManager private constructor() :
                 pickAssociationWord(item.text)
                 return
             }
+            // 合成候選（App 側學到的整串詞）：整串一次上屏。
+            if (item.segment == SYNTHETIC_SEGMENT) {
+                commitPhrase(item)
+                return
+            }
             // 分詞輸入時候選條列的是「這一段能選的字」（index = -1）：
             // 直接上屏、把剩餘段餵回引擎，不進引擎選詞（用戶 2026-11-09 指示）。
             if (item.segment >= 0) {
+                notePickedSegment(item.text, item.comment)
                 val engineIndex = resolveEngineIndexForSegment(item.text, item.comment)
                 if (engineIndex >= 0) {
                     twelveKeyController?.selectCandidate(engineIndex)
@@ -1149,6 +1247,7 @@ class TextInputManager private constructor() :
                 pickSegmentedCandidate(item.text, item.restCode)
                 return
             }
+            notePickedSegment(item.text, item.comment)
             twelveKeyController?.selectCandidate(item.index)
             return
         }

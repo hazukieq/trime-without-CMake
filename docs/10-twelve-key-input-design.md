@@ -2863,3 +2863,59 @@ preedit 又會回到「comment + 原碼」。所以「**整串一次上屏**」�
 
 這樣：面板逐段選字全程只在 preedit，最後一段選完才一次 commit；暫存的字在輸入框裡也看得見（嵌入式預覽）。
 83 unit tests / 0 failures。真機回歸待用戶複測（同一組操作：`8i8e4` → 面板 ji→以 → 次切法組 → 再選最後一個字）。
+
+## 15.64 App 側組詞記憶 + 合成候選（2026-11-11）
+
+### 15.64.1 為什麼是 App 側記
+
+`translator.enable_sentence: false`（2026-11-08 因簡拼分支爆炸關掉），librime 不會把「逐段選出的
+多字串」裝配成一條詞；引擎 userdb 只學「選中的那條候選」= 單字粒度。用戶逐段拼出來的詞
+（例：`8i8e4` → 以 + 液 + 難）下次再打同一串碼時，引擎依然給不出「以液難」。
+→ 這份記憶補的正是這個缺口（用戶 2026-11-11 定調「記錄走 App 側」）。
+
+### 15.64.2 存儲（`PhraseMemory`）
+
+| 項 | 值 |
+| --- | --- |
+| 文件 | SharedPreferences `twelvekey_phrases`（App 私有） |
+| key | 正規化碼串：去 `'`／空白、小寫（`8i'8e4` → `8i8e4`） |
+| value | 多條詞條：`文字\u0001讀音\u0001次數\u0001上次使用時間(ms)`，行間 `\n` |
+| 詞條上限 | 同碼串 ≤ [PhraseMemory.MAX_PER_CODE]=8 條；全局 ≤ [PhraseMemory.MAX_ENTRIES]=200 條（分數最低者先淘汰） |
+| 生效門檻 | 次數 ≥ [PhraseMemory.MIN_COUNT]=2（用戶「累計 2 次生效」） |
+| 衰減 | 半衰期 7 天（`score = (次數-1) × 0.5^(齡/7天)`） |
+
+讀音不是猜的：逐段選字時取每段候選的 comment（音節）拼成，和候選條同源 —— 合成候選的 preedit
+仍走「comment 一律優先」（§15.61），兩邊不會打架。
+
+### 15.64.3 何時 +1
+
+- **逐段拼出來的整串**上屏時記一次：本次組字過程中「分幾次選」≥2 才算（`pickedPieces ≥ 2`）。
+  一次選中的詞（例：直接點「醫院」）**不記** —— 那是引擎自己會學的。
+- **點合成候選上屏**再 +1（用戶：「重複組成 / 選擇時權重也要變化」）。
+- 同一 (碼串, 文字) 只累積次數與時間，不重複建條目。
+
+### 15.64.4 合成候選怎麼進候選條
+
+`TwelveKeySnapshotBuilder.build()` 在引擎 ranked 之後、`rankBar` 之前插入：
+
+| 項 | 規則 |
+| --- | --- |
+| 命中 | 只做**精確碼串**匹配（`normalize(input) == key`），不做前綴/模糊 |
+| 分數 | 合成候選 = `(次數-1) × 衰減`；引擎候選偽分數 = `1 - i/n`（第 0 條 ≈1，越後越低） |
+| 排序 | 分數高者前；**同分引擎優先**（`CandidateRanking.mergePhraseCandidates`，用戶 2026-11-11 選擇） |
+| 位置 | 佔「詞區」名額，受 [TwelveKeyTuning.BAR_WORD_SLOTS]=4 約束；詞區滿了就只進面板 |
+| 標記 | `CandidateItem.segment = SYNTHETIC_SEGMENT (-2)`，`restCode` = 完整碼串 |
+| 點擊 | `commitPhrase()`：先 `flushPendingPick()`，再整串 `commitText`，最後 `PhraseMemory.bump` |
+| 緩存 | `cacheKey` 帶 `PhraseMemory.version`，學到新詞立刻生效（同 SelectionMemory） |
+
+### 15.64.5 已知缺口
+
+1. 面板兜底單字（C4）仍只記 `SegmentMemory`/合成詞，引擎 userdb 學不到 —— 這條保持現狀。
+2. 沒有詞庫管理 UI：清空/查看目前只能改 SharedPreferences（調試用 `PhraseMemory.clear()`）。
+3. 只服務 12 鍵（`schemaId` 門控）；26 鍵候選條保持引擎順序。
+
+### 15.64.6 測試
+
+`app/src/test/.../twelvekey/PhraseMemoryTest.kt`（11 條）：碼串正規化、首次不生效/第二次生效、
+單字不記、時間衰減（7 天≈半）、同碼串上限、編解碼容錯、混排四種情形（無合成候選保持引擎序 /
+高分靠前 / 低分沉底 / 同分引擎優先 / 不破壞詞區配額）。全倉 94 tests / 0 failures。

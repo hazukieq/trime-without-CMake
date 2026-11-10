@@ -86,6 +86,7 @@ object TwelveKeySnapshotBuilder {
     ): String =
         local.input + "|" + local.segmentsKey +
             (if (full) "|full" else "|bar") + "|m" + SelectionMemory.version +
+            "|p" + PhraseMemory.version +
             (if (segmentAnchor == null) "" else "|a" + segmentAnchor.code) +
             (if (segmented) "|seg" else "")
 
@@ -145,6 +146,35 @@ object TwelveKeySnapshotBuilder {
         } else {
             flat
         }
+        // App 側學到的「逐段拼出來的組詞」（引擎裝不出整串）：作為合成候選混進 ranked。
+        // 只有 12 鍵且開啟學習排序時才做（26 鍵候選條由 librime 直接給，必須保持引擎順序）。
+        val ordered = if (applyLearning) {
+            val phraseCode = PhraseMemory.normalizeCode(input)
+            val now = System.currentTimeMillis()
+            val phrases = PhraseMemory.candidatesFor(phraseCode, now)
+            if (phrases.isEmpty()) {
+                ranked
+            } else {
+                val scoreByText = phrases.associate { it.text to PhraseMemory.score(it, now) }
+                CandidateRanking.mergePhraseCandidates(
+                    ranked = ranked,
+                    synthetic = phrases.map { e ->
+                        CandidateItem(
+                            text = e.text,
+                            comment = e.readings,
+                            index = -1,
+                            segment = SYNTHETIC_SEGMENT,
+                            // 合成候選把「完整碼串」放在 restCode：點擊上屏後用它記學習
+                            restCode = phraseCode,
+                        )
+                    },
+                    syntheticScore = { item -> scoreByText[item.text] ?: 0.0 },
+                    engineScore = { i -> 1.0 - i.toDouble() / ranked.size.coerceAtLeast(1) },
+                )
+            }
+        } else {
+            ranked
+        }
         // 分詞（theme 的 composing: delimiter → 送出 '）後，引擎只會給第一段候選；
         // 這裡按「段」補上字典候選：每段列出該碼對應的讀音與字，點擊後上屏該字、
         // 再把後面幾段的碼重新餵回引擎 —— 讓「分詞」真正能逐段聯想。
@@ -158,7 +188,7 @@ object TwelveKeySnapshotBuilder {
         // 展開面板的「音節 → 漢字」列表：選哪些音節由常用度/字頻決定，
         // 但最終順序按讀音字典序（用戶 2026-11-10：「按首字母→次字母排，不然還是找得艱難」）。
         val engineGroups = if (!wantGroups) emptyList() else CandidateRanking.orderGroups(
-            group(ranked).map { g -> g.copy(items = rankPanelItems(g.items)) },
+            group(ordered).map { g -> g.copy(items = rankPanelItems(g.items)) },
             charScore = { text -> SegmentMemory.charScore(text) },
             generalScore = { text -> TwelveKeyPreedit.generalScore(text) },
         )
@@ -198,7 +228,7 @@ object TwelveKeySnapshotBuilder {
         // 有 segmentAnchor（剛上屏的前一個字）時，與它關聯度高的字排前面。
         // 只剩最後一段時，用引擎候選（引擎本身按詞頻/用戶詞庫排序）再疊用戶關聯度，
         // 而不是繼續用字典順序 —— 否則「最後一個字」看起來完全不受詞頻影響（用戶 2026-11-09 反饋）。
-        val barEntries = barList(ranked)
+        val barEntries = barList(ordered)
         // 預覽文字與候選條第 0 條同源：一次算好，隨快照發佈。
         val previewText = barEntries.firstOrNull { it.text.isNotEmpty() }?.text ?: ""
         // 已選前綴（librime context 裡尚未 commit 的字）+ 第一條候選 = 嵌入式預覽全文

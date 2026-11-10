@@ -8,6 +8,14 @@ package com.hazukieq.hkrime.core.twelvekey
  * - [CandidateItem.index] 是 librime menu 裡的**全局下標**，直接餵給 Rime.select_candidate(int)。
  * - [SyllableGroup.reading] 即候選 comment（spelling_hints 打開後是精確拼音）。
  */
+/**
+ * 合成候選（App 側「逐段拼出來的組詞」）的 [CandidateItem.segment] 標記。
+ *
+ * 它不來自 librime：引擎裝不出這種整串（`enable_sentence: false`），所以點擊時不能走
+ * `select_candidate`，只能整串上屏；完整碼串放在 [CandidateItem.restCode] 裡，上屏後用它記學習。
+ */
+const val SYNTHETIC_SEGMENT = -2
+
 data class CandidateItem(
     val text: String,
     val comment: String,
