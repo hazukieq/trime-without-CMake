@@ -3397,3 +3397,41 @@ probe: prism.GetValue('7i')=1 value=163
 - 探针能力：`Rime.probe_dict`（词典级）、`!deploy`（部署后探）、`!schema`（切方案）、
   全量候选 `enumerateCandidates(2000)`；debug 触发点 `TrimeApplication.onCreate` /
   `TextInputManager.onInitializeInputUi`。
+
+### 15.71.7 根因与修复：Table::Query 的索引 BFS 到不了「全碼路徑」（2026-11-11）
+
+**根因不在 syllabifier**（`%5i4a57i` 探针证明图是完整的）：
+
+```
+syll: input='5i4a57i' consumed=7 interpreted_length=7 vertices=4 edges=3
+  edge 0->2 syllable=ki id=260 / syllable=li id=307      ← li 在！
+  edge 2->5 syllable=mak id=336 / syllable=nak id=366
+  edge 5->7 syllable=pi id=481 / syllable=si id=550
+  index pos=0 ki(260) li(307) / pos=2 mak(336) nak(366) / pos=5 pi(481) si(550)
+```
+
+而 `Dictionary::Lookup(graph, 0)` 的結果只有 `end=2`（151 chunk）與 `end=5`（1 chunk），
+**沒有 `end=7`** —— 也就是「整串三音節」的詞條一條都取不到（`Linux` 就在這一類裡）；
+`start=5` 單獨查卻有 `end=7` 121 chunk。問題出在 `hash`（我們自己的 12 鍵性能補丁）
+
+`librime/src/rime/dict/table.cc::Table::Query`：它做的是**沿 table 索引碼的 BFS**
+（`kMaxChunksPerEnd=48`、`kMaxExpansions=12000`、分支按 `remaining()` 降序展開）。
+在 12 鍵「同碼多音節」歧義拼寫（`5i`→ki|li、`4a5`→mak|nak）下，BFS 只把若干分支走到深處，
+`interpreted_length` 那個終點桶沒有被填到 → 該長度的詞條集體消失。
+
+**修法**（`librime/src/rime/dict/table.cc`，patch `rime-jni/patches/0003-table-query-full-path-fallback.patch`）：
+BFS 之後加一段**全碼路徑兜底** —— 僅當「終點（interpreted_length）桶為空」時，
+在音節圖上用 DFS 枚舉完整路徑（總數上限 64、每個前綴上限 16），對每條路徑
+`QueryPhrases(Code)` 直接做表內精確查詢，把命中的 accessor 補進終點桶。
+成本 O(路徑數) 次二分查表，且只在原本「會丟詞」的情況下觸發。
+
+**驗證**（真機 `!feed 5i4a57i`）：
+
+```
+feed candidates=308 hasLinux=true
+  #0 Linux
+  #1 li nak si
+```
+
+`Linux` 直接成了第一條候選（原來 153 條裡完全沒有）。單測/性能門禁：App 側無改動，
+perf-gate 需要真實鍵盤會話（本次未跑，待你正常打字時再確認 p90）。
