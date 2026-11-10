@@ -217,14 +217,26 @@ object CandidateRanking {
         engineGroups: List<SyllableGroup>,
     ): List<SyllableGroup> {
         if (segmentGroups.isEmpty()) return engineGroups
-        // 有段組時只保留「段組不可能覆蓋」的引擎組：
-        // 1) 詞組組（≥2 音節），段組只管單字；
-        // 2) 含有**非漢字單字**的組（ASCII 字母/符號/顏文字）——段組的字全部來自字典，
-        //    這些候選永遠不會出現在段組裡；之前整組被丟掉，於是候選條上有 `a`/`A`、
-        //    展開面板卻找不到（用戶 2026-11-11 報「輸入 qe 面板裡沒有固定條上的字母」）。
-        return segmentGroups + engineGroups.filter { group ->
-            group.syllables.size >= 2 || group.items.any { !isSingleCjkChar(it.text) }
+        // 段組只管「字典裡的字」，而候選條上的 ASCII 字母/符號/顏文字來自引擎。
+        // 用戶 2026-11-11：「輸入 qe，候選條有 A a，展開面板選中 qe 右邊卻沒有」——
+        // 所以按**讀音**把同名的引擎組並進段組（漢字在前、非漢字補在後面、按文字去重），
+        // 段組行因此「一個音節一格里就是它的全部候選」。
+        val consumed = HashSet<String>()
+        val mergedSegments = segmentGroups.map { seg ->
+            val same = engineGroups.filter { it.reading == seg.reading }
+            if (same.isEmpty()) return@map seg
+            consumed.add(seg.reading)
+            val extra = same.flatMap { it.items }
+                .filterNot { e -> seg.items.any { it.text == e.text } }
+            val (cjk, other) = extra.partition { isSingleCjkChar(it.text) || isCjkWord(it.text) }
+            seg.copy(items = seg.items + cjk + other)
         }
+        // 其餘引擎組：詞組組（≥2 音節）＋含非漢字單字的組（無讀音/無對應段組時仍要能看到字母）。
+        val leftover = engineGroups.filter { group ->
+            group.reading !in consumed &&
+                (group.syllables.size >= 2 || group.items.any { !isSingleCjkChar(it.text) })
+        }
+        return mergedSegments + leftover
     }
 
     /**

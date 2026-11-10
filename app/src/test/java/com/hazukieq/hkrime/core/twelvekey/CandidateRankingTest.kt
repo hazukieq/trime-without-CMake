@@ -596,4 +596,33 @@ class CandidateRankingTest {
         )
         assertEquals(engine, CandidateRanking.panelGroups(emptyList(), engine))
     }
+
+    @Test
+    fun `panelGroups merges engine items of the same reading into the segment group`() {
+        // 用戶場景：輸入 qe，段組 qe 只有字典漢字，候選條上的 A/a 在引擎同名讀音組裡
+        val segment = SyllableGroup(
+            reading = "qe",
+            syllables = listOf("qe"),
+            items = listOf(item("依", "qe", -1, segment = 0), item("挨", "qe", -1, segment = 0)),
+            segment = 0,
+        )
+        val engineSameReading = SyllableGroup(
+            reading = "qe",
+            syllables = listOf("qe"),
+            items = listOf(item("依", "qe", 0), item("A", "qe", 3), item("a", "qe", 4)),
+        )
+        val merged = CandidateRanking.panelGroups(listOf(segment), listOf(engineSameReading))
+        // 行不再重複，且字母補在段組裡（漢字在前、非漢字在後）
+        assertEquals(listOf("qe"), merged.map { it.reading })
+        assertEquals(listOf("依", "挨", "A", "a"), merged[0].items.map { it.text })
+    }
+
+    @Test
+    fun `panelGroups keeps non CJK engine group whose reading has no segment row`() {
+        val segment = SyllableGroup("qe", listOf("qe"), listOf(item("依", "qe", -1, segment = 0)), segment = 0)
+        val letters = SyllableGroup("", emptyList(), listOf(item("A", "", 5), item("a", "", 6)))
+        val merged = CandidateRanking.panelGroups(listOf(segment), listOf(letters))
+        assertEquals(listOf("qe", ""), merged.map { it.reading })
+        assertEquals(listOf("A", "a"), merged[1].items.map { it.text })
+    }
 }
