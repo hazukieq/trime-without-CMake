@@ -651,11 +651,32 @@ def cmd_build_syllables(args) -> None:
     text = open(args.source, encoding="utf-8").read()
     match = re.search(r"SYLLABLE_SOURCE\s*=\s*`(.*?)`", text, re.S)
     body = match.group(1) if match else text
-    syllables = sorted(dict.fromkeys(t for t in body.split() if t.isalpha()))
+    base = [t for t in body.split() if t.isalpha()]
+    # 字典音節：用戶 2026-11-11 定稿「字典並入後的就是標準集」
+    dict_path = args.dict or os.path.join(args.data, "hakka.dict.yaml")
+    dict_syll: list[str] = []
+    if os.path.isfile(dict_path):
+        for line in open(dict_path, encoding="utf-8"):
+            if "\t" not in line or line.lstrip().startswith("#"):
+                continue
+            reading = line.rstrip("\n").split("\t")[1]
+            dict_syll += [t for t in reading.split() if t.isalpha()]
+    # 補遺檔（可選，一行一個）：留給「兩邊都沒收、但確認合法」的音節
+    extra_path = args.extra or os.path.join(os.path.dirname(args.out), "hakka_syllables_extra.txt")
+    extras: list[str] = []
+    if extra_path and os.path.isfile(extra_path):
+        for line in open(extra_path, encoding="utf-8"):
+            tok = line.split("#")[0].strip()
+            if tok and tok.isalpha():
+                extras.append(tok)
+    sets = [set(base), set(dict_syll), set(extras)]
+    syllables = sorted(set().union(*sets))
     lines = [
-        "# 客家話合法音節標準集（權威來源：Hkdict/neo-frontend/src/data/hakkaSyllables.js）",
-        "# 一行一個音節；完整集 = 本標準集 ∪ 主詞典自帶音節。",
-        f"# 共 {len(syllables)} 個（由 panel_probe.py build-syllables 同步）。",
+        "# 客家話合法音節標準集（定稿：JS 源檔 ∪ hakka.dict.yaml 自帶音節）",
+        "#   權威來源 Hkdict/neo-frontend/src/data/hakkaSyllables.js；",
+        "#   用戶 2026-11-11 定稿：「字典并入后的就是标准集」（JS 源檔漏收 ji 等，已確認屬人為遺漏）。",
+        f"# 共 {len(syllables)} 個 = JS {len(sets[0])} ∪ 詞典 {len(sets[1])} ∪ 補遺 {len(sets[2])}"
+        "（由 panel_probe.py build-syllables 生成；App 側仍是本檔 ∪ 詞典的運行時並集）。",
     ] + syllables
     with open(args.out, "w", encoding="utf-8") as handle:
         handle.write("\n".join(lines) + "\n")
@@ -831,6 +852,16 @@ def main() -> None:
         nargs="?",
         default="/home/hazukie/Projects/Hkdict/neo-frontend/src/data/hakkaSyllables.js",
         help="含 SYLLABLE_SOURCE 的 JS 文件（默认 Hkdict 那份）",
+    )
+    p_bs.add_argument(
+        "--dict",
+        default="",
+        help="主詞典路徑（預設 <--data>/hakka.dict.yaml）",
+    )
+    p_bs.add_argument(
+        "--extra",
+        default="",
+        help="補遺檔（預設與 --out 同目錄的 hakka_syllables_extra.txt）",
     )
     p_bs.add_argument(
         "--out",
