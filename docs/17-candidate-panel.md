@@ -209,7 +209,10 @@ flowchart TD
 - 查询 `wordsByCodePrefix(codes)`：`entry.code.startsWith(输入码)` → 天然支持任意音节数、简拼、
   半截末节（`5i4a57` 命中 `5i4a57i`）；
 - 组装：`prefixWordRows` 走**轻路径**（只查表 + 拼行），在最终排序前用 `mergeRowsByReading`
-  按读音并入已有行（文字不分大小写去重）——**不走** `panelGroups`/大合并，避免把构建拖死。
+  并入已有行（文字不分大小写去重）——**不走** `panelGroups`/大合并，避免把构建拖死；
+- **并入时按「最长已有前缀读音」找行**：`ko thiau fa` 若已有 `ko thiau` 行，就作为该行的候选，
+  不再单独起一行（整串码本来就是「开头相同匹配」，长词单开一行会看起来像两个 list；
+  用户 2026-11-11 指出）；只有没有任何前缀行匹配时，才用完整读音新建一行。
 
 ---
 
@@ -217,7 +220,10 @@ flowchart TD
 
 比较器（`TwelveKeySnapshotBuilder.build` 末尾）：
 
-1. **分档只看音节数**：`syllables.size == 1 → 0`；`>= 2 → 1`；空 → 2（「推荐」组例外，固定第一行）；
+1. **分档只看「读音」的音节数**（`readingSyllableCount`，`reading.split(' ')` 计数）：
+   1 个 → 0 档；≥2 个 → 1 档；无读音 → 2 档（「推荐」组例外，固定第一行）。
+   **不要用 `syllables.size`**：引擎组的 `syllables` 只是 `listOf(reading)`（1 个元素），
+   `ka then` 这类两音节词会被误判成单音节混进 0 档（2026-11-11 的 `ko thiau` / `ko thiau fa` 分段问题）；
 2. 档内：`reading.lowercase()` 字典序；
 3. 再同：首候选文字字典序。
 
