@@ -2987,3 +2987,60 @@ score = fresh × ctr × (1 + ln(1 + typed))            // 手拼需求，邊際�
 - 單測 +6（曝光降權、點選壓過曝光、清理規則四種情形、曝光不改變可見門檻、
   混排：手拼 3 次排引擎第 0 之後 / 點選後躍第一 / 曝光 8 次沉底）；全倉 **105 tests / 0 failures**。
 - perf-gate PASS（build_p90 30.0ms、latency_p90 60.5ms）——曝光埋點只遍歷 ≤12 條候選條（+ 面板打開時的組），無可測退化。
+
+## 15.65 Spike：把 App 判定的詞寫回引擎 userdb（結論：可行，暫不實施 / 2026-11-11）
+
+背景：§15.64 的合成候選只活在 App 側（`PhraseMemory` + 混排），引擎完全不知道發生過提交
+（`commitPhrase` 走 `clearComposition` + `InputConnection.commitText`，librime 的
+`commit_notifier` 沒被觸發）。用戶（2026-11-11 01:04）問「點合成候選能不能引導引擎收錄」，
+並在討論後要求「寫一個 spike 試試」；跑通後用戶判斷「過於複雜，暫時不需要」，代碼已全部回滾。
+
+### 15.65.1 引擎學習機制（讀 librime 源碼得到的事實）
+
+- `Memory` 監聽 `commit_notifier`（`src/rime/gear/memory.cc:85`、`OnCommit:128`）→ 逐段
+  `ProcessSegmentOnCommit` → `CommitEntry::Save()`（`:40`）→ `TableTranslator::Memorize`
+  （`src/rime/gear/table_translator.cc:311`）。
+- `Memorize` 每個元素 `user_dict_->UpdateEntry(*e, 1)`（`src/rime/dict/user_dictionary.cc:425`），
+  key = `碼串\t文字`，值 `UserDbValue{commits, dee, tick}`；多元素時 `encoder_->EncodePhrase(text,"1")`
+  （`:325`）；`encode_commit_history` 會把最近幾次提交拼成短語（`:337-350`）。
+- 排序：`UserDictionary::CreateDictEntry`（`:532`）`weight = log(formula_p(...)) + credibility`。
+- userdb 查找用**原始輸入串**做前綴匹配（`table_translator.cc:167` `LookupWords(&uter_, input_)`），
+  而寫入時 `TranslateCodeToString`（`:512`）把每節拼寫補一個空格 → 注入時 `custom_code = code + ' '` 正好匹配。
+- 負反饋：菜單刪除 = `UpdateEntry(entry, -1)`（`memory.cc:146`）；提交後立刻退格 =
+  `RevertRecentTransaction`（`memory.cc:107`）。
+
+### 15.65.2 spike 做法（已回滾，留檔以備後用）
+
+- librime fork 三處：`service.h` 給 `Session` 加 `engine()`；`engine.h/.cc` 加
+  `LearnRawEntry(engine, code, text, commits)`（遍歷 `TableTranslator` → `user_dict()` →
+  `DictEntry{text, custom_code = code + ' '}` → `NewTransaction/UpdateEntry/CommitPendingTransaction/Flush`）；
+  `user_dictionary.h/.cc` 加 `Flush()` = `db_->Close() && db_->Open()`。
+- JNI：`Java_com_hazukieq_hkrime_core_Rime_learnEntry(String,String,int)`（注意 JNI 函數名不能有
+  `_learn_1entry` 這種 `_1` 轉義，否則報 `No implementation found`）。
+- App（debug only）：`onInitializeInputUi` 讀 `/sdcard/hkrime/spike_learn.txt`（`碼串\t詞\t次數`）執行一次。
+
+### 15.65.3 實測結果
+
+| 驗證 | 結果 |
+| --- | --- |
+| 注入 `8i8e4 → 以液難 commits=3` | 打 `8i8e4` 首條立刻是「以液難」（壓過 醫院/依然/已然） |
+| `am force-stop` 後重開 | 首條仍是「以液難」——**持久化成功** |
+| 刪除 `commits=-1` | 首條回到「醫院」，重啟後不復活 |
+| 副作用 | 注入條目沒有 comment（讀音）→ preedit 只能回退本地解碼，`8i8e4` 顯示 `ji jen`（少一節） |
+
+### 15.65.4 踩到的坑：leveldb 用戶態寫緩衝
+
+第一次注入「當場可見、重启即消失」，`hakka.userdb/00440x.log` 一直是 **0 字節**：
+rime 的 userdb 寫入先進 leveldb 的 `log::Writer`（默認 64KB 用戶態緩衝），
+進程被 SIGKILL 時緩衝一起丟。加 `UserDictionary::Flush()`（`db_->Close()` + `Open()`）後才真正落盤。
+——這也是「引擎自己的學習在 force-stop 下也會丟」的原因，不是注入特有。
+
+### 15.65.5 若將來要落地（結論與前提）
+
+- 可行：App 判定的詞能寫進引擎、立即生效、重啟不丟、可刪，且與引擎自學共用同一套
+  `formula_p`/`formula_d` 權重。
+- 需要的配套：① promotion 判定式（一時段內的 picked/typed 加權、曝光上限、跨天數）；
+  ② 寫回時由 App 供讀音（引擎 userdb 條目沒有 comment，preedit 會少節）；
+  ③ fork patch 化 + 版本升級維護成本（`rime-jni/patches/`）。
+- 風險：`dict.yaml` 版本變更時 rime 會把 `hakka.userdb` 改名 `.old` 重建——引擎自己的學習也會一起丟。
+- 用戶結論（2026-11-11）：過於複雜，暫不實施；spike 代碼、librime patch、測試條目全部清理。
