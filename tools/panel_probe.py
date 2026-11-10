@@ -483,8 +483,12 @@ class Data:
             if len(bucket) < 60:
                 bucket.append((tokens, word))
 
-    def key_initial_letters(self, code_char: str) -> list[str]:
-        """某个码位能作音节首字母的字母（排除元音；按音节集合实际出现过的首字母）。"""
+    def key_initial_letters(self, code_char: str, is_last: bool = False) -> list[str]:
+        """某个码位能作音节首字母的字母（排除元音；按音节集合实际出现过的首字母）。
+
+        后缀音节 `r`（儿化）**只能出现在最后一键**（用户 2026-11-11 特殊规则），
+        所以非末位按键不贡献 `r`。
+        """
         letters = KEY_LETTERS.get(code_char, "")
         initials = sorted(
             {
@@ -493,6 +497,8 @@ class Data:
                 if syl and syl[0] in letters and syl[0] not in VOWEL_LETTERS
             }
         )
+        if not is_last:
+            initials = [x for x in initials if x not in SUFFIX_ONLY_SYLLABLES]
         return initials
 
     def initial_pattern_combos(self, codes: str) -> list[tuple[str, ...]]:
@@ -505,8 +511,8 @@ class Data:
         if not codes:
             return []
         combos: list[tuple[str, ...]] = [()]
-        for ch in codes:
-            letters = self.key_initial_letters(ch)
+        for index, ch in enumerate(codes):
+            letters = self.key_initial_letters(ch, is_last=index == len(codes) - 1)
             if not letters:
                 return []
             combos = [pre + (x,) for pre in combos for x in letters]
@@ -742,6 +748,20 @@ class Data:
         def tokens(g: dict) -> list[str]:
             return [t for t in g["reading"].split(" ") if t]
 
+        # 先按读音去重（`ha boi` 可能同时来自联想行与词行；面板只有一行，脚本也只列一行）
+        merged_rows: "OrderedDict[str, dict]" = OrderedDict()
+        for g in groups:
+            key = g["reading"]
+            if key not in merged_rows:
+                merged_rows[key] = g
+                continue
+            existing = merged_rows[key]
+            texts = {t.lower() for t in existing.get("items", [])}
+            extra = [w for w in g.get("items", []) if w.lower() not in texts]
+            if extra:
+                merged_rows[key] = {**existing, "items": existing.get("items", []) + extra}
+        groups = list(merged_rows.values())
+
         out: list[dict] = [g for g in groups if len(tokens(g)) < 2]
         for row in sorted(
             [g for g in groups if len(tokens(g)) >= 2], key=lambda g: len(tokens(g))
@@ -970,6 +990,11 @@ def cmd_syllables(args, data: Data) -> None:
                 print("   单字: " + " ".join(g["reading"] for g in seg0))
             if others:
                 print("   联想: " + " ".join(g["reading"] for g in others))
+            stage_combos = data.initial_pattern_combos(prefix)
+            if stage_combos:
+                pattern = "  ".join("·".join(c) for c in stage_combos[:8])
+                more = "" if len(stage_combos) <= 8 else f" …共 {len(stage_combos)} 组"
+                print(f"   首字母组合 {len(stage_combos)} 组: {pattern}{more}")
             words = data.prefix_word_rows(prefix)
             if words:
                 print(
@@ -1179,6 +1204,20 @@ def cmd_selftest(args, data: Data) -> None:
     expect(
         all(unique[i][0] != unique[i + 1][0] for i in range(len(unique) - 1)),
         "累积去重后没有相邻重复读音",
+    )
+
+    # 4.44) 逐鍵累積：組合數 = 2^k（首字母集合大小之積），r 只在最後一鍵
+    for prefix, expected in (("ia", 4), ("ia8", 8), ("ia8i", 16), ("ia8i3", 32)):
+        got = data.initial_pattern_combos(prefix)
+        expect(len(got) == expected, f"{prefix} 组合数应为 {expected}，实际 {len(got)}")
+    last_only = data.initial_pattern_combos("ia8i3")
+    expect(
+        all("r" not in c[:-1] for c in last_only),
+        "r 只能出现在最后一键（儿化后缀）",
+    )
+    expect(
+        any(c[-1] == "r" for c in last_only),
+        "最后一键 vur 应允许 r",
     )
 
     # 4.45) 首字母組合規則（用戶 2026-11-11：「g.* z.*」，元音自由）
