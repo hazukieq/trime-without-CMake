@@ -145,8 +145,8 @@ class CandidateGroupAdapter(
         (holder.bar.background as GradientDrawable).setColor(
             if (item.selected) barColor else Color.TRANSPARENT,
         )
-        // 推薦組（候選條放不下的續頁）沒有讀音，左列顯示「推薦」；其餘照舊顯示拼音。
-        val label = if (item.reading.isBlank()) "推薦" else item.reading
+        // 推薦組（候選條放不下的續頁）沒有讀音，左列顯示「推荐」；其餘照舊顯示拼音。
+        val label = if (item.reading.isBlank()) "推荐" else item.reading
         holder.text.text = label
         holder.text.setTextColor(
             when {
