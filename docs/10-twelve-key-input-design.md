@@ -3256,3 +3256,44 @@ adb shell cat /sdcard/hkrime/logs/hkrime-deploy.log
 真機驗收（2026-11-11）：一次全量部署後文件開頭是
 `===== hkrime deploy @ ... =====`、`mode=full`，`build tables (after)` 裡 `hakka.table.bin`
 帶 `<<< REBUILT`，logcat 段可看到 `Took ... to convert to OpenCCDictionary[...]` 等行。
+
+## 15.70 設置裡「選擇方案」直接 crash：SwitcherSettings 掃空目錄（2026-11-11）
+
+### 15.70.1 現場
+
+`adb logcat -b crash`：
+
+```
+Fatal signal 6 (SIGABRT) ... com.hazukieq.hkrime
+Abort message: 'terminating with uncaught exception of type
+  std::__ndk1::__fs::filesystem::filesystem_error:
+  filesystem error: in directory_iterator::directory_iterator(...): Permission denied [.]'
+#09 rime::SwitcherSettings::GetAvailableSchemasFromDirectory(path const&)
+#10 rime::SwitcherSettings::Load()
+#12 Java_com_hazukieq_hkrime_core_Rime_get_1available_1schema_1list
+#18 com.hazukieq.hkrime.settings.components.SchemaPickerDialog.<init>
+```
+
+### 15.70.2 根因
+
+設置界面是**新進程**。`SchemaPickerDialog` 的字段初始化直接調
+`Rime.get_available_schema_list()`，若此進程還沒 `Rime.get(context)`，
+`deployer_->shared_data_dir / user_data_dir` 都是**空串**：
+
+- `fs::path("")` 在 libc++ 裡被當成 `"."`；
+- Android 進程的 cwd 是 `/`，**不可讀** → `directory_iterator(".")` 拋
+  `fs::filesystem_error`；
+- `GetAvailableSchemasFromDirectory()` 原本沒有 `catch`，異常穿出 JNI → `std::terminate` → abort。
+
+（同樣的空目錄掃描在 librime 上游對桌面端無害——桌面 cwd 可讀；只有 Android 會炸。）
+
+### 15.70.3 兩邊都修
+
+1. **librime fork**（`librime/src/rime/lever/switcher_settings.cc`，commit `f5e1637`）：
+   `dir.empty()` 直接返回；`exists/is_directory` 改用 `error_code` 重載；整個掃描包
+   `try { ... } catch (const fs::filesystem_error&)`，只記 `LOG(ERROR)`，異常不再穿出。
+2. **App**（`settings/components/SchemaPickerDialog.kt`）：新增 `availableSchemaList()`，
+   取列表前先 `Rime.get(context, false)` 保證 deployer 已初始化，再 `runCatching` 包住；
+   兩處調用（字段初始化、`showPickerDialog` 刷新）都改走它。
+
+重編 `librime_jni.so`（`rime-jni/script/build.sh`）→ 裝到 `hkrime/app/libs/arm64-v8a/`。
