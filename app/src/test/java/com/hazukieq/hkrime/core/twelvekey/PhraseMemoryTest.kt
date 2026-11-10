@@ -150,4 +150,43 @@ class PhraseMemoryTest {
         val bar = CandidateRanking.rankBar(merged + listOf(item("以", "ji", 99)), barSize = 12)
         assertEquals(TwelveKeyTuning.BAR_WORD_SLOTS, bar.count { it.text.length > 1 })
     }
+
+    // ---------- 快照構造：記憶 → 合成候選 → 混排 ----------
+
+    @Test
+    fun `mergeLearnedPhrases returns ranked unchanged without learned entries`() {
+        PhraseMemory.clear()
+        val ranked = listOf(item("醫院", "ji jen", 0), item("這種", "je zung", 1))
+        assertEquals(ranked, TwelveKeySnapshotBuilder.mergeLearnedPhrases(ranked, "8i8e4", 2000L * day))
+    }
+
+    @Test
+    fun `mergeLearnedPhrases inserts learned phrase with its readings and code`() {
+        PhraseMemory.clear()
+        val now = 2000L * day
+        PhraseMemory.putForTest(
+            "8i8e4",
+            listOf(PhraseMemory.Entry("以液難", "ji jek nan", 3, now)),
+        )
+        val ranked = listOf(item("醫院", "ji jen", 0), item("這種", "je zung", 1))
+        val merged = TwelveKeySnapshotBuilder.mergeLearnedPhrases(ranked, "8i8e4", now)
+        val syntheticItem = merged.first { it.segment == SYNTHETIC_SEGMENT }
+        assertEquals("以液難", syntheticItem.text)
+        assertEquals("ji jek nan", syntheticItem.comment)  // preedit 靠它
+        assertEquals("8i8e4", syntheticItem.restCode)      // 點擊後靠它記學習
+        assertEquals(-1, syntheticItem.index)
+        // count=3、剛用過 → 學習分 2.0 > 引擎第 0 條 1.0
+        assertEquals("以液難", merged.first().text)
+        PhraseMemory.clear()
+    }
+
+    @Test
+    fun `mergeLearnedPhrases hides entries below the count threshold`() {
+        PhraseMemory.clear()
+        val now = 2000L * day
+        PhraseMemory.putForTest("8i8e4", listOf(PhraseMemory.Entry("以液難", "ji jek nan", 1, now)))
+        val ranked = listOf(item("醫院", "ji jen", 0))
+        assertEquals(ranked, TwelveKeySnapshotBuilder.mergeLearnedPhrases(ranked, "8i8e4", now))
+        PhraseMemory.clear()
+    }
 }

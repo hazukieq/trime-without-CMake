@@ -164,6 +164,14 @@ object PhraseMemory {
         return visibleEntries(byCode[key] ?: return emptyList(), now)
     }
 
+    /** 單測注入：直接塞一批詞條（不碰 SharedPreferences）。 */
+    internal fun putForTest(code: String, entries: List<Entry>) {
+        val key = normalizeCode(code)
+        if (key.isEmpty()) return
+        byCode[key] = entries.toMutableList()
+        version++
+    }
+
     /** 清空（調試/單測用）。 */
     fun clear() {
         byCode.clear()

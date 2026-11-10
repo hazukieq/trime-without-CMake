@@ -149,29 +149,7 @@ object TwelveKeySnapshotBuilder {
         // App 側學到的「逐段拼出來的組詞」（引擎裝不出整串）：作為合成候選混進 ranked。
         // 只有 12 鍵且開啟學習排序時才做（26 鍵候選條由 librime 直接給，必須保持引擎順序）。
         val ordered = if (applyLearning) {
-            val phraseCode = PhraseMemory.normalizeCode(input)
-            val now = System.currentTimeMillis()
-            val phrases = PhraseMemory.candidatesFor(phraseCode, now)
-            if (phrases.isEmpty()) {
-                ranked
-            } else {
-                val scoreByText = phrases.associate { it.text to PhraseMemory.score(it, now) }
-                CandidateRanking.mergePhraseCandidates(
-                    ranked = ranked,
-                    synthetic = phrases.map { e ->
-                        CandidateItem(
-                            text = e.text,
-                            comment = e.readings,
-                            index = -1,
-                            segment = SYNTHETIC_SEGMENT,
-                            // 合成候選把「完整碼串」放在 restCode：點擊上屏後用它記學習
-                            restCode = phraseCode,
-                        )
-                    },
-                    syntheticScore = { item -> scoreByText[item.text] ?: 0.0 },
-                    engineScore = { i -> 1.0 - i.toDouble() / ranked.size.coerceAtLeast(1) },
-                )
-            }
+            mergeLearnedPhrases(ranked, PhraseMemory.normalizeCode(input), System.currentTimeMillis())
         } else {
             ranked
         }
@@ -494,6 +472,37 @@ object TwelveKeySnapshotBuilder {
         CandidateRanking.groupCandidates(items, BLANK_READING, MAX_GROUPS)
 
     /** 候選條最終列表（委託 [CandidateRanking]）。 */
+    /**
+     * 把 App 側學到的組詞（[PhraseMemory]）與引擎候選混排；沒有學到任何詞就原樣返回。
+     *
+     * 「純」的構造 + 混排都放在這裡，方便單測（不碰引擎，只吃 ranked 與記憶）。
+     */
+    internal fun mergeLearnedPhrases(
+        ranked: List<CandidateItem>,
+        code: String,
+        now: Long,
+    ): List<CandidateItem> {
+        if (ranked.isEmpty() || code.isEmpty()) return ranked
+        val phrases = PhraseMemory.candidatesFor(code, now)
+        if (phrases.isEmpty()) return ranked
+        val scoreByText = phrases.associate { it.text to PhraseMemory.score(it, now) }
+        return CandidateRanking.mergePhraseCandidates(
+            ranked = ranked,
+            synthetic = phrases.map { e ->
+                CandidateItem(
+                    text = e.text,
+                    comment = e.readings,
+                    index = -1,
+                    segment = SYNTHETIC_SEGMENT,
+                    // 合成候選把「完整碼串」放在 restCode：點擊上屏後用它記學習
+                    restCode = code,
+                )
+            },
+            syntheticScore = { item -> scoreByText[item.text] ?: 0.0 },
+            engineScore = { i -> 1.0 - i.toDouble() / ranked.size.coerceAtLeast(1) },
+        )
+    }
+
     private fun barList(ranked: List<CandidateItem>): List<CandidateItem> =
         CandidateRanking.rankBar(ranked, BAR_ITEMS)
 }

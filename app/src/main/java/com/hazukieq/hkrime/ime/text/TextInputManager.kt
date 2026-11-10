@@ -459,8 +459,12 @@ class TextInputManager private constructor() :
         val code = item.restCode
         val text = item.text
         if (text.isEmpty()) return
+        // 引擎裡可能已有「選中未提交」的前綴（先逐段選了幾個字），它不在 pendingPick 裡：
+        // 先取出來併進上屏文字，否則 clearComposition 會把它丟掉。
+        val enginePrefix = uncommittedPrefix.ifEmpty { withEngineLock { compositionPrefix() } }
+        uncommittedPrefix = ""
         flushPendingPick()
-        runCatching { activeEditorInstance.commitText(text, false) }
+        runCatching { activeEditorInstance.commitText(enginePrefix + text, false) }
             .onFailure { Timber.e(it, "twelvekey: phrase commit failed") }
         if (code.isNotEmpty()) PhraseMemory.bump(code, text, item.comment)
         withEngineLock { Rime.clearComposition() }
