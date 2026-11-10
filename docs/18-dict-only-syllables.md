@@ -48,7 +48,7 @@ JS 標準集：`Hkdict/neo-frontend/src/data/hakkaSyllables.js`（787 個）。
 | 35 | `jon` | 1 | `纸鸢`=zi jon |  |
 | 36 | `jut` | 1 | （詞表無） |  |
 | 37 | `kian` | 1 | （詞表無） |  |
-| 38 | `lod` | 1 | （詞表無） |  |
+| 38 | ~~`lod`~~ → `lot` | 1 | `捋`=lot | ✅ 已修（用戶 2026-11-11：`lod` 是錯拼，改 `lot`；`lot` 本來就在 JS 標準集裡） |
 | 39 | `meng` | 1 | （詞表無） |  |
 | 40 | `neng` | 1 | `倪儿`=neng |  |
 | 41 | `nh` | 1 | （詞表無） |  |
