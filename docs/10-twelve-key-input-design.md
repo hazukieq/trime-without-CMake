@@ -3229,6 +3229,37 @@ sum >= 輸入長  → 只顯示 comment（簡拼 `8 8`=ji jen、半截 `5i34i w`
 改這條規則前，舊實現（DP 邊界）在同一份語料上**當場報出 25+ 條不一致**——這就是反覆來回的原因。
 `AGENTS.md` §2.1.1 已寫死：**改 preedit / 面板分組必須先跑真實語料測試**。
 
+## 15.76 `ee5` 的真正成因：引擎确实没有候选 → 候选条不该退成字母（2026-11-11）
+
+§15.73/§15.74/§15.75 之後仍然重現。這次加了 native 診斷（`Rime.debug_enumerate_info()`：
+`session/begin/count`，由 Timber 寫進日誌文件，避開被沖掉的 logcat）：
+
+```
+twelvekey: fallback remaining=ee5 flat=0 composing=true session=262203480 begun=0 count=0
+```
+
+`begun=0` = `RimeCandidateListBegin` 返回 false；librime 源碼裡它失敗的唯一條件是
+`!ctx->HasMenu()`（`rime_api_impl.h::RimeCandidateListFromIndex`）——即**這個 composition 壓根沒有候選菜單**。
+PC 側同一份真實詞庫也復現：`--probe ee5` → `candidates=0`。
+
+所以 `ee5` 的真相是：
+
+- 引擎沒有候選（`ee5` 這種碼在方案/詞典裡裝不出來）→ **候選條退成字母兜底是「沒東西可選」的表現**；
+- 但**面板**在同樣狀態下用的是 App 側「字典段組」（`de` 讀音下的 邸/的/地…），
+  於是看起來「開面板就有 邸、關掉又變字母」——兩個入口的數據源不一致。
+
+**修法**（`TwelveKeySnapshotBuilder`）：
+
+1. 引擎候選為 0 且 `remaining` 非空時，**候選條改用與面板第 0 組同源的字典段組候選**
+   （`segmentGroupsFor(remaining)`，最多 12 條），「推薦」組接著放續頁；
+2. 只有在「引擎 0 條 **且字典段組也空**」時才顯示字母兜底（如 `qqqq` 這種無音節碼串）；
+3. `TwelveKeySnapshot.hasCandidates` 改為 `barEntries.isNotEmpty() || groups.isNotEmpty()`
+   （面板關閉時 groups 恆空，只看它會讓每一幀都被判成沒候選）。
+
+效果：`ee5` → 候選條 `邸 的 地 …`（de 讀音）、preedit `de 5`；面板/候選條/preedit 同源，
+不再有「開關面板換一套」的現象。回歸：`SnapshotDecouplingTest.emptyEngineFallsBackToDictionaryNotLetters`
+（140 tests / 0 failures）。
+
 ## 15.75 快照解耦：候選條/preedit 不得受面板狀態影響（2026-11-11）
 
 用戶：「編碼怎麼能讓展開面板給影響到呢？你這是解耦嗎？候選詞也是，`deek` 也會被展開面板影響到變為 `邸`。」
