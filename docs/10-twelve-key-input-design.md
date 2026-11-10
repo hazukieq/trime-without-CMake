@@ -3347,3 +3347,34 @@ table.cc:340           num entries: 536084
 同文件 `chatgpt`（4 音節、ASCII）與 `猛劥`（2 音節）都能出 → 問題不在「非漢字」「多音節」，
 而在 `li nak si` 這個**拼寫序列的查詢路徑**（prism/segment 側），下一步用字典級 JNI 探針
 （`Dictionary::LookupWords` 直接查 `li nak si`）定位。
+
+### 15.71.5 词典级探针（`@音节序列`）与 Linux 结论（2026-11-11）
+
+工具：`Rime.probe_dict("li nak si")`（librime `ProbeDictEntry`，JNI `probe_dict`），
+在候选探针文件里写一行 `@li nak si` 即可，输出：
+
+```
+probe: syllables_in_table=714
+  entry: 'Linux' weight=6.90776
+  entry: 'linux' weight=6.90776
+probe: entries_for_code=2
+probe: prism.GetValue('5i')=1 value=119
+probe: prism.GetValue('4a5')=1 value=69
+probe: prism.GetValue('7i')=1 value=163
+```
+
+结论链条（逐层排除）：
+
+| 层次 | 状态 |
+|---|---|
+| 词库文件（TAB/`---`/位置） | ✅ 正常 |
+| 建表收集（glog `collecting entries` / 无 `dropping entry`） | ✅ 收进去了（`num entries: 536082`） |
+| 表内词条（`Table::QueryPhrases([li][nak][si])`） | ✅ **2 条**：`Linux`、`linux`，weight=6.90776（=log 1000） |
+| prism 拼写（`5i`/`4a5`/`7i`） | ✅ 各自命中（value=119/69/163） |
+| 引擎候选（`5i4a57i` 全量 153 条） | ❌ 没有 Linux |
+
+⇒ 词库、建表、prism 三层都没问题，问题在 **`script_translator` 把「表里有、prism 认」的这条
+3 音節词条取不出来**（同一文件的 `chatgpt`(4 音節 ASCII)、`猛劥`(2 音節) 都能出；早期一次
+表里头还有 `T1 li nak si` 等测试条目时，`Linux` 也曾出现在候选第 2 位，说明「能出」本身成立）。
+下一步要查的是 `script_translator`/`Poet` 这一段对「多音節 + 同拼写歧义（5i→ki/li、4a5→mak/nak）」
+的组合枚举是否漏掉了该路径。
