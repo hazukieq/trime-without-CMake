@@ -230,13 +230,18 @@ class TwelveKeyController(
     private fun emit(next: TwelveKeySnapshot) {
         snapshot = next
         onSnapshot(next)
+        if (next.hasCandidates) fallbackRetryCount = 0
         // 兜底快照（引擎暫時拿不到候選）不緩存了，但也不會自己重試：
         // 這裡排一次延遲刷新，等引擎就緒/候選落地後把候選條與 preedit 一起換成真實內容。
         if (!next.isEmpty && !next.hasCandidates) scheduleFallbackRetry()
     }
 
     private var fallbackRetryJob: Job? = null
+    private var fallbackRetryCount = 0
+    /** 兜底快照後最多重試幾次：無限重試會一直搶 ENGINE_LOCK（用戶 2026-11-11：開面板變卡、點好幾次才開）。 */
     private fun scheduleFallbackRetry() {
+        if (fallbackRetryCount >= MAX_FALLBACK_RETRIES) return
+        fallbackRetryCount++
         fallbackRetryJob?.cancel()
         val gen = generation
         fallbackRetryJob = scope.launch {
@@ -266,6 +271,9 @@ class TwelveKeyController(
 
         /** 兜底快照後的重試延遲（等引擎就緒/候選落地）。 */
         private const val FALLBACK_RETRY_MS = 90L
+
+        /** 兜底重試上限：超過就停，避免一直搶鎖讓面板/鍵盤卡頓。 */
+        private const val MAX_FALLBACK_RETRIES = 3
 
         /** 連打期間不做全量枚舉，停手後再算。 */
         private const val DEBOUNCE_MS = 120L

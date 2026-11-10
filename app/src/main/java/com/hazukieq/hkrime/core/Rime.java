@@ -1189,6 +1189,9 @@ public class Rime {
 
   public static native String get_sync_dir();
 
+  /** 診斷：本次枚舉看到的 session / begin 結果 / 候選數（排查「後台枚舉 0 條」）。 */
+  public static native String debug_enumerate_info();
+
   public static native String get_user_id();
 
   // key_table

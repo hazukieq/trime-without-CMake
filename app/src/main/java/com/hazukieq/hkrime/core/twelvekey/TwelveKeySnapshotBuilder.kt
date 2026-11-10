@@ -245,7 +245,9 @@ object TwelveKeySnapshotBuilder {
         // 「打字顯示 dek，展開關閉後才是 de 5 / 邸」就是這條（docs/10 §15.74）。
         val fallback = if (shouldShowFallback(ordered.size, remaining)) {
             val raw = remaining.takeLast(MAX_FALLBACK_CODE)
-            Timber.i("twelvekey: fallback remaining=%s flat=%d", remaining, flat.size)
+            val dbg = runCatching { Rime.debug_enumerate_info() }.getOrElse { "n/a(${it.javaClass.simpleName})" }
+            Timber.i("twelvekey: fallback remaining=%s flat=%d composing=%b %s",
+                remaining, flat.size, runCatching { Rime.isComposing() }.getOrDefault(false), dbg)
             Fallback(rawCode = raw, letters = if (mapFallbackLetters) toLetters(raw) else raw)
         } else {
             null
