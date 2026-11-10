@@ -381,6 +381,10 @@ class TextInputManager private constructor() :
             pickedCode = ""
             pickedMissingReading = false
             pickedPieces = 0
+            // 本輪結束：露過面但沒被選的合成候選，各記一次曝光（弱負信號）
+            flushPhraseExposure()
+        } else {
+            collectPhraseExposure(snapshot)
         }
         currentSnapshot = snapshot
         // preedit 讀音對齊（docs/14）：把「用戶看到的第一條候選」發布給 TwelveKeyPreedit，
@@ -449,6 +453,39 @@ class TextInputManager private constructor() :
         }.onFailure { Timber.e(it, "twelvekey: association pick failed") }
     }
 
+    /** 記下本輪真展示過的合成候選（候選條必算；展開面板打開時也算）。 */
+    private fun collectPhraseExposure(snapshot: TwelveKeySnapshot) {
+        snapshot.barItems.forEach { item ->
+            if (item.segment == SYNTHETIC_SEGMENT && item.text.isNotEmpty()) {
+                shownSynthetic[item.text] = item.restCode
+            }
+        }
+        if (panelWanted || isCandidatePanelShown()) {
+            snapshot.groups.forEach { group ->
+                group.items.forEach { item ->
+                    if (item.segment == SYNTHETIC_SEGMENT && item.text.isNotEmpty()) {
+                        shownSynthetic[item.text] = item.restCode
+                    }
+                }
+            }
+        }
+    }
+
+    /** 本輪結束：露過面但沒被點選的合成候選，各 +1 曝光。 */
+    private fun flushPhraseExposure() {
+        val shown = shownSynthetic
+        if (shown.isEmpty()) {
+            pickedSynthetic.clear()
+            return
+        }
+        val picked = pickedSynthetic
+        shown.forEach { (text, code) ->
+            if (!picked.contains(text) && code.isNotEmpty()) PhraseMemory.noteShown(code, text)
+        }
+        shown.clear()
+        picked.clear()
+    }
+
     /**
      * 點合成候選（App 側學到的整串詞，[SYNTHETIC_SEGMENT]）：整串一次上屏。
      *
@@ -459,6 +496,7 @@ class TextInputManager private constructor() :
         val code = item.restCode
         val text = item.text
         if (text.isEmpty()) return
+        pickedSynthetic.add(text)
         // 引擎裡可能已有「選中未提交」的前綴（先逐段選了幾個字），它不在 pendingPick 裡：
         // 先取出來併進上屏文字，否則 clearComposition 會把它丟掉。
         val enginePrefix = uncommittedPrefix.ifEmpty { withEngineLock { compositionPrefix() } }
@@ -466,7 +504,7 @@ class TextInputManager private constructor() :
         flushPendingPick()
         runCatching { activeEditorInstance.commitText(enginePrefix + text, false) }
             .onFailure { Timber.e(it, "twelvekey: phrase commit failed") }
-        if (code.isNotEmpty()) PhraseMemory.bump(code, text, item.comment)
+        if (code.isNotEmpty()) PhraseMemory.bumpPicked(code, text)
         withEngineLock { Rime.clearComposition() }
         setSegmentAnchor(text.lastOrNull())
         trime.updateComposing()
@@ -1033,6 +1071,12 @@ class TextInputManager private constructor() :
 
     /** 一共「分幾次選」把這串拼出來：≥2 才算逐段拼出的詞（一次選中的詞由引擎自己學）。 */
     private var pickedPieces: Int = 0
+
+    // ---- 合成候選的曝光統計（誤造詞判定用，見 PhraseMemory.score）----
+    /** 本輪真出現在候選條/展開面板上的合成候選：文字 → 完整碼串。 */
+    private val shownSynthetic = LinkedHashMap<String, String>()
+    /** 本輪被點選過的合成候選文字。 */
+    private val pickedSynthetic = HashSet<String>()
 
     override fun onEvent(event: Event?) {
         lastKeyAtNs = System.nanoTime()

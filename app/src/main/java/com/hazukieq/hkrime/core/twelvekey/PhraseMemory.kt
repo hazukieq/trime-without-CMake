@@ -35,6 +35,17 @@ object PhraseMemory {
     /** 時間衰減半衰期：7 天不用，分數減半。 */
     const val HALF_LIFE_MS = 7L * 24 * 3600 * 1000
 
+    /** Beta 先驗（平滑 CTR）：α=1、β=2 → 從沒被選過的詞 CTR 先驗 ≈ 1/3。 */
+    const val CTR_ALPHA = 1.0
+    const val CTR_BETA = 2.0
+
+    /** 曝光折扣：展示算「弱负信号」，按 0.5 折算（位置/可见性差异，見 Google US8938463 的思路）。 */
+    const val EXPOSURE_DISCOUNT = 0.5
+
+    /** 自動清理：曝光 ≥ 8 次、一次沒被選、手拼 ≤ 1 次 → 判定為誤造詞，直接刪。 */
+    const val PURGE_SHOWN = 8
+    const val PURGE_MAX_TYPED = 1
+
     private const val SEP = '\u0001'
     private const val LINE = '\n'
 
@@ -42,8 +53,13 @@ object PhraseMemory {
     data class Entry(
         val text: String,
         val readings: String,
-        val count: Int,
+        /** 用戶**手拼**組成這個詞的次數（強需求信號）。 */
+        val typed: Int,
         val lastUsedAt: Long,
+        /** 作為合成候選**顯示**過多少次（弱負信號，見 [score] 的曝光折扣）。 */
+        val shown: Int = 0,
+        /** 從合成候選**點選**上屏多少次（強正信號）。 */
+        val picked: Int = 0,
     )
 
     private var prefs: SharedPreferences? = null
@@ -74,19 +90,38 @@ object PhraseMemory {
             }
         }
 
-    /** 學習分：次數（≥2 起算）× 時間衰減；分數越高越該排在前面。 */
+    /**
+     * 推薦分 = 鮮度 × 平滑 CTR × 需求（用戶 2026-11-11 定案，參考 Beta-Binomial 平滑、
+     * 曝光偏置建模與「未點擊降權」的成熟做法）：
+     *
+     * ```
+     * ctr   = (picked + α) / (picked + γ·shown + α + β)     // α=1, β=2, γ=0.5
+     * fresh = 0.5^(齡 / 7 天)                               // 時間衰減
+     * score = fresh × ctr × (1 + ln(1 + typed))             // 手拼需求，邊際遞減
+     * ```
+     *
+     * 直覺：反复展示卻沒人選 → `shown` 漲、`ctr` 掉 → 自動沉底（誤造詞）；
+     * 手拼或點選過 → `ctr` 與需求項一起漲 → 排前面。
+     */
     fun score(entry: Entry, now: Long): Double {
         val age = (now - entry.lastUsedAt).coerceAtLeast(0L)
-        val decay = Math.pow(0.5, age.toDouble() / HALF_LIFE_MS.toDouble())
-        return (entry.count - 1).coerceAtLeast(0) * decay
+        val fresh = Math.pow(0.5, age.toDouble() / HALF_LIFE_MS.toDouble())
+        val denom = entry.picked + EXPOSURE_DISCOUNT * entry.shown + CTR_ALPHA + CTR_BETA
+        val ctr = (entry.picked + CTR_ALPHA) / denom
+        val demand = 1.0 + Math.log1p(entry.typed.toDouble())
+        return fresh * ctr * demand
     }
+
+    /** 誤造詞：反复展示、一次沒選、也不曾手拼過 → 應該被清掉。 */
+    fun shouldPurge(entry: Entry): Boolean =
+        entry.shown >= PURGE_SHOWN && entry.picked == 0 && entry.typed <= PURGE_MAX_TYPED
 
     /** 某碼串下「可以顯示」的詞條（次數達標），按分數降序。 */
     fun visibleEntries(entries: List<Entry>, now: Long): List<Entry> =
-        entries.filter { it.count >= MIN_COUNT && it.text.length >= 2 }
+        entries.filter { (it.typed + it.picked) >= MIN_COUNT && it.text.length >= 2 && !shouldPurge(it) }
             .sortedWith(compareByDescending<Entry> { score(it, now) }.thenByDescending { it.lastUsedAt })
 
-    /** 記錄一次「逐段拼出」：同碼串同文字 +1，更新讀音與時間；超限淘汰。 */
+    /** 記錄一次「逐段拼出」：同一條詞手拼次數 +1，更新讀音與時間；超限淘汰。 */
     fun applyRecord(
         entries: List<Entry>,
         text: String,
@@ -101,7 +136,7 @@ object PhraseMemory {
                 merged = true
                 out.add(
                     e.copy(
-                        count = (e.count + 1).coerceAtMost(MAX_COUNT),
+                        typed = (e.typed + 1).coerceAtMost(MAX_COUNT),
                         lastUsedAt = now,
                         readings = readings.ifBlank { e.readings },
                     ),
@@ -110,18 +145,24 @@ object PhraseMemory {
                 out.add(e)
             }
         }
-        if (!merged) out.add(Entry(text, readings, 1, now))
+        if (!merged) out.add(Entry(text, readings, typed = 1, lastUsedAt = now))
         // 同碼串只留分數最高的前 N 條
         return out.sortedWith(compareByDescending<Entry> { score(it, now) }.thenByDescending { it.lastUsedAt })
             .take(MAX_PER_CODE)
             .sortedBy { it.lastUsedAt }
     }
 
-    /** 編碼：一行一條詞。 */
+    /** 編碼：一行一條詞（6 欄；舊版只有 4 欄，decode 時 shown/picked 補 0）。 */
     fun encode(entries: List<Entry>): String =
         entries.joinToString(LINE.toString()) { e ->
-            listOf(e.text, e.readings, e.count.toString(), e.lastUsedAt.toString())
-                .joinToString(SEP.toString())
+            listOf(
+                e.text,
+                e.readings,
+                e.typed.toString(),
+                e.lastUsedAt.toString(),
+                e.shown.toString(),
+                e.picked.toString(),
+            ).joinToString(SEP.toString())
         }
 
     /** 解碼：容錯，壞行直接丟。 */
@@ -132,9 +173,18 @@ object PhraseMemory {
                 if (parts.size < 4) return@mapNotNull null
                 val text = parts[0]
                 if (text.isBlank()) return@mapNotNull null
-                val count = parts[2].toIntOrNull() ?: return@mapNotNull null
+                val typed = parts[2].toIntOrNull() ?: return@mapNotNull null
                 val last = parts[3].toLongOrNull() ?: 0L
-                Entry(text, parts[1], count.coerceIn(1, MAX_COUNT), last)
+                val shown = parts.getOrNull(4)?.toIntOrNull() ?: 0
+                val picked = parts.getOrNull(5)?.toIntOrNull() ?: 0
+                Entry(
+                    text = text,
+                    readings = parts[1],
+                    typed = typed.coerceIn(1, MAX_COUNT),
+                    lastUsedAt = last,
+                    shown = shown.coerceAtLeast(0),
+                    picked = picked.coerceAtLeast(0),
+                )
             }
             .take(MAX_PER_CODE)
 
@@ -142,20 +192,61 @@ object PhraseMemory {
 
     fun hasAny(): Boolean = byCode.isNotEmpty()
 
-    /** 記一次「逐段拼出的整串」。 */
+    /** 記一次「逐段拼出的整串」（手拼次數 +1）。 */
     fun record(code: String, text: String, readings: String) {
         val key = normalizeCode(code)
         if (key.isEmpty() || text.length < 2) return
         val now = System.currentTimeMillis()
         val updated = applyRecord(byCode[key]?.toList() ?: emptyList(), text, readings, now)
-        byCode[key] = updated.toMutableList()
-        prefs?.edit()?.putString(key, encode(updated))?.apply()
+        write(key, updated, now)
+    }
+
+    /** 點合成候選上屏：點選計數 +1（用戶 2026-11-11：「重複組成/選擇時權重也要變化」）。 */
+    fun bumpPicked(code: String, text: String) {
+        val key = normalizeCode(code)
+        if (key.isEmpty() || text.length < 2) return
+        val now = System.currentTimeMillis()
+        var hit = false
+        val updated = (byCode[key] ?: return).map { e ->
+            if (e.text == text) {
+                hit = true
+                e.copy(picked = (e.picked + 1).coerceAtMost(MAX_COUNT), lastUsedAt = now)
+            } else {
+                e
+            }
+        }
+        if (!hit) return
+        write(key, updated, now)
+    }
+
+    /**
+     * 合成候選「顯示了但本輪沒被選」：曝光 +1（弱負信號）。
+     *
+     * 這是誤造詞判定的唯一信息來源（用戶 2026-11-11：反复出現在候選條卻沒人選，可能就是誤造）。
+     * 曝光本身不刪詞，只透過 [score] 的平滑 CTR 讓它沉底；到 [PURGE_SHOWN] 次且從沒被選才清掉。
+     */
+    fun noteShown(code: String, text: String) {
+        val key = normalizeCode(code)
+        if (key.isEmpty()) return
+        val entries = byCode[key] ?: return
+        if (entries.none { it.text == text }) return
+        val updated = entries.map { e ->
+            if (e.text == text) e.copy(shown = (e.shown + 1).coerceAtMost(MAX_COUNT * 4)) else e
+        }.filterNot { shouldPurge(it) }
+        write(key, updated, System.currentTimeMillis())
+    }
+
+    private fun write(key: String, updated: List<Entry>, now: Long) {
+        if (updated.isEmpty()) {
+            byCode.remove(key)
+            prefs?.edit()?.remove(key)?.apply()
+        } else {
+            byCode[key] = updated.toMutableList()
+            prefs?.edit()?.putString(key, encode(updated))?.apply()
+        }
         version++
         trimGlobal(now)
     }
-
-    /** 點合成候選上屏：同樣 +1（用戶 2026-11-11：「重複組成/選擇時權重也要變化」）。 */
-    fun bump(code: String, text: String, readings: String) = record(code, text, readings)
 
     /** 某碼串下可以作為合成候選的詞條（已按分數降序，次數未達標的被過濾）。 */
     fun candidatesFor(code: String, now: Long = System.currentTimeMillis()): List<Entry> {

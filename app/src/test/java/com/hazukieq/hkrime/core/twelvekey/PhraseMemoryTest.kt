@@ -9,13 +9,21 @@ class PhraseMemoryTest {
 
     private val day = 24L * 3600 * 1000
 
-    private fun entry(text: String, count: Int, ageDays: Long, readings: String = "a b") =
-        PhraseMemory.Entry(
-            text = text,
-            readings = readings,
-            count = count,
-            lastUsedAt = 1000L * day - ageDays * day,
-        )
+    private fun entry(
+        text: String,
+        typed: Int,
+        ageDays: Long,
+        readings: String = "a b",
+        shown: Int = 0,
+        picked: Int = 0,
+    ) = PhraseMemory.Entry(
+        text = text,
+        readings = readings,
+        typed = typed,
+        lastUsedAt = 1000L * day - ageDays * day,
+        shown = shown,
+        picked = picked,
+    )
 
     @Test
     fun `normalizeCode drops apostrophes and spaces and lowercases`() {
@@ -29,11 +37,11 @@ class PhraseMemoryTest {
         val now = 2000L * day
         var entries = PhraseMemory.applyRecord(emptyList(), "以液難", "ji jek nan", now)
         assertEquals(1, entries.size)
-        assertEquals(1, entries[0].count)
+        assertEquals(1, entries[0].typed)
         assertEquals(0, PhraseMemory.visibleEntries(entries, now).size)
 
         entries = PhraseMemory.applyRecord(entries, "以液難", "ji jek nan", now)
-        assertEquals(2, entries[0].count)
+        assertEquals(2, entries[0].typed)
         val visible = PhraseMemory.visibleEntries(entries, now)
         assertEquals(1, visible.size)
         assertEquals("以液難", visible[0].text)
@@ -56,6 +64,43 @@ class PhraseMemoryTest {
         assertTrue(week > month)
         // 半衰期 7 天：一週後大約剩一半
         assertTrue(week in (fresh * 0.45)..(fresh * 0.55))
+    }
+
+    @Test
+    fun `exposure without selection demotes a phrase`() {
+        val now = 2000L * day
+        val fresh = PhraseMemory.score(entry("以液難", 2, 0), now)
+        val ignored = PhraseMemory.score(entry("以液難", 2, 0, shown = 8), now)
+        assertTrue(ignored < fresh * 0.6) // 反復展示卻沒人選 → 分數掉一大截（沉到引擎詞後面）
+    }
+
+    @Test
+    fun `picked phrase outweighs ignored one`() {
+        val now = 2000L * day
+        val picked = PhraseMemory.score(entry("以液難", 2, 0, shown = 2, picked = 3), now)
+        val ignored = PhraseMemory.score(entry("以液難", 2, 0, shown = 8), now)
+        assertTrue(picked > ignored * 3)
+    }
+
+    @Test
+    fun `purge rule only kills repeatedly ignored unsolicited phrases`() {
+        assertTrue(PhraseMemory.shouldPurge(entry("以液難", 1, 0, shown = 8)))
+        // 手拼過兩次 = 真需求，不清
+        assertTrue(!PhraseMemory.shouldPurge(entry("以液難", 2, 0, shown = 8)))
+        // 被選過就不算誤造
+        assertTrue(!PhraseMemory.shouldPurge(entry("以液難", 1, 0, shown = 8, picked = 1)))
+        // 曝光不夠多也不清
+        assertTrue(!PhraseMemory.shouldPurge(entry("以液難", 1, 0, shown = 5)))
+    }
+
+    @Test
+    fun `noteShown style updates float through applyShown like accounting`() {
+        // 曝光只在 score 裡起作用，不改變可見門檻（門檻仍是 typed+picked ≥ 2）
+        val now = 2000L * day
+        val ignored = listOf(entry("以液難", 2, 0, shown = 7))
+        assertEquals(1, PhraseMemory.visibleEntries(ignored, now).size)
+        val purged = listOf(entry("以液難", 1, 0, shown = 8))
+        assertEquals(0, PhraseMemory.visibleEntries(purged, now).size)
     }
 
     @Test
@@ -175,8 +220,8 @@ class PhraseMemoryTest {
         assertEquals("ji jek nan", syntheticItem.comment)  // preedit 靠它
         assertEquals("8i8e4", syntheticItem.restCode)      // 點擊後靠它記學習
         assertEquals(-1, syntheticItem.index)
-        // count=3、剛用過 → 學習分 2.0 > 引擎第 0 條 1.0
-        assertEquals("以液難", merged.first().text)
+        // 手拼 3 次、從沒被點選 → 分數 ≈0.79：插在引擎第 0 條（1.0）後面、第 1 條（0.5）前面
+        assertEquals(listOf("醫院", "以液難", "這種"), merged.map { it.text })
         PhraseMemory.clear()
     }
 
@@ -214,5 +259,35 @@ class PhraseMemoryTest {
         )
         val bar = CandidateRanking.rankBar(ranked, barSize = 12)
         assertEquals(listOf("半截碼", "半截", "半"), bar.map { it.text })
+    }
+
+    @Test
+    fun `picked learned phrase outranks engine top candidate`() {
+        PhraseMemory.clear()
+        val now = 2000L * day
+        PhraseMemory.putForTest(
+            "8i8e4",
+            // 手拼 3 次 + 點選 3 次，只被略過 1 次 → 分數 ≈1.4 > 引擎第 0 條 1.0
+            listOf(PhraseMemory.Entry("以液難", "ji jek nan", 3, now, shown = 1, picked = 3)),
+        )
+        val ranked = listOf(item("醫院", "ji jen", 0), item("這種", "je zung", 1))
+        val merged = TwelveKeySnapshotBuilder.mergeLearnedPhrases(ranked, "8i8e4", now)
+        assertEquals("以液難", merged.first().text)
+        PhraseMemory.clear()
+    }
+
+    @Test
+    fun `repeatedly ignored learned phrase sinks behind all engine candidates`() {
+        PhraseMemory.clear()
+        val now = 2000L * day
+        PhraseMemory.putForTest(
+            "8i8e4",
+            listOf(PhraseMemory.Entry("以液難", "ji jek nan", 2, now, shown = 8)),
+        )
+        val ranked = listOf(item("醫院", "ji jen", 0), item("這種", "je zung", 1))
+        val merged = TwelveKeySnapshotBuilder.mergeLearnedPhrases(ranked, "8i8e4", now)
+        // 曝光 8 次沒人選 → 沉到最後（0.30 < 引擎第 1 條 0.5）
+        assertEquals(listOf("醫院", "這種", "以液難"), merged.map { it.text })
+        PhraseMemory.clear()
     }
 }
