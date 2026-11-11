@@ -50,6 +50,7 @@ internal enum class RowSource {
  * @param segment 0=單字組 / 1=詞行；沿用 [SyllableGroup.segment] 語義，投影時原樣帶過去
  * @param restCode 點擊後要餵回引擎的剩餘碼（單字組用；合併時取**首行**，見 [mergeRows]）
  * @param sources 內部診斷用（本行由哪些源貢獻）；投影成 [SyllableGroup] 時丟棄
+ * @param hasUserWord 行內是否含用戶詞庫的詞；只用於 LS 選行優先（不進 UI、不影響顯示順序）
  */
 internal data class PanelRow(
     val reading: String,
@@ -57,6 +58,7 @@ internal data class PanelRow(
     val segment: Int,
     val restCode: String = "",
     val sources: Set<RowSource> = emptySet(),
+    val hasUserWord: Boolean = false,
 ) {
     /** 讀音有幾個音節（`ko thiau fa` = 3）；空白讀音 = 0。**禁止**用 `syllables.size` 判檔。 */
     val syllableCount: Int get() = reading.split(' ').count { it.isNotBlank() }

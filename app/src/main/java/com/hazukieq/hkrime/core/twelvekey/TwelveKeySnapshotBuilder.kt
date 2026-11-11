@@ -530,7 +530,9 @@ object TwelveKeySnapshotBuilder {
                 // 都按這個 key 排，否則桶內插入順序不同時會選中不同行（golden 會漂）。
                 .add(
                     buckets.getValue(key).sortedWith(
-                        compareByDescending<PanelRow> { it.items.size }.thenBy { it.reading }
+                        compareByDescending<PanelRow> { it.hasUserWord }
+                            .thenByDescending { it.items.size }
+                            .thenBy { it.reading }
                     )
                 )
         }
@@ -576,6 +578,9 @@ object TwelveKeySnapshotBuilder {
         items = words.map { CandidateItem(text = it, comment = reading, index = -1, segment = 1) },
         segment = 1,
         sources = setOf(RowSource.ASSOC),
+        // 用戶詞庫的詞優先進面板（選行階段，見 pickBucketRows）：B站 這種只在 userdb 裡的詞
+        // 不該因為「同桶詞數少」被 12 行預算擠掉（用戶 2026-11-11）。
+        hasUserWord = words.any { TwelveKeyPreedit.isUserWord(it) },
     )
 
     /**
