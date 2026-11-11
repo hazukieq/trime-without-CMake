@@ -231,8 +231,11 @@ class TwelveKeyCoverageTest {
         )
         assertTrue("推薦組應有聯想詞", snapshot.recommend.isNotEmpty())
         assertTrue(
-            "推薦組只能是 CJK 詞：${snapshot.recommend.map { it.text }}",
-            snapshot.recommend.all { com.hazukieq.hkrime.core.twelvekey.CandidateRanking.isCjkWord(it.text) },
+            "推薦組只能是 CJK 詞/單字：${snapshot.recommend.map { it.text }}",
+            snapshot.recommend.all {
+                com.hazukieq.hkrime.core.twelvekey.CandidateRanking.isCjkWord(it.text) ||
+                    com.hazukieq.hkrime.core.twelvekey.CandidateRanking.isSingleCjkChar(it.text)
+            },
         )
     }
 

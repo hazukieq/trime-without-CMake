@@ -3091,16 +3091,17 @@ rime 的 userdb 寫入先進 leveldb 的 `log::Writer`（默認 64KB 用戶態�
 
 - 排序唯一來源：`CandidateRanking.fullBarOrder(ranked)` = 去重 → 全部詞 → 全部單字（各段保持
   `ranked` 相對順序）。候選條 `rankBar` 與推薦 `recommendFrom` 都從這裡派生，規則不會漂移。
-- 推薦（2026-11-11 改定）= **全部聯想詞語**的排序顯示（候選條同一套算法，單字不進推薦），
-  最多 `RECOMMEND_WORDS = 20` 條。舊的「候選條續頁（含單字，≤36）」口徑已作廢。
+- 推薦（2026-11-11 再改定）= 聯想詞排序顯示 + 單字，**40 個 = 30 詞 + 10 單字**
+  （`RECOMMEND_WORDS = 30`、`RECOMMEND_CHARS = 10`；詞在前、單字在後）。
+  舊的「候選條續頁（含單字，≤36）」「單字不進推薦（≤20 詞）」口徑均已作廢。
 - **不能寫成 `fullBarOrder.drop(12)`**：候選條除「總 12 條」外還有「詞組區 ≤4」的配額，
   被配額擠掉的第 5..N 個詞正好落在 `order` 的前 12 條裡，`drop(12)` 會連它們一起跳過
   （單測 `recommend is the page after the bar and keeps words the bar dropped` 守住這條）。
-- 特例與候選條一致：**完全沒有單字時**，詞組可以佔滿整個推薦組。
+- 單字區：先取引擎候選裡的單字（保持 `index`），不足 10 個時用面板段組的字按行序補位。
 - 推薦為空（候選全上了條）時不插這一組，段組自然回到第 0 組。
 
-常量：`TwelveKeyTuning.RECOMMEND_WORDS = 20`（面板網格可視約 3 行×4 列；調大露得更全
-但翻頁變多、DiffUtil 變慢；調小又會被擠回「看不到」）。
+常量：`TwelveKeyTuning.RECOMMEND_WORDS = 30`、`RECOMMEND_CHARS = 10`（面板網格翻頁變多、
+DiffUtil 變慢；調小又會被擠回「看不到」）。
 
 ### 15.66.3 面板行為
 

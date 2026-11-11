@@ -214,10 +214,10 @@ object TwelveKeySnapshotBuilder {
         } else {
             barList(ordered)
         }
-        // 面板左列第一個「推薦」組 = **全部聯想詞語**的排序顯示（用戶 2026-11-11 改定）：
-        // 不再放「候選條放不下的續頁」（單字、被詞組配額擠掉的詞都不再混進來），
-        // 只收聯想詞行（ASSOC / INITIAL_COMBO / WHOLE_WORD / 引擎詞組）裡出現的詞，
-        // 順序沿用候選條那套（引擎/學習排序 → 詞序），最多 [TwelveKeyTuning.RECOMMEND_WORDS] 條。
+        // 面板左列第一個「推薦」組 = 聯想詞 + 單字（用戶 2026-11-11 改定：40 個 = 30 詞 + 10 單字）：
+        // 詞收聯想詞行（ASSOC / INITIAL_COMBO / WHOLE_WORD / 引擎詞組）裡出現的詞，
+        // 單字先取引擎候選、再用段組字補位；順序沿用候選條那套（引擎/學習排序 → 詞序），
+        // 詞在前、單字在後，上限見 [TwelveKeyTuning.RECOMMEND_WORDS] / [RECOMMEND_CHARS]。
         val recommend = recommendWords(ordered, panelRows, local.remaining)
         // 推薦組固定排左列第一（reading 為空 + [RECOMMEND_SEGMENT] 標記）；空的就不插，
         // 這樣「候選全上了條」時段組自然回到第 0 組。
@@ -1007,32 +1007,53 @@ object TwelveKeySnapshotBuilder {
      */
     internal fun recommendWords(
         engineCandidates: List<CandidateItem>,
-        panelWordRows: List<PanelRow>,
+        panelRows: List<PanelRow>,
         code: String = "",
     ): List<CandidateItem> {
+        // 用戶 2026-11-11 改定：推薦組 = 40 個 = **30 詞 + 10 單字**（詞在前、單字在後）。
+        // 詞的順序沿用候選條那套（引擎/學習排序 → 面板詞行）；單字先取引擎候選裡的單字，
+        // 不足再從面板段組的字補位（點擊語義沿用各自條目：引擎單字走 select_candidate、
+        // 段組單字走 onPickPanelCandidate 的 segment>=0 分支）。
         val seen = HashSet<String>()
-        val out = ArrayList<CandidateItem>(TwelveKeyTuning.RECOMMEND_WORDS)
-        CandidateRanking.fullBarOrder(engineCandidates)
-            .filter { CandidateRanking.isCjkWord(it.text) }
-            .forEach { item -> if (seen.add(item.text)) out.add(item) }
-        // 面板行的詞優先級：先用字表反推「完整碼」，能前綴匹配當前輸入碼的排前面。
-        // 用戶 2026-11-11：`jen cin kung z`（=8e4ai4534i8）的「遠程控制」在推薦裡被
-        // 排在 20 條之外；它的完整碼 8e4ai4534i8e 正好以輸入碼開頭，應該排到前面。
+        val words = ArrayList<CandidateItem>(TwelveKeyTuning.RECOMMEND_WORDS)
+        val chars = ArrayList<CandidateItem>(TwelveKeyTuning.RECOMMEND_CHARS)
+
+        fun addWord(item: CandidateItem) {
+            if (item.text.isEmpty() || !seen.add(item.text)) return
+            if (words.size < TwelveKeyTuning.RECOMMEND_WORDS) words.add(item)
+        }
+
+        fun addChar(item: CandidateItem) {
+            if (item.text.length != 1 || !seen.add(item.text)) return
+            if (chars.size < TwelveKeyTuning.RECOMMEND_CHARS) chars.add(item)
+        }
+
+        CandidateRanking.fullBarOrder(engineCandidates).forEach { item ->
+            when {
+                CandidateRanking.isCjkWord(item.text) -> addWord(item)
+                CandidateRanking.isSingleCjkChar(item.text) -> addChar(item)
+            }
+        }
+        // 面板詞行：先排「完整碼前綴命中」的詞，再排其餘（見下方 comment）。
         val matched = ArrayList<CandidateItem>()
         val others = ArrayList<CandidateItem>()
-        panelWordRows.forEach { row ->
+        panelRows.forEach { row ->
             if (row.segment != 1) return@forEach
             row.items.forEach { item ->
                 if (item.text.isEmpty()) return@forEach
-                if (!seen.add(item.text)) return@forEach
                 val wordCode = TwelveKeyPreedit.derivedWordCode(item.text)
                 val hit = wordCode != null && code.isNotEmpty() &&
                     (wordCode.startsWith(code) || code.startsWith(wordCode))
                 if (hit) matched.add(item) else others.add(item)
             }
         }
-        out.addAll(matched)
-        out.addAll(others)
-        return out.take(TwelveKeyTuning.RECOMMEND_WORDS)
+        matched.forEach(::addWord)
+        others.forEach(::addWord)
+        // 單字補位：面板段組（segment==0）的字，按面板行序。
+        panelRows.forEach { row ->
+            if (row.segment != 0) return@forEach
+            row.items.forEach { item -> addChar(item) }
+        }
+        return words + chars
     }
 }

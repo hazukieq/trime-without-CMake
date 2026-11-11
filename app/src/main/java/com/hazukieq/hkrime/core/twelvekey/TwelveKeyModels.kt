@@ -19,7 +19,8 @@ const val SYNTHETIC_SEGMENT = -2
 /**
  * 展開面板「推薦」組的 [SyllableGroup.segment] 標記。
  *
- * 推薦組 = 全部聯想詞語（候選條同一套順序，見 [TwelveKeyTuning.RECOMMEND_WORDS]），
+ * 推薦組 = 聯想詞 + 單字（候選條同一套順序；40 個 = 30 詞 + 10 單字，
+ * 見 [TwelveKeyTuning.RECOMMEND_WORDS] / [TwelveKeyTuning.RECOMMEND_CHARS]），
  * 它沒有讀音（reading 為空），在左列固定排第一。用負數與段組（>=0）、合成候選（-2）區分。
  */
 const val RECOMMEND_SEGMENT = -3
@@ -72,8 +73,8 @@ data class TwelveKeySnapshot(
     val degradedToSinglePage: Boolean = false,
     val barEntries: List<CandidateItem> = emptyList(),
     /**
-     * 面板左列「推薦」組的內容 = **全部聯想詞語**（按候選條同一套排序，最多
-     * [TwelveKeyTuning.RECOMMEND_WORDS] 條；單字不進推薦組）。
+     * 面板左列「推薦」組的內容 = 聯想詞 + 單字（按候選條同一套排序；詞在前、單字在後，
+     * 最多 [TwelveKeyTuning.RECOMMEND_WORDS] 詞 + [TwelveKeyTuning.RECOMMEND_CHARS] 單字）。
      */
     val recommend: List<CandidateItem> = emptyList(),
     /**

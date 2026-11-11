@@ -119,7 +119,7 @@ flowchart TD
 | `input` / `consumedEnd` / `remaining` | librime 原始码串、已消费前缀字节数、未消费码串（面板都用 `remaining`） |
 | `groups` | 面板左列（含第一行「推荐」）；面板关闭时为空 |
 | `barEntries` | 候选条 12 条（**选单顺序**，不是第 0 组） |
-| `recommend` | 「推荐」组内容 = **全部联想词**（候选条同一套顺序，≤`RECOMMEND_WORDS`=20；单字不进） |
+| `recommend` | 「推荐」组内容 = 联想词 + 单字（候选条同一套顺序；**40 个 = 30 词 + 10 单字**，见 `RECOMMEND_WORDS` / `RECOMMEND_CHARS`） |
 | `fallback` | 引擎与字典**都没有**候选时的字母兜底（如 `qqqq`） |
 | `previewText` / `inlineText` | 嵌入式预览：候选条第一条 / 已选前缀 + 第一条 |
 | `hasCandidates` | `barEntries.isNotEmpty() \|\| groups.isNotEmpty()` —— **判断有没有候选只能用它** |
@@ -353,20 +353,23 @@ flowchart TD
 
 ### 7.6 推荐组（`recommendWords`，2026-11-11 改）
 
-推荐组 = **全部联想词的排序显示**（用户 2026-11-11：「推薦那裡的顯示的詞語，改為所有聯想詞語的排序顯示
-（按照候選條顯示的算法來做），數量取至多 20 個」）：
+推荐组 = 联想词排序显示 + 单字（用户 2026-11-11 两轮定案：先「全部联想词、候选条同一套算法」，
+后放宽到 **40 个 = 30 词 + 10 单字**）：
 
-1. 引擎/学习候选先走 `CandidateRanking.fullBarOrder`（与候选条同一排序），只留 **CJK 词**（单字不收）；
+1. 引擎/学习候选先走 `CandidateRanking.fullBarOrder`（与候选条同一排序）：**CJK 词**进词区，
+   **单个 CJK 字**进单字区（保持引擎 `index`，点击走 `select_candidate`）；
 2. 再接面板词行（`panelRows.filter { it.segment == 1 }`）的全部 `items`——`ASSOC` / `INITIAL_COMBO` /
    `WHOLE_WORD` / 引擎词行，**ASCII 词（如 `Linux`）也收**；
 3. 面板词再过一遍**完整碼前綴優先**：`TwelveKeyPreedit.derivedWordCode(word)` 用字表逐字首讀音拼出完整碼，
-   凡是完整碼與當前輸入碼互為前綴的詞先排（用戶 2026-11-11：`jen cin kung z` 的「遠程控制」被 20 條上限
+   凡是完整碼與當前輸入碼互為前綴的詞先排（用戶 2026-11-11：`jen cin kung z` 的「遠程控制」被上限
    擠出推薦；它的完整碼 `8e4ai4534i8e` 正好以輸入碼開頭）。推不出讀音的詞（純詞表裡讀音缺失）退回原行序；
-4. 按文字 `HashSet` 去重（引擎項優先保留 `comment`/`index`），`take(RECOMMEND_WORDS=20)`；
-5. 渲染为 `segment = RECOMMEND_SEGMENT` 的组，插在左列第 0 位（`CandidatePanelController` 只按
+4. 单字区不足 10 个时，从面板段组（`segment == 0`）的行内字按行序补位（点击走段组字语义）；
+5. 按文字 `HashSet` 全局去重（引擎項優先保留 `comment`/`index`），词取前 `RECOMMEND_WORDS=30`、
+   单字取前 `RECOMMEND_CHARS=10`，**词在前、单字在后**；
+6. 渲染为 `segment = RECOMMEND_SEGMENT` 的组，插在左列第 0 位（`CandidatePanelController` 只按
    `group.segment` 判断，不参与五源流水线）。
 
-旧实现（候选条续页、`RECOMMEND_ITEMS=36`）已删除。
+旧实现（候选条续页、`RECOMMEND_ITEMS=36`；以及「单字不进推荐组、≤20 词」的中间口径）已删除。
 
 ## 8. 左列排序（当前规则）
 
@@ -684,7 +687,7 @@ $ python3 tools/panel_probe.py selftest
 | 想改 | 改这里 |
 |---|---|
 | 候选条 12 格里词/单字比例 | `TwelveKeyTuning.BAR_WORD_SLOTS` |
-| 「推荐」组条数 | `TwelveKeyTuning.RECOMMEND_WORDS`（=20，只放联想词） |
+| 「推荐」组条数 | `TwelveKeyTuning.RECOMMEND_WORDS`（=30 词）+ `RECOMMEND_CHARS`（=10 单字） |
 | 段组每个音节列多少字 | `TwelveKeyTuning.SEGMENT_CHARS_LIMIT` |
 | 段组给多少个音节 | `SEGMENT_SYLLABLE_LIMIT(_RICH)`、`RICH_SYLLABLE_THRESHOLD` |
 | 联想行数量/词数 | `ASSOC_MAX_ROWS`、`ASSOC_WORDS`（=20，分组組詞 <20 時完整展示） |
@@ -703,7 +706,7 @@ $ python3 tools/panel_probe.py selftest
 
 ## 17. 已知缺口 / 下一步
 
-1. **多音节词行只在面板**：候选条不放（担心挤掉高频单字）；推荐组会收全部联想词（≤20）。
+1. **多音节词行只在面板**：候选条不放（担心挤掉高频单字）；推荐组会收联想词（≤30）+ 单字（≤10）。
 2. **`ASSOC_PREFIX_READINGS=4`** 是拍脑袋值，需要真机观察长词（4+ 音节）场景是否够。
 3. **面板组数 200 上限**（`MAX_GROUPS`）在超长输入下可能截断引擎词组，需要实测确认可接受。
 4. **性能监控**：目前 `diag.log` 只记结构，不记耗时；考虑加 `buildMs` 字段（注意别让日志本身变慢）。
@@ -717,7 +720,7 @@ $ python3 tools/panel_probe.py selftest
 |---|---|
 | 段组 / 分詞段 | 12 键按码位切出的「待选段」，每段一个音节，点字后剩余码回引擎递归 |
 | 整串码 | 一个词的完整数字码串（`Σ codeOf(音节)`），如 `Linux`→`5i4a57i` |
-| 推荐组 | 全部联想词的排序（候选条同一套顺序，≤20，单字不进），面板左列第一行 |
+| 推荐组 | 联想词 + 单字的排序（候选条同一套顺序，30 词 + 10 单字），面板左列第一行 |
 | 合成候选 | App 侧逐段拼出来后记住的整串词（`PhraseMemory`），引擎给不出 |
 | 兜底 | 引擎与字典都没有候选时的字母显示（`qqqq`） |
 | inline preview | 把第一条候选（+已选前缀）写进输入框的嵌入式预览 |

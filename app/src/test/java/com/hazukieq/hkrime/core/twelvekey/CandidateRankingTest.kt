@@ -447,9 +447,23 @@ class CandidateRankingTest {
     }
 
     @Test
-    fun `recommend shows all association words in candidate bar order`() {
+    fun `recommend puts 30 words before 10 single chars`() {
+        fun cjk(n: Int): Char = (0x4E00 + n).toChar()
+        val words = (1..35).map { i -> item("${cjk(i)}${cjk(i + 200)}", index = i) }
+        val singles = (1..12).map { i -> item("${cjk(i + 900)}", index = 100 + i) }
+        val recommend = TwelveKeySnapshotBuilder.recommendWords(words + singles, emptyList())
+        assertEquals(40, recommend.size)
+        assertEquals(30, recommend.count { CandidateRanking.isCjkWord(it.text) })
+        assertEquals(10, recommend.count { CandidateRanking.isSingleCjkChar(it.text) })
+        // 詞在前、單字在後
+        assertEquals(true, CandidateRanking.isCjkWord(recommend[29].text))
+        assertEquals(true, CandidateRanking.isSingleCjkChar(recommend[30].text))
+    }
+
+    @Test
+    fun `recommend shows words in candidate bar order then single chars`() {
         // 引擎/學習排序裡的詞先出（候選條同一套順序），再接 App 側聯想詞行的詞；
-        // 單字一律不進推薦組（用戶 2026-11-11 改定）。
+        // 單字最後，先取引擎單字、再補面板段組的字（用戶 2026-11-11：30 詞 + 10 單字）。
         val engineWords = listOf(item("你好", index = 0), item("爾雅", index = 1))
         val engineSingles = listOf(item("以", index = 2), item("夜", index = 3))
         val appWords = listOf(item("掛紙", index = 10), item("下把", index = 11))
@@ -458,7 +472,7 @@ class CandidateRankingTest {
             PanelRow("以", listOf(item("以", "ji", -1, segment = 0)), segment = 0),
         )
         val recommend = TwelveKeySnapshotBuilder.recommendWords(engineWords + engineSingles, panelRows)
-        assertEquals(listOf("你好", "爾雅", "掛紙", "下把"), recommend.map { it.text })
+        assertEquals(listOf("你好", "爾雅", "掛紙", "下把", "以", "夜"), recommend.map { it.text })
     }
 
     @Test
@@ -473,13 +487,16 @@ class CandidateRankingTest {
     }
 
     @Test
-    fun `recommend is empty when there are only single chars`() {
-        val ordered = listOf(item("以", index = 0), item("夜", index = 1))
-        assertTrue(TwelveKeySnapshotBuilder.recommendWords(ordered, emptyList()).isEmpty())
+    fun `recommend fills chars from panel rows when engine has few`() {
+        val panelRows = listOf(
+            PanelRow("以夜", listOf(item("以", "ji", -1, segment = 0), item("夜", "ja", -1, segment = 0)), segment = 0),
+        )
+        val recommend = TwelveKeySnapshotBuilder.recommendWords(emptyList(), panelRows)
+        assertEquals(listOf("以", "夜"), recommend.map { it.text })
     }
 
     @Test
-    fun `recommend is capped by RECOMMEND_WORDS`() {
+    fun `recommend is capped at 30 words and 10 chars`() {
         fun cjk(n: Int): Char = (0x4E00 + n).toChar()
         val words = (1..50).map { i -> item("${cjk(i)}${cjk(i + 200)}", index = i) }
         val recommend = TwelveKeySnapshotBuilder.recommendWords(words, emptyList())
