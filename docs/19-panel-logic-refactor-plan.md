@@ -266,16 +266,46 @@ adb shell ime set com.hazukieq.hkrime/.TrimeImeService
 
 ## 9. 風險與已知坑（執行時務必遵守）
 
-1. **不要用 `syllables.size` 分檔**（引擎組只有 1 個元素）——用 `reading.split(' ')` 的長度；
-2. **`reading` 去重要大小寫不敏感**（`Linux`/`linux`）；`items` 文字去重同理；
-3. **`INITIAL_COMBO` 必須走首字母序列匹配**，不是碼前綴（歷史錯誤：碼前綴等於把元音釘死為 a/b/c）；
-4. **`WHOLE_WORD` 要求第一段音節打全**（`wordsByCodePrefix` 已修，別回退）；
-5. **`r` 是後綴音節**：非末位不允許（`syllablesForSegment(allowSuffixOnly=false)`）；
-6. **合併點只有一處**：禁止在源函數內自行去重/排序，否則腳本對照會漂移；
-7. **UI 契約**：`SyllableGroup` 字段不變；`sources` 不得進入 UI 可觀察狀態；
-8. 改完必須同步 `tools/panel_probe.py`（同一規則兩份實現，靠 `selftest` + golden JSON 鎖住）。
+> 2026-11-11 收尾複核：八條逐條對照代碼，第 2/6 條按實際實現細化，其餘原樣成立（複核記錄見 §9.1）。
 
----
+1. **不要用 `syllables.size` 分檔**（引擎組只有 1 個元素）——判檔一律用讀音 token 數
+   （`PanelRow.syllableCount` / `reading.split(' ').count { it.isNotBlank() }`）。
+   現存 `syllables.size` 只剩兩處**非分檔**用途：`TwelveKeyPreedit` 建聯想索引時的詞長判斷、
+   以及 `CandidateRanking.groupCandidates` 的「讀音未知組排最後」判斷（已改為讀音 token 數）。
+2. **`reading` 去重一律大小寫不敏感**（`Linux`/`linux`）；**`items` 文字去重分兩檔**：
+   - 含 `WHOLE_WORD` 的行：大小寫不敏感（純詞表裡同一詞的大小寫變體只留一條）；
+   - 其餘行：**精確文字**（引擎會同時給 `J` 與 `j`，一律小寫會吞掉大寫候選；`8e`/`64` 的 `ze` 組實測）。
+   `collapsePrefixRows` 的跨行收斂仍用大小寫不敏感（與 `panel_probe.py` 的 `collapse` 同口徑），
+   這是重構前的既有行為，本次不改。
+3. **`INITIAL_COMBO` 必須走首字母序列匹配**，不是碼前綴——現由 `TwelveKeyPreedit.initialPatternIndex`
+   （key = 各音節首字母拼接，如 `d·k`）+ `initialCombos()` 提供；首字母取自 `syllableSet`、排除元音
+   `aeiou`，`r` 只在末鍵。
+4. **`WHOLE_WORD` 要求第一段音節打全**——`wordsByCodePrefix` 用 `codeOf(entry.tokens[0])` +
+   `prefix.startsWith(firstCode)` 卡住；別回退成「只要求碼前綴」。
+5. **`r` 是後綴音節**：`splitParts` 只在 `rest.isEmpty()` 時 `allowSuffixOnly=true`；ASSOC 第一段沿用
+   該段旗標、第二段（最後一段）固定 `true`；INITIAL_COMBO 由 `keyInitialLetters(codeChar, isLast)` 控制；
+   WHOLE_WORD 由首音節 prefix 判斷天然擋住。
+6. **合併點只有一處**（`mergeRows`）——最終的**合併/去重/分檔/截斷**只走
+   `mergeRows → collapsePrefixRows → tierAndSort → capRows` 這條鏈。源函數內只允許「選行順序」
+   （`pickBucketRows` 的桶輪轉、`initialComboRows` 的兩輪輪轉）：這是與腳本同構的**選行**邏輯，
+   不是最終排序，golden 32 碼鎖住；禁止源函數再做跨源去重或按讀音重排。
+7. **UI 契約**：`SyllableGroup` 欄位不變；`RowSource`/`sources` 只存在於 `PanelRow` 與
+   `PanelStats`/`diag`，投影 `toSyllableGroup()` 時丟掉，UI 不可觀察到「這行來自哪一源」。
+8. **改完必須同步 `tools/panel_probe.py`**（同一規則兩份實現，靠 `selftest` +
+   `app/src/test/resources/panel-golden.json` 鎖住）；改 App 側規則時同步改腳本並重跑
+   `python3 tools/panel_probe.py selftest`。
+
+### 9.1 收尾複核（2026-11-11）
+
+- **死代碼清理**：`CandidateRanking.panelGroups` / `mergeAssociationGroups` 重構後已無生產調用
+  （只剩 `PerfGate` 與舊測試在用），本次刪除；`PerfGate.measureRankAndMerge` 改量新流水線
+  （`mergeRows → collapsePrefixRows → tierAndSort → capRows`），避免性能門禁量到死路徑。
+- **測試遷移**：`RealCorpusTest.panelGroupsFollowMergeAndDropRules` 改走 `engineRows + mergeRows`
+  斷言同一批「同讀音併段組、詞組/非漢字組保留」規則；`CandidateRankingTest` 裡 6 條舊 API 測試刪除。
+- **新增回歸**：`TwelveKeyCoverageTest.engineEmptyFallbackPanelKeepsAssociationRows`
+  （`ee5` 引擎空兜底仍出通配聯想行，防 `includePanelOnlySources=false` 回歸）。
+- 判檔口徑統一：`groupCandidates` / `orderGroups` / `engineRows` 的「多音節」判斷全部改成讀音 token 數，
+  不再依賴 `syllables.size`。
 
 ## 10. 交付物清單
 
@@ -299,7 +329,8 @@ adb shell ime set com.hazukieq.hkrime/.TrimeImeService
 |---|---|---|
 | `9ca4c1e` refactor(panel) | 步驟 A + B 合併 | 五源拆分 + 流水線固定化；與 bb20a52 乾淨 worktree 對拍：snapshot 精確差異 0/12,774、segment 集合差異 0/12,784（3,931 碼行序變化＝修掉舊 `syllables.size` 分檔 bug）。A/B 合併為一個提交：中間態沒有獨立可回退價值。 |
 | `9557044` feat(panel) | 步驟 C | `INITIAL_COMBO` 接入 + `ASSOC` 改分桶輪轉；新增 `PanelGoldenTest` 與 golden JSON。 |
-| 本提交 docs(panel) | 步驟 D | 常量審計、docs/17、docs/19、AGENTS 更新；裝機。 |
+| `b92bb15` docs(panel) | 步驟 D | 常量審計、docs/17、docs/19、AGENTS 更新；裝機。 |
+| 本提交 refactor(panel) | §9 收尾複核 | 刪 `CandidateRanking.panelGroups`/`mergeAssociationGroups`（死代碼）；`PerfGate` 改量新流水線；`groupCandidates`/`orderGroups`/`engineRows` 判檔改用讀音 token 數；`RealCorpusTest` 遷移到 `engineRows + mergeRows`；docs/19 §9 按實現細化。 |
 
 ### 11.2 最終常量值（`TwelveKeyTuning`）
 

@@ -2,7 +2,11 @@ package com.hazukieq.hkrime.core
 
 import com.hazukieq.hkrime.core.twelvekey.CandidateItem
 import com.hazukieq.hkrime.core.twelvekey.CandidateRanking
+import com.hazukieq.hkrime.core.twelvekey.PanelRow
+import com.hazukieq.hkrime.core.twelvekey.RowSource
+import com.hazukieq.hkrime.core.twelvekey.SyllableGroup
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder
+import com.hazukieq.hkrime.core.twelvekey.mergeRows
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.BeforeClass
@@ -255,7 +259,29 @@ class RealCorpusTest {
                 .getOrElse { emptyList() }
                 .filter { it.segment != 1 }
             val engineGroups = CandidateRanking.groupCandidates(items)
-            val merged = CandidateRanking.panelGroups(segments, engineGroups)
+            // 走重構後的唯一流水線（舊 CandidateRanking.panelGroups 已刪）：段組行 + 引擎行，
+            // 交給 mergeRows 合併去重（引擎組 >2 音節/含非漢字的保留規則在 engineRows 內）。
+            val segmentRows = segments.map { group ->
+                PanelRow(
+                    reading = group.reading,
+                    items = group.items,
+                    segment = group.segment,
+                    sources = setOf(RowSource.SYNTH_SINGLE),
+                )
+            }
+            val engineRows = TwelveKeySnapshotBuilder.engineRows(
+                engineGroups,
+                segments.map { it.reading }.toSet(),
+            )
+            val merged = mergeRows(segmentRows + engineRows)
+                .map { row ->
+                    SyllableGroup(
+                        reading = row.reading,
+                        syllables = row.reading.split(' ').filter { it.isNotBlank() },
+                        items = row.items,
+                        segment = row.segment,
+                    )
+                }
 
             val readings = merged.map { it.reading }.filter { it.isNotBlank() }
             if (readings.size != readings.distinct().size && failures.size < 25) {
@@ -267,7 +293,7 @@ class RealCorpusTest {
             for (g in engineGroups) {
                 val mustKeep = segmentReadings.isEmpty() ||
                     g.reading in segmentReadings ||
-                    g.syllables.size >= 2 ||
+                    g.reading.split(' ').count { it.isNotBlank() } >= 2 ||
                     g.items.any { !CandidateRanking.isSingleCjkChar(it.text) }
                 if (!mustKeep) continue      // 設計上允許丟掉
                 for ((text, n) in g.items.map { it.text }.groupingBy { it }.eachCount()) {

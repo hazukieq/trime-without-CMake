@@ -354,6 +354,7 @@ object TwelveKeyPreedit {
                 val r2 = charTable[word.substring(1, 2)] ?: return@forEach
                 listOf(r1, r2)
             }
+            // 這是「聯想索引只收雙音節以上詞」的詞長判斷，不是面板分檔（docs/19 §9.1 禁的是分檔）。
             if (syllables.size < 2) return@forEach
             // 只認**客家話音節集合**裡的音節：目錄裡可能還有 luna_pinyin 這類別的方案詞表
             // （`例行 → li xing`），把它們當音節用會讓面板長出根本不是客家話的聯想行。

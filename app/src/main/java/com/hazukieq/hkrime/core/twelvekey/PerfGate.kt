@@ -147,16 +147,23 @@ object PerfGate {
             )
         }
         val engineGroups = CandidateRanking.groupCandidates(items)
+        // 走**重構後的唯一流水線**（mergeRows → collapsePrefixRows → tierAndSort → capRows）；
+        // 舊的 panelGroups/mergeAssociationGroups 已刪，perf gate 不能再量一條死路徑。
+        val segmentRows = segmentGroups.map { group ->
+            PanelRow(group.reading, group.items, group.segment, sources = setOf(RowSource.SYNTH_SINGLE))
+        }
+        val assocRows = assocGroups.map { group ->
+            PanelRow(group.reading, group.items, group.segment, sources = setOf(RowSource.ASSOC))
+        }
+        val engineRows = engineGroups.map { group ->
+            PanelRow(group.reading, group.items, group.segment, sources = setOf(RowSource.ENGINE))
+        }
         val t0 = System.nanoTime()
         var merged = 0
         repeat(RANK_ROUNDS) {
-            val ordered = CandidateRanking.orderGroups(
-                engineGroups,
-                charScore = { 0 },
-                generalScore = { 0 },
-            )
-            val panel = CandidateRanking.panelGroups(segmentGroups, ordered)
-            merged += CandidateRanking.mergeAssociationGroups(panel, assocGroups).size
+            val rows = mergeRows(segmentRows + engineRows + assocRows)
+            val collapsed = collapsePrefixRows(rows)
+            merged += capRows(tierAndSort(collapsed)).size
         }
         val avg = msSince(t0) / RANK_ROUNDS
         Timber.i("perfgate: op=merge avg=%.2fms n=%d merged=%d", avg, RANK_ROUNDS, merged)

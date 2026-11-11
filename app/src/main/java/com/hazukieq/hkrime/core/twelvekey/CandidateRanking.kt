@@ -199,84 +199,13 @@ object CandidateRanking {
         }.sortedWith(
             // 讀音未知（comment 空）的組永遠排最後：它是兜底分組，不該擋在真正的單字組前面。
             compareBy(
-                { if (it.syllables.isEmpty()) Int.MAX_VALUE else it.syllables.size },
+                // 分檔用**讀音 token 數**，不用 `syllables.size`（docs/19 §9.1）。
+                { if (it.syllables.isEmpty()) Int.MAX_VALUE else it.reading.split(' ').size },
                 { it.reading.lowercase() },
             ),
         )
     }
 
-    /**
-     * 面板左列「段組 + 引擎組」的合併規則（用戶 2026-11-10）。
-     *
-     * 有段組（按碼位自切的單字組，已按「每個首字母 8 個」限量）時，引擎那邊的
-     * **單音節組**只是同一批字的另一種排法：全列出來左列會被 g* 的幾十個讀音灌滿。
-     * 因此只保留引擎的**多音節（詞組）組**；沒有段組時（單音節輸入）引擎組照舊全留。
-     */
-    fun panelGroups(
-        segmentGroups: List<SyllableGroup>,
-        engineGroups: List<SyllableGroup>,
-    ): List<SyllableGroup> {
-        if (segmentGroups.isEmpty()) return engineGroups
-        // 段組只管「字典裡的字」，而候選條上的 ASCII 字母/符號/顏文字來自引擎。
-        // 用戶 2026-11-11：「輸入 qe，候選條有 A a，展開面板選中 qe 右邊卻沒有」——
-        // 所以按**讀音**把同名的引擎組並進段組（漢字在前、非漢字補在後面、按文字去重），
-        // 段組行因此「一個音節一格里就是它的全部候選」。
-        val consumed = HashSet<String>()
-        val mergedSegments = segmentGroups.map { seg ->
-            val same = engineGroups.filter { it.reading == seg.reading }
-            if (same.isEmpty()) return@map seg
-            consumed.add(seg.reading)
-            val extra = same.flatMap { it.items }
-                .filterNot { e -> seg.items.any { it.text == e.text } }
-            val (cjk, other) = extra.partition { isSingleCjkChar(it.text) || isCjkWord(it.text) }
-            seg.copy(items = seg.items + cjk + other)
-        }
-        // 其餘引擎組：詞組組（≥2 音節）＋含非漢字單字的組（無讀音/無對應段組時仍要能看到字母）。
-        val leftover = engineGroups.filter { group ->
-            group.reading !in consumed &&
-                (group.syllables.size >= 2 || group.items.any { !isSingleCjkChar(it.text) })
-        }
-        return mergedSegments + leftover
-    }
-
-    /**
-     * 把「聯想詞組」並進面板分組（用戶 2026-11-10）。
-     *
-     * 規則：**同讀音就合併進引擎那一組**（引擎候選在前，聯想詞補在後面、按詞去重）；
-     * 引擎沒有這個讀音的組時，才新建一組（此時它就是補集）。
-     * 這樣行標題與引擎完全一致（`song hau`、`song heu`…），不會出現 `h**` 這種通配寫法。
-     */
-    fun mergeAssociationGroups(
-        base: List<SyllableGroup>,
-        associations: List<SyllableGroup>,
-    ): List<SyllableGroup> {
-        if (associations.isEmpty()) return base
-        val result = base.toMutableList()
-        associations.forEach { assoc ->
-            val idx = result.indexOfFirst { it.reading == assoc.reading }
-            if (idx < 0) {
-                result.add(assoc)
-            } else {
-                val existing = result[idx]
-                val extra = assoc.items.filter { candidate ->
-                    existing.items.none { it.text == candidate.text }
-                }
-                if (extra.isNotEmpty()) {
-                    result[idx] = existing.copy(items = existing.items + extra)
-                }
-            }
-        }
-        return result
-    }
-
-    /**
-     * 左列的最終顯示順序（用戶 2026-11-10）：
-     * 單音節輸入時左列全是「同一批音節」的組，必須按常用度排（常用音節在前），
-     * 不能按讀音字母序 —— 否則找想要的音節要找半天。
-     *
-     * 排序鍵：單音節組 → 多音節（詞組）組 → 讀音未知；同類內按組內第一個字的
-     * 用戶字頻、通用字頻降序，最後用讀音兜底保證穩定。數量不做限制（引擎給多少列多少）。
-     */
     /**
      * 左列分組排序（用戶 2026-11-10 定案）：
      * **先按首字母、再按次字母**——即讀音字典序，而不是常用度降序。
@@ -297,7 +226,7 @@ object CandidateRanking {
                 when {
                     it.syllables.isEmpty() -> 3
                     it.segment == 1 -> 1
-                    it.syllables.size == 1 -> 0
+                    it.reading.split(' ').count { part -> part.isNotBlank() } == 1 -> 0
                     else -> 2
                 }
             },

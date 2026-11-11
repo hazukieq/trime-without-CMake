@@ -629,6 +629,7 @@ object TwelveKeySnapshotBuilder {
      * 有段組（按碼位自切的單字組）時，引擎的**單音節組**只是同一批字的另一種排法：
      * 全列出來左列會被 g* 的幾十個讀音灌滿，所以只保留「同讀音的引擎組」（並進段組）
      * 與「多音節/含非漢字的組」——與舊 `CandidateRanking.panelGroups` 同一口徑。
+     * 判「多音節」用讀音 token 數，不用 `syllables.size`（docs/19 §9.1：引擎組的 syllables 只有 1 個元素）。
      */
     internal fun engineRows(engineGroups: List<SyllableGroup>, segmentReadings: Set<String>): List<PanelRow> {
         if (engineGroups.isEmpty()) return emptyList()
@@ -655,7 +656,7 @@ object TwelveKeySnapshotBuilder {
                         sources = setOf(RowSource.ENGINE),
                     )
                 )
-            } else if (group.syllables.size >= 2 ||
+            } else if (group.reading.split(' ').count { part -> part.isNotBlank() } >= 2 ||
                 group.items.any { !CandidateRanking.isSingleCjkChar(it.text) }
             ) {
                 out.add(
