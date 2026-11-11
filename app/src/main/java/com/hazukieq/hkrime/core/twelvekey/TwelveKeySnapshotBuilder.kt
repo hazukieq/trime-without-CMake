@@ -187,7 +187,11 @@ object TwelveKeySnapshotBuilder {
                 remaining = remaining,
                 anchor = segmentAnchor,
                 engineGroups = emptyList(),
-                includePanelOnlySources = false,
+                // 引擎一條候選都沒有時（`ee5` 這類裝不出來的碼），面板仍要出**完整五源**
+                // （聯想詞行/首字母組合/整串詞行）：重構前 `segmentGroupsFor` 在
+                // `wantGroups || needDictionaryFallback` 時都會算全量，這裡漏成 false 過，
+                // 結果真機 `ee5` 面板只剩 `de`/`fe` 兩個單字組，通配聯想詞全丟（用戶 2026-11-11 報）。
+                includePanelOnlySources = true,
             )
             else -> PanelBuild(emptyList(), PanelStats.EMPTY)
         }

@@ -196,6 +196,39 @@ class TwelveKeyCoverageTest {
     }
 
     @Test
+    fun engineEmptyFallbackPanelKeepsAssociationRows() {
+        // 用戶 2026-11-11：`ee5`（鍵面 def def kl）引擎裝不出候選，但展開面板必須照樣看到
+        // 「d·k / f·l…」這些通配聯想行（腳本 `panel ee5` 有 12 行），不能只剩 de/fe 兩個單字組。
+        // 回歸點：重構時 needDictionaryFallback 分支漏傳 includePanelOnlySources=true。
+        val local = TwelveKeySnapshotBuilder.Local(
+            input = "ee5",
+            consumedEnd = 0,
+            remaining = "ee5",
+            segmentsKey = "",
+        )
+        val snapshot = TwelveKeySnapshotBuilder.build(
+            local = local,
+            applyLearning = false,
+            wantGroups = true,
+            candidatesOverride = emptyList(),
+        )
+        val assoc = snapshot.groups.filter { it.segment == 1 }
+        assertTrue(
+            "引擎空兜底時應有聯想詞行，實際 ${snapshot.groups.map { it.reading }}",
+            assoc.isNotEmpty(),
+        )
+        assertTrue(
+            "聯想行標題必須是兩個完整音節：${assoc.map { it.reading }}",
+            assoc.all { it.reading.split(' ').size == 2 },
+        )
+        assertTrue("推薦組應有聯想詞", snapshot.recommend.isNotEmpty())
+        assertTrue(
+            "推薦組只能是 CJK 詞：${snapshot.recommend.map { it.text }}",
+            snapshot.recommend.all { com.hazukieq.hkrime.core.twelvekey.CandidateRanking.isCjkWord(it.text) },
+        )
+    }
+
+    @Test
     fun twoLetterKeyCombinationsKeepItems() {
         // 兩個「多字母鍵」相連（如 abc+def、ghi+mno）最容易出「整串是一個音節」的邊界
         val multiLetterCodes = setOf('a', 'e', 'i', '5', '4', '7', '3', '8', '9')
