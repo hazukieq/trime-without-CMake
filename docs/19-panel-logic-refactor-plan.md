@@ -304,6 +304,10 @@ adb shell ime set com.hazukieq.hkrime/.TrimeImeService
 
 ### 9.1 收尾複核（2026-11-11）
 
+- **聯想行「已完成第二音節」補丁**（2026-11-11 追加）：剩餘碼開頭已是完整音節（`8e9`=zet、`8i`=zi）時，
+  第一段取 exact、第二段取這些已完成音節；修掉 `vu zet t`（338e/338e99）找不到 `vu zet` 行
+  （行內含 武则天）的問題。ee5（剩餘碼只是前綴 `5`）不受影響，仍走首字母通配。
+
 - **死代碼清理**：`CandidateRanking.panelGroups` / `mergeAssociationGroups` 重構後已無生產調用
   （只剩 `PerfGate` 與舊測試在用），本次刪除；`PerfGate.measureRankAndMerge` 改量新流水線
   （`mergeRows → collapsePrefixRows → tierAndSort → capRows`），避免性能門禁量到死路徑。

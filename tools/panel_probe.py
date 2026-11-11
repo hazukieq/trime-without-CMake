@@ -516,13 +516,28 @@ class Data:
             # - 第二段只看剩餘碼第一個碼位的首字母（`5` → {k,l}）；
             # - 只有一段（剩餘碼為空）時仍按碼前綴展開，列出該音節的全部後續音節。
             if rest:
-                assoc_first = self.syllables_by_initials(
-                    self.key_initial_letters(head[0], is_last=False)
-                )
+                completed_seconds = self.syllables_completing_prefix(rest)
                 last_part = index == len(splits) - 1
-                second_candidates = self.syllables_by_initials(
-                    self.key_initial_letters(rest[0], is_last=last_part and len(rest) == 1)
-                )
+                if completed_seconds:
+                    # 第二音節已打全（三音節以上輸入）：第一段用 exact 音節，第二段用已完成音節，
+                    # 否則 `vu zet t`（338e99）會丟掉 `vu zet` 這一行（含 武则天）。
+                    assoc_first = (
+                        self.syllables_for_segment(
+                            head, huge, True, allow_suffix_only, total_limit=huge
+                        )
+                        if self.is_single_syllable(head)
+                        else self.syllables_by_initials(
+                            self.key_initial_letters(head[0], is_last=False)
+                        )
+                    )
+                    second_candidates = completed_seconds
+                else:
+                    assoc_first = self.syllables_by_initials(
+                        self.key_initial_letters(head[0], is_last=False)
+                    )
+                    second_candidates = self.syllables_by_initials(
+                        self.key_initial_letters(rest[0], is_last=last_part and len(rest) == 1)
+                    )
             else:
                 assoc_first = self.syllables_for_segment(
                     head, huge, False, allow_suffix_only, total_limit=huge
@@ -596,6 +611,22 @@ class Data:
         if not is_last:
             initials = [x for x in initials if x not in SUFFIX_ONLY_SYLLABLES]
         return initials
+
+    def syllables_completing_prefix(self, code: str) -> list[str]:
+        """「整段碼的前綴恰好是一個完整音節」的那些音節（`8e99` → ze/zet；`8i` → zi/ji）。
+
+        鏡像 App `TwelveKeyPreedit.syllablesCompletingPrefix`：三音節以上、第二音節已打全時，
+        聯想行要按這些已完成音節查（否則 rest 展開不到音節，`vu zet` 行會消失）。
+        """
+        if not code:
+            return []
+        out = {
+            syl
+            for syl_code, syllables in self.code_to_syllables.items()
+            if syl_code and code.startswith(syl_code)
+            for syl in syllables
+        }
+        return sorted(out)
 
     def syllables_by_initials(self, initials: list[str]) -> list[str]:
         """首字母集合 → 這些字母打頭的全部音節（字典序、去重）。

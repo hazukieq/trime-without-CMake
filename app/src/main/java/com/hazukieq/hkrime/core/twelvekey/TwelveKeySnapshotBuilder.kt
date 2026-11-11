@@ -455,23 +455,39 @@ object TwelveKeySnapshotBuilder {
             // - 有剩餘碼（兩音節聯想）：第一段只看第一個碼位的首字母——`ee` → {d,f}，
             //   於是 da/dai/dang/di/de… 都能進候選，而不是只有元音被釘成 e 的 de/den/det/fen/feu；
             // - 第二段同理只看剩餘碼第一個碼位的首字母——`5` → {k,l}，元音自由；
+            // - 剩餘碼開頭已經是一個**完整音節**（`8e99` 的 `8e9`=zet、`8i` 的 `8i`=zi）時，
+            //   視為「第二音節已打全」的三音節以上輸入：第一段只取該段 exact 音節（`vu`、`ga`），
+            //   第二段只取這些已完成音節——否則 `vu zet t` 會因為 rest 展開不到音節而丟掉
+            //   `vu zet` 這一行（它含 武则天、无节等整詞），用戶 2026-11-11 報。
             // - 只有一段（剩餘碼為空）時仍按碼前綴展開，列出該音節的全部後續音節（維持原文行為）。
-            val firstCandidates = if (part.rest.isEmpty()) {
-                TwelveKeyPreedit.syllablesForSegment(
+            val completedSeconds = if (part.rest.isEmpty()) {
+                emptyList()
+            } else {
+                TwelveKeyPreedit.syllablesCompletingPrefix(part.rest)
+            }
+            val firstCandidates = when {
+                part.rest.isEmpty() -> TwelveKeyPreedit.syllablesForSegment(
                     part.head,
                     ASSOC_EXPAND_LIMIT,
                     exactOnly = false,
                     totalLimit = ASSOC_EXPAND_LIMIT,
                     allowSuffixOnly = part.allowSuffixOnly,
                 )
-            } else {
-                TwelveKeyPreedit.syllablesByInitials(partInitials(part.head, isLastKey = false))
+                completedSeconds.isNotEmpty() && part.headIsCompleteSyllable ->
+                    TwelveKeyPreedit.syllablesForSegment(
+                        part.head,
+                        ASSOC_EXPAND_LIMIT,
+                        exactOnly = true,
+                        totalLimit = ASSOC_EXPAND_LIMIT,
+                        allowSuffixOnly = part.allowSuffixOnly,
+                    )
+                else -> TwelveKeyPreedit.syllablesByInitials(partInitials(part.head, isLastKey = false))
             }
             // 第二段：有剩餘碼才展開（`r` 這類後綴音節在這裡是合法結尾，末位鍵要保留 r）。
-            val secondCandidates = if (part.rest.isEmpty()) {
-                null
-            } else {
-                TwelveKeyPreedit.syllablesByInitials(partInitials(part.rest, isLastKey = isLastPart))
+            val secondCandidates = when {
+                part.rest.isEmpty() -> null
+                completedSeconds.isNotEmpty() -> completedSeconds
+                else -> TwelveKeyPreedit.syllablesByInitials(partInitials(part.rest, isLastKey = isLastPart))
             }
             for (first in firstCandidates) {
                 val bySecond = TwelveKeyPreedit.assocSecondMap(first)

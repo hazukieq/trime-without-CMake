@@ -623,6 +623,24 @@ object TwelveKeyPreedit {
     }
 
     /**
+     * 「整段碼的前綴恰好是一個完整音節」的那些音節（`8e99` → ze/zet；`8i` → zi/ji）。
+     *
+     * 面板聯想行用它處理「三音節以上、第二音節已打全」的輸入：`vu zet t`（338e99）的第二段
+     * `8e99` 不是一整個音節，舊實現（把整段 rest 當一個前綴展開）會展開不到任何音節，
+     * 聯想行只能退回「第一音節的全部後續音節」，於是找不到 `vu zet`（含 武则天）這一行。
+     * 這裡改成「找 rest 開頭已完成的音節」，沒有命中再退回首字母通配。
+     */
+    internal fun syllablesCompletingPrefix(code: String): List<String> {
+        if (code.isEmpty()) return emptyList()
+        val out = LinkedHashSet<String>()
+        codeToSyllables.forEach { (syllableCode, list) ->
+            if (syllableCode.isEmpty() || !code.startsWith(syllableCode)) return@forEach
+            list.forEach { entry -> out.add(entry.syllable) }
+        }
+        return out.sorted()
+    }
+
+    /**
      * 首字母集合 → 這些字母打頭的全部音節（字典序、去重）。
      *
      * 面板聯想行（`ASSOC`）用：每個音節只由「該音節首字母」約束，元音不固定。
