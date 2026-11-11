@@ -1030,7 +1030,8 @@ object TwelveKeySnapshotBuilder {
 
         CandidateRanking.fullBarOrder(engineCandidates).forEach { item ->
             when {
-                CandidateRanking.isCjkWord(item.text) -> addWord(item)
+                // 純漢字詞與混合詞（`b站`）都算詞條；純 ASCII 引擎候選仍不進推薦（見 isWordLike）。
+                CandidateRanking.isWordLike(item.text) -> addWord(item)
                 CandidateRanking.isSingleCjkChar(item.text) -> addChar(item)
             }
         }

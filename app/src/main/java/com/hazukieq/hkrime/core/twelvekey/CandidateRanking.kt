@@ -15,6 +15,18 @@ object CandidateRanking {
     fun isCjkWord(text: String): Boolean =
         text.length >= 2 && text.all { it.code in 0x3400..0x4DBF || it.code in 0x4E00..0x9FFF }
 
+    /** 含至少一個漢字（混合詞，如 `b站`、`QQ群`、`3D打印`）。 */
+    fun containsCjk(text: String): Boolean =
+        text.any { it.code in 0x3400..0x4DBF || it.code in 0x4E00..0x9FFF }
+
+    /**
+     * 「詞條」口徑（推薦組用）：≥2 字元且**至少含一個漢字**。
+     *
+     * 用戶 2026-11-11：逐字拼出「b站」後候選條有、推薦組沒有——`isCjkWord` 要求整詞全是漢字，
+     * 把 `b站` 這類混合詞漏掉了。純 ASCII（`Linux`）仍不算引擎詞，避免把字母候選塞進推薦。
+     */
+    fun isWordLike(text: String): Boolean = text.length >= 2 && containsCjk(text)
+
     /** 單個漢字（段組只會從字典拿這種字）。ASCII/符號/顏文字一律不算。 */
     fun isSingleCjkChar(text: String): Boolean =
         text.length == 1 && (text[0].code in 0x3400..0x4DBF || text[0].code in 0x4E00..0x9FFF)

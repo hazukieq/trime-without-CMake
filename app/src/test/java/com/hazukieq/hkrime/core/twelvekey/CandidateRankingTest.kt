@@ -476,6 +476,15 @@ class CandidateRankingTest {
     }
 
     @Test
+    fun `recommend includes mixed CJK engine words like b站`() {
+        // 用戶 2026-11-11：逐字拼出 `b站` 後候選條有、推薦組沒有——isCjkWord 把混合詞漏掉了。
+        // 純 ASCII（Linux）仍不算引擎詞條；含漢字的混合詞要進推薦。
+        val engine = listOf(item("你好", index = 0), item("b站", index = 1), item("Linux", index = 2))
+        val recommend = TwelveKeySnapshotBuilder.recommendWords(engine, emptyList())
+        assertEquals(listOf("你好", "b站"), recommend.map { it.text })
+    }
+
+    @Test
     fun `recommend dedupes words repeated between engine and panel rows`() {
         val engineWord = item("共產黨", "kiung than", index = 0)
         val dup = item("共產黨", "kiung than", index = 7)

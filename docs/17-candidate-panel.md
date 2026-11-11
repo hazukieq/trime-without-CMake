@@ -356,8 +356,9 @@ flowchart TD
 推荐组 = 联想词排序显示 + 单字（用户 2026-11-11 两轮定案：先「全部联想词、候选条同一套算法」，
 后放宽到 **40 个 = 30 词 + 10 单字**）：
 
-1. 引擎/学习候选先走 `CandidateRanking.fullBarOrder`（与候选条同一排序）：**CJK 词**进词区，
-   **单个 CJK 字**进单字区（保持引擎 `index`，点击走 `select_candidate`）；
+1. 引擎/学习候选先走 `CandidateRanking.fullBarOrder`（与候选条同一排序）：**CJK 词**及
+   **含汉字的混合词**（`b站`、`3D打印`，`isWordLike`）进词区，**单个 CJK 字**进单字区
+   （保持引擎 `index`，点击走 `select_candidate`）；纯 ASCII 引擎候选不进词区；
 2. 再接面板词行（`panelRows.filter { it.segment == 1 }`）的全部 `items`——`ASSOC` / `INITIAL_COMBO` /
    `WHOLE_WORD` / 引擎词行，**ASCII 词（如 `Linux`）也收**；
 3. 面板词再过一遍**完整碼前綴優先**：`TwelveKeyPreedit.derivedWordCode(word)` 用字表逐字首讀音拼出完整碼，
