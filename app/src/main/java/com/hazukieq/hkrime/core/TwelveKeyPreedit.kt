@@ -104,6 +104,14 @@ object TwelveKeyPreedit {
      * 「帶讀音的多音節詞」（三音節以上 `Linux` 這類），不依賴詞表是否有讀音列。
      */
     @Volatile
+    /**
+     * 音節首字母 → 該首字母下的全部音節（字典序）。
+     *
+     * 聯想行（`ASSOC` 源）改按**首字母序列**匹配後用它：碼只約束每個音節的首字母，
+     * 元音完全自由（用戶 2026-11-11：「必須走首字母序列匹配，不是碼前綴」）。
+     */
+    private var syllablesByInitial: Map<Char, List<String>> = emptyMap()
+
     private var initialPatternIndex: Map<String, List<Pair<String, List<String>>>> = emptyMap()
 
     /**
@@ -606,6 +614,30 @@ object TwelveKeyPreedit {
         }
         initialLettersByCode = normal.mapValues { it.value.sorted() }
         initialLettersByCodeLast = last.mapValues { it.value.sorted() }
+        // 聯想行用的「首字母 → 全部音節」索引：只收字典音節集合，按字典序固定，
+        // 兩份實現（App/腳本）才能逐行對拍（docs/19 §9.1）。
+        syllablesByInitial = syllableSet
+            .filter { it.isNotEmpty() }
+            .groupBy { it.first() }
+            .mapValues { (_, list) -> list.sorted() }
+    }
+
+    /**
+     * 首字母集合 → 這些字母打頭的全部音節（字典序、去重）。
+     *
+     * 面板聯想行（`ASSOC`）用：每個音節只由「該音節首字母」約束，元音不固定。
+     * 與 `tools/panel_probe.py` 的 `syllables_by_initials()` 同口徑。
+     */
+    internal fun syllablesByInitials(initials: Collection<Char>): List<String> {
+        if (initials.isEmpty()) return emptyList()
+        val out = ArrayList<String>()
+        val seen = HashSet<String>()
+        initials.forEach { initial ->
+            syllablesByInitial[initial]?.forEach { syllable ->
+                if (seen.add(syllable)) out.add(syllable)
+            }
+        }
+        return out
     }
 
     /**

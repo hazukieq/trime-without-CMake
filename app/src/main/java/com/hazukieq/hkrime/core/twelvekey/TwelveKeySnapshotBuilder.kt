@@ -435,28 +435,43 @@ object TwelveKeySnapshotBuilder {
      * 用戶 2026-11-11：「ghi+abc → g b, g c, h b, h c 4 個通配聯想詞組」——分桶就是為了
      * 每個通配組合都有代表，而不是被高頻桶整批佔滿。
      */
+    /**
+     * 這一段「一個音節」的首字母集合：只看該段**第一個碼位**的首字母（元音不釘死）。
+     *
+     * `ee` → {d,f}、`5` → {k,l}；`r` 只在該段只有一個碼位且是輸入末鍵時才出現。
+     * 與 `panel_probe.py` 的 `key_initial_letters(part[0], is_last=...)` 同口徑。
+     */
+    private fun partInitials(code: String, isLastKey: Boolean): List<Char> {
+        val first = code.firstOrNull() ?: return emptyList()
+        return TwelveKeyPreedit.keyInitialLetters(first, isLast = isLastKey && code.length == 1)
+    }
+
     internal fun assocRows(parts: List<SplitPart>): List<PanelRow> {
         val buckets = LinkedHashMap<Pair<Char, Char>, MutableList<PanelRow>>()
-        for (part in parts) {
-            // 第一段：**前綴展開全部音節**（`ia` → ga/gam/gan/gang/han/hau…），不能用配額後的列表。
-            val firstCandidates = TwelveKeyPreedit.syllablesForSegment(
-                part.head,
-                ASSOC_EXPAND_LIMIT,
-                exactOnly = false,
-                totalLimit = ASSOC_EXPAND_LIMIT,
-                allowSuffixOnly = part.allowSuffixOnly,
-            )
-            // 第二段：有剩餘碼才展開（`r` 這類後綴音節在這裡是合法結尾，固定 allowSuffixOnly=true）。
-            val secondCandidates = if (part.rest.isEmpty()) {
-                null
-            } else {
+        parts.forEachIndexed { index, part ->
+            val isLastPart = index == parts.lastIndex
+            // 聯想行按**首字母序列**匹配，不再按碼前綴（用戶 2026-11-11：
+            // 「必須走首字母序列匹配，不是碼前綴（碼前綴等於把元音釘死為 a/b/c）」）。
+            // - 有剩餘碼（兩音節聯想）：第一段只看第一個碼位的首字母——`ee` → {d,f}，
+            //   於是 da/dai/dang/di/de… 都能進候選，而不是只有元音被釘成 e 的 de/den/det/fen/feu；
+            // - 第二段同理只看剩餘碼第一個碼位的首字母——`5` → {k,l}，元音自由；
+            // - 只有一段（剩餘碼為空）時仍按碼前綴展開，列出該音節的全部後續音節（維持原文行為）。
+            val firstCandidates = if (part.rest.isEmpty()) {
                 TwelveKeyPreedit.syllablesForSegment(
-                    part.rest,
+                    part.head,
                     ASSOC_EXPAND_LIMIT,
                     exactOnly = false,
                     totalLimit = ASSOC_EXPAND_LIMIT,
-                    allowSuffixOnly = true,
+                    allowSuffixOnly = part.allowSuffixOnly,
                 )
+            } else {
+                TwelveKeyPreedit.syllablesByInitials(partInitials(part.head, isLastKey = false))
+            }
+            // 第二段：有剩餘碼才展開（`r` 這類後綴音節在這裡是合法結尾，末位鍵要保留 r）。
+            val secondCandidates = if (part.rest.isEmpty()) {
+                null
+            } else {
+                TwelveKeyPreedit.syllablesByInitials(partInitials(part.rest, isLastKey = isLastPart))
             }
             for (first in firstCandidates) {
                 val bySecond = TwelveKeyPreedit.assocSecondMap(first)

@@ -511,12 +511,24 @@ class Data:
             # 最後跨拆法统一轮转（用戶 2026-11-11：「ghi+abc → g b, g c, h b, h c 4 個通配聯想詞組」）。
             # 通配桶要覆盖**全部**候选音節（不受面板配額截斷），否则 (g,b) 这类组合会漏。
             huge = 1_000_000
-            # 通配桶的第一段候選 = 該碼**前綴展開**的全部音節（`ia` → ga/gam/gan/gang/gau/ha/han/hau…），
-            # 不能用 exactOnly（那只有 ga/ha，会漏掉 `gam se`、`han jiu` 这类真实词）。
-            assoc_first = self.syllables_for_segment(
-                head, huge, False, allow_suffix_only, total_limit=huge
-            )
-            for key, rows in self.assoc_buckets(assoc_first, rest).items():
+            # 2026-11-11 起改用**首字母序列匹配**，不再用碼前綴：
+            # - 兩音節聯想：第一段只看第一個碼位的首字母（`ee` → {d,f}，元音自由：da/dai/dang/di/de…）；
+            # - 第二段只看剩餘碼第一個碼位的首字母（`5` → {k,l}）；
+            # - 只有一段（剩餘碼為空）時仍按碼前綴展開，列出該音節的全部後續音節。
+            if rest:
+                assoc_first = self.syllables_by_initials(
+                    self.key_initial_letters(head[0], is_last=False)
+                )
+                last_part = index == len(splits) - 1
+                second_candidates = self.syllables_by_initials(
+                    self.key_initial_letters(rest[0], is_last=last_part and len(rest) == 1)
+                )
+            else:
+                assoc_first = self.syllables_for_segment(
+                    head, huge, False, allow_suffix_only, total_limit=huge
+                )
+                second_candidates = None
+            for key, rows in self.assoc_buckets(assoc_first, second_candidates).items():
                 assoc_buckets.setdefault(key, []).extend(rows)
         for reading, words in self.pick_bucket_rows(assoc_buckets):
             groups.append(
@@ -584,6 +596,17 @@ class Data:
         if not is_last:
             initials = [x for x in initials if x not in SUFFIX_ONLY_SYLLABLES]
         return initials
+
+    def syllables_by_initials(self, initials: list[str]) -> list[str]:
+        """首字母集合 → 這些字母打頭的全部音節（字典序、去重）。
+
+        鏡像 App `TwelveKeyPreedit.syllablesByInitials`：鏡像聯想行按首字母序列匹配後，
+        每個音節只由「首字母」約束，元音不釘死（用戶 2026-11-11）。
+        """
+        if not initials:
+            return []
+        wanted = set(initials)
+        return sorted({syl for syl in self.syllables if syl and syl[0] in wanted})
 
     def initial_pattern_combos(self, codes: str) -> list[tuple[str, ...]]:
         """首字母組合的**規則**（每鍵一個音節首字母、元音自由；不管詞條存不存在）。
@@ -663,13 +686,10 @@ class Data:
         return [k for k, _ in sorted(weight.items(), key=lambda kv: -kv[1])][:limit]
 
     def assoc_buckets(
-        self, first_candidates: list[str], rest: str
+        self, first_candidates: list[str], second_candidates: list[str] | None
     ) -> "OrderedDict[tuple[str, str], list[tuple[str, list[str]]]]":
         """收集 (第一音節候選 × 第二音節候選) 命中的具體行，按（首字母, 首字母）分桶。"""
-        second_candidates: list[str] = []
-        if rest:
-            huge = 1_000_000
-            second_candidates = self.syllables_for_segment(rest, huge, False, True, total_limit=huge)
+        second_candidates = second_candidates or []
         buckets: OrderedDict[tuple[str, str], list[tuple[str, list[str]]]] = OrderedDict()
         for first in first_candidates:
             by_second = self.assoc.get(first) or {}

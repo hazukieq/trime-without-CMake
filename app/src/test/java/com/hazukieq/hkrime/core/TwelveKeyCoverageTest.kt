@@ -178,10 +178,13 @@ class TwelveKeyCoverageTest {
         // 首碼出本鍵音節族，剩餘碼交給 restCode 遞歸。
         val ngGroups = TwelveKeySnapshotBuilder.debugSegmentGroups("1e")
         val nzGroups = TwelveKeySnapshotBuilder.debugSegmentGroups("ye")
-        assertTrue("1e 應出 ng* 音節，實際 ${ngGroups.map { it.reading }}",
-            ngGroups.isNotEmpty() && ngGroups.all { it.reading.startsWith("ng") })
-        assertTrue("ye 應出 nz* 音節，實際 ${nzGroups.map { it.reading }}",
-            nzGroups.isNotEmpty() && nzGroups.all { it.reading.startsWith("nz") })
+        // 只看單字組（segment 0）：聯想行現在按首字母序列匹配，行標題可能是 `ga fui`/`ngen ci` 等。
+        val ngSingle = ngGroups.filter { it.segment == 0 }
+        val nzSingle = nzGroups.filter { it.segment == 0 }
+        assertTrue("1e 應出 ng* 音節，實際 ${ngSingle.map { it.reading }}",
+            ngSingle.isNotEmpty() && ngSingle.all { it.reading.startsWith("ng") })
+        assertTrue("ye 應出 nz* 音節，實際 ${nzSingle.map { it.reading }}",
+            nzSingle.isNotEmpty() && nzSingle.all { it.reading.startsWith("nz") })
         // 同樣要能給出「第一段音節組」而不是只有兜底
         assertTrue(ngGroups.any { it.segment == 0 && it.items.isNotEmpty() })
         assertTrue(nzGroups.any { it.segment == 0 && it.items.isNotEmpty() })

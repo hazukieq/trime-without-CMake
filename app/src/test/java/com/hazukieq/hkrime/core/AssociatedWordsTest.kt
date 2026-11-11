@@ -79,25 +79,29 @@ class AssociatedWordsTest {
     fun mixedCodeMatrixKeepsAssociationRows() {
         // 12 鍵覆蓋矩陣（用戶 2026-11-10：「你的測試用例還有問題，12鍵根本沒有覆蓋完全」）：
         // 每個混合碼都要能出「第一段音節組 + 至少一行聯想詞」。
+        // 2026-11-11 起聯想行按**首字母序列**匹配（元音自由），行標題不再固定首音節：
+        // 例如 `5i34iwe` 的第一個碼位 `5` 給 {k,l}，聯想行可能是 `kiung than`、`kau hak`、`len he`…
+        // 所以這裡斷言「第一音節首字母落在該鍵的首字母集合裡」，不再釘死具體讀音。
         val cases = mapOf(
-            "5i34iwe" to "kiung ",     // kiung + th + d：th/def 合成 the
-            "744ii" to "song ",        // song + i：引擎會切成 son + gi
-            "5i34iw" to "kiung ",
-            "i44yi" to null,           // gong + h：只剩前綴，不能崩
+            "5i34iwe" to setOf('k', 'l'),   // 5 → k/l
+            "744ii" to setOf('p', 's'),     // 7 → p/s
+            "5i34iw" to setOf('k', 'l'),
+            "i44yi" to null,                // gong + h：只剩前綴，不能崩
         )
-        for ((codes, prefix) in cases) {
+        for ((codes, initials) in cases) {
             val groups = com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder
                 .debugSegmentGroups(codes)
             val readings = groups.map { it.reading }
             println("PROBE $codes -> $readings")
             assertTrue("[$codes] 應至少有單字組，實際 $readings", groups.any { it.segment == 0 })
-            if (prefix != null) {
+            if (initials != null) {
+                val assocRows = groups.filter { it.segment == 1 && it.reading.contains(' ') }
+                assertTrue("[$codes] 應有聯想詞行，實際 $readings", assocRows.isNotEmpty())
                 assertTrue(
-                    "[$codes] 應有以「$prefix」開頭的聯想詞行，實際 $readings",
-                    readings.any { it.startsWith(prefix) && it != prefix.trim() },
+                    "[$codes] 聯想行第一音節首字母應 ∈ $initials，實際 ${assocRows.map { it.reading }}",
+                    assocRows.all { it.reading.first() in initials },
                 )
-                val row = groups.first { it.reading.startsWith(prefix) && it.reading != prefix.trim() }
-                assertTrue("[$codes] 聯想詞行不能是空的", row.items.isNotEmpty())
+                assertTrue("[$codes] 聯想詞行不能是空的", assocRows.all { it.items.isNotEmpty() })
             }
         }
     }
