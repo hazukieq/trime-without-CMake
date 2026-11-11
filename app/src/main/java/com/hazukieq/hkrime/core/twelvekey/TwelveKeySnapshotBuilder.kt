@@ -218,7 +218,7 @@ object TwelveKeySnapshotBuilder {
         // 不再放「候選條放不下的續頁」（單字、被詞組配額擠掉的詞都不再混進來），
         // 只收聯想詞行（ASSOC / INITIAL_COMBO / WHOLE_WORD / 引擎詞組）裡出現的詞，
         // 順序沿用候選條那套（引擎/學習排序 → 詞序），最多 [TwelveKeyTuning.RECOMMEND_WORDS] 條。
-        val recommend = recommendWords(ordered, panelRows)
+        val recommend = recommendWords(ordered, panelRows, local.remaining)
         // 推薦組固定排左列第一（reading 為空 + [RECOMMEND_SEGMENT] 標記）；空的就不插，
         // 這樣「候選全上了條」時段組自然回到第 0 組。
         val recommendRow = if (recommend.isEmpty()) {
@@ -1007,19 +1007,31 @@ object TwelveKeySnapshotBuilder {
     internal fun recommendWords(
         engineCandidates: List<CandidateItem>,
         panelWordRows: List<PanelRow>,
+        code: String = "",
     ): List<CandidateItem> {
         val seen = HashSet<String>()
         val out = ArrayList<CandidateItem>(TwelveKeyTuning.RECOMMEND_WORDS)
         CandidateRanking.fullBarOrder(engineCandidates)
             .filter { CandidateRanking.isCjkWord(it.text) }
             .forEach { item -> if (seen.add(item.text)) out.add(item) }
+        // 面板行的詞優先級：先用字表反推「完整碼」，能前綴匹配當前輸入碼的排前面。
+        // 用戶 2026-11-11：`jen cin kung z`（=8e4ai4534i8）的「遠程控制」在推薦裡被
+        // 排在 20 條之外；它的完整碼 8e4ai4534i8e 正好以輸入碼開頭，應該排到前面。
+        val matched = ArrayList<CandidateItem>()
+        val others = ArrayList<CandidateItem>()
         panelWordRows.forEach { row ->
             if (row.segment != 1) return@forEach
             row.items.forEach { item ->
                 if (item.text.isEmpty()) return@forEach
-                if (seen.add(item.text)) out.add(item)
+                if (!seen.add(item.text)) return@forEach
+                val wordCode = TwelveKeyPreedit.derivedWordCode(item.text)
+                val hit = wordCode != null && code.isNotEmpty() &&
+                    (wordCode.startsWith(code) || code.startsWith(wordCode))
+                if (hit) matched.add(item) else others.add(item)
             }
         }
+        out.addAll(matched)
+        out.addAll(others)
         return out.take(TwelveKeyTuning.RECOMMEND_WORDS)
     }
 }

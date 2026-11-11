@@ -641,7 +641,26 @@ object TwelveKeyPreedit {
     }
 
     /**
-     * 首字母集合 → 這些字母打頭的全部音節（字典序、去重）。
+     * 詞面 → 逐字首讀音拼出的完整碼；任一字在 [charTable] 裡沒有讀音就回 `null`。
+     *
+     * 只給「推薦組排序」用：純詞表（sougou 等）只有詞面、沒有讀音，卻仍可能是
+     * `jen cin kung z` 這種已打前綴的目標詞（用戶 2026-11-11：遠程控制在推薦裡看不到）。
+     * 面板行本身仍只按前兩音節索引，這裡只是拿字表反推完整碼做前綴匹配；
+     * 多音字取首讀音，推錯最多影響排序，不影響候選文字。
+     */
+    internal fun derivedWordCode(word: String): String? {
+        if (word.isEmpty()) return null
+        val sb = StringBuilder()
+        for (ch in word) {
+            val syllable = charTable[ch.toString()] ?: return null
+            val code = codeOf(syllable)
+            if (code.isEmpty()) return null
+            sb.append(code)
+        }
+        return sb.toString()
+    }
+
+    /** 首字母集合 → 這些字母打頭的全部音節（字典序、去重）。
      *
      * 面板聯想行（`ASSOC`）用：每個音節只由「該音節首字母」約束，元音不固定。
      * 與 `tools/panel_probe.py` 的 `syllables_by_initials()` 同口徑。

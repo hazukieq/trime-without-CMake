@@ -355,7 +355,7 @@ adb shell ime set com.hazukieq.hkrime/.TrimeImeService
 | `ASSOC_BUCKET_ROW_BUDGET` | 12 | `= ASSOC_MAX_ROWS × 3`（用戶 2026-11-11 拍板） |
 | `ASSOC_MAX_ROWS` | 4 | 公式基底（不再直接封頂） |
 | `ASSOC_EXPAND_LIMIT` | 1_000_000 | 聯想分桶展開「全部候選音節」 |
-| `ASSOC_PREFIX_READINGS` / `ASSOC_WORDS` | 4 / 6 | 整串詞行 / 行內詞數 |
+| `ASSOC_PREFIX_READINGS` / `ASSOC_WORDS` | 4 / 20 | 整串詞行 / 行內詞數（分組組詞 <20 時完整展示） |
 | `MAX_SYLLABLES_TOTAL` | 16（= `SEGMENT_SYLLABLE_LIMIT`） | 由 `TwelveKeyPreedit` 搬入 Tuning |
 | `MAX_RESULT_GROUPS` | — | **刪除**：無引用死常量（原計畫是搬進 Tuning，審計後直接移除） |
 

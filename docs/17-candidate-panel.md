@@ -160,7 +160,7 @@ flowchart TD
 9. panelRows = capRows(panelRows, MAX_GROUPS)    // 超额先丢 INITIAL_COMBO
 10. groups   = panelRows.map { it.toSyllableGroup() }   // 投影（sources 丢弃）
 11. barEntries = barList(ordered) | 字典兜底（§5）
-12. recommend = recommendWords(ordered, panelRows.filter { it.segment == 1 })  // §7.6
+12. recommend = recommendWords(ordered, panelRows.filter { it.segment == 1 }, local.remaining)  // §7.6
 13. groupsWithRecommend = 推荐行(若有) + groups
 14. previewText/inlineText/fallback
 15. 返回不可变 TwelveKeySnapshot
@@ -214,8 +214,9 @@ flowchart TD
 4. 總行數上限 **`ASSOC_BUCKET_ROW_BUDGET = ASSOC_MAX_ROWS × 3 = 12`**（用戶 2026-11-11 拍板：
    保留 App 富聯想 + 照腳本字母序 + 放開到 12 行；舊「每輪 ≤4 行」只適用於未分桶的舊實現）。
 
-**行內詞**：每個 `(第一音節, 第二音節)` 桶取詞表熱度前 `ASSOC_WORDS=6` 條；行標題永遠是兩個完整讀音
-（禁止 `than d**` 這種通配寫法）。
+**行內詞**：每個 `(第一音節, 第二音節)` 桶取詞表熱度前 `ASSOC_WORDS=20` 條；行標題永遠是兩個完整讀音
+（禁止 `than d**` 這種通配寫法）。用戶 2026-11-11 定案：**分組組詞不足 20 條時要完整展示**，
+所以上限放到 20（`jen cin` 桶 23 條時取前 20，`遠程控制` 第 13 條不再被舊 6 條上限擠掉）。
 
 #### 7.2.0 只认**客家话音节集合**（2026-11-11 定）
 
@@ -358,8 +359,11 @@ flowchart TD
 1. 引擎/学习候选先走 `CandidateRanking.fullBarOrder`（与候选条同一排序），只留 **CJK 词**（单字不收）；
 2. 再接面板词行（`panelRows.filter { it.segment == 1 }`）的全部 `items`——`ASSOC` / `INITIAL_COMBO` /
    `WHOLE_WORD` / 引擎词行，**ASCII 词（如 `Linux`）也收**；
-3. 按文字 `HashSet` 去重（引擎项优先保留 `comment`/`index`），`take(RECOMMEND_WORDS=20)`；
-4. 渲染为 `segment = RECOMMEND_SEGMENT` 的组，插在左列第 0 位（`CandidatePanelController` 只按
+3. 面板词再过一遍**完整碼前綴優先**：`TwelveKeyPreedit.derivedWordCode(word)` 用字表逐字首讀音拼出完整碼，
+   凡是完整碼與當前輸入碼互為前綴的詞先排（用戶 2026-11-11：`jen cin kung z` 的「遠程控制」被 20 條上限
+   擠出推薦；它的完整碼 `8e4ai4534i8e` 正好以輸入碼開頭）。推不出讀音的詞（純詞表裡讀音缺失）退回原行序；
+4. 按文字 `HashSet` 去重（引擎項優先保留 `comment`/`index`），`take(RECOMMEND_WORDS=20)`；
+5. 渲染为 `segment = RECOMMEND_SEGMENT` 的组，插在左列第 0 位（`CandidatePanelController` 只按
    `group.segment` 判断，不参与五源流水线）。
 
 旧实现（候选条续页、`RECOMMEND_ITEMS=36`）已删除。
@@ -679,7 +683,7 @@ $ python3 tools/panel_probe.py selftest
 | 「推荐」组条数 | `TwelveKeyTuning.RECOMMEND_WORDS`（=20，只放联想词） |
 | 段组每个音节列多少字 | `TwelveKeyTuning.SEGMENT_CHARS_LIMIT` |
 | 段组给多少个音节 | `SEGMENT_SYLLABLE_LIMIT(_RICH)`、`RICH_SYLLABLE_THRESHOLD` |
-| 联想行数量/词数 | `ASSOC_MAX_ROWS`、`ASSOC_WORDS`、`ASSOC_INITIAL_ROWS`、`ASSOC_INITIALS` |
+| 联想行数量/词数 | `ASSOC_MAX_ROWS`、`ASSOC_WORDS`（=20，分组組詞 <20 時完整展示） |
 | 多音节词行上限 | `ASSOC_PREFIX_READINGS` |
 | 面板组数上限 | `TwelveKeyTuning.MAX_GROUPS` |
 | 左列排序（分档） | `TwelveKeySnapshotBuilder.build` 末尾 comparator（§8） |

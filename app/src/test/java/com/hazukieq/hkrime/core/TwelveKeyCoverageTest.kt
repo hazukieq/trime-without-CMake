@@ -164,7 +164,12 @@ class TwelveKeyCoverageTest {
         // 聯想行：第二段只按首字母匹配（th* + d/e/f），行標題形如 `than d`
         val assoc = groups.filter { it.segment == 1 }
         assertTrue("we 應有首字母級聯想行（如 than d），實際 ${assoc.map { it.reading }}", assoc.isNotEmpty())
-        assertTrue("聯想行詞數應 ≤ 6，實際 ${assoc.first().items.size}", assoc.first().items.size <= 6)
+        // 用戶 2026-11-11：分組組詞不足 20 時要完整展示，行內詞數上限 = ASSOC_WORDS（20）。
+        val wordCap = com.hazukieq.hkrime.core.twelvekey.TwelveKeyTuning.ASSOC_WORDS
+        assertTrue(
+            "聯想行詞數應 ≤ $wordCap，實際 ${assoc.first().items.size}",
+            assoc.first().items.size <= wordCap,
+        )
         // 總行數要收斂（用戶 2026-11-10：增補聯想組不要給太多，影響性能就截斷；
         // 2026-11-11 分桶輪轉後預算放開到 ASSOC_BUCKET_ROW_BUDGET = ASSOC_MAX_ROWS×3）
         val budget = com.hazukieq.hkrime.core.twelvekey.TwelveKeyTuning.ASSOC_BUCKET_ROW_BUDGET
@@ -228,6 +233,31 @@ class TwelveKeyCoverageTest {
         assertTrue(
             "推薦組只能是 CJK 詞：${snapshot.recommend.map { it.text }}",
             snapshot.recommend.all { com.hazukieq.hkrime.core.twelvekey.CandidateRanking.isCjkWord(it.text) },
+        )
+    }
+
+    @Test
+    fun associationRowAndRecommendKeepFullWordsBelowLimit() {
+        // 用戶 2026-11-11：`jen cin kung z` 的「远程控制」不能因為行內配額被擠掉——
+        // ① `jen cin` 分組的組詞不足 20 條時要完整展示（ASSOC_WORDS 已放開到 20）；
+        // ② 推薦組要按「完整碼前綴匹配」把它排到 20 條以內。
+        val code = "8e4ai4534i8"
+        val local = TwelveKeySnapshotBuilder.Local(code, 0, code, "")
+        val snapshot = TwelveKeySnapshotBuilder.build(
+            local = local,
+            applyLearning = false,
+            wantGroups = true,
+            candidatesOverride = emptyList(),
+        )
+        assertTrue(
+            "推薦應含遠程控制：${snapshot.recommend.map { it.text }}",
+            snapshot.recommend.any { it.text == "远程控制" },
+        )
+        val row = snapshot.groups.firstOrNull { it.reading == "jen cin" }
+        assertTrue("jen cin 分組應存在", row != null)
+        assertTrue(
+            "jen cin 行內應含遠程控制：${row!!.items.map { it.text }}",
+            row.items.any { it.text == "远程控制" },
         )
     }
 
