@@ -3709,3 +3709,30 @@ perf-gate 需要真實鍵盤會話（本次未跑，待你正常打字時再確�
 > **排查入口**：這類「詞庫有、候選沒有」的問題，先看
 > [15-librime-local-mods.md](15-librime-local-mods.md) —— 本地 librime 補丁（`0001`/`0003`）
 > 直接決定候選能不能被列舉出來，App 側排序只是其後的第二層。
+
+## 15.67 詞條只覆蓋輸入前幾個音節時，剩餘碼不能丟（2026-11-11）
+
+用戶 2026-11-11 報：「輸入 灵机一动来的 會只輸出前面成語（固定候選條上屏、展開面板上屏都是），
+後面會丟失」。
+
+三條上屏路徑的差異：
+
+| 路径 | 選中後的剩餘輸入 | 問題 |
+|---|---|---|
+| 引擎候選（`select_candidate`） | librime 原生保留，preedit 繼續 | 正常 |
+| 面板**引擎詞組**（過去被 `pickAssociationWord` 攔截） | 整詞 commit + `clearComposition()` | 剩餘丟失 |
+| 聯想詞 / 學習詞 / 合成候選（`index < 0`） | 整詞 commit + `clearComposition()` | 剩餘丟失 |
+
+修復：
+
+1. 面板 `segment == 1` 且 `index >= 0` 的條目改走 `TwelveKeyController.selectCandidate(index)`
+   （引擎原生「選中不提交」；不要再走 `pickAssociationWord`）。
+2. App 側合成的詞（聯想詞、PhraseMemory 學習詞）上屏前，用
+   `TwelveKeyPreedit.remainingCodeAfter(reading, Rime.RimeGetInput())` 算出剩餘碼：
+   只有「當前碼串以該詞完整碼開頭」時才算（簡拼碼不猜），commit 文字後 `Rime.onText(剩餘碼)`
+   把組合接回去，行為與 librime 對齊。
+3. `codeOfReading()`（讀音 → 碼串）與 `remainingCodeAfter()` 都是純函數，單測覆蓋
+   （`PartialWordCommitTest`：`lin gi jit dung` = `5i4ii8i9e34i`，剩餘 `54iei9`）。
+
+副作用：面板引擎詞組點擊現在會走 librime 學習/提交路徑，`uncommittedPrefix` 那套「多字詞選中不提交」
+的既有邏輯不變；App 合成詞仍記 PhraseMemory（`learnPick`/`bumpPicked`）。

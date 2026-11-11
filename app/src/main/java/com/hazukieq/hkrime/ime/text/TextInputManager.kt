@@ -456,9 +456,15 @@ class TextInputManager private constructor() :
         if (text.isEmpty()) return
         // 先記下當前完整碼串：清組合後 input 就沒了，學習的 key 必須是「這次打的碼」。
         val code = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
+        // 詞只覆蓋輸入前幾個音節時（灵机一动 | 来的），剩餘碼上屏後重新餵回引擎，
+        // 對齊 librime select_candidate 的「選中不提交、剩餘輸入保留」。
+        val remaining = TwelveKeyPreedit.remainingCodeAfter(reading, code)
         runCatching {
             withEngineLock { Rime.clearComposition() }
             activeEditorInstance.commitText(text, false)
+            if (remaining.isNotEmpty()) {
+                withEngineLock { runCatching { Rime.onText(remaining) } }
+            }
             setSegmentAnchor(text.lastOrNull())
             trime.updateComposing()
             refreshTwelveKey()
@@ -529,11 +535,18 @@ class TextInputManager private constructor() :
         // 先取出來併進上屏文字，否則 clearComposition 會把它丟掉。
         val enginePrefix = uncommittedPrefix.ifEmpty { withEngineLock { compositionPrefix() } }
         uncommittedPrefix = ""
+        // 合成候選只覆蓋輸入前幾個音節時，剩餘碼要在清組合後重新餵回引擎
+        // （同 pickAssociationWord；用戶 2026-11-11：灵机一动 | 来的 後半丟失）。
+        val input = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
+        val remaining = TwelveKeyPreedit.remainingCodeAfter(item.comment, input)
         flushPendingPick()
         runCatching { activeEditorInstance.commitText(enginePrefix + text, false) }
             .onFailure { Timber.e(it, "twelvekey: phrase commit failed") }
         if (code.isNotEmpty()) PhraseMemory.bumpPicked(code, text)
         withEngineLock { Rime.clearComposition() }
+        if (remaining.isNotEmpty()) {
+            withEngineLock { runCatching { Rime.onText(remaining) } }
+        }
         setSegmentAnchor(text.lastOrNull())
         trime.updateComposing()
         refreshTwelveKey()
@@ -582,6 +595,16 @@ class TextInputManager private constructor() :
             return
         }
         if (item.segment == 1) {
+            // 引擎詞組（`灵机一动` 這種多音節詞在面板裡也有下標）：必須走 librime
+            // 原生 select_candidate，選中不提交、剩餘輸入（`来的`）才會保留。
+            // 只有 App 側合成的聯想詞/學習詞（index < 0）才整詞上屏。
+            if (item.index >= 0) {
+                // 不要 notePickedSegment：這裡是引擎原生選中，引擎會自己管 commit buffer；
+                // 再往 pendingPick 塞一份會在最終上屏時重複。
+                learnCandidatePick(item.text, item.comment)
+                twelveKeyController?.selectCandidate(item.index)
+                return
+            }
             pickAssociationWord(item.text, item.comment)
             return
         }

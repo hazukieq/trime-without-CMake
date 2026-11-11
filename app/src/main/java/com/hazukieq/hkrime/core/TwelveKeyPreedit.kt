@@ -415,6 +415,41 @@ object TwelveKeyPreedit {
         }
     }
 
+    /**
+     * 讀音 → 完整碼串（`lin gi jit dung` → `5i4ii8i9e34i`）。
+     *
+     * 上屏 App 側詞條時用來判斷「這條詞只覆蓋了輸入的前幾個音節，後面還有剩餘碼」。
+     */
+    internal fun codeOfReading(reading: String): String {
+        val tokens = reading.split(' ', '\u3000').filter { it.isNotEmpty() }
+        if (tokens.isEmpty()) return ""
+        val sb = StringBuilder()
+        tokens.forEach { token ->
+            val code = codeOf(token)
+            if (code.isEmpty()) return ""
+            sb.append(code)
+        }
+        return sb.toString()
+    }
+
+    /**
+     * 上屏「App 側詞條」後應重新餵回引擎的剩餘碼串（沒有剩餘返回空串）。
+     *
+     * 用戶 2026-11-11：輸入「灵机一动来的」只上屏「灵机一动」，後面「来的」丟了——
+     * 聯想詞/學習詞是 App 自己整詞 commit + `clearComposition()`，沒有 librime
+     * `select_candidate` 的「選中不提交、剩餘輸入保留」語義。這裡把剩餘碼算出來，
+     * 上屏後重新 `onText` 進引擎。
+     *
+     * 只有 input **以該詞的完整碼開頭**時才成立（簡拼輸入時詞碼可能不是前綴，
+     * 那就無從得知剩餘，維持原行為整詞上屏）。
+     */
+    internal fun remainingCodeAfter(wordReading: String, input: String): String {
+        if (wordReading.isEmpty() || input.isEmpty()) return ""
+        val wordCode = codeOfReading(wordReading)
+        if (wordCode.isEmpty() || !input.startsWith(wordCode) || input.length <= wordCode.length) return ""
+        return input.substring(wordCode.length)
+    }
+
     /** PhraseMemory 變化時重建「學習詞 → 讀音」索引（面板與候選條同源）。 */
     private fun ensureLearnedIndex() {
         val version = PhraseMemory.version
