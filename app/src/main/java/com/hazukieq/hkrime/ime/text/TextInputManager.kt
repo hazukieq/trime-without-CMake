@@ -452,15 +452,33 @@ class TextInputManager private constructor() :
      * 這些詞的碼不是用戶打出來的（是 App 依「第一段音節 + 下一個音節首字母」合成的），
      * 引擎沒有對應 context，所以只能整詞 commit，再把組字清掉。
      */
-    private fun pickAssociationWord(text: String) {
+    private fun pickAssociationWord(text: String, reading: String = "") {
         if (text.isEmpty()) return
+        // 先記下當前完整碼串：清組合後 input 就沒了，學習的 key 必須是「這次打的碼」。
+        val code = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
         runCatching {
             withEngineLock { Rime.clearComposition() }
             activeEditorInstance.commitText(text, false)
             setSegmentAnchor(text.lastOrNull())
             trime.updateComposing()
             refreshTwelveKey()
+            // 面板聯想詞不走 librime select_candidate，引擎學不到；記進 App 學習，
+            // 重複點選才能把詞排到候選條/推薦前面（用戶 2026-11-11 報「點 3 次也不動」）。
+            if (code.isNotEmpty()) PhraseMemory.learnPick(code, text, reading)
         }.onFailure { Timber.e(it, "twelvekey: association pick failed") }
+    }
+
+    /**
+     * 點**引擎候選**（候選條裡的詞）時也記一次 App 學習。
+     *
+     * librime 自己會學 userdb，但 App 的推薦/候選排序用的是 App 學習分數；
+     * 用戶 2026-11-11：同一條詞點了 3 次以上，排位仍不動——所以兩套學習都記。
+     * 單字不記（`learnPick` 只收 ≥2 字）。
+     */
+    private fun learnCandidatePick(text: String, reading: String) {
+        if (text.length < 2) return
+        val code = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
+        if (code.isNotEmpty()) PhraseMemory.learnPick(code, text, reading)
     }
 
     /** 記下本輪真展示過的合成候選（候選條必算；展開面板打開時也算）。 */
@@ -564,7 +582,7 @@ class TextInputManager private constructor() :
             return
         }
         if (item.segment == 1) {
-            pickAssociationWord(item.text)
+            pickAssociationWord(item.text, item.comment)
             return
         }
         if (item.segment == SYNTHETIC_SEGMENT) {
@@ -586,6 +604,7 @@ class TextInputManager private constructor() :
             // 引擎確實沒有這個字（字表有、詞庫沒收）時才退回 App 側兜底。
             val engineIndex = resolveEngineIndexForSegment(item.text, item.comment)
             if (engineIndex >= 0) {
+                learnCandidatePick(item.text, item.comment)
                 twelveKeyController?.selectCandidate(engineIndex)
                 return
             }
@@ -1285,7 +1304,7 @@ class TextInputManager private constructor() :
         if (item != null) {
             // 聯想詞（segment = 1）：整詞上屏。
             if (item.segment == 1) {
-                pickAssociationWord(item.text)
+                pickAssociationWord(item.text, item.comment)
                 return
             }
             // 合成候選（App 側學到的整串詞）：整串一次上屏。
@@ -1299,6 +1318,7 @@ class TextInputManager private constructor() :
                 notePickedSegment(item.text, item.comment)
                 val engineIndex = resolveEngineIndexForSegment(item.text, item.comment)
                 if (engineIndex >= 0) {
+                    learnCandidatePick(item.text, item.comment)
                     twelveKeyController?.selectCandidate(engineIndex)
                     return
                 }
@@ -1306,6 +1326,7 @@ class TextInputManager private constructor() :
                 return
             }
             notePickedSegment(item.text, item.comment)
+            learnCandidatePick(item.text, item.comment)
             twelveKeyController?.selectCandidate(item.index)
             return
         }

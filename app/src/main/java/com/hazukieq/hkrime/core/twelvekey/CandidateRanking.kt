@@ -96,10 +96,22 @@ object CandidateRanking {
         synthetic: List<CandidateItem>,
         syntheticScore: (CandidateItem) -> Double,
         engineScore: (Int) -> Double,
+        /**
+         * 已經在引擎候選裡的詞 → 學習分數（用戶 2026-11-11：重複點選 3 次以上仍不往前排）。
+         *
+         * 引擎候選的偽分數只反映引擎順序；App 學到的詞若與引擎條目同文，會被
+         * [TwelveKeySnapshotBuilder.mergeLearnedPhrases] 過濾掉（避免重複），於是永遠無法提升。
+         * 這裡用「取較大值」把學習分數套回引擎條目：同分仍由引擎在前（比較器不變）。
+         */
+        boostByText: Map<String, Double> = emptyMap(),
     ): List<CandidateItem> {
-        if (synthetic.isEmpty()) return ranked
+        if (synthetic.isEmpty() && boostByText.isEmpty()) return ranked
         val merged = ArrayList<Pair<CandidateItem, Double>>(ranked.size + synthetic.size)
-        ranked.forEachIndexed { i, item -> merged.add(item to engineScore(i)) }
+        ranked.forEachIndexed { i, item ->
+            val engine = engineScore(i)
+            val boost = boostByText[item.text]
+            merged.add(item to if (boost != null && boost > engine) boost else engine)
+        }
         synthetic.forEach { merged.add(it to syntheticScore(it)) }
         return merged.sortedWith(
             compareByDescending<Pair<CandidateItem, Double>> { it.second }

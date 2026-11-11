@@ -209,6 +209,47 @@ object PhraseMemory {
         write(key, updated, now)
     }
 
+    /**
+     * 點「聯想詞行」等面板詞上屏：把這次點選記進學習。
+     *
+     * 用戶 2026-11-11：在固定候選條/展開面板點「遠程」3 次以上，排位仍不動。
+     * 原因：面板聯想詞走 `pickAssociationWord`，只 `commitText`，既不經 librime
+     * `select_candidate`（引擎學不到），也沒寫 [PhraseMemory]。
+     *
+     * 這裡記成「手拼 1 次 + 點選 1 次」：首次點就達到 [MIN_COUNT] 露面的門檻；
+     * 之後每次再沿 [bumpPicked] 累加 picked，`score` 的分數會越過引擎候選的偽分數 1.0，
+     * 第 2 次起就能排到候選條/推薦前面（用戶要求的「重複點選 → 排前」）。
+     */
+    fun learnPick(code: String, text: String, readings: String) {
+        val key = normalizeCode(code)
+        if (key.isEmpty() || text.length < 2) return
+        val now = System.currentTimeMillis()
+        val entries = byCode[key] ?: emptyList()
+        val existing = entries.firstOrNull { it.text == text }
+        if (existing != null) {
+            val updated = entries.map { e ->
+                if (e.text == text) {
+                    e.copy(picked = (e.picked + 1).coerceAtMost(MAX_COUNT), lastUsedAt = now)
+                } else {
+                    e
+                }
+            }
+            write(key, updated, now)
+            return
+        }
+        val entry = Entry(
+            text = text,
+            readings = readings,
+            typed = 1,
+            lastUsedAt = now,
+            picked = 1,
+        )
+        val updated = (entries + entry)
+            .sortedWith(compareByDescending<Entry> { score(it, now) }.thenByDescending { it.lastUsedAt })
+            .take(MAX_PER_CODE)
+        write(key, updated, now)
+    }
+
     /** 點合成候選上屏：點選計數 +1（用戶 2026-11-11：「重複組成/選擇時權重也要變化」）。 */
     fun bumpPicked(code: String, text: String) {
         val key = normalizeCode(code)

@@ -402,7 +402,11 @@ flowchart TD
    - 退格优先撤 `pendingPick` 的最后一个字；
 3. **合成候选**（`segment == SYNTHETIC_SEGMENT`）：`commitPhrase` = flush pending → 并入引擎已选前缀 →
    `commitText` 整串 → `PhraseMemory.bumpPicked`；
-4. **联想词**（`segment == -1` 且 `index < 0`）：`pickAssociationWord` 整词上屏。
+4. **联想词**（`segment == -1` 且 `index < 0`）：`pickAssociationWord` 整词上屏，并记一次
+   `PhraseMemory.learnPick`（首次点就「手拼 1 + 点选 1」，之后每次点选 `picked+1`）——
+   面板联想词不走 `select_candidate`，不记的话点 3 次以上排位也不会动（用户 2026-11-11 报）。
+   引擎候选点选同样记一次 `learnPick`：学习分既插新词，也**抬升**引擎里已有的同文条目
+   （`mergePhraseCandidates` 的 `boostByText`，同分仍引擎在前）。
 
 面板打开期间：`activeGroup` 落第 0 组（「推荐」）；连续消费时若当前 reading 仍存在就保持，
 否则回第 0 组；只有「点左列切组」才把右格滚到顶。

@@ -965,9 +965,9 @@ object TwelveKeySnapshotBuilder {
         // 引擎自己也會學（userdb / custom_phrase）：同一條詞已經在引擎候選裡就不再塞合成候選，
         // 否則候選條會出現兩個一模一樣的詞（用戶 2026-11-11 報「重複詞條」）。
         val engineTexts = ranked.mapTo(HashSet()) { it.text }
+        // 學習分數同時用於「引擎已有同文條目」的抬升（見 mergePhraseCandidates 的 boostByText）。
+        val scoreByText = phrases.associate { it.text to PhraseMemory.score(it, now) }
         val fresh = phrases.filterNot { engineTexts.contains(it.text) }
-        if (fresh.isEmpty()) return ranked
-        val scoreByText = fresh.associate { it.text to PhraseMemory.score(it, now) }
         return CandidateRanking.mergePhraseCandidates(
             ranked = ranked,
             synthetic = fresh.map { e ->
@@ -982,6 +982,7 @@ object TwelveKeySnapshotBuilder {
             },
             syntheticScore = { item -> scoreByText[item.text] ?: 0.0 },
             engineScore = { i -> 1.0 - i.toDouble() / ranked.size.coerceAtLeast(1) },
+            boostByText = scoreByText,
         )
     }
 

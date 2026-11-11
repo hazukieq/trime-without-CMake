@@ -48,6 +48,27 @@ class PhraseMemoryTest {
     }
 
     @Test
+    fun `learnPick makes repeated association picks outrank engine top`() {
+        // 用戶 2026-11-11：面板聯想詞點 3 次以上，排位仍不動。
+        // learnPick 首次點就記「手拼 1 + 點選 1」，重複點選把分數推過引擎首條的偽分數 1.0。
+        PhraseMemory.clear()
+        val code = "8e4ai4534i8"
+        PhraseMemory.learnPick(code, "远程", "")
+        val now = System.currentTimeMillis()
+        assertEquals("首次點選就應該露面", 1, PhraseMemory.candidatesFor(code, now).size)
+
+        PhraseMemory.learnPick(code, "远程", "")
+        PhraseMemory.learnPick(code, "远程", "")
+        val top = PhraseMemory.candidatesFor(code, now).first()
+        assertEquals("远程", top.text)
+        assertEquals(3, top.picked)
+        assertTrue(
+            "重複點選後分數應高於引擎首條偽分數 1.0，實際 ${PhraseMemory.score(top, now)}",
+            PhraseMemory.score(top, now) > 1.0,
+        )
+    }
+
+    @Test
     fun `single character records are ignored`() {
         val now = 2000L * day
         val entries = PhraseMemory.applyRecord(emptyList(), "以", "ji", now)
@@ -168,6 +189,21 @@ class PhraseMemoryTest {
         )
         // 0.1 < 引擎第 0 條(1.0)、第 1 條(0.5) → 排最後
         assertEquals(listOf("醫院", "這種", "以液難"), merged.map { it.text })
+    }
+
+    @Test
+    fun `boost lifts an engine item that was picked repeatedly`() {
+        // 用戶 2026-11-11：同一個詞（引擎已給）點 3 次以上仍不動。
+        // 學習分數要能抬升引擎條目，而不是只有「不在引擎裡」的合成候選才能插隊。
+        val ranked = listOf(item("醫院", "ji jen", 0), item("遠程", "jen cin", 1))
+        val merged = CandidateRanking.mergePhraseCandidates(
+            ranked = ranked,
+            synthetic = emptyList(),
+            syntheticScore = { 0.0 },
+            engineScore = { i -> 1.0 - i.toDouble() / ranked.size },
+            boostByText = mapOf("遠程" to 1.5),
+        )
+        assertEquals(listOf("遠程", "醫院"), merged.map { it.text })
     }
 
     @Test
