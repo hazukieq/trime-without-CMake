@@ -362,6 +362,30 @@ class Data:
     def is_single_syllable(self, codes: str) -> bool:
         return codes in self.code_to_syllables
 
+    def synth_syllables(self, codes: str) -> list[str]:
+        """当前码串**能解码出的全部完整音节**（可能多节；尾端没打全的部分忽略）。
+
+        这是诊断口径（`syllables` 的「合成音节」块），不是面板左列口径：面板只列
+        待输入的第一段，选完一个字才轮到下一段；诊断要把 `338e9` 的 vu 和 zet 都列出来。
+        """
+        if not codes:
+            return []
+        decoded = self.decode(codes)
+        if decoded is None:
+            # 尾端可能只剩半截音节：从尾部逐个退，找到能完整解码的最长前缀。
+            for cut in range(1, len(codes)):
+                decoded = self.decode(codes[:-cut])
+                if decoded is not None:
+                    break
+        if decoded is None:
+            return []
+        out: list[str] = []
+        for seg in decoded:
+            out.extend(
+                self.syllables_for_segment(seg, 1_000_000, True, True, total_limit=1_000_000)
+            )
+        return list(dict.fromkeys(out))
+
     def split_heads(self, codes: str, limit: int = 2) -> list[tuple[str, str]]:
         """镜像 TwelveKeyPreedit.splitHeads：由长到短找「head 恰为一个完整音节」的切法。"""
         if len(codes) < 2:
@@ -1183,14 +1207,10 @@ def cmd_syllables(args, data: Data) -> None:
     if not args.no_stages:
         for length, prefix, rows in data.cumulative(args.codes, args.min_len):
             print(f"## {length} 键  {prefix}")
-            # 1) 合成音节：整串码恰好是一个完整音节时（`ia` = ga/ha）
-            synth: list[str] = []
-            if data.is_single_syllable(prefix):
-                synth = list(
-                    dict.fromkeys(
-                        data.syllables_for_segment(prefix, 1_000_000, True, True, total_limit=1_000_000)
-                    )
-                )
+            # 1) 合成音节：当前码串**能解码出的全部完整音节**（可能多节；尾端半截忽略）。
+            #    旧口径只看「整串是否恰好一个音节」，`vu zet t`（338e9/338e99）会显示（无），
+            #    但 vu、zet 明明已经打全——用户 2026-11-11 指出这是判定问题。
+            synth = data.synth_syllables(prefix)
             print("   合成音节: " + (", ".join(synth) if synth else "（无）"))
             # 2) 首字母组合（每键一个音节、元音自由；逐键累积）
             combos = data.initial_pattern_combos(prefix)
@@ -1472,6 +1492,22 @@ def cmd_selftest(args, data: Data) -> None:
         expect(got == code, f"parse_code({text!r}) = {got!r}（期望 {code!r}）")
     ok = any(r["reading"] == "li nak si" for r in data.prefix_word_rows(parse_code("kl ghi mno abc kl ps")))
     expect(ok, "键名写法 kl ghi mno abc kl ps 也能查到 li nak si")
+
+    # 3.6) 合成音节 = 当前码串能解码出的全部完整音节（多节；尾端半截忽略）
+    #      用户 2026-11-11：`vu zet t` 已打全 vu/zet 时不能显示「（无）」。
+    expect(data.synth_syllables("ia") == ["ga", "ha"], f"合成音节 ia = {data.synth_syllables('ia')}")
+    expect(
+        set(data.synth_syllables("ee5")) == {"de", "fe"},
+        f"合成音节 ee5 = {data.synth_syllables('ee5')}",
+    )
+    expect(
+        set(data.synth_syllables("338e9")) == {"vu", "zet", "jet"},
+        f"合成音节 338e9 = {data.synth_syllables('338e9')}",
+    )
+    expect(
+        set(data.synth_syllables("338e99")) == {"vu", "zet", "jet"},
+        f"合成音节 338e99（尾端半截 9）= {data.synth_syllables('338e99')}",
+    )
 
     # 4) 整串码前缀：5i4a57 → li nak si → Linux
     rows = data.prefix_word_rows("5i4a57")
