@@ -497,63 +497,56 @@ class CandidateRankingTest {
     }
 
     @Test
-    fun `recommend is the page after the bar and keeps words the bar dropped`() {
-        // 8 個詞 + 10 個單字：候選條只留 4 詞 + 8 字（12 條），第 5..8 個詞必須出現在推薦裡。
-        val wordTexts = listOf("你好", "爾雅", "學校", "電話", "電腦", "時間", "朋友", "老師")
-        val singleTexts = listOf("以", "夜", "就", "也", "有", "在", "要", "這", "呀", "真")
-        val words = wordTexts.mapIndexed { i, t -> item(t, index = i) }
-        val singles = singleTexts.mapIndexed { i, t -> item(t, index = 100 + i) }
-        val ordered = words + singles
-        val bar = CandidateRanking.rankBar(ordered, 12, 4)
-        val recommend = TwelveKeySnapshotBuilder.recommendFrom(ordered)
-        assertEquals(wordTexts.take(4), bar.take(4).map { it.text })
-        // 推薦第一條就是被詞組配額擠掉的「詞5」
-        assertEquals(wordTexts.drop(4), recommend.take(4).map { it.text })
-        // 推薦與候選條零重叠；條拿走 4 詞 + 8 字之後，剩下的單字續頁也在
-        assertTrue(bar.map { it.text }.toSet().intersect(recommend.map { it.text }.toSet()).isEmpty())
-        assertEquals(singleTexts.drop(8), recommend.drop(4).map { it.text })
-    }
-
-    @Test
-    fun `recommend is empty when everything fits in the bar`() {
-        val ordered = listOf(item("以", index = 0), item("夜", index = 1))
-        assertTrue(TwelveKeySnapshotBuilder.recommendFrom(ordered).isEmpty())
-    }
-
-    @Test
-    fun `recommend is capped by RECOMMEND_ITEMS`() {
-        val singles = (1..200).map { item("字$it", index = it) }
-        assertEquals(
-            TwelveKeyTuning.RECOMMEND_ITEMS,
-            TwelveKeySnapshotBuilder.recommendFrom(singles).size,
+    fun `recommend shows all association words in candidate bar order`() {
+        // 引擎/學習排序裡的詞先出（候選條同一套順序），再接 App 側聯想詞行的詞；
+        // 單字一律不進推薦組（用戶 2026-11-11 改定）。
+        val engineWords = listOf(item("你好", index = 0), item("爾雅", index = 1))
+        val engineSingles = listOf(item("以", index = 2), item("夜", index = 3))
+        val appWords = listOf(item("掛紙", index = 10), item("下把", index = 11))
+        val panelRows = listOf(
+            PanelRow("ga zi", appWords, segment = 1),
+            PanelRow("以", listOf(item("以", "ji", -1, segment = 0)), segment = 0),
         )
+        val recommend = TwelveKeySnapshotBuilder.recommendWords(engineWords + engineSingles, panelRows)
+        assertEquals(listOf("你好", "爾雅", "掛紙", "下把"), recommend.map { it.text })
     }
 
     @Test
-    fun `recommend keeps words first but caps them at half of the slots`() {
-        // 40 個詞 + 40 個單字：條上拿走 4 詞 + 8 字；推薦裡詞最多 18 條（36 的一半），其餘給單字。
-        fun cjk(n: Int): Char = (0x4E00 + n).toChar()
-        val wordTexts = (1..40).map { "${cjk(it)}${cjk(it + 200)}" }
-        val singleTexts = (1..40).map { "${cjk(it + 400)}" }
-        val ordered = wordTexts.mapIndexed { i, t -> item(t, index = i) } +
-            singleTexts.mapIndexed { i, t -> item(t, index = 100 + i) }
-        val recommend = TwelveKeySnapshotBuilder.recommendFrom(ordered)
-        assertEquals(TwelveKeyTuning.RECOMMEND_ITEMS, recommend.size)
-        val words = recommend.filter { CandidateRanking.isCjkWord(it.text) }
-        val singles = recommend.filterNot { CandidateRanking.isCjkWord(it.text) }
-        // 詞組在前、單字在後，且詞組不超過一半
-        assertEquals(words.map { it.text }, recommend.take(words.size).map { it.text })
-        assertEquals(TwelveKeyTuning.RECOMMEND_ITEMS / 2, words.size)
-        assertEquals(TwelveKeyTuning.RECOMMEND_ITEMS / 2, singles.size)
+    fun `recommend dedupes words repeated between engine and panel rows`() {
+        val engineWord = item("共產黨", "kiung than", index = 0)
+        val dup = item("共產黨", "kiung than", index = 7)
+        val panelRows = listOf(PanelRow("kiung than", listOf(dup, item("群眾", index = 8)), segment = 1))
+        val recommend = TwelveKeySnapshotBuilder.recommendWords(listOf(engineWord), panelRows)
+        assertEquals(listOf("共產黨", "群眾"), recommend.map { it.text })
+        // 引擎那條優先（index 保留 0，不被面板補的 index=7 蓋掉）
+        assertEquals(0, recommend.first().index)
     }
 
     @Test
-    fun `recommend lets words fill everything when there is no single char`() {
+    fun `recommend is empty when there are only single chars`() {
+        val ordered = listOf(item("以", index = 0), item("夜", index = 1))
+        assertTrue(TwelveKeySnapshotBuilder.recommendWords(ordered, emptyList()).isEmpty())
+    }
+
+    @Test
+    fun `recommend is capped by RECOMMEND_WORDS`() {
         fun cjk(n: Int): Char = (0x4E00 + n).toChar()
         val words = (1..50).map { i -> item("${cjk(i)}${cjk(i + 200)}", index = i) }
-        val recommend = TwelveKeySnapshotBuilder.recommendFrom(words)
+        val recommend = TwelveKeySnapshotBuilder.recommendWords(words, emptyList())
+        assertEquals(TwelveKeyTuning.RECOMMEND_WORDS, recommend.size)
         assertTrue(recommend.all { CandidateRanking.isCjkWord(it.text) })
-        assertEquals(TwelveKeyTuning.RECOMMEND_ITEMS, recommend.size)
+    }
+
+    @Test
+    fun `recommend keeps only CJK engine words but includes ASCII words from panel rows`() {
+        // 引擎候選裡的 ASCII（`Linux`）不算 CJK 詞組，不進「引擎段」；
+        // 但它作為整串詞行的條目（`li nak si → Linux`）屬於聯想詞，推薦組要收。
+        val engine = listOf(item("Linux", index = 0), item("你好", index = 1))
+        val panelRows = listOf(
+            PanelRow("li nak si", listOf(item("Linux", "li nak si", -1, segment = 1)), segment = 1),
+        )
+        val recommend = TwelveKeySnapshotBuilder.recommendWords(engine, panelRows)
+        assertEquals(listOf("你好", "Linux"), recommend.map { it.text })
     }
 
     @Test

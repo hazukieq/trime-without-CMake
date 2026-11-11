@@ -119,7 +119,7 @@ flowchart TD
 | `input` / `consumedEnd` / `remaining` | librime 原始码串、已消费前缀字节数、未消费码串（面板都用 `remaining`） |
 | `groups` | 面板左列（含第一行「推荐」）；面板关闭时为空 |
 | `barEntries` | 候选条 12 条（**选单顺序**，不是第 0 组） |
-| `recommend` | 候选条放不下的续页（≤36），即「推荐」组内容 |
+| `recommend` | 「推荐」组内容 = **全部联想词**（候选条同一套顺序，≤`RECOMMEND_WORDS`=20；单字不进） |
 | `fallback` | 引擎与字典**都没有**候选时的字母兜底（如 `qqqq`） |
 | `previewText` / `inlineText` | 嵌入式预览：候选条第一条 / 已选前缀 + 第一条 |
 | `hasCandidates` | `barEntries.isNotEmpty() \|\| groups.isNotEmpty()` —— **判断有没有候选只能用它** |
@@ -646,7 +646,7 @@ $ python3 tools/panel_probe.py selftest
 | 想改 | 改这里 |
 |---|---|
 | 候选条 12 格里词/单字比例 | `TwelveKeyTuning.BAR_WORD_SLOTS` |
-| 「推荐」组条数 | `TwelveKeyTuning.RECOMMEND_ITEMS` |
+| 「推荐」组条数 | `TwelveKeyTuning.RECOMMEND_WORDS`（=20，只放联想词） |
 | 段组每个音节列多少字 | `TwelveKeyTuning.SEGMENT_CHARS_LIMIT` |
 | 段组给多少个音节 | `SEGMENT_SYLLABLE_LIMIT(_RICH)`、`RICH_SYLLABLE_THRESHOLD` |
 | 联想行数量/词数 | `ASSOC_MAX_ROWS`、`ASSOC_WORDS`、`ASSOC_INITIAL_ROWS`、`ASSOC_INITIALS` |

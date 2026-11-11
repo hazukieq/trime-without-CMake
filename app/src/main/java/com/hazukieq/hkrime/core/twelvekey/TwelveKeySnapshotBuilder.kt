@@ -210,19 +210,11 @@ object TwelveKeySnapshotBuilder {
         } else {
             barList(ordered)
         }
-        // 候選條放不下的續頁 → 面板左列第一個「推薦」組（用戶 2026-11-11 定案）。
-        // 順序與候選條同源（[CandidateRanking.fullBarOrder]），起點是候選條之後的那一條：
-        // 這樣連「被 4 條詞組配額擠掉的第 5..N 個詞」也一起收進來，而不是只剩單字續頁。
-        val recommend = if (ordered.isEmpty() && panelRows.isNotEmpty()) {
-            // 字典兜底時同樣把「沒上條的部分」放進推薦組（續頁語義不變）
-            dictionaryRows
-                .flatMap { g -> g.items }
-                .distinctBy { it.text }
-                .drop(barEntries.size)
-                .take(TwelveKeyTuning.RECOMMEND_ITEMS)
-        } else {
-            recommendFrom(ordered)
-        }
+        // 面板左列第一個「推薦」組 = **全部聯想詞語**的排序顯示（用戶 2026-11-11 改定）：
+        // 不再放「候選條放不下的續頁」（單字、被詞組配額擠掉的詞都不再混進來），
+        // 只收聯想詞行（ASSOC / INITIAL_COMBO / WHOLE_WORD / 引擎詞組）裡出現的詞，
+        // 順序沿用候選條那套（引擎/學習排序 → 詞序），最多 [TwelveKeyTuning.RECOMMEND_WORDS] 條。
+        val recommend = recommendWords(ordered, panelRows)
         // 推薦組固定排左列第一（reading 為空 + [RECOMMEND_SEGMENT] 標記）；空的就不插，
         // 這樣「候選全上了條」時段組自然回到第 0 組。
         val recommendRow = if (recommend.isEmpty()) {
@@ -961,28 +953,37 @@ object TwelveKeySnapshotBuilder {
         CandidateRanking.rankBar(ranked, BAR_ITEMS)
 
     /**
-     * 面板「推薦」組的內容 = 候選條放不下的續頁。
+     * 面板「推薦」組的內容 = **全部聯想詞語**（按候選條同一套順序，最多
+     * [TwelveKeyTuning.RECOMMEND_WORDS] 條）。
      *
-     * 純函數（便於單測）：與候選條共用 [CandidateRanking.fullBarOrder] 的順序，只取第
-     * `BAR_ITEMS+1` 條起的前 [TwelveKeyTuning.RECOMMEND_ITEMS] 條。
-     * 關鍵：必須用 `fullBarOrder` 而不是 `rankBar` 的結果 `drop`，否則被 4 條詞組配額
-     * 擠掉的第 5..N 個詞會永遠看不到（用戶 2026-11-11 定案要收進推薦）。
+     * 用戶 2026-11-11：「推薦那裡的顯示的詞語，改為所有聯想詞語的排序顯示（按照候選條顯示的
+     * 算法來做），數量取至多 20 個」。
+     *
+     * 順序：
+     * 1. 引擎/學習排序後的候選先過 [CandidateRanking.fullBarOrder]（= 候選條的唯一來源，
+     *    去重 + 詞前字後），只留 CJK 詞組（ASCII/顏文字不算聯想詞）；
+     * 2. 再接面板聯想詞行裡的詞（App 側補的 `ga zi` / `li nak si` 這類不在引擎候選裡的詞），
+     *    按面板行序；同一文字只留第一條（引擎條目優先，保留 comment/index）。
+     *
+     * 為什麼不再用「候選條續頁」口徑：推薦組只放詞，才能一屏看完所有聯想詞；
+     * 單字續頁由候選條/段組承擔，不再擠進推薦。
      */
-    internal fun recommendFrom(ordered: List<CandidateItem>): List<CandidateItem> {
-        val order = CandidateRanking.fullBarOrder(ordered)
-        if (order.isEmpty()) return order
-        // 注意：不能用 `order.drop(BAR_ITEMS)` —— 候選條除「總條數 12」外還有「詞組區 ≤4」的配額，
-        // 被配額擠掉的第 5..N 個詞在 order 的前 12 條裡，`drop(12)` 會把它們一起跳過，
-        // 於是「推薦」就只剩單字續頁。這裡按「不在候選條裡」取補集。
-        val onBar = CandidateRanking.rankBar(ordered, BAR_ITEMS).mapTo(HashSet()) { it.text }
-        val rest = order.filterNot { onBar.contains(it.text) }
-        // 布局與候選條同源（用戶 2026-11-11）：詞組在前、單字在後；差別是詞組配額放寬到
-        // 「最多佔一半」（條上是 12 條裡的 4 條），其餘位置留給單字。
-        val words = rest.filter { CandidateRanking.isCjkWord(it.text) }
-        val singles = rest.filterNot { CandidateRanking.isCjkWord(it.text) }
-        // 特例與候選條一致：完全沒有單字時，詞組才可以佔滿整個推薦組。
-        if (singles.isEmpty()) return words.take(TwelveKeyTuning.RECOMMEND_ITEMS)
-        val wordCap = TwelveKeyTuning.RECOMMEND_ITEMS / 2
-        return (words.take(wordCap) + singles).take(TwelveKeyTuning.RECOMMEND_ITEMS)
+    internal fun recommendWords(
+        engineCandidates: List<CandidateItem>,
+        panelWordRows: List<PanelRow>,
+    ): List<CandidateItem> {
+        val seen = HashSet<String>()
+        val out = ArrayList<CandidateItem>(TwelveKeyTuning.RECOMMEND_WORDS)
+        CandidateRanking.fullBarOrder(engineCandidates)
+            .filter { CandidateRanking.isCjkWord(it.text) }
+            .forEach { item -> if (seen.add(item.text)) out.add(item) }
+        panelWordRows.forEach { row ->
+            if (row.segment != 1) return@forEach
+            row.items.forEach { item ->
+                if (item.text.isEmpty()) return@forEach
+                if (seen.add(item.text)) out.add(item)
+            }
+        }
+        return out.take(TwelveKeyTuning.RECOMMEND_WORDS)
     }
 }
