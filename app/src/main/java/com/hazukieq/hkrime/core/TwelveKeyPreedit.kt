@@ -1,6 +1,7 @@
 package com.hazukieq.hkrime.core
 
 import android.content.Context
+import com.hazukieq.hkrime.core.twelvekey.PhraseMemory
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeyTuning
 import timber.log.Timber
 import java.util.HashMap
@@ -47,19 +48,18 @@ object TwelveKeyPreedit {
      */
     private val assocWords = HashMap<String, LinkedHashMap<String, Int>>()
 
-    /**
-     * 用戶詞庫（librime userdb）的兩音節詞讀音，來自 `<userDataDir>/sync/<installation>/<name>.userdb.txt`。
-     *
-     * 為什麼需要它（用戶 2026-11-11：「b cam 應該出 bi cam，但音節組裡沒有」）：
-     * 資產詞表沒有 `bi cam`（B站），這條只在用戶詞庫裡；而簡拼/首字母通配匹配是按
-     * 「真實詞條的讀音」進行的，資產詞表看不到的詞就永遠進不了面板。
-     * 用戶詞庫快照每行是 `讀音 \t 詞面 \t metadata`（如 `bi cam \t B站 ...`），
-     * 直接拿讀音欄建聯想索引，B站 就會以 `bi cam` 行出現。
-     *
-     * 只收**兩音節**：三音節以上要塞進整串碼索引（7 萬條）會把載入時間/內存撐爆，
-     * 目前面板聯想行也只按前兩個音節做 key；等有需要再單獨建輕量索引。
-     */
-    private val assocWordsFromUser = HashSet<String>()
+    // ---- App 學習詞（PhraseMemory）索引 ----
+    // 面板匹配與候選條**同源**：候選條把 PhraseMemory 的學習詞當合成候選混進去
+    // （見 TwelveKeySnapshotBuilder.mergeLearnedPhrases），面板也該用同一份「詞→讀音」。
+    // 用戶 2026-11-11：「候選條能拿到 B站，為甚麼面板不行」——根因就是面板的
+    // reading 索引只吃詞表，沒吃這份學習記憶（PhraseMemory 裡有 `aaa4 → B站 / bi cam`）。
+    // 只在 PhraseMemory.version 變化時重建（≤200 條，成本可忽略）。
+
+    private var learnedIndexVersion = -1
+    private var learnedAssoc: Map<String, Map<String, List<String>>> = emptyMap()
+    private var learnedInitial: Map<String, List<Pair<String, List<String>>>> = emptyMap()
+    private var learnedHybrid: Map<String, List<Pair<String, List<String>>>> = emptyMap()
+    private var learnedWords: Set<String> = emptySet()
 
     /**
      * 詞條的整串碼：`Linux` → tokens `[li, nak, si]` → `5i4a57i`。
@@ -258,65 +258,17 @@ object TwelveKeyPreedit {
                 names.forEach { name ->
                     loadWordLines(RimeDictSource.body(appContext, name).asSequence())
                 }
-                // 第一階段：資產詞表索引（perf-gate 的 assoc_load 口徑，與用戶詞無關）。
                 finishWordIndex()
                 Timber.i(
                     "TwelveKeyPreedit: assoc keys=%d byFirst=%d lists=%s load=%dms",
                     assocWords.size, assocByFirst.size, names.joinToString(","),
                     (System.nanoTime() - t0) / 1_000_000,
                 )
-                // 第二階段：用戶詞庫（兩音節）併入後整体重建一次索引；放在 load 日誌之後，
-                // 不讓 3MB 快照解析污染 assoc_load 指標（索引重建在後台線程，鍵盤已可用）。
-                val userAdded = loadUserWordsFromSync()
-                if (userAdded > 0) {
-                    finishWordIndex()
-                    Timber.i(
-                        "TwelveKeyPreedit: assoc keys=%d byFirst=%d userWords=%d ready=%dms",
-                        assocWords.size, assocByFirst.size, userAdded,
-                        (System.nanoTime() - t0) / 1_000_000,
-                    )
-                }
             }.onFailure { Timber.w(it, "TwelveKeyPreedit: load word lists failed") }
         }, "twelvekey-assoc").apply {
             isDaemon = true
             start()
         }
-    }
-
-    /**
-     * 從 librime 的 userdb 同步快照載入用戶詞庫讀音。
-     *
-     * 路徑：`Rime.get_sync_dir()`（native，通常 `<userDataDir>/sync`），向下找最新的
-     * `*.userdb.txt`；native 拿不到時退回 `AppPrefs.conf.userDataDir/sync`。
-     * 沒有同步過（或快照不存在）時靜默跳過——面板只是暫時沒有用戶詞，不影響啟動。
-     */
-    private fun loadUserWordsFromSync(): Int {
-        var added = 0
-        runCatching {
-            val roots = LinkedHashSet<java.io.File>()
-            runCatching { Rime.get_sync_dir() }.getOrNull()
-                ?.takeIf { it.isNotBlank() }
-                ?.let { roots.add(java.io.File(it)) }
-            runCatching {
-                com.hazukieq.hkrime.data.AppPrefs.defaultInstance().conf.userDataDir
-            }.getOrNull()?.takeIf { it.isNotBlank() }
-                ?.let { roots.add(java.io.File(it, "sync")) }
-            val snapshots = roots.asSequence()
-                .filter { it.isDirectory }
-                .flatMap { it.walkTopDown().asSequence() }
-                .filter { it.isFile && it.name.endsWith(".userdb.txt") }
-                .toList()
-            // 同步目錄裡可能有別方案的快照（`rime_ice.userdb.txt` 等），它們的讀音不是客家話音節，
-            // 優先取主詞典同名的那份；沒有時才退回最新的任意一份（多數情況會解析出 0 條）。
-            val snapshot = snapshots
-                .filter { it.name == "$MAIN_DICT.userdb.txt" }
-                .maxByOrNull { it.lastModified() }
-                ?: snapshots.maxByOrNull { it.lastModified() }
-                ?: return added
-            added = loadUserWordsFromSnapshot(snapshot)
-            Timber.i("TwelveKeyPreedit: userdb snapshot=%s", snapshot.absolutePath)
-        }.onFailure { Timber.w(it, "TwelveKeyPreedit: load userdb snapshot failed") }
-        return added
     }
 
     /** 主詞典名（`hakka.dict.yaml`）；它自己的 `import_tables` 決定聯想詞要讀哪些詞表。 */
@@ -463,95 +415,52 @@ object TwelveKeyPreedit {
         }
     }
 
-    /**
-     * 載入用戶詞庫快照（`*.userdb.txt`）。
-     *
-     * 行格式：`spelling \t word \t meta`（rime 導出的 userdb 快照），例如
-     * `bi cam \tB站\tc=7 d=2.68 t=787137`。只取前兩欄；讀音走音節集合校驗。
-     * 只收兩音節詞（面板聯想索引按前兩音節建 key，見 [assocWordsFromUser]）。
-     */
-    internal fun loadUserWordLines(lines: Sequence<String>): Int {
-        var added = 0
-        lines.forEach { raw ->
-            val line = raw.trim()
-            if (line.isEmpty() || line.startsWith("#")) return@forEach
-            val cols = line.split('\t')
-            if (cols.size < 2) return@forEach
-            val syllables = cols[0].trim().split(' ', '\u3000').filter { it.isNotEmpty() }
-            if (syllables.size != 2) return@forEach
-            if (addUserWordPair(syllables[0], syllables[1], cols[1].trim())) added++
-        }
-        Timber.i("TwelveKeyPreedit: userWords=%d (assoc keys=%d)", added, assocWords.size)
-        return added
-    }
-
-    /**
-     * 從快照檔逐行快速解析（3.2MB / 7 萬行，逐行 `split` 會讓後台 load 多花 ~1.5s，超過
-     * perf-gate 的 `assoc_load` 閾值）：只對「恰有一個空格（兩音節）」的行做字串分配。
-     */
-    private fun loadUserWordsFromSnapshot(file: java.io.File): Int {
-        var added = 0
-        file.bufferedReader(Charsets.UTF_8, 1 shl 16).use { reader ->
-            while (true) {
-                val raw = reader.readLine() ?: break
-                if (raw.isEmpty() || raw[0] == '#') continue
-                val t1 = raw.indexOf('\t')
-                if (t1 <= 0) continue
-                // 讀音欄 = [0, t1)，去掉尾端空白
-                var end = t1
-                while (end > 0 && raw[end - 1] == ' ') end--
-                if (end <= 0) continue
-                // 兩音節判定：恰有一個空格（避免 split 分配）
-                var sp = -1
-                var spaces = 0
-                var i = 0
-                while (i < end) {
-                    if (raw[i] == ' ') {
-                        spaces++
-                        sp = i
-                        if (spaces > 1) break
-                    }
-                    i++
-                }
-                if (spaces != 1 || sp <= 0 || sp >= end - 1) continue
-                val t2 = raw.indexOf('\t', t1 + 1)
-                val wordEnd = if (t2 < 0) raw.length else t2
-                var ws = t1 + 1
-                while (ws < wordEnd && raw[ws] == ' ') ws++
-                if (ws >= wordEnd) continue
-                val first = raw.substring(0, sp)
-                val second = raw.substring(sp + 1, end)
-                val word = raw.substring(ws, wordEnd)
-                if (addUserWordPair(first, second, word)) added++
+    /** PhraseMemory 變化時重建「學習詞 → 讀音」索引（面板與候選條同源）。 */
+    private fun ensureLearnedIndex() {
+        val version = PhraseMemory.version
+        if (version == learnedIndexVersion) return
+        val assoc = HashMap<String, LinkedHashMap<String, LinkedHashSet<String>>>()
+        val initial = HashMap<String, LinkedHashMap<String, LinkedHashSet<String>>>()
+        val hybrid = HashMap<String, LinkedHashMap<String, LinkedHashSet<String>>>()
+        val words = HashSet<String>()
+        PhraseMemory.allEntries().forEach { entry ->
+            val text = entry.text
+            if (text.isEmpty()) return@forEach
+            val tokens = entry.readings.split(' ', '\u3000').filter { it.isNotEmpty() }
+            if (tokens.size < 2) return@forEach
+            if (syllableSet.isNotEmpty() && tokens.any { it !in syllableSet }) return@forEach
+            val reading = tokens.joinToString(" ")
+            words.add(text)
+            if (tokens.size == 2) {
+                assoc.getOrPut(tokens[0]) { LinkedHashMap() }
+                    .getOrPut(tokens[1]) { LinkedHashSet() }
+                    .add(text)
             }
+            val initials = tokens.joinToString("") { it.first().toString() }
+            initial.getOrPut(initials) { LinkedHashMap() }
+                .getOrPut(reading) { LinkedHashSet() }
+                .add(text)
+            val prefix = tokens.dropLast(1).joinToString("") { it.first().toString() }
+            hybrid.getOrPut(prefix + "|" + tokens.last()) { LinkedHashMap() }
+                .getOrPut(reading) { LinkedHashSet() }
+                .add(text)
         }
-        Timber.i("TwelveKeyPreedit: userWords=%d (assoc keys=%d)", added, assocWords.size)
-        return added
-    }
-
-    /** 校驗 + 寫入用戶詞（兩音節）；回傳是否收錄。 */
-    private fun addUserWordPair(first: String, second: String, word: String): Boolean {
-        if (first.isEmpty() || second.isEmpty() || word.isEmpty()) return false
-        if (!first.all(Char::isLetter) || !second.all(Char::isLetter)) return false
-        if (syllableSet.isNotEmpty() && (first !in syllableSet || second !in syllableSet)) return false
-        var cjkOnly = true
-        for (ch in word) {
-            if (!isCjk(ch)) {
-                cjkOnly = false
-                break
+        learnedAssoc = assoc.mapValues { (_, rows) -> rows.mapValues { (_, ws) -> ws.toList() } }
+        fun freeze(src: HashMap<String, LinkedHashMap<String, LinkedHashSet<String>>>) =
+            src.mapValues { (_, rows) ->
+                rows.entries.sortedBy { it.key }.map { it.key to it.value.toList() }
             }
-        }
-        if (cjkOnly && word.length !in 2..4) return false
-        if (!cjkOnly && word.length !in 1..16) return false
-        val key = first + "|" + second
-        val bucket = assocWords.getOrPut(key) { LinkedHashMap() }
-        bucket[word] = (bucket[word] ?: 0) + 1
-        assocWordsFromUser.add(word)
-        return true
+        learnedInitial = freeze(initial)
+        learnedHybrid = freeze(hybrid)
+        learnedWords = words
+        learnedIndexVersion = version
     }
 
-    /** 該詞是否來自用戶詞庫（面板選行時給用戶自己的詞更高優先，見 docs/17 §7.2）。 */
-    internal fun isUserWord(word: String): Boolean = word in assocWordsFromUser
+    /** 該詞是否為 App 學習詞（面板選行時給更高優先，見 docs/17 §7.2）。 */
+    internal fun isLearnedWord(word: String): Boolean {
+        ensureLearnedIndex()
+        return word in learnedWords
+    }
 
     /** 診斷：整串碼表裡到底有沒有某個詞（真機排查「面板查不到」用；數量小，開銷可忽略）。 */
     fun debugWordCodeEntries(probeWord: String = "Linux"): String {
@@ -570,7 +479,11 @@ object TwelveKeyPreedit {
      */
     internal fun clearWordDataForTest() {
         assocWords.clear()
-        assocWordsFromUser.clear()
+        learnedIndexVersion = -1
+        learnedAssoc = emptyMap()
+        learnedInitial = emptyMap()
+        learnedHybrid = emptyMap()
+        learnedWords = emptySet()
         wordCodeEntries.clear()
         wordCodeIndex = emptyList()
         assocByFirst = emptyMap()
@@ -922,9 +835,24 @@ object TwelveKeyPreedit {
     }
 
     /** 按模式查詞表（純簡拼走 [initialPatternIndex]，混合走 [hybridPatternIndex]）。 */
-    internal fun wordsByPattern(pattern: InitialPattern): List<Pair<String, List<String>>> =
-        if (pattern.isHybrid) hybridPatternIndex[pattern.key] ?: emptyList()
-        else initialPatternIndex[pattern.initials.joinToString("")] ?: emptyList()
+    internal fun wordsByPattern(pattern: InitialPattern): List<Pair<String, List<String>>> {
+        ensureLearnedIndex()
+        val key = pattern.initials.joinToString("")
+        val base = if (pattern.isHybrid) hybridPatternIndex[pattern.key] ?: emptyList()
+        else initialPatternIndex[key] ?: emptyList()
+        val learned = if (pattern.isHybrid) learnedHybrid[pattern.key] ?: emptyList()
+        else learnedInitial[key] ?: emptyList()
+        if (learned.isEmpty()) return base
+        // 學過的詞與資產詞表按讀音合併（同讀音取並集；行內順序沿用資產詞表在前）。
+        val merged = LinkedHashMap<String, LinkedHashSet<String>>()
+        base.forEach { (reading, words) ->
+            merged.getOrPut(reading) { LinkedHashSet() }.addAll(words)
+        }
+        learned.forEach { (reading, words) ->
+            merged.getOrPut(reading) { LinkedHashSet() }.addAll(words)
+        }
+        return merged.entries.sortedBy { it.key }.map { it.key to it.value.toList() }
+    }
 
     /**
      * 按「讀音首字母序列」查詞表：`[g, b]` → `gang bung`、`gau boi`…
@@ -999,7 +927,19 @@ object TwelveKeyPreedit {
      *
      * 返回的是**已按熱度降序**的詞列表；沒有聯想詞回空 map。
      */
-    internal fun assocSecondMap(first: String): Map<String, List<String>> = assocByFirst[first] ?: emptyMap()
+    internal fun assocSecondMap(first: String): Map<String, List<String>> {
+        ensureLearnedIndex()
+        val base = assocByFirst[first]
+        val learned = learnedAssoc[first]
+        if (learned == null || learned.isEmpty()) return base ?: emptyMap()
+        if (base == null) return learned
+        val merged = LinkedHashMap<String, List<String>>(base)
+        learned.forEach { (second, words) ->
+            val had = merged[second]
+            merged[second] = if (had == null) words else had + words
+        }
+        return merged
+    }
 
     /** 詞典行載入後統一收尾：音節次數 → code 表。 */
     internal fun finishLoading(counts: HashMap<String, Int>) {

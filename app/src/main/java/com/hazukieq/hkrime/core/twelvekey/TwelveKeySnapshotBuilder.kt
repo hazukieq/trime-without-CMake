@@ -580,7 +580,7 @@ object TwelveKeySnapshotBuilder {
         sources = setOf(RowSource.ASSOC),
         // 用戶詞庫的詞優先進面板（選行階段，見 pickBucketRows）：B站 這種只在 userdb 裡的詞
         // 不該因為「同桶詞數少」被 12 行預算擠掉（用戶 2026-11-11）。
-        hasUserWord = words.any { TwelveKeyPreedit.isUserWord(it) },
+        hasUserWord = words.any { TwelveKeyPreedit.isLearnedWord(it) },
     )
 
     /**

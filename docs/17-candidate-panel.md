@@ -218,20 +218,20 @@ flowchart TD
 （禁止 `than d**` 這種通配寫法）。用戶 2026-11-11 定案：**分組組詞不足 20 條時要完整展示**，
 所以上限放到 20（`jen cin` 桶 23 條時取前 20，`遠程控制` 第 13 條不再被舊 6 條上限擠掉）。
 
-#### 7.2.1 詞源：資產詞表 + 用戶詞庫同步快照（2026-11-11）
+#### 7.2.1 詞源：資產詞表 + PhraseMemory 學習詞（2026-11-11，與候選條同源）
 
-聯想行按「真實詞條的讀音」匹配，所以**詞源必須包含用戶自己學到的詞**，否則只存在 userdb 的詞
-（如 `bi cam B站`）永遠進不了面板——用戶 2026-11-11 報「`aaa4` 簡拼 b+cam 看不到 `bi cam` 行」。
+聯想行按「真實詞條的讀音」匹配；詞源必須和**候選條**一致，否則會出現「候選條有、面板沒有」：
 
-- App 在後台詞表線程裡，讀完資產詞表後呼叫 `TwelveKeyPreedit.loadUserWordsFromSync()`：
-  路径取 `Rime.get_sync_dir()`（native）→ 遍歷 `<sync>/<installation>/<name>.userdb.txt`，
-  取最新一份；沒有同步過/快照不存在時靜默跳過（面板只是暫時沒有用戶詞）。
-- 快照行格式 `reading \t word \t meta`（如 `bi cam \tB站\tc=7 d=2.68 t=787137`），
-  **直接用第一欄讀音**建 `assocWords`（`bi|cam` → B站），不走 `charTable` 反推。
-- 只收 **兩音節**、讀音全部在客家話音節集合內、詞長規則與資產詞表一致（漢字 2~4 字、非漢字 1~16）。
-  三音節以上暫時不入索引（7 萬條會把整串碼索引/載入時間撐爆），有需要再單獨建輕量索引。
-- 選行時 `PanelRow.hasUserWord=true` 的行在同桶內排最前（只影響「12 行預算留哪些」，不影響顯示順序）；
-  腳本 `panel_probe.py` 沒有用戶詞庫，行為不變，golden 不受影響。
+- 候選條 = 引擎候選（`Rime.candidatesSnapshot`，comment 就是讀音）+ `PhraseMemory` 學習詞
+  （逐段拼出來後被點選的詞，`text` / `readings` 都是現成欄位，見 `mergeLearnedPhrases`）。
+- 面板此前只吃資產詞表 → `B站`（`bi cam`，只在 userdb / PhraseMemory）永遠進不了左列。
+- 現在 `TwelveKeyPreedit` 在 `PhraseMemory.version` 變化時重建一份「學習詞 → 讀音」索引
+  （`learnedAssoc` / `learnedInitial` / `learnedHybrid`，上限 `MAX_ENTRIES=200`，成本可忽略），
+  在 `assocSecondMap()` / `wordsByPattern()` 查詢時與資產詞表按讀音**取並集**；
+  `isLearnedWord()` 供選行優先（`PanelRow.hasUserWord`）。
+- 語義後果（與候選條對齊）：學習過的詞才能參與面板簡拼通配，沒被點選、引擎也沒給過的
+  userdb 詞不會預先出現——不再解析外部 `*.userdb.txt` 快照，也不依賴「同步過沒有」。
+- 腳本 `panel_probe.py` 沒有 PhraseMemory，行為不變，golden 不受影響。
 
 #### 7.2.0 只认**客家话音节集合**（2026-11-11 定）
 

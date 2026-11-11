@@ -297,6 +297,13 @@ object PhraseMemory {
         trimGlobal(now)
     }
 
+    /**
+     * 全部學習詞（面板匹配用：面板要像候選條一樣吃同一份「詞→讀音」）。
+     *
+     * 條目上限 [MAX_ENTRIES]=200，直接攤平即可，不需要索引。
+     */
+    internal fun allEntries(): List<Entry> = byCode.values.flatten()
+
     /** 某碼串下可以作為合成候選的詞條（已按分數降序，次數未達標的被過濾）。 */
     fun candidatesFor(code: String, now: Long = System.currentTimeMillis()): List<Entry> {
         val key = normalizeCode(code)
