@@ -115,6 +115,13 @@ object TwelveKeyPreedit {
     private var initialPatternIndex: Map<String, List<Pair<String, List<String>>>> = emptyMap()
 
     /**
+     * 「簡拼 + 完整音節」索引：key = `前 N-1 個音節首字母拼接|末音節`
+     * （如 `b|can`）→ 讀音 → 詞列表。用戶 2026-11-11：`abc abc abc mno`（碼 `aaa4`）
+     * 要能得到 `b cam` / `b can` 這類組合。
+     */
+    private var hybridPatternIndex: Map<String, List<Pair<String, List<String>>>> = emptyMap()
+
+    /**
      * 碼位 → 該鍵能作音節首字母的字母（**非末鍵**版，已排除元音與後綴 `r`）。
      *
      * 給面板 `INITIAL_COMBO` 源用：`ia8` 每鍵各取一個首字母組成「g·b / h·c…」通配組合，
@@ -415,6 +422,7 @@ object TwelveKeyPreedit {
         wordCodeIndex = emptyList()
         assocByFirst = emptyMap()
         initialPatternIndex = emptyMap()
+        hybridPatternIndex = emptyMap()
         assocReady = false
     }
 
@@ -706,6 +714,65 @@ object TwelveKeyPreedit {
         return combos
     }
 
+    /** 一個召回首字母模式：純簡拼（每音節一個首字母）或「簡拼 + 最後一個完整音節」。 */
+    internal data class InitialPattern(val initials: List<Char>, val tail: String? = null) {
+        val isHybrid: Boolean get() = tail != null
+        val key: String get() = initials.joinToString("") + (tail?.let { "|$it" } ?: "")
+    }
+
+    /**
+     * 「簡拼 + 完整音節」規則（用戶 2026-11-11）：前面的鍵各出一個音節首字母，
+     * **最後一段碼串恰好是一個完整音節**。`aaa4` 拆 `a` + `aa4`（aa4 = cam/ban/can）
+     * → `b·cam`、`b·ban`、`b·can`…；所有切法都試（k=1..n-1）。
+     * 完整音節的判定走音節集合（[isSingleSyllable] / [syllablesForSegment] 的 exact 音節）。
+     */
+    internal fun initialHybridPatterns(codes: String): List<InitialPattern> {
+        val clean = codes.replace("'", "")
+        if (clean.length < 2) return emptyList()
+        val out = ArrayList<InitialPattern>()
+        for (k in 1 until clean.length) {
+            val suffix = clean.substring(k)
+            if (!isSingleSyllable(suffix)) continue
+            var prefixes: List<List<Char>> = listOf(emptyList())
+            var ok = true
+            for (i in 0 until k) {
+                val letters = keyInitialLetters(clean[i], isLast = false)
+                if (letters.isEmpty()) { ok = false; break }
+                prefixes = prefixes.flatMap { p -> letters.map { p + it } }
+                if (prefixes.size > TwelveKeyTuning.INITIAL_COMBO_PATTERN_LIMIT) { ok = false; break }
+            }
+            if (!ok) continue
+            val tails = syllablesForSegment(
+                suffix,
+                1_000_000,
+                exactOnly = true,
+                totalLimit = 1_000_000,
+                allowSuffixOnly = true,
+            )
+            for (pre in prefixes) {
+                for (tail in tails) out.add(InitialPattern(pre, tail))
+            }
+        }
+        return out
+    }
+
+    /** 首字母組合規則 = 純簡拼組合 + 簡拼+完整音節（總數封頂，純組合在前；與腳本同口徑）。 */
+    internal fun initialPatterns(codes: String): List<InitialPattern> {
+        val pure = initialCombos(codes).map { InitialPattern(it) }
+        val hybrids = initialHybridPatterns(codes)
+        val all = pure + hybrids
+        return if (all.size > TwelveKeyTuning.INITIAL_COMBO_PATTERN_LIMIT) {
+            all.subList(0, TwelveKeyTuning.INITIAL_COMBO_PATTERN_LIMIT)
+        } else {
+            all
+        }
+    }
+
+    /** 按模式查詞表（純簡拼走 [initialPatternIndex]，混合走 [hybridPatternIndex]）。 */
+    internal fun wordsByPattern(pattern: InitialPattern): List<Pair<String, List<String>>> =
+        if (pattern.isHybrid) hybridPatternIndex[pattern.key] ?: emptyList()
+        else initialPatternIndex[pattern.initials.joinToString("")] ?: emptyList()
+
     /**
      * 按「讀音首字母序列」查詞表：`[g, b]` → `gang bung`、`gau boi`…
      *
@@ -727,15 +794,37 @@ object TwelveKeyPreedit {
                 .getOrPut(reading) { LinkedHashSet() }
                 .add(word)
         }
+        // 簡拼+完整音節索引：末音節用完整讀音、前面的音節只按首字母。
+        // 純詞表只知道前兩個音節，所以只把**兩字純詞**當作完整兩音節；帶讀音的詞表按整條入索引。
+        val byHybrid = HashMap<String, LinkedHashMap<String, LinkedHashSet<String>>>()
+        fun addHybrid(tokens: List<String>, word: String) {
+            if (tokens.size < 2) return
+            val prefix = tokens.dropLast(1).joinToString("") { it.firstOrNull()?.toString() ?: "" }
+            if (prefix.length != tokens.size - 1) return
+            val key = prefix + "|" + tokens.last()
+            val reading = tokens.joinToString(" ")
+            byHybrid.getOrPut(key) { LinkedHashMap() }
+                .getOrPut(reading) { LinkedHashSet() }
+                .add(word)
+        }
         // 兩音節詞（聯想索引）——純詞表反推出來的也在這裡，是面板最常用的來源。
         assocWords.forEach { (key, bucket) ->
             val sep = key.indexOf('|')
             if (sep <= 0 || sep >= key.length - 1) return@forEach
             val tokens = listOf(key.substring(0, sep), key.substring(sep + 1))
-            bucket.keys.forEach { word -> add(tokens, word) }
+            bucket.keys.forEach { word ->
+                add(tokens, word)
+                if (word.length == 2) addHybrid(tokens, word)
+            }
         }
         // 三音節以上的詞（帶讀音的詞表才有）。
-        entries.forEach { entry -> add(entry.tokens, entry.word) }
+        entries.forEach { entry ->
+            add(entry.tokens, entry.word)
+            addHybrid(entry.tokens, entry.word)
+        }
+        hybridPatternIndex = byHybrid.mapValues { (_, rows) ->
+            rows.entries.sortedBy { it.key }.map { it.key to it.value.toList() }
+        }
         return byPattern.mapValues { (_, rows) ->
             rows.entries.sortedBy { it.key }.map { it.key to it.value.toList() }
         }

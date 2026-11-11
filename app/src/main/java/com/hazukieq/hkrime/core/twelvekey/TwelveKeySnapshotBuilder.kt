@@ -586,13 +586,15 @@ object TwelveKeySnapshotBuilder {
      */
     internal fun initialComboRows(codes: String): List<PanelRow> {
         if (codes.length < 2) return emptyList()
-        val combos = TwelveKeyPreedit.initialCombos(codes)
+        // 用戶 2026-11-11：除了「每鍵一個首字母」的純簡拼，還要「簡拼 + 完整音節」
+        // （`aaa4` → `b·cam` / `b·can`）；完整音節的判定走音節集合。
+        val combos = TwelveKeyPreedit.initialPatterns(codes)
         if (combos.isEmpty()) return emptyList()
         val rows = ArrayList<PanelRow>(INITIAL_COMBO_MAX_ROWS)
         val seen = HashSet<String>()
         // 兩輪：第一輪每個組合先出第 1 行（保證「g·b / g·c / h·b / h·c」都有代表），
         // 第二輪再給每個組合補第 2 行。節奏由 INITIAL_COMBO_ROWS_PER_PATTERN 控制。
-        val entriesByCombo = combos.map { TwelveKeyPreedit.wordsByInitialPattern(it) }
+        val entriesByCombo = combos.map { TwelveKeyPreedit.wordsByPattern(it) }
         for (round in 0 until 2) {
             val start = round * INITIAL_COMBO_ROWS_PER_PATTERN
             val stop = start + INITIAL_COMBO_ROWS_PER_PATTERN

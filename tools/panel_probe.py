@@ -582,7 +582,7 @@ class Data:
             )
         # 首字母組合行（每鍵一個音節首字母，元音不固定）：`ghi+abc` → g b / g c / h b / h c，
         # 每個組合找真實詞條，行標題仍是具體讀音（用戶 2026-11-11：「g.* z.*」）。
-        for reading, words in self.initial_pattern_rows(codes):
+        for _label, reading, words in self.initial_pattern_rows(codes):
             groups.append(
                 {
                     "reading": reading,
@@ -618,6 +618,27 @@ class Data:
             key = tuple(t[0] for t in tokens)
             bucket = self.by_initials.setdefault(key, [])
             bucket.append((tokens, word))
+        # 简拼+完整音节（用户 2026-11-11）：末音节按完整读音匹配、前面的音节只按首字母。
+        # key = 「前 N-1 个音节首字母拼接 | 末音节」，如 `b|can`。
+        # 纯词表只知道前两个音节，所以只把**两字纯词**当成完整两音节入索引；
+        # 带读音的词表（zon/hakka 等）按整条读音入索引。
+        self.by_hybrid: dict[str, list[tuple[list[str], str]]] = {}
+        def _add_hybrid(tokens: list[str], word: str) -> None:
+            if len(tokens) < 2:
+                return
+            prefix = "".join(t[0] for t in tokens[:-1])
+            key = prefix + "|" + tokens[-1]
+            self.by_hybrid.setdefault(key, []).append((tokens, word))
+        for first, by_second in self.assoc.items():
+            for second, words in by_second.items():
+                if not first or not second:
+                    continue
+                for word in words:
+                    # 两字纯词：前两音节就是完整读音；更长的纯词读音未知，不参与。
+                    if len(word) == 2:
+                        _add_hybrid([first, second], word)
+        for tokens, word, _code in self.word_codes:
+            _add_hybrid(tokens, word)
 
     def key_initial_letters(self, code_char: str, is_last: bool = False) -> list[str]:
         """某个码位能作音节首字母的字母（排除元音；按音节集合实际出现过的首字母）。
@@ -683,9 +704,55 @@ class Data:
                 return []
         return combos
 
+    def initial_pattern_hybrids(self, codes: str) -> list[tuple[str, ...]]:
+        """「简拼 + 完整音节」组合（用户 2026-11-11）。
+
+        前面的键各贡献一个音节首字母，**最后一段码串恰好是一个完整音节**：
+        `aaa4` 拆成 `a` + `aa4`（aa4 = cam/ban/can）→ `b·can`、`b·ban`、`c·cam`…
+        所有切法都试（k=1..n-1；suffix 必须是单音节码），前缀组合数受
+        `INITIAL_COMBO_PATTERN_LIMIT` 约束。
+        """
+        clean = codes.replace("'", "")
+        if len(clean) < 2:
+            return []
+        out: list[tuple[str, ...]] = []
+        for k in range(1, len(clean)):
+            suffix = clean[k:]
+            if not self.is_single_syllable(suffix):
+                continue
+            prefix_combos: list[tuple[str, ...]] = [()]
+            ok = True
+            for ch in clean[:k]:
+                letters = self.key_initial_letters(ch, is_last=False)
+                if not letters:
+                    ok = False
+                    break
+                prefix_combos = [pre + (x,) for pre in prefix_combos for x in letters]
+                if len(prefix_combos) > INITIAL_COMBO_PATTERN_LIMIT:
+                    ok = False
+                    break
+            if not ok:
+                continue
+            tails = self.syllables_for_segment(
+                suffix, 1_000_000, True, True, total_limit=1_000_000
+            )
+            for pre in prefix_combos:
+                for tail in tails:
+                    out.append(pre + (tail,))
+        return out
+
+    def initial_patterns(self, codes: str) -> list[tuple[str, ...]]:
+        """首字母组合规则 = 纯简拼组合 + 简拼+完整音节（总数封顶，保持纯组合在前）。"""
+        pure = self.initial_pattern_combos(codes)
+        hybrids = self.initial_pattern_hybrids(codes)
+        patterns = list(pure) + hybrids
+        if len(patterns) > INITIAL_COMBO_PATTERN_LIMIT:
+            patterns = patterns[:INITIAL_COMBO_PATTERN_LIMIT]
+        return patterns
+
     def initial_pattern_rows(
         self, codes: str, max_rows: int = INITIAL_COMBO_MAX_ROWS
-    ) -> list[tuple[str, list[str]]]:
+    ) -> list[tuple[str, str, list[str]]]:
         """「每键一个音节首字母」的联想行：字母组合×真实词条，行标题仍是具体读音。
 
         与 App `INITIAL_COMBO` 源同一套**轮转**语义（docs/19 §5.2/步骤 3）：
@@ -701,29 +768,34 @@ class Data:
         codes = codes.replace("'", "")
         if len(codes) < 2:
             return []
-        combos = self.initial_pattern_combos(codes)
+        combos = self.initial_patterns(codes)
         if not combos:
             return []
         # 先把每个组合的命中词条按读音分组、按读音字典序排好（与 App `wordsByInitialPattern` 同构：
         # 同一读音的多条词合并成一行）。跨組合輪轉時直接按序号取。
         entries_by_combo: list[list[tuple[str, list[str]]]] = []
         for combo in combos:
+            if len(combo[-1]) > 1:
+                entries = self.by_hybrid.get("".join(combo[:-1]) + "|" + combo[-1]) or []
+            else:
+                entries = self.by_initials.get(combo) or []
             grouped: "OrderedDict[str, list[str]]" = OrderedDict()
-            for tokens, word in self.by_initials.get(combo) or []:
+            for tokens, word in entries:
                 grouped.setdefault(" ".join(tokens), []).append(word)
             entries_by_combo.append(sorted(grouped.items()))
-        rows: list[tuple[str, list[str]]] = []
+        rows: list[tuple[str, str, list[str]]] = []
         seen: set[str] = set()
         # 两轮：第 1 轮每组合 1 条，第 2 轮再补第 2 条（`ROWS_PER_PATTERN` 控制每轮条数）
         for round_index in range(2):
             start = round_index * INITIAL_COMBO_ROWS_PER_PATTERN
             stop = start + INITIAL_COMBO_ROWS_PER_PATTERN
-            for entries in entries_by_combo:
+            for combo, entries in zip(combos, entries_by_combo):
+                label = "·".join(combo)
                 for reading, words in entries[start:stop]:
                     if reading in seen:
                         continue
                     seen.add(reading)
-                    rows.append((reading, list(words)))
+                    rows.append((label, reading, list(words)))
                     if len(rows) >= max_rows:
                         return rows
         return rows
@@ -1214,17 +1286,21 @@ def cmd_syllables(args, data: Data) -> None:
             synth = data.synth_syllables(prefix)
             print("   合成音节: " + (", ".join(synth) if synth else "（无）"))
             # 2) 首字母组合（每键一个音节、元音自由；逐键累积）
-            combos = data.initial_pattern_combos(prefix)
-            shown = ", ".join("·".join(c) for c in combos[:8])
-            tail = "" if len(combos) <= 8 else f" …（共 {len(combos)} 组）"
-            print(f"   {length}键组合({len(combos)}): " + (shown + tail if combos else "（无）"))
+            pure = data.initial_pattern_combos(prefix)
+            hybrids = data.initial_pattern_hybrids(prefix)
+            shown = ", ".join("·".join(c) for c in pure[:8])
+            tail = "" if len(pure) <= 8 else f" …（共 {len(pure)} 组）"
+            print(f"   {length}键组合({len(pure)}): " + (shown + tail if pure else "（无）"))
             print('     注：组合里每个字母都隐含「≥1 个字母」（如 g·b = g.* 与 b.*，元音不限）')
+            # 2b) 简拼 + 完整音节（用户 2026-11-11：前面的键各出一个首字母，最后一段码串是完整音节）
+            if hybrids:
+                hshown = ", ".join("·".join(c) for c in hybrids[:8])
+                htail = "" if len(hybrids) <= 8 else f" …（共 {len(hybrids)} 组）"
+                print(f"   简拼+完整音节({len(hybrids)}): " + hshown + htail)
             # 3) 实际存在的词语：按组合 → 真实词条（行标题=具体读音）
             words_by_combo: "OrderedDict[str, list[str]]" = OrderedDict()
-            for reading, words in data.initial_pattern_rows(prefix, max_rows=32):
-                combo = "·".join(t[0] for t in reading.split(" ")) if " " in reading else ""
-                combo = "·".join(t[0] for t in reading.split(" "))
-                words_by_combo.setdefault(combo, []).append(f"{reading}={','.join(words[:3])}")
+            for label, reading, words in data.initial_pattern_rows(prefix, max_rows=32):
+                words_by_combo.setdefault(label, []).append(f"{reading}={','.join(words[:3])}")
             if words_by_combo:
                 print("   实际存在词语:")
                 for combo, items in words_by_combo.items():
@@ -1716,6 +1792,17 @@ def cmd_selftest(args, data: Data) -> None:
         len(combo_rows) <= INITIAL_COMBO_MAX_ROWS,
         f"ia8i3 首字母组合行数 ≤ {INITIAL_COMBO_MAX_ROWS}（实际 {len(combo_rows)}）",
     )
+    # 简拼 + 完整音节（用户 2026-11-11：`abc abc abc mno` 应得到 `b cam` / `b can`）
+    patterns_a4 = data.initial_patterns("aaa4")
+    expect(
+        ("b", "can") in patterns_a4 and ("b", "cam") in patterns_a4,
+        f"aaa4 简拼+完整音节应含 b·cam / b·can：{patterns_a4[-14:]}",
+    )
+    expect(
+        all(p[0] in "bc" for p in patterns_a4 if len(p[-1]) > 1),
+        "简拼前缀首字母不得含元音（元音不做开头）",
+    )
+
     # 上一条在 ia8i3 上恰好是 0；再用真实有命中的 `5i` 守住「组合行能产出且不超上限」
     combo_rows_5i = data.initial_pattern_rows("5i")
     expect(

@@ -240,6 +240,25 @@ class TwelveKeyCoverageTest {
     }
 
     @Test
+    fun hybridInitialCombosKeepFullTailSyllable() {
+        // 用戶 2026-11-11：`abc abc abc mno`（碼 aaa4）要能得到「簡拼 + 完整音節」
+        // `b·cam` / `b·can`；完整音節判定走音節集合（aa4 = cam/ban/can）。
+        val patterns = TwelveKeyPreedit.initialPatterns("aaa4")
+        assertTrue(
+            "應含 b·can：${patterns.map { it.key }}",
+            patterns.any { it.initials == listOf('b') && it.tail == "can" },
+        )
+        assertTrue(
+            "應含 b·cam：${patterns.map { it.key }}",
+            patterns.any { it.initials == listOf('b') && it.tail == "cam" },
+        )
+        assertTrue(
+            "簡拼前綴不得含元音：${patterns.filter { it.isHybrid }.map { it.initials }}",
+            patterns.filter { it.isHybrid }.all { p -> p.initials.all { it !in "aeiou" } },
+        )
+    }
+
+    @Test
     fun associationRowAndRecommendKeepFullWordsBelowLimit() {
         // 用戶 2026-11-11：`jen cin kung z` 的「远程控制」不能因為行內配額被擠掉——
         // ① `jen cin` 分組的組詞不足 20 條時要完整展示（ASSOC_WORDS 已放開到 20）；

@@ -3500,7 +3500,46 @@
           ]
         }
       ],
-      "combo": [],
+      "combo": [
+        {
+          "reading": "kai gung",
+          "items": [
+            "快攻"
+          ]
+        },
+        {
+          "reading": "kong hung",
+          "items": [
+            "狂吼",
+            "狂轰"
+          ]
+        },
+        {
+          "reading": "lau gung",
+          "items": [
+            "劳工",
+            "老公"
+          ]
+        },
+        {
+          "reading": "lung hung",
+          "items": [
+            "龙吼"
+          ]
+        },
+        {
+          "reading": "keu gung",
+          "items": [
+            "口供"
+          ]
+        },
+        {
+          "reading": "len gung",
+          "items": [
+            "练功"
+          ]
+        }
+      ],
       "whole_word": [
         {
           "reading": "kiung than dong",
@@ -3595,6 +3634,20 @@
         ]
       },
       {
+        "reading": "kai gung",
+        "segment": 1,
+        "items": [
+          "快攻"
+        ]
+      },
+      {
+        "reading": "keu gung",
+        "segment": 1,
+        "items": [
+          "口供"
+        ]
+      },
+      {
         "reading": "ki gon",
         "segment": 1,
         "items": [
@@ -3684,6 +3737,29 @@
           "科学界",
           "科学知识",
           "科学研究"
+        ]
+      },
+      {
+        "reading": "kong hung",
+        "segment": 1,
+        "items": [
+          "狂吼",
+          "狂轰"
+        ]
+      },
+      {
+        "reading": "lau gung",
+        "segment": 1,
+        "items": [
+          "劳工",
+          "老公"
+        ]
+      },
+      {
+        "reading": "len gung",
+        "segment": 1,
+        "items": [
+          "练功"
         ]
       },
       {
@@ -3807,6 +3883,13 @@
           "柳眉",
           "柳眉剔竖",
           "柳眉踢竖"
+        ]
+      },
+      {
+        "reading": "lung hung",
+        "segment": 1,
+        "items": [
+          "龙吼"
         ]
       }
     ]
