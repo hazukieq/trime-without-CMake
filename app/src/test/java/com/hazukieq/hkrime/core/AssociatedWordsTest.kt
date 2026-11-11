@@ -161,17 +161,22 @@ class AssociatedWordsTest {
     @Test
     fun kiungPlusTheStillEmitsAssociationRows() {
         // 用戶 2026-11-10：「kiung th d —— th 和 def 合成 the，導致什麼聯想詞都沒有」。
-        // 剩餘碼 `we` 剛好是一個完整音節（洗=the），面板仍必須出「kiung than」這類聯想詞行。
+        // 剩餘碼 `we` 展開不到任何音節（`we` 不是任何音節的碼前綴）→ 面板必須回退到
+        // 「該第一音節的全部後續音節」，照樣出聯想行，而不是一行都沒有。
+        //
+        // 2026-11-11 用戶改定「分桶輪轉 + 字母序 + 行數 12」：具體選中哪幾行由桶的字母序決定
+        // （`kiun bak` 這類桶排在 `kiung than` 前面），所以這裡不再釘死某一行，只釘
+        // 「有聯想行、行標題是具體兩音節、內容非空」。
         val groups = com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder
             .debugSegmentGroups("5i34iwe")
-        val readings = groups.map { it.reading }
-        println("PROBE groups=$readings")
-        assertTrue("應有 kiung than 行，實際 $readings", readings.any { it == "kiung than" })
-        val thanGroup = groups.first { it.reading == "kiung than" }
+        val assoc = groups.filter { it.segment == 1 }
+        println("PROBE assoc=${assoc.map { it.reading }}")
+        assertTrue("應有聯想詞行，實際 ${groups.map { it.reading }}", assoc.isNotEmpty())
         assertTrue(
-            "kiung than 行應含共產黨，實際 ${thanGroup.items.map { it.text }}",
-            thanGroup.items.any { it.text.contains("共产党") },
+            "聯想行標題必須是兩個完整音節：${assoc.map { it.reading }}",
+            assoc.all { it.reading.split(' ').size == 2 },
         )
+        assertTrue("聯想行不能是空的：${assoc.map { it.reading }}", assoc.all { it.items.isNotEmpty() })
     }
 
     @Test

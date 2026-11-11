@@ -1,6 +1,7 @@
 package com.hazukieq.hkrime.core
 
 import android.content.Context
+import com.hazukieq.hkrime.core.twelvekey.TwelveKeyTuning
 import timber.log.Timber
 import java.util.HashMap
 
@@ -94,6 +95,30 @@ object TwelveKeyPreedit {
      */
     @Volatile
     private var assocByFirst: Map<String, Map<String, List<String>>> = emptyMap()
+
+    /**
+     * 「讀音首字母序列」→ [(reading, words)] 的索引（面板 `INITIAL_COMBO` 源用）。
+     *
+     * `ia8` 兩個鍵分別能起 g/h 與 z/j → 查 `gz`/`gj`/`hz`/`hj` 四組真實詞條，
+     * 行標題仍是具體讀音（`ga zi`、`han ziu`…）。索引同時收「兩音節聯想詞」與
+     * 「帶讀音的多音節詞」（三音節以上 `Linux` 這類），不依賴詞表是否有讀音列。
+     */
+    @Volatile
+    private var initialPatternIndex: Map<String, List<Pair<String, List<String>>>> = emptyMap()
+
+    /**
+     * 碼位 → 該鍵能作音節首字母的字母（**非末鍵**版，已排除元音與後綴 `r`）。
+     *
+     * 給面板 `INITIAL_COMBO` 源用：`ia8` 每鍵各取一個首字母組成「g·b / h·c…」通配組合，
+     * 再按組合去詞表找具體讀音（行標題仍是 `gang bung` 這種真音節）。
+     * 用 [TwelveKeyTuning.INITIAL_COMBO_PATTERN_LIMIT] 封頂組合數，避免 2^k 爆炸。
+     */
+    @Volatile
+    private var initialLettersByCode: Map<Char, List<Char>> = emptyMap()
+
+    /** 同 [initialLettersByCode]，但**允許末鍵**貢獻後綴音節首字母（`r`）。 */
+    @Volatile
+    private var initialLettersByCodeLast: Map<Char, List<Char>> = emptyMap()
 
     // ---- 只讀診斷（性能門禁 PerfGate / 單測用）----
     fun debugSyllableCount(): Int = table.size
@@ -370,6 +395,22 @@ object TwelveKeyPreedit {
             "hits=" + hits.take(4).joinToString(";") { "${it.code}<-${it.tokens.joinToString(" ")}" }
     }
 
+    /**
+     * 單測用：清空已載入的詞表資料（聯想/整串碼/首字母索引）。
+     *
+     * 多個測試類別共用這個 object，`loadWordLines` 是累加的（會重複計數、影響
+     * 「取哪幾條」的排序）。golden 對拍要求乾淨詞表，所以測試載入前先呼叫這個。
+     * 正式執行路徑只有在初始化時載入一次，不需要它。
+     */
+    internal fun clearWordDataForTest() {
+        assocWords.clear()
+        wordCodeEntries.clear()
+        wordCodeIndex = emptyList()
+        assocByFirst = emptyMap()
+        initialPatternIndex = emptyMap()
+        assocReady = false
+    }
+
     /** 詞表載入完後把索引整理成「按熱度降序」的列表，避免每次查詢都排序。 */
     internal fun finishWordIndex() {
         assocWords.values.forEach { bucket ->
@@ -396,6 +437,7 @@ object TwelveKeyPreedit {
         assocReady = index.isNotEmpty()
         // 整體替換（讀者看到的是舊或新的完整列表，不會看到半截）
         wordCodeIndex = ArrayList(wordCodeEntries)
+        initialPatternIndex = buildInitialPatternIndex(wordCodeEntries)
         assocGeneration++
     }
 
@@ -548,6 +590,107 @@ object TwelveKeyPreedit {
             .take(limit)
     }
 
+    /** 由音節集合重建「碼位 → 可作首字母的字母」索引（[finishLoading] 後呼叫一次）。 */
+    private fun rebuildInitialLetters() {
+        val normal = HashMap<Char, MutableSet<Char>>()
+        val last = HashMap<Char, MutableSet<Char>>()
+        val vowels = TwelveKeyTuning.VOWEL_LETTERS
+        syllableSet.forEach { syllable ->
+            val initial = syllable.firstOrNull() ?: return@forEach
+            if (initial in vowels) return@forEach
+            val suffixOnly = isSuffixOnlySyllable(syllable)
+            TwelveKeyTuning.KEY_LETTERS.forEach { (code, letters) ->
+                if (initial !in letters) return@forEach
+                if (!suffixOnly) normal.getOrPut(code) { LinkedHashSet() }.add(initial)
+                last.getOrPut(code) { LinkedHashSet() }.add(initial)
+            }
+        }
+        initialLettersByCode = normal.mapValues { it.value.sorted() }
+        initialLettersByCodeLast = last.mapValues { it.value.sorted() }
+    }
+
+    /**
+     * 某個碼位能作音節首字母的字母（排除元音；後綴 `r` 只在 [isLast] 時出現）。
+     *
+     * 與 `tools/panel_probe.py` 的 `key_initial_letters()` 同口徑；首字母集合取自
+     * 客家話音節集合（主詞典），不讀任何外部資產。
+     */
+    internal fun keyInitialLetters(codeChar: Char, isLast: Boolean): List<Char> =
+        (if (isLast) initialLettersByCodeLast else initialLettersByCode)[codeChar] ?: emptyList()
+
+    /**
+     * 每鍵取一個音節首字母的笛卡爾積（`ia8` → `(g|h)(z|j)` 4 組）。
+     *
+     * [TwelveKeyTuning.INITIAL_COMBO_PATTERN_LIMIT] 是**組合數**上限，不是鍵數上限：
+     * `5i4a57` 6 鍵恰好 64 組仍生成，7 鍵以上通常超限 → 整組不生成。
+     * 任一鍵沒有任何可用首字母（純元音鍵、`0` 等）也整組不生成。
+     */
+    internal fun initialCombos(codes: String): List<List<Char>> {
+        val clean = codes.replace("'", "")
+        if (clean.isEmpty()) return emptyList()
+        var combos: List<List<Char>> = listOf(emptyList())
+        for ((index, ch) in clean.withIndex()) {
+            val letters = keyInitialLetters(ch, isLast = index == clean.lastIndex)
+            if (letters.isEmpty()) return emptyList()
+            combos = combos.flatMap { prefix -> letters.map { prefix + it } }
+            if (combos.size > TwelveKeyTuning.INITIAL_COMBO_PATTERN_LIMIT) return emptyList()
+        }
+        return combos
+    }
+
+    /**
+     * 按「讀音首字母序列」查詞表：`[g, b]` → `gang bung`、`gau boi`…
+     *
+     * 只回傳**音節數與 [pattern] 相同、且每個音節首字母都對上**的詞條（對應
+     * `panel_probe.py` 的 `by_initials`）。行內按讀音字典序分組，供面板取前幾條。
+     */
+    /** 由「聯想詞索引 + 整串碼索引」建 [initialPatternIndex]（[finishWordIndex] 時整體替換）。 */
+    private fun buildInitialPatternIndex(
+        entries: List<WordCodeEntry>,
+    ): Map<String, List<Pair<String, List<String>>>> {
+        // key = 各音節首字母拼接；value = reading → 詞列表（保持字典序，面板取前幾條要穩定）
+        val byPattern = HashMap<String, LinkedHashMap<String, LinkedHashSet<String>>>()
+        fun add(tokens: List<String>, word: String) {
+            if (tokens.size < 2) return
+            val key = tokens.joinToString("") { it.firstOrNull()?.toString() ?: "" }
+            if (key.length != tokens.size) return
+            val reading = tokens.joinToString(" ")
+            byPattern.getOrPut(key) { LinkedHashMap() }
+                .getOrPut(reading) { LinkedHashSet() }
+                .add(word)
+        }
+        // 兩音節詞（聯想索引）——純詞表反推出來的也在這裡，是面板最常用的來源。
+        assocWords.forEach { (key, bucket) ->
+            val sep = key.indexOf('|')
+            if (sep <= 0 || sep >= key.length - 1) return@forEach
+            val tokens = listOf(key.substring(0, sep), key.substring(sep + 1))
+            bucket.keys.forEach { word -> add(tokens, word) }
+        }
+        // 三音節以上的詞（帶讀音的詞表才有）。
+        entries.forEach { entry -> add(entry.tokens, entry.word) }
+        return byPattern.mapValues { (_, rows) ->
+            rows.entries.sortedBy { it.key }.map { it.key to it.value.toList() }
+        }
+    }
+
+    /**
+     * 按「讀音首字母序列」查詞表：`[g, b]` → `gang bung`、`gau boi`…
+     *
+     * 只回傳**音節數與 [pattern] 相同、且每個音節首字母都對上**的詞條
+     * （對應 `panel_probe.py` 的 `by_initials`）。行內按讀音字典序。
+     */
+    internal fun wordsByInitialPattern(pattern: List<Char>): List<Pair<String, List<String>>> {
+        if (pattern.size < 2) return emptyList()
+        return initialPatternIndex[pattern.joinToString("")] ?: emptyList()
+    }
+
+    /**
+     * 第一音節 → (第二音節 → 詞列表) 的原始聯想索引（面板 `ASSOC` 源分桶用）。
+     *
+     * 返回的是**已按熱度降序**的詞列表；沒有聯想詞回空 map。
+     */
+    internal fun assocSecondMap(first: String): Map<String, List<String>> = assocByFirst[first] ?: emptyMap()
+
     /** 詞典行載入後統一收尾：音節次數 → code 表。 */
     internal fun finishLoading(counts: HashMap<String, Int>) {
         // 可重入：測試會在不同測試類別各自載入一次資源；這裡先把派生表清空再重建，
@@ -565,6 +708,7 @@ object TwelveKeyPreedit {
             codeToSyllables.getOrPut(code) { ArrayList() }.add(Entry(syllable, freq))
         }
         buildGeneralScores()
+        rebuildInitialLetters()
         Timber.i("TwelveKeyPreedit: syllables=%d codes=%d scores=%d", counts.size, table.size, generalScores.size)
     }
 
@@ -640,7 +784,9 @@ object TwelveKeyPreedit {
                     list.filter(::allowed).forEach { prefix.add(syllableCode[code.length] to it) }
             }
         }
-        val exactSorted = exact.sortedByDescending { it.freq }
+        // 同頻時按音節字典序（不能用插入順序，HashMap 的迭代順序不可依賴；
+        // 腳本 `panel_probe.py` 用同一 key，golden 才能逐行一致）。
+        val exactSorted = exact.sortedWith(compareByDescending<Entry> { it.freq }.thenBy { it.syllable })
         // 前綴命中要同時滿足兩件事：
         // 1) 「下一個碼位」多樣：`w`（th 鍵）要能給 than（下一個 a）/ the（下一個 e）…
         // 2) 「音節首字母」多樣：`i`（ghi 鍵）要 g/h/i 交替，不能整批 g 系。
@@ -652,9 +798,20 @@ object TwelveKeyPreedit {
                 .getOrPut(initial) { ArrayList() }
                 .add(e)
         }
-        outer.values.forEach { inner -> inner.values.forEach { it.sortByDescending { e -> e.freq } } }
+        outer.values.forEach { inner ->
+            inner.values.forEach { list ->
+                list.sortWith(compareByDescending<Entry> { it.freq }.thenBy { it.syllable })
+            }
+        }
+        // 桶順序必須**完全確定**（不能依賴 HashMap 的迭代順序）：外層按「桶內最高頻」降序、
+        // 同頻按 next-code 碼位；內層按音節首字母。腳本 `panel_probe.py` 用同一 key 排序，
+        // golden 對拍才能逐行一致（docs/19 §6「純函數可測」）。
         val order = outer.entries
-            .sortedByDescending { (_, inner) -> inner.values.maxOfOrNull { it.first().freq } ?: 0 }
+            .sortedWith(
+                compareByDescending<Map.Entry<Char, LinkedHashMap<Char, MutableList<Entry>>>> { entry ->
+                    entry.value.values.maxOfOrNull { it.first().freq } ?: 0
+                }.thenBy { it.key }
+            )
             .map { it.value }
         // limit = **每個首字母**最多取幾個（用戶 2026-11-10：常數應對應「各取一份」而不是平分）；
         // 總數另有上限 MAX_SYLLABLES_TOTAL，避免一個鍵覆蓋 3 個聲母時左列過長。
@@ -671,7 +828,7 @@ object TwelveKeyPreedit {
             order.any { inner -> inner.values.any { it.size > round } }
         ) {
             order.forEach { inner ->
-                inner.forEach { (initial, list) ->
+                inner.entries.sortedBy { it.key }.forEach { (initial, list) ->
                     if (round < list.size && (perInitialSeen[initial] ?: 0) < perInitialCap &&
                         diversified.size + distinctExact.size < totalCap
                     ) {

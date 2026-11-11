@@ -165,8 +165,10 @@ class TwelveKeyCoverageTest {
         val assoc = groups.filter { it.segment == 1 }
         assertTrue("we 應有首字母級聯想行（如 than d），實際 ${assoc.map { it.reading }}", assoc.isNotEmpty())
         assertTrue("聯想行詞數應 ≤ 6，實際 ${assoc.first().items.size}", assoc.first().items.size <= 6)
-        // 總行數要收斂（用戶 2026-11-10：增補聯想組不要給太多，影響性能就截斷）
-        assertTrue("聯想行總數應 ≤4，實際 ${assoc.size}：${assoc.map { it.reading }}", assoc.size <= 4)
+        // 總行數要收斂（用戶 2026-11-10：增補聯想組不要給太多，影響性能就截斷；
+        // 2026-11-11 分桶輪轉後預算放開到 ASSOC_BUCKET_ROW_BUDGET = ASSOC_MAX_ROWS×3）
+        val budget = com.hazukieq.hkrime.core.twelvekey.TwelveKeyTuning.ASSOC_BUCKET_ROW_BUDGET
+        assertTrue("聯想行總數應 ≤$budget，實際 ${assoc.size}：${assoc.map { it.reading }}", assoc.size <= budget)
     }
 
     @Test

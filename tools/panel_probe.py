@@ -84,6 +84,9 @@ SECONDARY_SPLIT_DIVISOR = 2
 MAX_SYLLABLES_TOTAL = SEGMENT_SYLLABLE_LIMIT
 ASSOC_WORDS = 6
 ASSOC_MAX_ROWS = 4
+# 分桶輪轉後每輪實際取幾行：桶數可以很多（(g,b)/(g,c)/(h,b)/(h,c)…），
+# 4 行只夠 4 個桶露頭；×3 讓更多桶有代表。與 App `ASSOC_BUCKET_ROW_BUDGET` 同值。
+ASSOC_BUCKET_ROW_BUDGET = ASSOC_MAX_ROWS * 3
 ASSOC_PREFIX_READINGS = 4
 
 # --- 首字母組合（INITIAL_COMBO）常量：與 App `TwelveKeyTuning` 及 docs/19 §5.2 同值 ---
@@ -100,6 +103,11 @@ INITIAL_COMBO_PATTERN_LIMIT = 64
 
 
 # ---------------------------------------------------------------- 基础工具
+
+
+def _is_cjk(ch: str) -> bool:
+    code = ord(ch)
+    return 0x3400 <= code <= 0x4DBF or 0x4E00 <= code <= 0x9FFF
 
 
 def code_of(syllable: str) -> str:
@@ -137,8 +145,14 @@ class Data:
         self.code_to_syllables: dict[str, list[str]] = defaultdict(list)
         # 联想（两音节词）：第一音节 → 第二音节 → 词表（按热度降序）
         self.assoc: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
+        # 词频：与 App `assocWords` 的 count 一致（同一词跨词表出现多次就累加），
+        # 决定桶内「取哪 6 条」（App 按 count 降序、同 count 按词面）。
+        self._assoc_freq: dict[str, dict[str, dict[str, int]]] = defaultdict(lambda: defaultdict(dict))
         # 整串码（只收词表自带读音的条目）：code → [(tokens, word)]
         self.word_codes: list[tuple[list[str], str, str]] = []
+        # 单字 → 首读音（镜像 App 的 charTable）：纯词表（sougou 这类没有读音列的）
+        # 靠它反推前两字读音，否则联想索引会比 App 少一大截。
+        self.char_first: dict[str, str] = {}
 
         main = os.path.join(data_dir, "hakka.dict.yaml")
         if not os.path.isfile(main):
@@ -167,10 +181,13 @@ class Data:
             if not syl or not syl.isalpha():
                 continue
             self.syllable_freq[syl] = self.syllable_freq.get(syl, 0) + 1
-            if len(ch) == 1:
+            # Kotlin 的 Char 是 UTF-16 單元，BMP 外字（U+24334 這類）在 App 端 `ch.length==1`
+            # 不成立、整條被跳過；腳本的 Python `len(ch)==1` 卻會收——golden 會差一個字。
+            if len(ch) == 1 and ord(ch) <= 0xFFFF:
                 chars = self.syllable_chars[syl]
                 if ch not in chars:
                     chars.append(ch)
+                self.char_first.setdefault(ch, syl)
         for syl in self.syllable_freq:
             self.code_to_syllables[code_of(syl)].append(syl)
 
@@ -257,6 +274,31 @@ class Data:
     def _load_words(self, path: str) -> None:
         for line in _iter_body(path):
             if "\t" not in line:
+                # 纯词表（`hakka_sougou_words` 这类没有读音列）：镜像 App
+                # `TwelveKeyPreedit.loadWordLines` 的 charTable 反推——只反推**前两字**读音，
+                # 且只进联想索引（不建整串码：App 端同样只对带读音的条目建 word_codes，
+                # 否则 2 千条会撑到 17 万条、真机加载从 1s 变 18s）。
+                word = line.strip()
+                if len(word) < 2:
+                    continue
+                # 与 App `loadWordLines` 同口径：先反推前两字读音，再套词长规则
+                #（汉字词 2~4 字；含非汉字的词 1~16 字——`你不上QQ` 这类也收）。
+                cjk_only = all(_is_cjk(c) for c in word)
+                if cjk_only and len(word) not in (2, 3, 4):
+                    continue
+                if not cjk_only and not (1 <= len(word) <= 16):
+                    continue
+                r1 = self.char_first.get(word[0])
+                r2 = self.char_first.get(word[1])
+                if not r1 or not r2:
+                    continue
+                if r1 not in self.syllables or r2 not in self.syllables:
+                    continue
+                bucket = self.assoc[r1][r2]
+                if word not in bucket:
+                    bucket.append(word)
+                freq = self._assoc_freq[r1][r2]
+                freq[word] = freq.get(word, 0) + 1
                 continue
             word, rest = line.split("\t", 1)
             word = word.strip()
@@ -269,19 +311,35 @@ class Data:
             # （`例行 → li xing`），12 键方案不该把它们当音节用。
             if any(t not in self.syllables for t in tokens):
                 continue
+            # 词长过滤与 App `loadWordLines` 一致：汉字的词 2~4 字（三/四字词整词上屏更有用），
+            # 非汉字词（Linux、iPhone…）放宽到 1~16 字。不过滤会让联想桶比 App 多收长词、
+            # golden 对拍出现「脚本有、App 没有」的行。
+            cjk_only = all(_is_cjk(c) for c in word)
+            if cjk_only and len(word) not in (2, 3, 4):
+                continue
+            if not cjk_only and not (1 <= len(word) <= 16):
+                continue
             # 联想索引：只收两音节词（与 App 的 assocWords 一致）
             if len(tokens) >= 2:
                 bucket = self.assoc[tokens[0]][tokens[1]]
                 if word not in bucket:
                     bucket.append(word)
+                freq = self._assoc_freq[tokens[0]][tokens[1]]
+                freq[word] = freq.get(word, 0) + 1
             code = "".join(code_of(t) for t in tokens)
             if code:
                 self.word_codes.append((tokens, word, code))
 
     def _sort_assoc(self) -> None:
-        for by_second in self.assoc.values():
-            for words in by_second.values():
-                words.sort()
+        """桶内排序镜像 App `finishWordIndex`：出现次数降序、同次数按词面字典序。
+
+        App 的 `assocByFirst` 里词表就是按这个顺序存的，面板行内取前 `ASSOC_WORDS` 条
+        依赖它；脚本若只按词面排，golden 对拍会出现同一行文字集合不同。
+        """
+        for first, by_second in self.assoc.items():
+            for second, words in by_second.items():
+                freq = self._assoc_freq[first][second]
+                words.sort(key=lambda w: (-freq.get(w, 1), w))
 
     # -- 查询 ------------------------------------------------------------
 
@@ -354,19 +412,25 @@ class Data:
                 for syl in syllables:
                     if allowed(syl):
                         prefix.append((sc[len(code)], syl))
-        exact_sorted = sorted(exact, key=lambda s: -self.syllable_freq.get(s, 0))
+        # 同频按音节字典序（与 App 同一 key；不能依赖插入顺序）
+        exact_sorted = sorted(exact, key=lambda s: (-self.syllable_freq.get(s, 0), s))
 
         outer: OrderedDict[str, OrderedDict[str, list[str]]] = OrderedDict()
         for next_code, syl in prefix:
             outer.setdefault(next_code, OrderedDict()).setdefault(syl[0], []).append(syl)
         for inner in outer.values():
             for key in inner:
-                inner[key].sort(key=lambda s: -self.syllable_freq.get(s, 0))
+                inner[key].sort(key=lambda s: (-self.syllable_freq.get(s, 0), s))
+        # 桶顺序必须完全确定（与 App 同一 key）：外层「桶内最高频」降序、同频按 next-code 码位；
+        # 内层按音节首字母。App 那边已不依赖 HashMap 迭代顺序，脚本这里必须镜像同一规则。
         order = [
             inner
             for _, inner in sorted(
                 outer.items(),
-                key=lambda kv: -max(self.syllable_freq.get(v[0], 0) for v in kv[1].values()),
+                key=lambda kv: (
+                    -max(self.syllable_freq.get(v[0], 0) for v in kv[1].values()),
+                    kv[0],
+                ),
             )
         ]
 
@@ -382,7 +446,7 @@ class Data:
             any(len(lst) > round_idx for lst in inner.values()) for inner in order
         ):
             for inner in order:
-                for initial, lst in inner.items():
+                for initial, lst in sorted(inner.items()):
                     if (
                         round_idx < len(lst)
                         and per_initial[initial] < per_initial_cap
@@ -412,7 +476,6 @@ class Data:
             return []
 
         groups: list[dict] = []
-        seen: set[str] = set()
         assoc_buckets: OrderedDict[tuple[str, str], list[tuple[str, list[str]]]] = OrderedDict()
         for index, (head, rest) in enumerate(splits):
             pool = self.syllable_count_for_code(head)
@@ -429,9 +492,6 @@ class Data:
             # 注意 `source` 欄位已被「exact/prefix」佔用，這裡另開 `origin`，不改既有語義。
             origin = "synth" if index == 0 and not rest else "split"
             for syl in syllables:
-                if syl in seen:
-                    continue
-                seen.add(syl)
                 chars = self.syllable_chars.get(syl, [])
                 if not chars:
                     continue
@@ -459,9 +519,6 @@ class Data:
             for key, rows in self.assoc_buckets(assoc_first, rest).items():
                 assoc_buckets.setdefault(key, []).extend(rows)
         for reading, words in self.pick_bucket_rows(assoc_buckets):
-            if reading in seen:
-                continue
-            seen.add(reading)
             groups.append(
                 {
                     "reading": reading,
@@ -474,9 +531,6 @@ class Data:
         # 首字母組合行（每鍵一個音節首字母，元音不固定）：`ghi+abc` → g b / g c / h b / h c，
         # 每個組合找真實詞條，行標題仍是具體讀音（用戶 2026-11-11：「g.* z.*」）。
         for reading, words in self.initial_pattern_rows(codes):
-            if reading in seen:
-                continue
-            seen.add(reading)
             groups.append(
                 {
                     "reading": reading,
@@ -496,13 +550,22 @@ class Data:
         行标题仍然是具体读音（`gong bun`、`han coi`…）。
         """
         self.by_initials: dict[tuple[str, ...], list[tuple[list[str], str]]] = {}
+        # 两音节联想词（含纯词表反推出来的）：与 App `buildInitialPatternIndex` 同口径
+        for first, by_second in self.assoc.items():
+            for second, words in by_second.items():
+                if not first or not second:
+                    continue
+                key = (first[0], second[0])
+                bucket = self.by_initials.setdefault(key, [])
+                for word in words:
+                    bucket.append(([first, second], word))
+        # 三音节以上的词（带读音的词表）
         for tokens, word, _code in self.word_codes:
             if len(tokens) < 2:
                 continue
             key = tuple(t[0] for t in tokens)
             bucket = self.by_initials.setdefault(key, [])
-            if len(bucket) < 60:
-                bucket.append((tokens, word))
+            bucket.append((tokens, word))
 
     def key_initial_letters(self, code_char: str, is_last: bool = False) -> list[str]:
         """某个码位能作音节首字母的字母（排除元音；按音节集合实际出现过的首字母）。
@@ -562,11 +625,14 @@ class Data:
         combos = self.initial_pattern_combos(codes)
         if not combos:
             return []
-        # 先把每个组合的命中词条按读音字典序排好（跨組合輪轉時直接按序号取）
-        entries_by_combo = [
-            sorted(self.by_initials.get(combo) or [], key=lambda e: " ".join(e[0]))
-            for combo in combos
-        ]
+        # 先把每个组合的命中词条按读音分组、按读音字典序排好（与 App `wordsByInitialPattern` 同构：
+        # 同一读音的多条词合并成一行）。跨組合輪轉時直接按序号取。
+        entries_by_combo: list[list[tuple[str, list[str]]]] = []
+        for combo in combos:
+            grouped: "OrderedDict[str, list[str]]" = OrderedDict()
+            for tokens, word in self.by_initials.get(combo) or []:
+                grouped.setdefault(" ".join(tokens), []).append(word)
+            entries_by_combo.append(sorted(grouped.items()))
         rows: list[tuple[str, list[str]]] = []
         seen: set[str] = set()
         # 两轮：第 1 轮每组合 1 条，第 2 轮再补第 2 条（`ROWS_PER_PATTERN` 控制每轮条数）
@@ -574,12 +640,11 @@ class Data:
             start = round_index * INITIAL_COMBO_ROWS_PER_PATTERN
             stop = start + INITIAL_COMBO_ROWS_PER_PATTERN
             for entries in entries_by_combo:
-                for tokens, word in entries[start:stop]:
-                    reading = " ".join(tokens)
+                for reading, words in entries[start:stop]:
                     if reading in seen:
                         continue
                     seen.add(reading)
-                    rows.append((reading, [word]))
+                    rows.append((reading, list(words)))
                     if len(rows) >= max_rows:
                         return rows
         return rows
@@ -628,13 +693,14 @@ class Data:
     def pick_bucket_rows(
         self,
         buckets: "OrderedDict[tuple[str, str], list[tuple[str, list[str]]]]",
-        max_rows: int = ASSOC_MAX_ROWS * 3,
+        max_rows: int = ASSOC_BUCKET_ROW_BUDGET,
     ) -> list[tuple[str, list[str]]]:
         """跨拆法统一轮转取行：每个（首字母, 首字母）桶先出 1 行，保证通配组合都有代表。"""
         if not buckets:
             return []
         for rows in buckets.values():
-            rows.sort(key=lambda x: -len(x[1]))
+            # 桶内排序必须确定：词数降序、同词数按读音（与 App `pickBucketRows` 同一 key）
+            rows.sort(key=lambda x: (-len(x[1]), x[0]))
         picked: list[tuple[str, list[str]]] = []
         seen: set[str] = set()
 
@@ -746,9 +812,11 @@ class Data:
         return rows[:ASSOC_MAX_ROWS]
 
     def prefix_word_rows(self, codes: str) -> list[dict]:
+        # 每行標記 source，`merge_groups` 才能套用「整串詞行大小寫不敏感」規則。
         """整串码前缀联想（多音节词），镜像 wordsByCodePrefix。"""
         prefix = codes.replace("'", "")
         rows: OrderedDict[str, list[str]] = OrderedDict()
+        seen_words: dict[str, set[str]] = defaultdict(set)
         for tokens, word, code in self.word_codes:
             # 第一個音節必須打全（與 App `wordsByCodePrefix` 同口徑）：
             # 打 `ia`（= ga）時不該列出 `gam se`（= ia4|7e，第一段還沒打完）。
@@ -757,7 +825,12 @@ class Data:
                 continue
             if not code.startswith(prefix):
                 continue
-            rows.setdefault(" ".join(tokens), []).append(word)
+            reading = " ".join(tokens)
+            # 同一读音只收一次（App 端用 LinkedHashSet 去重）
+            if word in seen_words[reading]:
+                continue
+            seen_words[reading].add(word)
+            rows.setdefault(reading, []).append(word)
         if not rows:
             return []
         picked = sorted(rows.items(), key=lambda kv: -len(kv[1]))[:ASSOC_PREFIX_READINGS]
@@ -768,8 +841,8 @@ class Data:
                     "reading": reading,
                     "syllables": reading.split(" "),
                     "segment": 1,
-                    "items": sorted(words)[:ASSOC_WORDS],
-                    "source": "prefix",
+                    "items": sorted(set(words))[:ASSOC_WORDS],
+                    "source": "whole_word",
                 }
             )
         return out
@@ -911,10 +984,53 @@ class Data:
                 seen.setdefault(row["reading"], (length, "词行"))
         return [(reading, length, kind) for reading, (length, kind) in seen.items()]
 
+    @staticmethod
+    def merge_groups(groups: list[dict]) -> list[dict]:
+        """唯一合并点（镜像 App `PanelRow.mergeRows`）：同 reading 的行合并 item。
+
+        - key = reading 小写（`Linux`/`linux` 是同一行），保持首次出现顺序；
+        - items：整串词行（`source == "whole_word"`）大小写不敏感去重，其余来源用精确文字
+          （引擎会同时给 `J` 和 `j`，按小写去重会吞掉大写候选，跟重構前口徑一致）；
+        - segment/rest 取首行（拼接顺序已保证单字组在前）。
+        """
+        merged: "OrderedDict[str, dict]" = OrderedDict()
+        for row in groups:
+            key = row["reading"].lower()
+            existing = merged.get(key)
+            if existing is None:
+                texts = list(row.get("items") or row.get("chars") or [])
+                created = {
+                    "reading": row["reading"],
+                    "syllables": list(row.get("syllables") or row["reading"].split(" ")),
+                    "segment": row.get("segment", 0),
+                    "rest": row.get("rest", ""),
+                    "items": texts,
+                    "source": row.get("source"),
+                    "origin": row.get("origin"),
+                }
+                if created["segment"] == 0:
+                    created["chars"] = texts
+                merged[key] = created
+                continue
+            case_insensitive = row.get("source") == "whole_word"
+            seen = {
+                (t.lower() if case_insensitive else t)
+                for t in existing["items"]
+            }
+            for text in row.get("items") or row.get("chars") or []:
+                probe = text.lower() if case_insensitive else text
+                if probe in seen:
+                    continue
+                seen.add(probe)
+                existing["items"].append(text)
+                if existing["segment"] == 0:
+                    existing["chars"] = existing["items"]
+        return list(merged.values())
+
     def panel(self, codes: str) -> list[dict]:
         groups = self.segment_groups(codes)
         groups += self.prefix_word_rows(codes.replace("'", ""))
-        groups = self.collapse(groups)
+        groups = self.collapse(self.merge_groups(groups))
 
         def tier(g: dict) -> int:
             n = len([t for t in g["reading"].split(" ") if t])
@@ -1324,9 +1440,15 @@ def cmd_selftest(args, data: Data) -> None:
         bool(merged) and merged[0]["reading"] in ("li nak", "li nak si"),
         f"整串阶段应出现含 Linux 的行（{merged[0]['reading'] if merged else 'NONE'}）",
     )
+    # 2026-11-11 用户定案：联想改分桶轮转 + 字母序 + 行数 12，面板不一定选中 li nak；
+    # 这里改为验证「联想索引本身有 li+nak（含 Linux）」+「累积汇总里有 li 开头的联想行」。
     expect(
-        "li nak" in [r[0] for r in unique],
-        f"累积去重含 li nak（{len(unique)} 个读音）",
+        any(w.lower() == "linux" for w in (data.assoc.get("li") or {}).get("nak", [])),
+        "联想索引 li+nak 应含 Linux",
+    )
+    expect(
+        any(r[0].startswith("li ") for r in unique),
+        f"累积去重应含 li 开头的联想行（{len(unique)} 个读音）",
     )
     expect(
         all(unique[i][0] != unique[i + 1][0] for i in range(len(unique) - 1)),
@@ -1390,8 +1512,8 @@ def cmd_selftest(args, data: Data) -> None:
     uniq = data.cumulative_unique("5i4a57", 2)
     readings_only = [r[0] for r in uniq]
     expect(
-        "li nak" in readings_only and "li nak si" in readings_only,
-        f"应同时列出 li nak 与 li nak si：{[r for r in readings_only if r.startswith('li nak')]}",
+        "li nak si" in readings_only,
+        f"整串词行应列出 li nak si：{[r for r in readings_only if r.startswith('li nak')]}",
     )
     expect(
         all(r[2] in ("词行", "联想/词") for r in uniq if r[0] == "li nak si"),
@@ -1446,11 +1568,16 @@ def cmd_selftest(args, data: Data) -> None:
     first = [g["reading"] for g in data.segment_groups(phrase) if g["segment"] == 0]
     expect("r" not in first, f"「到下儿」第一段不得含 r：{first}")
 
-    # 5) 联想：li + 4a5（= nak）→ 至少一行 li nak（含 Linux）
+    # 5) 联想：li + 4a5（码展开 = mak/nak）→ 行标题是具体两音节、第二音节首字母 ∈ {m,n}
+    #    （2026-11-11 后选行按分桶字母序 + 12 行预算，不再钉死某一行）
     assoc = data.assoc_rows("li", "4a5")
     expect(
-        any(r[0] == "li nak" and any(w.lower() == "linux" for w in r[1]) for r in assoc),
-        f"li + nak 联想行：{[(r[0], r[1][:3]) for r in assoc]}",
+        bool(assoc) and all(len(r[0].split(" ")) == 2 for r in assoc),
+        f"li + 4a5 联想行应非空且标题两音节：{[(r[0], r[1][:2]) for r in assoc]}",
+    )
+    expect(
+        all(r[0].split(" ")[1][0] in {"m", "n"} for r in assoc),
+        f"li + 4a5 第二音节首字母应 ∈ m/n：{[(r[0], r[1][:2]) for r in assoc]}",
     )
 
     # 6) 单字：ji 全部字（>>100，验证「列全部」而不是 60 字截断）

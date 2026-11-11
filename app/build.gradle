@@ -104,6 +104,8 @@ dependencies {
 
     // 純 JVM 單元測試（算法/資源數據校驗，不依賴 Android 框架）
     testImplementation 'junit:junit:4.13.2'
+    // PanelGoldenTest 解析 test/resources/panel-golden.json（單測裡 org.json 只是 stub）
+    testImplementation 'com.google.code.gson:gson:2.8.9'
     implementation 'com.google.android.material:material:1.8.0'
 
     // 仪器测试（部署 / OpenCC 功能验证）

@@ -427,41 +427,122 @@ object TwelveKeySnapshotBuilder {
     /**
      * 源 3：兩音節聯想詞行（`ga zi`、`than dung`）。
      *
-     * 行標題一律是兩個完整讀音（精確哈希 `(第一音節, 第二音節)`）；數量受
-     * [TwelveKeyTuning.ASSOC_MAX_ROWS] 封頂。這裡的局部去重只是**配額計數**用
-     * （同一個 reading 不能佔兩格额度），跨源合併仍由 [mergeRows] 負責。
+     * 行標題一律是兩個完整讀音（精確哈希 `(第一音節, 第二音節)`）。選行規則與
+     * `tools/panel_probe.py` 的 `assoc_buckets()` + `pick_bucket_rows()` 完全一致：
+     *
+     * 1. 每個切法的第一段取**全部**音節候選（不受面板配額截斷，否則 `(g,b)` 這類桶會漏）；
+     * 2. 第二段有剩餘碼 → 把它前綴展開成確切音節再逐個查；剩餘碼為空 → 取該第一音節的全部後續音節
+     *    （整輪聯想，行標題仍是完整讀音）；
+     * 3. 命中的行按 **（第一音節首字母, 第二音節首字母）** 分桶；桶內按詞數降序；
+     * 4. 跨桶輪轉取行：每個「第一段首字母」組內先各桶第 1 行、再第 2 行…，組與組之間再輪轉；
+     * 5. 總數受 [TwelveKeyTuning.ASSOC_MAX_ROWS] 封頂，最後按 reading 字典序排。
+     *
+     * 用戶 2026-11-11：「ghi+abc → g b, g c, h b, h c 4 個通配聯想詞組」——分桶就是為了
+     * 每個通配組合都有代表，而不是被高頻桶整批佔滿。
      */
     internal fun assocRows(parts: List<SplitPart>): List<PanelRow> {
-        var assocRows = 0
-        val out = ArrayList<PanelRow>()
-        val seen = HashSet<String>()
+        val buckets = LinkedHashMap<Pair<Char, Char>, MutableList<PanelRow>>()
         for (part in parts) {
-            if (assocRows >= ASSOC_MAX_ROWS) break
-            val initials = TwelveKeyPreedit.initialsForPrefix(part.rest, ASSOC_INITIALS)
-            if (initials.isEmpty()) continue
-            for (syllable in part.syllables.take(ASSOC_HEAD_SYLLABLES)) {
-                if (assocRows >= ASSOC_MAX_ROWS) break
-                // 寬鬆行（第二段只按首字母匹配）
-                TwelveKeyPreedit.associatedBySegmentCode(
-                    syllable, part.rest, ASSOC_WORDS, ASSOC_INITIAL_ROWS,
-                ).forEach { (reading, words) ->
-                    if (words.isEmpty() || assocRows >= ASSOC_MAX_ROWS) return@forEach
-                    if (!seen.add(reading)) return@forEach
-                    out.add(assocRow(reading, words))
-                    assocRows++
+            // 第一段：**前綴展開全部音節**（`ia` → ga/gam/gan/gang/han/hau…），不能用配額後的列表。
+            val firstCandidates = TwelveKeyPreedit.syllablesForSegment(
+                part.head,
+                ASSOC_EXPAND_LIMIT,
+                exactOnly = false,
+                totalLimit = ASSOC_EXPAND_LIMIT,
+                allowSuffixOnly = part.allowSuffixOnly,
+            )
+            // 第二段：有剩餘碼才展開（`r` 這類後綴音節在這裡是合法結尾，固定 allowSuffixOnly=true）。
+            val secondCandidates = if (part.rest.isEmpty()) {
+                null
+            } else {
+                TwelveKeyPreedit.syllablesForSegment(
+                    part.rest,
+                    ASSOC_EXPAND_LIMIT,
+                    exactOnly = false,
+                    totalLimit = ASSOC_EXPAND_LIMIT,
+                    allowSuffixOnly = true,
+                )
+            }
+            for (first in firstCandidates) {
+                val bySecond = TwelveKeyPreedit.assocSecondMap(first)
+                if (bySecond.isEmpty()) continue
+                // 剩餘碼展開不到任何音節（`we` 這種「像 the 但碼不是 wie」的輸入）→ 取該第一音節的
+                // 全部後續音節（整輪聯想）。這與腳本 `if not second_candidates: allowed = by_second.keys`
+                // 一致；否則 `kiung th` 這種用戶場景會一行聯想都沒有（2026-11-10 報過的問題）。
+                val allowed = secondCandidates
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.filter { bySecond.containsKey(it) }
+                    ?: bySecond.keys.toList()
+                for (second in allowed) {
+                    if (second.isEmpty()) continue
+                    val words = bySecond[second]?.take(ASSOC_WORDS) ?: continue
+                    if (words.isEmpty()) continue
+                    buckets.getOrPut(first[0] to second[0]) { ArrayList() }
+                        .add(assocRow("$first $second", words))
                 }
-                // 精確行（第二段是確切音節）
-                TwelveKeyPreedit.associatedByReading(syllable, initials, ASSOC_WORDS, ASSOC_READINGS)
-                    .forEach { (second, words) ->
-                        if (words.isEmpty() || assocRows >= ASSOC_MAX_ROWS) return@forEach
-                        val reading = "$syllable $second"
-                        if (!seen.add(reading)) return@forEach
-                        out.add(assocRow(reading, words))
-                        assocRows++
-                    }
             }
         }
-        return out
+        return pickBucketRows(buckets, ASSOC_BUCKET_ROW_BUDGET)
+    }
+
+    /**
+     * 分桶輪轉取行（`panel_probe.py: pick_bucket_rows` 的鏡像）。
+     *
+     * 先按（第一首字母, 第二首字母）排序；同一「第一首字母」組內各桶輪轉（第 1 行→第 2 行…），
+     * 再在組之間輪轉；總數封頂後按 reading 字典序排序（顯示順序由後續 tierAndSort 再排一次）。
+     */
+    private fun pickBucketRows(
+        buckets: Map<Pair<Char, Char>, List<PanelRow>>,
+        maxRows: Int,
+    ): List<PanelRow> {
+        if (buckets.isEmpty() || maxRows <= 0) return emptyList()
+        val sortedKeys = buckets.keys.sortedWith(compareBy({ it.first }, { it.second }))
+        val groups = LinkedHashMap<Char, MutableList<List<PanelRow>>>()
+        sortedKeys.forEach { key ->
+            groups.getOrPut(key.first) { ArrayList() }
+                // 桶內排序必須**確定**：詞數降序、同詞數按 reading。兩份實現（App/腳本）
+                // 都按這個 key 排，否則桶內插入順序不同時會選中不同行（golden 會漂）。
+                .add(
+                    buckets.getValue(key).sortedWith(
+                        compareByDescending<PanelRow> { it.items.size }.thenBy { it.reading }
+                    )
+                )
+        }
+        val flat = LinkedHashMap<Char, MutableList<PanelRow>>()
+        groups.forEach { (initial, bucketRows) ->
+            val rows = ArrayList<PanelRow>()
+            var round = 0
+            while (true) {
+                var added = false
+                for (bucket in bucketRows) {
+                    if (round < bucket.size) {
+                        rows.add(bucket[round])
+                        added = true
+                    }
+                }
+                if (!added) break
+                round++
+            }
+            flat[initial] = rows
+        }
+        val cursors = HashMap<Char, Int>()
+        val picked = ArrayList<PanelRow>(maxRows)
+        val seen = HashSet<String>()
+        while (picked.size < maxRows) {
+            var added = false
+            for ((initial, rows) in flat) {
+                val cursor = cursors[initial] ?: 0
+                if (cursor >= rows.size) continue
+                cursors[initial] = cursor + 1
+                val row = rows[cursor]
+                if (!seen.add(row.reading)) continue
+                picked.add(row)
+                added = true
+                if (picked.size >= maxRows) break
+            }
+            if (!added) break
+        }
+        return picked.sortedBy { it.reading }
     }
 
     private fun assocRow(reading: String, words: List<String>) = PanelRow(
@@ -477,7 +558,40 @@ object TwelveKeySnapshotBuilder {
      * 規則已在 `tools/panel_probe.py` 驗證（`initial_pattern_rows`）；本步驟先留空，
      * 接入與常數見 docs/19 §7 步驟 3。
      */
-    internal fun initialComboRows(codes: String): List<PanelRow> = emptyList()
+    internal fun initialComboRows(codes: String): List<PanelRow> {
+        if (codes.length < 2) return emptyList()
+        val combos = TwelveKeyPreedit.initialCombos(codes)
+        if (combos.isEmpty()) return emptyList()
+        val rows = ArrayList<PanelRow>(INITIAL_COMBO_MAX_ROWS)
+        val seen = HashSet<String>()
+        // 兩輪：第一輪每個組合先出第 1 行（保證「g·b / g·c / h·b / h·c」都有代表），
+        // 第二輪再給每個組合補第 2 行。節奏由 INITIAL_COMBO_ROWS_PER_PATTERN 控制。
+        val entriesByCombo = combos.map { TwelveKeyPreedit.wordsByInitialPattern(it) }
+        for (round in 0 until 2) {
+            val start = round * INITIAL_COMBO_ROWS_PER_PATTERN
+            val stop = start + INITIAL_COMBO_ROWS_PER_PATTERN
+            for (hits in entriesByCombo) {
+                val from = if (start < hits.size) start else hits.size
+                val to = if (stop < hits.size) stop else hits.size
+                for (hit in hits.subList(from, to)) {
+                    val reading = hit.first
+                    if (!seen.add(reading)) continue
+                    rows.add(
+                        PanelRow(
+                            reading = reading,
+                            items = hit.second.map { word ->
+                                CandidateItem(text = word, comment = reading, index = -1, segment = 1)
+                            },
+                            segment = 1,
+                            sources = setOf(RowSource.INITIAL_COMBO),
+                        )
+                    )
+                    if (rows.size >= INITIAL_COMBO_MAX_ROWS) return rows
+                }
+            }
+        }
+        return rows
+    }
 
     /**
      * 源 5：整串碼前綴命中的多音節詞條（`li nak si` → Linux）。
@@ -600,9 +714,58 @@ object TwelveKeySnapshotBuilder {
         anchor: Char?,
         engineGroups: List<SyllableGroup>,
         includePanelOnlySources: Boolean,
-    ): PanelBuild {
+    ): PanelBuild = computePanel(remaining, anchor, engineGroups, includePanelOnlySources).build
+
+    /**
+     * 單測/診斷用：把五源與合併後的行都攤開（golden 對拍腳本 `panel_probe.py json`）。
+     *
+     * 僅供 `internal` 調用；UI 永遠只看到 [buildPanelRows] 投影出的 `SyllableGroup`。
+     */
+    internal fun debugPanelSources(codes: String): PanelSources =
+        computePanel(codes, null, emptyList(), includePanelOnlySources = true).let { c ->
+            PanelSources(
+                synth = c.synth,
+                split = c.split,
+                assoc = c.assoc,
+                combo = c.combo,
+                wholeWord = c.word,
+                merged = c.build.rows,
+            )
+        }
+
+    /** 五源 + 合併後的最終行（[debugPanelSources] 的回傳型別）。 */
+    internal data class PanelSources(
+        val synth: List<PanelRow>,
+        val split: List<PanelRow>,
+        val assoc: List<PanelRow>,
+        val combo: List<PanelRow>,
+        val wholeWord: List<PanelRow>,
+        val merged: List<PanelRow>,
+    )
+
+    private data class PanelComputation(
+        val synth: List<PanelRow>,
+        val split: List<PanelRow>,
+        val engine: List<PanelRow>,
+        val assoc: List<PanelRow>,
+        val combo: List<PanelRow>,
+        val word: List<PanelRow>,
+        val build: PanelBuild,
+    )
+
+    private fun computePanel(
+        remaining: String,
+        anchor: Char?,
+        engineGroups: List<SyllableGroup>,
+        includePanelOnlySources: Boolean,
+    ): PanelComputation {
         val codes = remaining.replace("'", "")
-        if (codes.isEmpty()) return PanelBuild(emptyList(), PanelStats.EMPTY)
+        if (codes.isEmpty()) {
+            return PanelComputation(
+                emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList(),
+                PanelBuild(emptyList(), PanelStats.EMPTY),
+            )
+        }
         val parts = splitParts(codes)
         val synth = synthSingleRows(parts, anchor)
         val split = splitSingleRows(parts, anchor)
@@ -620,21 +783,29 @@ object TwelveKeySnapshotBuilder {
         val collapsed = collapsePrefixRows(merged)
         val sorted = tierAndSort(collapsed)
         val capped = capRows(sorted)
-        return PanelBuild(
-            rows = capped,
-            stats = PanelStats(
-                synth = synth.size,
-                split = split.size,
-                assoc = assoc.size,
-                combo = combo.size,
-                word = word.size,
-                engine = engine.size,
-                merged = merged.size,
-                collapsed = collapsed.size,
-                capped = capped.size,
-                tierSingles = sorted.count { it.syllableCount == 1 },
-                tierWords = sorted.count { it.syllableCount >= 2 },
-                tierBlank = sorted.count { it.syllableCount == 0 },
+        return PanelComputation(
+            synth = synth,
+            split = split,
+            engine = engine,
+            assoc = assoc,
+            combo = combo,
+            word = word,
+            build = PanelBuild(
+                rows = capped,
+                stats = PanelStats(
+                    synth = synth.size,
+                    split = split.size,
+                    assoc = assoc.size,
+                    combo = combo.size,
+                    word = word.size,
+                    engine = engine.size,
+                    merged = merged.size,
+                    collapsed = collapsed.size,
+                    capped = capped.size,
+                    tierSingles = sorted.count { it.syllableCount == 1 },
+                    tierWords = sorted.count { it.syllableCount >= 2 },
+                    tierBlank = sorted.count { it.syllableCount == 0 },
+                ),
             ),
         )
     }
@@ -658,14 +829,17 @@ object TwelveKeySnapshotBuilder {
             includePanelOnlySources = false,
         ).rows.map { it.toSyllableGroup() }
 
-    /** 每位音節列幾個聯想詞（用戶：≤6）。 */
     // ---- 聯想詞配額：集中在 [TwelveKeyTuning]（改值請改 Tuning）----
     private const val ASSOC_WORDS = TwelveKeyTuning.ASSOC_WORDS
     private const val ASSOC_HEAD_SYLLABLES = TwelveKeyTuning.ASSOC_HEAD_SYLLABLES
     private const val ASSOC_INITIAL_ROWS = TwelveKeyTuning.ASSOC_INITIAL_ROWS
     private const val ASSOC_MAX_ROWS = TwelveKeyTuning.ASSOC_MAX_ROWS
+    private const val ASSOC_BUCKET_ROW_BUDGET = TwelveKeyTuning.ASSOC_BUCKET_ROW_BUDGET
     private const val ASSOC_INITIALS = TwelveKeyTuning.ASSOC_INITIALS
     private const val ASSOC_READINGS = TwelveKeyTuning.ASSOC_READINGS
+    private const val ASSOC_EXPAND_LIMIT = TwelveKeyTuning.ASSOC_EXPAND_LIMIT
+    private const val INITIAL_COMBO_MAX_ROWS = TwelveKeyTuning.INITIAL_COMBO_MAX_ROWS
+    private const val INITIAL_COMBO_ROWS_PER_PATTERN = TwelveKeyTuning.INITIAL_COMBO_ROWS_PER_PATTERN
 
     /** 面板組數硬上限（防止字典前綴聯想把左列灌爆；正常一屏 ~10 行）。 */
     private const val MAX_RESULT_GROUPS = 40
@@ -701,7 +875,6 @@ object TwelveKeySnapshotBuilder {
         if (consumedEnd >= bytes.size) return ""
         return String(bytes, consumedEnd, bytes.size - consumedEnd, Charsets.UTF_8)
     }
-
 
     /** 12 鍵碼 → 拼音字母（只用於本地兜底上屏，不影響引擎）。 */
     fun toLetters(rawCode: String): String = buildString(rawCode.length + 8) {

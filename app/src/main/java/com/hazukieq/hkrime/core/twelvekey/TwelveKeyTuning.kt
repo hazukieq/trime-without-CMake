@@ -108,6 +108,16 @@ object TwelveKeyTuning {
     /** 每次整輪聯想行總數上限（跨所有第一音節、跨切法）。 */
     const val ASSOC_MAX_ROWS = 4
 
+    /**
+     * 分桶輪轉後每輪實際取幾行 = [ASSOC_MAX_ROWS] × 3。
+     *
+     * 影響：`ASSOC` 源（聯想詞行）最終行數；現在 12。
+     * 為什麼不是 4：分桶後桶數可以很多（`(g,b)/(g,c)/(h,b)/(h,c)`…），4 行只夠 4 個桶露頭；
+     * 用戶 2026-11-11 定案「保留 App 富聯想 + 照腳本字母序、行數放開到 12」。
+     * 調大：更多長尾桶露頭，但面板更長、高頻行不一定在前；調小：回到 4 行只保前 4 桶。
+     */
+    const val ASSOC_BUCKET_ROW_BUDGET = ASSOC_MAX_ROWS * 3
+
     /** 剩餘碼要展開幾個「第二段首字母」來找聯想（用於精確音節行的候選集）。 */
     const val ASSOC_INITIALS = 2
 
@@ -116,6 +126,67 @@ object TwelveKeyTuning {
     const val ASSOC_PREFIX_READINGS = 4
 
     const val ASSOC_READINGS = 4
+
+    // ---------- 首字母組合（INITIAL_COMBO 源） ----------
+
+    /** 12 鍵碼位 → 該鍵上的字母（與 `TwelveKeyPreedit.codeOf` 的映射互為逆）。 */
+    val KEY_LETTERS: Map<Char, String> = mapOf(
+        'a' to "abc",
+        'e' to "def",
+        'i' to "ghi",
+        '5' to "kl",
+        '4' to "mn",
+        '7' to "ps",
+        '9' to "qt",
+        '3' to "vur",
+        '8' to "zj",
+        '1' to "ng",
+        'w' to "th",
+        'y' to "nz",
+    )
+
+    /**
+     * 元音字母：不能作音節首字母。
+     *
+     * 影響：`INITIAL_COMBO` 的組合生成（只由輔音開頭）；現在 `aeiou`。
+     * 調大：更多字母被排除，組合更少、更「像聲母」；調小：元音也進組合，
+     * 會生成 `a·b` 這種現實中不存在的首字母序列（詞表命中率極低）。
+     */
+    val VOWEL_LETTERS: Set<Char> = setOf('a', 'e', 'i', 'o', 'u')
+
+    /**
+     * 首字母組合行總行數上限。
+     *
+     * 影響：`INITIAL_COMBO` 源（`ia8` 8 組、`ia8i3` 32 組）；現在 8。
+     * 調大：面板首字母組合行更多、更全，但會把單字組/聯想行往後推；
+     * 調小：只保留每組代表，部分組合看不到詞。
+     */
+    const val INITIAL_COMBO_MAX_ROWS = 8
+
+    /**
+     * 每個首字母組合**每輪**先出幾行。
+     *
+     * 影響：輪轉節奏；現在 1（第一輪每組合保 1 行，第二輪補第 2 行）。
+     * 調大：少數高頻組合壟斷行數預算；調小到 0：不生成首字母組合行。
+     */
+    const val INITIAL_COMBO_ROWS_PER_PATTERN = 1
+
+    /**
+     * 首字母組合數上限。
+     *
+     * 影響：`INITIAL_COMBO` 是否生成；現在 64（`5i4a57` 6 鍵恰 64 組仍生成）。
+     * 調大：2^k 爆炸風險（組合數 × 詞表查詢變慢）；調小：5 鍵以上就沒有首字母組合行。
+     */
+    const val INITIAL_COMBO_PATTERN_LIMIT = 64
+
+    /**
+     * 聯想行「分桶」時展開第一/第二段音節的上限（= 不截斷）。
+     *
+     * 影響：`ASSOC` 源收集 (第一音節 × 第二音節) 桶時取多少候選音節；現在 1000000。
+     * 調小：桶覆蓋不全，`g·b`/`h·c` 這類通配組合會漏行（早期用面板配額 16 就漏過）。
+     * 調大：沒有意義，只是防呆。
+     */
+    const val ASSOC_EXPAND_LIMIT = 1_000_000
 
     // ---------- 兜底 ----------
 
