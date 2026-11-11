@@ -172,7 +172,13 @@ flowchart TD
 
 ## 7. 分组的数据来源
 
-### 7.1 段组（`segmentGroupsFor`，`TwelveKeySnapshotBuilder`）
+> **2026-11-11 重构后：面板左列 = 五源流水线**（docs/19）：
+> `SYNTH_SINGLE / SPLIT_SINGLE / ASSOC / INITIAL_COMBO / WHOLE_WORD` 五个纯函数 →
+> `mergeRows`（唯一合并点）→ `collapsePrefixRows` → `tierAndSort` → `capRows`。
+> 每源都不自己排序/去重；`RowSource` 只用于 `diag.log` 统计，投影成 `SyllableGroup` 时丢弃。
+> 下面的 7.1~7.4 是各源规则（`segmentGroupsFor` 已删除，名字保留在旧描述里以对照）。
+
+### 7.1 段组（`SYNTH_SINGLE` / `SPLIT_SINGLE`，`TwelveKeySnapshotBuilder`）
 
 目标：把「当前待选段」的所有合法读法 + 每个读法的全部字列出来。
 
@@ -189,7 +195,19 @@ flowchart TD
   `ki` 83、`fu` 76 —— 用 `tools/panel_probe.py chars ji` 可复现）；
 - 每项 `segment=0`、`restCode=rest`（点了之后剩余码回引擎，面板接着列下一段）。
 
-### 7.2 联想行（两音节，`associatedBySegmentCode` / `associatedByReading`）
+### 7.2 联想行（两音节，`ASSOC` 源）
+
+**选行规则（2026-11-11 起，与 `tools/panel_probe.py` 的 `assoc_buckets` + `pick_bucket_rows` 同构）：**
+
+1. 每个切法的第一段取**全部**音節候選（不受面板配額截斷）；第二段有剩餘碼就按碼前綴展開成確切音節，
+   剩餘碼展開不到任何音節（`we` 這類）時退回「該第一音節的全部後續音節」（整輪聯想）；
+2. 命中的行按 **（第一音節首字母, 第二音節首字母）** 分桶，桶內按「詞數降序 → 讀音字典序」排；
+3. 跨桶輪轉：同一「第一段首字母」組內各桶先第 1 行、再第 2 行…，組與組之間再輪轉；
+4. 總行數上限 **`ASSOC_BUCKET_ROW_BUDGET = ASSOC_MAX_ROWS × 3 = 12`**（用戶 2026-11-11 拍板：
+   保留 App 富聯想 + 照腳本字母序 + 放開到 12 行；舊「每輪 ≤4 行」只適用於未分桶的舊實現）。
+
+**行內詞**：每個 `(第一音節, 第二音節)` 桶取詞表熱度前 `ASSOC_WORDS=6` 條；行標題永遠是兩個完整讀音
+（禁止 `than d**` 這種通配寫法）。
 
 #### 7.2.0 只认**客家话音节集合**（2026-11-11 定）
 
@@ -314,8 +332,8 @@ flowchart TD
   加载 1s→18s、内存暴涨，是 2026-11-11 面板「分组全消失」的直接原因）；
 - 查询 `wordsByCodePrefix(codes)`：`entry.code.startsWith(输入码)` → 天然支持任意音节数、简拼、
   半截末节（`5i4a57` 命中 `5i4a57i`）；
-- 组装：`prefixWordRows` 走**轻路径**（只查表 + 拼行），在最终排序前用 `mergeRowsByReading`
-  并入已有行（文字不分大小写去重）——**不走** `panelGroups`/大合并，避免把构建拖死；
+- 组装：`WHOLE_WORD` 源走**轻路径**（只查表 + 拼行），与其它源一起交给 `mergeRows` 合并
+  （整串词行按大小写不敏感去重，其余来源按精确文字）——**不走** `panelGroups`/大合并，避免把构建拖死；
 - **并入时按「最长已有前缀读音」找行**：`ko thiau fa` 若已有 `ko thiau` 行，就作为该行的候选，
   不再单独起一行（整串码本来就是「开头相同匹配」，长词单开一行会看起来像两个 list；
   用户 2026-11-11 指出）；只有没有任何前缀行匹配时，才用完整读音新建一行。
@@ -326,8 +344,11 @@ flowchart TD
 
 比较器（`TwelveKeySnapshotBuilder.build` 末尾）：
 
-1. **分档只看「读音」的音节数**（`readingSyllableCount`，`reading.split(' ')` 计数）：
-   1 个 → 0 档；≥2 个 → 1 档；无读音 → 2 档（「推荐」组例外，固定第一行）。
+1. **分档只看「读音」的音节数**（`reading.split(' ')` 计数）：
+   1 个 → 0 档；≥2 个 → 1 档；空读音 → 2 档（「推荐」组例外，固定第一行）。
+   注意 `BLANK_READING`（`…`）是一个**非空 token**，所以无读音的引擎组实际落 **0 档**、
+   用首候选的字典读音参与排序——这是重構前 `readingSyllableCount` 的真实行为，
+   2026-11-11 重構後照舊保留（不採「无读音→2 档」的舊文檔說法）。
    **不要用 `syllables.size`**：引擎组的 `syllables` 只是 `listOf(reading)`（1 个元素），
    `ka then` 这类两音节词会被误判成单音节混进 0 档（2026-11-11 的 `ko thiau` / `ko thiau fa` 分段问题）；
 2. 档内：`reading.lowercase()` 字典序；
@@ -404,8 +425,9 @@ flowchart TD
 
 ## 11. 不变量（硬约束，改代码前逐条对照）
 
-1. **同读音 = 一行**：任何来源的行（段组/联想/引擎/多音节词典词）合并后，`reading` 不得重复；
-   行内 `text` 不分大小写去重。
+1. **同读音 = 一行**：任何来源的行（段组/联想/首字母组合/引擎/多音节词典词）合并后，
+   `reading` 不得重复（`reading.lowercase()` 为 key）；行内 `text`：整串詞行（`WHOLE_WORD`）
+   不分大小写去重，**其余來源用精確文字**（引擎同時給 `J`/`j`，小寫去重會吞掉大寫候選）。
 2. **面板关着时 `groups` 必为空**；「有没有候选」只看 `hasCandidates`（= `barEntries || groups`）。
 3. **候选条 / 面板 / preedit / 嵌入式预览 同源**：都从同一份快照取值，禁止另行访问引擎。
 4. **一次按键 = 一份快照**；快照不可变，发布后不再修改。
@@ -413,6 +435,12 @@ flowchart TD
 6. **配额常量只在 `TwelveKeyTuning` 改**，且改完要在真机看左列高度与滚动距离。
 7. **段组列字要全**（`SEGMENT_CHARS_LIMIT=1000`）；面板右格是 RecyclerView，懒加载。
 8. **点击语义只由 `index` + `segment` 决定**（§4.2），不要在 adapter 里另加分支。
+9. **来源不外显**：`RowSource`/`PanelStats` 只进 `diag.log` 與 `twelvekey:build`，
+   `SyllableGroup` 字段不變、UI 不可觀察到「這行來自哪一源」。
+10. **`INITIAL_COMBO` 走首字母序列匹配**（`[g,b]` → `gang bung`），不是碼前綴：
+   組合數受 `INITIAL_COMBO_PATTERN_LIMIT=64` 封頂，任一鍵沒有可用首字母 → 整組跳過。
+11. **兩份實現必須同步**：App（Kotlin）與 `tools/panel_probe.py`（Python）是同一規則的兩份實現，
+   `PanelGoldenTest` 讀 `app/src/test/resources/panel-golden.json` 逐源/merged 對拍，改規則要一齊改並重生成 golden。
 
 ---
 

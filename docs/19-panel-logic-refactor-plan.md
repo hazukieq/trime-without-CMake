@@ -288,3 +288,51 @@ adb shell ime set com.hazukieq.hkrime/.TrimeImeService
 - [ ] `diag.log` / `twelvekey:build` 來源統計行
 - [ ] `docs/17` 各源/合併/不變式更新；`docs/19` 標 ✅；`AGENTS.md` §2.4 增補
 - [ ] 4 個提交（A 拆分 / B 流水線 / C 新源 / D 收尾），每個都能獨立 revert
+
+---
+
+## 11. 實施結果（2026-11-11，✅ 已完成）
+
+### 11.1 提交
+
+| 提交 | 內容 | 說明 |
+|---|---|---|
+| `9ca4c1e` refactor(panel) | 步驟 A + B 合併 | 五源拆分 + 流水線固定化；與 bb20a52 乾淨 worktree 對拍：snapshot 精確差異 0/12,774、segment 集合差異 0/12,784（3,931 碼行序變化＝修掉舊 `syllables.size` 分檔 bug）。A/B 合併為一個提交：中間態沒有獨立可回退價值。 |
+| `9557044` feat(panel) | 步驟 C | `INITIAL_COMBO` 接入 + `ASSOC` 改分桶輪轉；新增 `PanelGoldenTest` 與 golden JSON。 |
+| 本提交 docs(panel) | 步驟 D | 常量審計、docs/17、docs/19、AGENTS 更新；裝機。 |
+
+### 11.2 最終常量值（`TwelveKeyTuning`）
+
+| 常量 | 值 | 備註 |
+|---|---|---|
+| `INITIAL_COMBO_MAX_ROWS` | 8 | 首字母組合行總數 |
+| `INITIAL_COMBO_ROWS_PER_PATTERN` | 1 | 每組合每輪 1 行 |
+| `INITIAL_COMBO_PATTERN_LIMIT` | 64 | **組合數**上限（`5i4a57` 6 鍵恰 64 組） |
+| `VOWEL_LETTERS` / `KEY_LETTERS` | `aeiou` / 12 鍵字母表 | 首字母集合取自詞典音節集合 |
+| `ASSOC_BUCKET_ROW_BUDGET` | 12 | `= ASSOC_MAX_ROWS × 3`（用戶 2026-11-11 拍板） |
+| `ASSOC_MAX_ROWS` | 4 | 公式基底（不再直接封頂） |
+| `ASSOC_EXPAND_LIMIT` | 1_000_000 | 聯想分桶展開「全部候選音節」 |
+| `ASSOC_PREFIX_READINGS` / `ASSOC_WORDS` | 4 / 6 | 整串詞行 / 行內詞數 |
+| `MAX_SYLLABLES_TOTAL` | 16（= `SEGMENT_SYLLABLE_LIMIT`） | 由 `TwelveKeyPreedit` 搬入 Tuning |
+| `MAX_RESULT_GROUPS` | — | **刪除**：無引用死常量（原計畫是搬進 Tuning，審計後直接移除） |
+
+### 11.3 與計畫的偏差（均已有用戶/驗證依據）
+
+1. **A/B 合併為一個提交**（見 11.1）；**ASSOC 行數上限 4 → 12**（用戶 2026-11-11 明確拍板：
+   「保留 App 富聯想 + 照腳本字母序，行數放開到 12」）。AGENTS §2.4 已同步。
+2. **聯想索引口徑**：腳本原本只收「詞表自帶讀音」的詞，App 會用字表反推純詞表（sougou 等）。
+   為讓 golden 可對拍，腳本補上與 App 一致的反推、詞長、詞頻、排序規則；兩邊從此同口徑。
+3. **`ASSOC` 選行**：由舊「熱度優先 + 每輪 ≤4」改為「(首字母,首字母) 分桶 + 跨桶輪轉」；
+   `we` 這類剩餘碼展開不到音節時退回「該第一音節全部後續音節」，與舊 `kiung th` 場景一致。
+4. **排序確定性**：音節桶外層/內層、桶內詞條全部改成顯式排序，消除對 `HashMap` 迭代順序的依賴
+   （否則腳本無法鏡像、golden 會漂）。
+5. **`BLANK_READING("…")` 實際落 0 檔**（§4.3 原寫「→2 档」），按重構前行為保留；docs/17 §8 已更正。
+6. **golden 對拍範圍**：`PanelGoldenTest` 逐源比對「讀音集合 + 行內文字集合 + 行序」，
+   merged 另比讀音/檔位順序；32 個碼串（含用戶樣例 `ia8`/`ia8i3`/`5i4a57`/`744ii`/`we`/`798ea`）。
+   重新生成命令見測試類頭部註釋。
+
+### 11.4 驗收
+
+- `testDebugUnitTest`：147 個全綠（含新增 `PanelGoldenTest`）。
+- `python3 tools/panel_probe.py selftest`：0 失敗。
+- 真機只裝機、不代測（用戶要求）；APK 與裝機命令見 §8。

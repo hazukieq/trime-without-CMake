@@ -29,7 +29,6 @@ object TwelveKeySnapshotBuilder {
     private const val MAX_GROUPS = TwelveKeyTuning.MAX_GROUPS
 
     // ---- 單音節組配額：全部集中在 [TwelveKeyTuning]，這裡只是別名（改值請改 Tuning）----
-    private const val MAX_SYLLABLE_GROUPS = TwelveKeyTuning.SEGMENT_SYLLABLE_LIMIT
     private const val SEGMENT_SYLLABLE_LIMIT = TwelveKeyTuning.SEGMENT_SYLLABLE_LIMIT
     private const val SEGMENT_SYLLABLE_LIMIT_RICH = TwelveKeyTuning.SEGMENT_SYLLABLE_LIMIT_RICH
     private const val RICH_SYLLABLE_THRESHOLD = TwelveKeyTuning.RICH_SYLLABLE_THRESHOLD
@@ -299,8 +298,8 @@ object TwelveKeySnapshotBuilder {
      * 不區分「有沒有按分詞鍵」：碼串先去掉 `'`，再按碼位切出第一段與其餘碼。
      * - 完整拼音（如 `5e5e`）：切成 `5e` + `5e`；
      * - 首字母相拼（如 `855`、`4i`）：切成第一個碼位 + 其餘碼，`syllablesForSegment` 會展開成
-     *   「以該字母開頭的音節」：**每個首字母**各取高頻前 [MAX_SYLLABLE_GROUPS] 個
-     *   （合計受 `TwelveKeyPreedit.MAX_SYLLABLES_TOTAL`=16 限制；用戶 2026-11-10 定案）。
+     *   「以該字母開頭的音節」：**每個首字母**各取高頻前 [TwelveKeyTuning.SEGMENT_SYLLABLE_LIMIT] 個
+     *   （合計受 `TwelveKeyTuning.MAX_SYLLABLES_TOTAL`=16 限制；用戶 2026-11-10 定案）。
      *
      * 每項帶 `segment = 0` 與 `restCode = 其餘碼`：點擊 = 上屏這個字 + 其餘碼餵回引擎，
      * 面板接著列下一段的單字（按順序推進）。
@@ -831,18 +830,12 @@ object TwelveKeySnapshotBuilder {
 
     // ---- 聯想詞配額：集中在 [TwelveKeyTuning]（改值請改 Tuning）----
     private const val ASSOC_WORDS = TwelveKeyTuning.ASSOC_WORDS
-    private const val ASSOC_HEAD_SYLLABLES = TwelveKeyTuning.ASSOC_HEAD_SYLLABLES
-    private const val ASSOC_INITIAL_ROWS = TwelveKeyTuning.ASSOC_INITIAL_ROWS
     private const val ASSOC_MAX_ROWS = TwelveKeyTuning.ASSOC_MAX_ROWS
     private const val ASSOC_BUCKET_ROW_BUDGET = TwelveKeyTuning.ASSOC_BUCKET_ROW_BUDGET
-    private const val ASSOC_INITIALS = TwelveKeyTuning.ASSOC_INITIALS
-    private const val ASSOC_READINGS = TwelveKeyTuning.ASSOC_READINGS
     private const val ASSOC_EXPAND_LIMIT = TwelveKeyTuning.ASSOC_EXPAND_LIMIT
+    private const val ASSOC_PREFIX_READINGS = TwelveKeyTuning.ASSOC_PREFIX_READINGS
     private const val INITIAL_COMBO_MAX_ROWS = TwelveKeyTuning.INITIAL_COMBO_MAX_ROWS
     private const val INITIAL_COMBO_ROWS_PER_PATTERN = TwelveKeyTuning.INITIAL_COMBO_ROWS_PER_PATTERN
-
-    /** 面板組數硬上限（防止字典前綴聯想把左列灌爆；正常一屏 ~10 行）。 */
-    private const val MAX_RESULT_GROUPS = 40
 
     /** 兼容舊調用：同步一次做完（UI 線程慎用）。 */
     fun build(): TwelveKeySnapshot = build(local())

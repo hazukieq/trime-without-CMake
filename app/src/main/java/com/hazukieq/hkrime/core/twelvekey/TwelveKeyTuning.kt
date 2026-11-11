@@ -87,6 +87,16 @@ object TwelveKeyTuning {
     const val RICH_SYLLABLE_THRESHOLD = SEGMENT_SYLLABLE_LIMIT
 
     /**
+     * 單次 `syllablesForSegment` 的默認總上限（= [SEGMENT_SYLLABLE_LIMIT]，16）。
+     *
+     * 影響：每個碼位最多列多少個音節組（跨首字母合計）；現在 16。
+     * 獨立於 [SEGMENT_SYLLABLE_LIMIT] 的意義：`limit` 是「每個首字母各取幾個」，
+     * 這個是「全部首字母合計」的防呆上限，避免一個鍵覆蓋 3 個聲母時左列過長。
+     * 調大：音節更全、面板更長；調小：後面的首字母整批看不到。
+     */
+    const val MAX_SYLLABLES_TOTAL = SEGMENT_SYLLABLE_LIMIT
+
+    /**
      * 同一個碼位的「備選切法」拿多少配額（按一半算）。
      *
      * 例如 `we` 既能整串讀 the、也能切成 w|e：第一種切法吃滿 16/24，
@@ -96,16 +106,22 @@ object TwelveKeyTuning {
 
     // ---------- 聯想詞組 ----------
 
-    /** 每個聯想行最多幾個詞（行內按熱度取，再按詞面字典序顯示）。 */
+    /**
+     * 每個聯想行最多幾個詞（行內按熱度取，再按詞面字典序顯示）。
+     *
+     * 影響：`ASSOC` / 整串詞行的行內詞數；現在 6。
+     * 調大：一行能看到更多近義詞，但面板左列橫向更擠、點擊目標變小；
+     * 調小：行更短，常用詞以外的同讀音詞看不到（要再點進候選條）。
+     */
     const val ASSOC_WORDS = 6
 
-    /** 每次最多給幾個「第一音節」生成聯想行（取面板最高頻的前幾個音節）。 */
-    const val ASSOC_HEAD_SYLLABLES = 4
-
-    /** 每個第一音節最多幾行聯想（每個第二音節一行，行標題是兩個完整讀音）。 */
-    const val ASSOC_INITIAL_ROWS = 2
-
-    /** 每次整輪聯想行總數上限（跨所有第一音節、跨切法）。 */
+    /**
+     * 每次整輪聯想行總數上限（跨所有第一音節、跨切法）。
+     *
+     * 影響：`ASSOC` 源在「分桶輪轉前的配額」；現在 4。
+     * 現在實際取行數是 [ASSOC_BUCKET_ROW_BUDGET]（=本值×3），這個值只作為公式基底，
+     * 調大/調小會等比放大/縮小每輪行數（見下一條的後果說明）。
+     */
     const val ASSOC_MAX_ROWS = 4
 
     /**
@@ -118,14 +134,13 @@ object TwelveKeyTuning {
      */
     const val ASSOC_BUCKET_ROW_BUDGET = ASSOC_MAX_ROWS * 3
 
-    /** 剩餘碼要展開幾個「第二段首字母」來找聯想（用於精確音節行的候選集）。 */
-    const val ASSOC_INITIALS = 2
-
-    /** `associatedByReading` 最多幾行（確切讀音行，與 [ASSOC_INITIAL_ROWS] 共用總上限）。 */
-    /** 整串碼前綴聯想（三音節以上詞，如 `li nak si` → Linux）最多幾行；行內詞數沿用 ASSOC_WORDS。 */
+    /**
+     * 整串碼前綴聯想（三音節以上詞，如 `li nak si` → Linux）最多幾行；行內詞數沿用 [ASSOC_WORDS]。
+     *
+     * 影響：`WHOLE_WORD` 源行數；現在 4。
+     * 調大：長詞/英文詞露得更全，但面板更長；調小：只留詞數最多的前幾行。
+     */
     const val ASSOC_PREFIX_READINGS = 4
-
-    const val ASSOC_READINGS = 4
 
     // ---------- 首字母組合（INITIAL_COMBO 源） ----------
 
