@@ -103,7 +103,7 @@ Android 进程 cwd `/` 不可读 → `filesystem_error` 穿出 JNI → abort。
 | 设置里点「选择方案」直接崩 | **0002** |
 | 部署日志 `build/` 没变，或 `hkrime-deploy.log` 里 `librime glog` 段为空 | 日志是否被编译进去（`ENABLE_LOGGING=ON`、`<userDataDir>/logs/` 有没有 INFO 文件） |
 | 按键卡顿 / ANR | 0001 的预算；先跑 `docs/13` 的性能门禁 |
-| 候选条上字母/符号在面板里找不到 | App 侧（`CandidateRanking.panelGroups`），与本清单无关 |
+| 候选条上字母/符号在面板里找不到 | App 侧（`TwelveKeySnapshotBuilder.buildPanelRows` / `mergeRows`），与本清单无关 |
 
 ## 4. 调试探针手册
 

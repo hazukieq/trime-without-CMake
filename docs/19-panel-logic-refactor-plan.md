@@ -1,6 +1,9 @@
 # 展開面板「邏輯層」重構執行方案（可直接交給下一個 agent 執行）
 
-> 狀態：**方案（未實施）** ｜ 2026-11-11 ｜ 用戶已審閱架構方向並要求：
+> 狀態：**已實施（2026-11-11）**。§1–§10 是重構前的計畫內容（保留作決策記錄），
+> 實際落地、偏差與最終常量見 **§11**；現行實現/不變量以 `docs/17-candidate-panel.md` §6–§8、§11 為準。
+>
+> 用戶已審閱架構方向並要求：
 > ①常量要清晰、解釋清楚；②架構可持續維護/可調試；③**UI 層零改動**；④同一讀音去重合併，**來源不外顯**。
 
 ---
@@ -133,7 +136,8 @@ internal fun buildPanel(
 ### 4.1 `mergeRows(rows)`（唯一合併點）
 
 1. 按 `reading` 歸併（保持**首次出現順序**，用 `LinkedHashMap`）；
-2. `items` 合併：文字大小寫不敏感去重；**引擎項在前**、App 織補在後（沿用 `mergeAssociationGroups` 口徑）；
+2. `items` 合併：含 `WHOLE_WORD` 的行大小寫不敏感去重、其餘來源精確文字（引擎會同時給 `J`/`j`）；
+   **引擎項在前**、App 織補在後；
 3. `sources` 並集；`segment` 取「單字組(0) > 詞行(1)」（同讀音既有單字又有詞時，按單字組呈現）；
 4. `restCode` 取首個非空。
 
@@ -144,7 +148,8 @@ internal fun buildPanel(
 
 ### 4.3 `tierAndSort(rows)`
 
-檔位 = **讀音音節數**：`1 → 0`，`≥2 → 1`，無讀音(`BLANK_READING`)→ `2`；檔內按 `reading.lowercase()` 字典序。
+檔位 = **讀音音節數**：`1 → 0`，`≥2 → 1`；`BLANK_READING("…")` 是一個非空 token，**實際落 0 檔**
+（與重構前行為一致，見 §11/ docs/17 §8）；檔內按 `reading.lowercase()` 字典序。
 **禁止**用 `syllables.size` 判檔（引擎組 `syllables` 只有 1 個元素，歷史 bug）。
 
 ### 4.4 `capRows(rows)`
@@ -270,8 +275,8 @@ adb shell ime set com.hazukieq.hkrime/.TrimeImeService
 
 1. **不要用 `syllables.size` 分檔**（引擎組只有 1 個元素）——判檔一律用讀音 token 數
    （`PanelRow.syllableCount` / `reading.split(' ').count { it.isNotBlank() }`）。
-   現存 `syllables.size` 只剩兩處**非分檔**用途：`TwelveKeyPreedit` 建聯想索引時的詞長判斷、
-   以及 `CandidateRanking.groupCandidates` 的「讀音未知組排最後」判斷（已改為讀音 token 數）。
+   現存 `syllables.size` 只剩一處**非分檔**用途：`TwelveKeyPreedit` 建聯想索引時的「詞長 ≥ 2」判斷；
+   `groupCandidates` / `orderGroups` / `engineRows` 的「多音節」判斷已全部改成讀音 token 數。
 2. **`reading` 去重一律大小寫不敏感**（`Linux`/`linux`）；**`items` 文字去重分兩檔**：
    - 含 `WHOLE_WORD` 的行：大小寫不敏感（純詞表裡同一詞的大小寫變體只留一條）；
    - 其餘行：**精確文字**（引擎會同時給 `J` 與 `j`，一律小寫會吞掉大寫候選；`8e`/`64` 的 `ze` 組實測）。
@@ -302,7 +307,7 @@ adb shell ime set com.hazukieq.hkrime/.TrimeImeService
 - **死代碼清理**：`CandidateRanking.panelGroups` / `mergeAssociationGroups` 重構後已無生產調用
   （只剩 `PerfGate` 與舊測試在用），本次刪除；`PerfGate.measureRankAndMerge` 改量新流水線
   （`mergeRows → collapsePrefixRows → tierAndSort → capRows`），避免性能門禁量到死路徑。
-- **測試遷移**：`RealCorpusTest.panelGroupsFollowMergeAndDropRules` 改走 `engineRows + mergeRows`
+- **測試遷移**：`RealCorpusTest.engineRowsFollowMergeAndDropRules` 改走 `engineRows + mergeRows`
   斷言同一批「同讀音併段組、詞組/非漢字組保留」規則；`CandidateRankingTest` 裡 6 條舊 API 測試刪除。
 - **新增回歸**：`TwelveKeyCoverageTest.engineEmptyFallbackPanelKeepsAssociationRows`
   （`ee5` 引擎空兜底仍出通配聯想行，防 `includePanelOnlySources=false` 回歸）。
@@ -332,8 +337,8 @@ adb shell ime set com.hazukieq.hkrime/.TrimeImeService
 | `9ca4c1e` refactor(panel) | 步驟 A + B 合併 | 五源拆分 + 流水線固定化；與 bb20a52 乾淨 worktree 對拍：snapshot 精確差異 0/12,774、segment 集合差異 0/12,784（3,931 碼行序變化＝修掉舊 `syllables.size` 分檔 bug）。A/B 合併為一個提交：中間態沒有獨立可回退價值。 |
 | `9557044` feat(panel) | 步驟 C | `INITIAL_COMBO` 接入 + `ASSOC` 改分桶輪轉；新增 `PanelGoldenTest` 與 golden JSON。 |
 | `b92bb15` docs(panel) | 步驟 D | 常量審計、docs/17、docs/19、AGENTS 更新；裝機。 |
-| 本提交 fix(panel) | ASSOC 首字母序列匹配 | `ASSOC` 第一/二音節候選改由「該段第一個碼位的首字母集合」決定（元音自由），不再按碼前綴；腳本同步、golden 重生成、docs/17 §7.2/§11 更新。 |
-| 本提交 refactor(panel) | §9 收尾複核 | 刪 `CandidateRanking.panelGroups`/`mergeAssociationGroups`（死代碼）；`PerfGate` 改量新流水線；`groupCandidates`/`orderGroups`/`engineRows` 判檔改用讀音 token 數；`RealCorpusTest` 遷移到 `engineRows + mergeRows`；docs/19 §9 按實現細化。 |
+| `fa56159` fix(panel) | ASSOC 首字母序列匹配 | `ASSOC` 第一/二音節候選改由「該段第一個碼位的首字母集合」決定（元音自由），不再按碼前綴；腳本同步、golden 重生成、docs/17 §7.2/§11 更新。 |
+| `3824115` refactor(panel) | §9 收尾複核 | 刪 `CandidateRanking.panelGroups`/`mergeAssociationGroups`（死代碼）；`PerfGate` 改量新流水線；`groupCandidates`/`orderGroups`/`engineRows` 判檔改用讀音 token 數；`RealCorpusTest` 遷移到 `engineRows + mergeRows`；docs/19 §9 按實現細化。 |
 
 ### 11.2 最終常量值（`TwelveKeyTuning`）
 

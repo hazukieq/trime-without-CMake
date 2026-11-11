@@ -827,7 +827,7 @@ class TextInputManager private constructor() :
 
     private fun doOnCandidatesRefreshed() {
         // 組字結束（上屏/清空）→ 清掉「按段選字」的錨點，下一輪重新記。
-        // 分段不再依賴用戶按 `'`：面板按碼位自動拆段（見 TwelveKeySnapshotBuilder.segmentGroupsFor）。
+        // 分段不再依賴用戶按 `'`：面板按碼位自動拆段（見 TwelveKeySnapshotBuilder.splitParts）。
         if (!Rime.isComposing()) {
             setSegmentAnchor(null)
             // 組字結束（上屏/清空/取消）→ 未提交前綴已無意義，避免後續一次性誤上屏。

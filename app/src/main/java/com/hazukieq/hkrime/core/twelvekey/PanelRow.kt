@@ -38,7 +38,7 @@ internal enum class RowSource {
     /** 整串碼前綴命中的多音節詞條（`li nak si` → Linux）。 */
     WHOLE_WORD,
 
-    /** librime 候選組（`CandidateRanking.panelGroups` 的來源）。 */
+    /** librime 候選組（引擎源，經 [mergeRows] 並入面板）。 */
     ENGINE,
 }
 
@@ -79,10 +79,11 @@ internal data class PanelRow(
  *
  * 規則：
  * 1. 行位置 = 首次出現位置（`LinkedHashMap`，保持來源拼接順序）；
- * 2. `items` 文字大小寫不敏感去重，保留先出現的那一條（引擎項在拼接順序裡已排在 App 補集之前）；
+ * 2. `items` 文字去重：含 `WHOLE_WORD` 的行大小寫不敏感（`Linux`/`linux` 是同一個詞），
+ *    其餘來源用**精確文字**（引擎會同時給 `J`/`j`，小寫去重會吞掉大寫候選），保留先出現的那一條
+ *    （引擎項在拼接順序裡已排在 App 補集之前）；
  * 3. `segment` / `restCode` 取**首行**：來源拼接順序固定為「段組 → 引擎 → 聯想 → 組合 → 詞行」，
- *    所以「單字組(0) 優先於詞行(1)」「整串音節的空 restCode 優先於備選切法」自然成立
- *    （與重構前 `mergeRowsByReading` / `mergeAssociationGroups` / `panelGroups` 的口徑一致）；
+ *    所以「單字組(0) 優先於詞行(1)」「整串音節的空 restCode 優先於備選切法」自然成立；
  * 4. `sources` 取並集（只進日誌）。
  */
 internal fun mergeRows(rows: List<PanelRow>): List<PanelRow> {
@@ -97,7 +98,7 @@ internal fun mergeRows(rows: List<PanelRow>): List<PanelRow> {
         }
         // 文字去重：整串詞行（WHOLE_WORD）大小寫不敏感（`Linux`/`linux` 是同一個詞）；
         // 其餘來源用**精確文字**——引擎會同時給 `J` 和 `j`，按小寫去重會把大寫候選吞掉
-        //（`8e` 的 `ze` 組實測少了 `J`），與重構前 panelGroups/mergeAssociationGroups 口徑一致。
+        // （`8e` 的 `ze` 組實測少了 `J`）。
         val caseInsensitive = row.sources.any { it == RowSource.WHOLE_WORD }
         val seen = existing.items.mapTo(HashSet(existing.items.size)) {
             if (caseInsensitive) it.text.lowercase() else it.text

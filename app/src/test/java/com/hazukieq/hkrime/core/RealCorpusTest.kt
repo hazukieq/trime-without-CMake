@@ -245,7 +245,7 @@ class RealCorpusTest {
      * - 讀音不重複（一個讀音只有一行）。
      */
     @Test
-    fun panelGroupsFollowMergeAndDropRules() {
+    fun engineRowsFollowMergeAndDropRules() {
         val failures = ArrayList<String>()
         var checked = 0
         val seen = HashSet<String>()

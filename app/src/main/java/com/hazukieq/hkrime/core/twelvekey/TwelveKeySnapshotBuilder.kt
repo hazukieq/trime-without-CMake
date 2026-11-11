@@ -188,7 +188,7 @@ object TwelveKeySnapshotBuilder {
                 anchor = segmentAnchor,
                 engineGroups = emptyList(),
                 // 引擎一條候選都沒有時（`ee5` 這類裝不出來的碼），面板仍要出**完整五源**
-                // （聯想詞行/首字母組合/整串詞行）：重構前 `segmentGroupsFor` 在
+                // （聯想詞行/首字母組合/整串詞行）：重構前在
                 // `wantGroups || needDictionaryFallback` 時都會算全量，這裡漏成 false 過，
                 // 結果真機 `ee5` 面板只剩 `de`/`fe` 兩個單字組，通配聯想詞全丟（用戶 2026-11-11 報）。
                 includePanelOnlySources = true,
@@ -643,12 +643,12 @@ object TwelveKeySnapshotBuilder {
      *
      * 有段組（按碼位自切的單字組）時，引擎的**單音節組**只是同一批字的另一種排法：
      * 全列出來左列會被 g* 的幾十個讀音灌滿，所以只保留「同讀音的引擎組」（並進段組）
-     * 與「多音節/含非漢字的組」——與舊 `CandidateRanking.panelGroups` 同一口徑。
+     * 與「多音節/含非漢字的組」——與重構前的合併口徑一致（單音節引擎組並入段組，只留詞組/非漢字組）。
      * 判「多音節」用讀音 token 數，不用 `syllables.size`（docs/19 §9.1：引擎組的 syllables 只有 1 個元素）。
      */
     internal fun engineRows(engineGroups: List<SyllableGroup>, segmentReadings: Set<String>): List<PanelRow> {
         if (engineGroups.isEmpty()) return emptyList()
-        // 沒有任何段組時（單鍵/純碼位、段組還沒展開）引擎組原樣全留 —— 這是舊 panelGroups 的
+        // 沒有任何段組時（單鍵/純碼位、段組還沒展開）引擎組原樣全留 —— 這是重構前的
         // `if (segmentGroups.isEmpty()) return engineGroups` 分支；不能套用下面的「只留詞組」過濾，
         // 否則單鍵輸入的單音節引擎組會整批消失（`8` 的 `ji` 就是這樣被吞掉的）。
         if (segmentReadings.isEmpty()) {
@@ -659,7 +659,7 @@ object TwelveKeySnapshotBuilder {
         val out = ArrayList<PanelRow>(engineGroups.size)
         engineGroups.forEach { group ->
             if (group.reading in segmentReadings) {
-                // 同讀音引擎組會並進段組：漢字在前、非漢字補在後面（舊 panelGroups 的分區口徑）。
+                // 同讀音引擎組會並進段組：漢字在前、非漢字補在後面（重構前的分區口徑）。
                 val (cjk, other) = group.items.partition {
                     CandidateRanking.isSingleCjkChar(it.text) || CandidateRanking.isCjkWord(it.text)
                 }

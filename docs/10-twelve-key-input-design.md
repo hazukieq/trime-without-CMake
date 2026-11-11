@@ -1,5 +1,12 @@
 # 10 · 12 键（九宫格）客家话输入：设计与实现方案
 
+> **閱讀提示（2026-11-11）**：本文是 12 鍵輸入的**歷史設計/變更記錄**（§15.x 按日期追加）。
+> 文中出現的 `segmentGroupsFor` / `panelGroups` / `mergeAssociationGroups` / `mergeRowsByReading` /
+> `recommendFrom` / `MAX_SYLLABLE_GROUPS` / `RECOMMEND_ITEMS` 等符號**已於 2026-11-11 面板重構刪除或改名**，
+> 只作為歷史記錄保留；現行實現以 `docs/17-candidate-panel.md` §6–§8、§11 與
+> `docs/19-panel-logic-refactor-plan.md` §11 為準。
+
+
 > 本文回答两个问题：**librime 到底能给 12 键做什么**（issue #123 之后），以及 **hkrime 里怎么落地**。
 > 结论先行：**不改 librime，只补一个候选枚举 JNI + 重写候选面板**。
 > 文中所有引擎行为都已在 host 上实测（`artifacts/12key/engine/probe/`），不是推测。

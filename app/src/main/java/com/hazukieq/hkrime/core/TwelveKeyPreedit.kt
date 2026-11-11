@@ -80,7 +80,7 @@ object TwelveKeyPreedit {
      * 已發布的整串碼索引（**不可變**，[finishWordIndex] 時整體替換）。
      *
      * 不能在查詢端直接遍歷 [wordCodeEntries]：詞表在後台線程邊讀邊加，按鍵線程同時遍歷會
-     * `ConcurrentModificationException` —— 那會讓整個 `segmentGroupsFor` 拋異常、面板所有組
+     * `ConcurrentModificationException` —— 那會讓整輪面板組裝（`buildPanelRows`）拋異常、所有組
      * 一起消失（用戶 2026-11-11：「連單音節和聯想詞分組全部消失了」）。
      */
     @Volatile

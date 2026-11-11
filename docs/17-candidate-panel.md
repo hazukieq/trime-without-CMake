@@ -34,7 +34,7 @@
 |---|---|
 | `core/twelvekey/TwelveKeyModels.kt` | 数据模型：`CandidateItem`、`SyllableGroup`、`Fallback`、`TwelveKeySnapshot`；常量 `SYNTHETIC_SEGMENT=-2`、`RECOMMEND_SEGMENT=-3` |
 | `core/twelvekey/TwelveKeySnapshotBuilder.kt` | **快照组装**：枚举候选 → 候选条排序 → 段组/联想/多音节词典词行 → 面板分组排序 → preview/inlineText/fallback |
-| `core/twelvekey/CandidateRanking.kt` | 纯函数排序/合并：`rankBar`、`fullBarOrder`、`mergePhraseCandidates`、`rankPanelItems`、`groupCandidates`、`panelGroups`、`mergeAssociationGroups`、`orderGroups`、`rankWithLearning` |
+| `core/twelvekey/CandidateRanking.kt` | 纯函数排序/合并：`rankBar`、`fullBarOrder`、`mergePhraseCandidates`、`rankPanelItems`、`groupCandidates`、`orderGroups`、`rankWithLearning`（合并/排序已统一到 `PanelRow.kt` 的 `mergeRows → collapsePrefixRows → tierAndSort → capRows`） |
 | `core/twelvekey/TwelveKeyController.kt` | 异步刷新（协程 + 去抖 120ms）、快照缓存（8 条 LRU + `engineVersion`）、兜底重试（90ms ×3）、`selectCandidate` 转发 |
 | `core/twelvekey/CandidatePanelController.kt` | 面板视图控制：`toggle()` / `submit()` / `show()` / `hide()`、`activeGroup` 保持、「推荐」落第 0 组 |
 | `core/twelvekey/TwelveKeyTuning.kt` | **所有产品策略常量**（配额/上限）集中地，每个常量都写了「调大调小的后果」 |
@@ -110,7 +110,7 @@ flowchart TD
 `reading` 是左列显示的文字（精确读音；「推荐」组为空串），`syllables` 是拆分后的音节
 （**排序要用它**），`items` 是该读音下的全部候选，`segment` 见上表。
 
-**不变量**：`reading` 相同 ⇒ 必须只有一行（同读音的行要合并，见 §7.3）。
+**不变量**：`reading` 相同 ⇒ 必须只有一行（同读音的行要合并，见 §6 的 `mergeRows`）。
 
 ### 4.4 `TwelveKeySnapshot`
 
@@ -150,23 +150,24 @@ flowchart TD
 ```
 1. 取 input / consumedEnd / remaining（consumedEnd 来自 context 段状态）
 2. 枚举引擎候选（MAX_CANDIDATES=600）→ flat
-3. ordered = rankWithLearning(flat)          // 覆盖深度 + 学习分 + 引擎顺序
-4. segmentGroups = segmentGroupsFor(remaining)   // 见 §7.1（wantGroups 或字典兜底才建）
-5. engineGroups = orderGroups(group(ordered))    // 面板左列的「引擎词组/读音组」
-6. merged  = panelGroups(baseSegmentGroups, engineGroups)       // §7.3
-7. groups  = mergeRowsByReading(
-                mergeAssociationGroups(merged, assocGroups),
-                prefixWordRows)                                  // §7.2 + §7.4
-8. groups  = groups.sortedWith(comparator)                       // §8
-9. barEntries = barList(ordered) | 字典兜底（§5）
-10. recommend = recommendFrom(ordered) | 字典兜底续页
-11. groupsWithRecommend = 推荐行(若有) + groups
-12. previewText/inlineText/fallback
-13. 返回不可变 TwelveKeySnapshot
+3. ordered = rankWithLearning(flat)              // 覆盖深度 + 学习分 + 引擎顺序
+4. engineGroups = engineGroupsOf(ordered)        // 面板左列的「引擎读音组/词组」（wantGroups 才建）
+5. panelRows = buildPanelRows(remaining, anchor, engineGroups, includePanelOnlySources)
+      五源：SYNTH_SINGLE / SPLIT_SINGLE / ASSOC / INITIAL_COMBO / WHOLE_WORD   // §7.1 / §7.2 / §7.5 / §7.4
+6. panelRows = mergeRows(panelRows)              // 唯一合并点（同读音一行）
+7. panelRows = collapsePrefixRows(panelRows)     // 多音节行按最长已有前缀收敛
+8. panelRows = tierAndSort(panelRows)            // 分档 + 档内字典序（§8）
+9. panelRows = capRows(panelRows, MAX_GROUPS)    // 超额先丢 INITIAL_COMBO
+10. groups   = panelRows.map { it.toSyllableGroup() }   // 投影（sources 丢弃）
+11. barEntries = barList(ordered) | 字典兜底（§5）
+12. recommend = recommendWords(ordered, panelRows.filter { it.segment == 1 })  // §7.6
+13. groupsWithRecommend = 推荐行(若有) + groups
+14. previewText/inlineText/fallback
+15. 返回不可变 TwelveKeySnapshot
 ```
 
-顺序不能随便调：`segmentGroups` 要在 `engineGroups` 之前（段组决定左列主体），
-`prefixWordRows` 要在**最终排序之前**并入（否则又会出现「不按字母排」的问题，见 §13-5）。
+顺序不能随便调：五源拼接顺序固定「段組 → 引擎 → 聯想 → 組合 → 詞行」（決定同讀音合併時誰的
+`segment`/`items` 在前），`collapsePrefixRows` 必须在 `tierAndSort` 之前（否则多音节行会被拆成两档）。
 
 ---
 
@@ -176,7 +177,7 @@ flowchart TD
 > `SYNTH_SINGLE / SPLIT_SINGLE / ASSOC / INITIAL_COMBO / WHOLE_WORD` 五个纯函数 →
 > `mergeRows`（唯一合并点）→ `collapsePrefixRows` → `tierAndSort` → `capRows`。
 > 每源都不自己排序/去重；`RowSource` 只用于 `diag.log` 统计，投影成 `SyllableGroup` 时丢弃。
-> 下面的 7.1~7.4 是各源规则（`segmentGroupsFor` 已删除，名字保留在旧描述里以对照）。
+> 下面的 7.1 / 7.2 / 7.4 / 7.5 是各源规则。
 
 ### 7.1 段组（`SYNTH_SINGLE` / `SPLIT_SINGLE`，`TwelveKeySnapshotBuilder`）
 
@@ -268,7 +269,7 @@ flowchart TD
 
 - `r` 在标准集里（`r` 也是 `儿` 的读音），但属**后缀音节**（`TwelveKeyPreedit.SUFFIX_ONLY_SYLLABLES`）；
 - **不参与首字母简拼展开**：不能当第一段/中间段的音节候选（`syllablesForSegment(..., allowSuffixOnly = false)` 会滤掉）；
-- **只能当这次输入的最后一个音节的候选**：`TwelveKeySnapshotBuilder.segmentGroupsFor()` 用 `allowSuffixOnly = rest.isEmpty()` 判断，
+- **只能当这次输入的最后一个音节的候选**：`TwelveKeySnapshotBuilder.splitParts()` 用 `allowSuffixOnly = rest.isEmpty()` 判断，
   本地解码 `decodeSpans()` 里也要求 `i + len == input.length` 才允许 `r`；
 - 例：`到下儿 = dau ha r`（码 `ea3ia3`）第一段只给 `dau/fa/da`，打到最后 `3` 时面板才给 `r`；
   `r` 夹在中间（如码 `35i`）时既不展开也不会被本地解码切成 `r + li`；
@@ -338,19 +339,33 @@ flowchart TD
 - 查询 `wordsByCodePrefix(codes)`：`entry.code.startsWith(输入码)` → 天然支持任意音节数、简拼、
   半截末节（`5i4a57` 命中 `5i4a57i`）；
 - 组装：`WHOLE_WORD` 源走**轻路径**（只查表 + 拼行），与其它源一起交给 `mergeRows` 合并
-  （整串词行按大小写不敏感去重，其余来源按精确文字）——**不走** `panelGroups`/大合并，避免把构建拖死；
+  （整串词行按大小写不敏感去重，其余来源按精确文字）——与其它源一起交给 `mergeRows` 唯一合并点，避免两套合并逻辑漂移；
 - **并入时按「最长已有前缀读音」找行**：`ko thiau fa` 若已有 `ko thiau` 行，就作为该行的候选，
   不再单独起一行（整串码本来就是「开头相同匹配」，长词单开一行会看起来像两个 list；
   用户 2026-11-11 指出）；只有没有任何前缀行匹配时，才用完整读音新建一行。
 
 ---
 
+### 7.6 推荐组（`recommendWords`，2026-11-11 改）
+
+推荐组 = **全部联想词的排序显示**（用户 2026-11-11：「推薦那裡的顯示的詞語，改為所有聯想詞語的排序顯示
+（按照候選條顯示的算法來做），數量取至多 20 個」）：
+
+1. 引擎/学习候选先走 `CandidateRanking.fullBarOrder`（与候选条同一排序），只留 **CJK 词**（单字不收）；
+2. 再接面板词行（`panelRows.filter { it.segment == 1 }`）的全部 `items`——`ASSOC` / `INITIAL_COMBO` /
+   `WHOLE_WORD` / 引擎词行，**ASCII 词（如 `Linux`）也收**；
+3. 按文字 `HashSet` 去重（引擎项优先保留 `comment`/`index`），`take(RECOMMEND_WORDS=20)`；
+4. 渲染为 `segment = RECOMMEND_SEGMENT` 的组，插在左列第 0 位（`CandidatePanelController` 只按
+   `group.segment` 判断，不参与五源流水线）。
+
+旧实现（候选条续页、`RECOMMEND_ITEMS=36`）已删除。
+
 ## 8. 左列排序（当前规则）
 
 比较器（`TwelveKeySnapshotBuilder.build` 末尾）：
 
 1. **分档只看「读音」的音节数**（`reading.split(' ')` 计数）：
-   1 个 → 0 档；≥2 个 → 1 档；空读音 → 2 档（「推荐」组例外，固定第一行）。
+   1 个 → 0 档；≥2 个 → 1 档；`reading` 为空串 → 2 档（「推荐」组例外，固定第一行）。
    注意 `BLANK_READING`（`…`）是一个**非空 token**，所以无读音的引擎组实际落 **0 档**、
    用首候选的字典读音参与排序——这是重構前 `readingSyllableCount` 的真实行为，
    2026-11-11 重構後照舊保留（不採「无读音→2 档」的舊文檔說法）。
@@ -482,9 +497,9 @@ flowchart TD
 6. **引擎 0 候选被误判成 bug**：`ee5` 在真实词库里真的没有候选（`RimeCandidateListBegin` 返回 false，
    因为 `!ctx->HasMenu()`）。现在候选条改用字典段组，只有字典也没有才显示字母。
 7. **同读音重复行**：`deepseek` 在用户词典里两条读音（`di si`/`di thok`），引擎一行 + 多音节词行一行
-   → 两行一模一样。现在 `mergeRowsByReading` 按读音合并、行内去重。
+   → 两行一模一样。现在 `mergeRows` 按读音合并、行内去重。
 8. **`ConcurrentModificationException`**：词表在后台线程边读边加，按键线程遍历同一个 `ArrayList`
-   → 整轮 `segmentGroupsFor` 抛异常、面板所有组消失。现在 `finishWordIndex` 发布不可变
+   → 整轮面板组装（`buildPanelRows`）抛异常、全部组消失。现在 `finishWordIndex` 发布不可变
    `@Volatile wordCodeIndex`，查询只读快照。
 9. **`‸` 光标被当成前缀**：`getCompositionPrefix` 曾把 preedit 末尾的 `‸` 一起当已选前缀，
    导致输入框出现 `88˄以`。现在 `compositionPrefix` 只保留非 ASCII 且非 `‸` 的字。
@@ -673,7 +688,7 @@ $ python3 tools/panel_probe.py selftest
 
 ## 17. 已知缺口 / 下一步
 
-1. **多音节词行只在面板**：候选条不放（担心挤掉高频单字），后续可评估「只在推荐组出现」。
+1. **多音节词行只在面板**：候选条不放（担心挤掉高频单字）；推荐组会收全部联想词（≤20）。
 2. **`ASSOC_PREFIX_READINGS=4`** 是拍脑袋值，需要真机观察长词（4+ 音节）场景是否够。
 3. **面板组数 200 上限**（`MAX_GROUPS`）在超长输入下可能截断引擎词组，需要实测确认可接受。
 4. **性能监控**：目前 `diag.log` 只记结构，不记耗时；考虑加 `buildMs` 字段（注意别让日志本身变慢）。
@@ -687,7 +702,7 @@ $ python3 tools/panel_probe.py selftest
 |---|---|
 | 段组 / 分詞段 | 12 键按码位切出的「待选段」，每段一个音节，点字后剩余码回引擎递归 |
 | 整串码 | 一个词的完整数字码串（`Σ codeOf(音节)`），如 `Linux`→`5i4a57i` |
-| 推荐组 | 候选条放不下的续页，面板左列第一行 |
+| 推荐组 | 全部联想词的排序（候选条同一套顺序，≤20，单字不进），面板左列第一行 |
 | 合成候选 | App 侧逐段拼出来后记住的整串词（`PhraseMemory`），引擎给不出 |
 | 兜底 | 引擎与字典都没有候选时的字母显示（`qqqq`） |
 | inline preview | 把第一条候选（+已选前缀）写进输入框的嵌入式预览 |

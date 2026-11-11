@@ -85,21 +85,27 @@ Rime.candidatesSnapshot(600)
 
 ### 3.1 左列分组的组成
 
+> **2026-11-11 重構後以 `docs/17-candidate-panel.md` §6–§8 為準**：
+> `buildPanelRows` 五源（`SYNTH_SINGLE / SPLIT_SINGLE / ASSOC / INITIAL_COMBO / WHOLE_WORD`）
+> → `mergeRows`（唯一合併點）→ `collapsePrefixRows` → `tierAndSort` → `capRows` → 投影 `SyllableGroup`。
+> 下文 A 節保留的是本節撰寫時的舊拆分說明，`segmentGroupsFor` 已不存在（現為 `splitParts` + 五源），
+> 僅供理解「段組」概念；改代碼請直接看 docs/17。
+
 ```
 remaining（剩余码串，可能含用户按过的 '）
-   → CandidateRanking? 不，先由 builder 拼：
-groups = segmentGroupsFor(remaining, anchor)   // 段组（本段可选的「字」）
-       + groupCandidates(ranked, "…", MAX_GROUPS=200).map { copy(items = rankPanelItems(items)) }
+   → TwelveKeySnapshotBuilder.buildPanelRows(...)   // 见 docs/17 §6
 ```
 
-**A. 段组 `segmentGroupsFor`**（`TwelveKeySnapshotBuilder.kt:188` 起）
+**A. 段組（現由 `splitParts` + `synthSingleRows` / `splitSingleRows` 產生）**
 
 1. `codes = remaining.replace("'", "")` —— 用户按的 `'` 只是显式边界，拆段算法自己也能拆，两者结果一致。
 2. `TwelveKeyPreedit.splitFirstSyllable(codes)` 切出「第一段码」与「其余码」：
    - `decode(codes)` 能切出 ≥2 个音节 → 找第一个「单音节 head + 剩余 tail 音节数之和 == 总数」的切分；
    - `decode(codes)` 切不出音节（首字母相拼，如 `855`、`4i`）→ 直接取 `codes[0]` 与 `codes.substring(1)`；
    - 单音节输入 → 返回 null（不需要段组）。
-3. `syllablesForSegment(head, MAX_SYLLABLE_GROUPS = 8)`：以该码/首字母开头的**高频音节**（精确码优先，其次前缀），按音节词频降序、去重、**只取前 8 个**——用户明确反对「把每个首字母的所有组合都罗列」。
+3. `syllablesForSegment(head, SEGMENT_SYLLABLE_LIMIT=16 / _RICH=24)`：以该码/首字母开头的**高频音节**
+   （精确码优先，其次前缀），按音节词频降序、去重；可用音节 >16 的「豐富鍵」放開到 24。
+   **段碼剛好是一個完整音節**（`4i`、`ea`、`74`）時只列該音節，不再展開同前綴更長音節。
 4. 每个音节一组：`charsForSyllable(syllable)` → `rankChars(chars, anchor)` → `CandidateItem(ch, comment=syllable, index=-1, segment=0, restCode=tail)`。
 5. **组间排序**：若有 `anchor`（上一字），按 `SegmentMemory.bigramScore(anchor, 组内第一字)` 降序 —— 打完「區」之后，含「域」的组自动排最前。
 
@@ -142,7 +148,7 @@ groups = segmentGroupsFor(remaining, anchor)   // 段组（本段可选的「字
 |---|---|---|---|
 | 候选条条数 | `TwelveKeySnapshotBuilder.BAR_ITEMS` | 12 | 与 UI 一屏宽度绑定，改完顺手看候选条是否截断 |
 | 枚举上限 | `TwelveKeySnapshotBuilder.MAX_CANDIDATES` | 600 | 越小越省内存，越大面板越全 |
-| 段组音节组数量 | `TwelveKeySnapshotBuilder.MAX_SYLLABLE_GROUPS` | 8 | **改前先跑 `SyllableGroupCountTest` 看覆盖表**（§6） |
+| 段组音节组数量 | `TwelveKeyTuning.SEGMENT_SYLLABLE_LIMIT` / `..._RICH` | 16 / 24（豐富鍵門檻 16） | **改前先跑 `SyllableGroupCountTest` 看覆盖表**（§6） |
 | 面板组总数上限 | `TwelveKeySnapshotBuilder.MAX_GROUPS` | 200 | 防止巨型方案把分组拖慢 |
 | 空读音组名 | `TwelveKeySnapshotBuilder.BLANK_READING` | `…` | 改了要同步 UI 文案 |
 | 词表字频权重 | `tools/gen-char-freq.py`（oftenwords×3 / mobilewords×2 / 其余×1） | — | 改完重生成 `hakka_char_freq.txt` |
@@ -159,7 +165,7 @@ groups = segmentGroupsFor(remaining, anchor)   // 段组（本段可选的「字
 |---|---|---|
 | `twelvekey:build … ms=` | `TwelveKeySnapshotBuilder.build` | 一次快照构建耗时（含引擎枚举 + 分组 + 排序） |
 | `twelvekey:panel order=… keys=…` | `rankPanelItems` | 面板某个组的前 8 条及**两个比较键**：`字:u用户分/g综合分`；核对时先看 `u` 降序、同 `u` 再看 `g` 降序（只看 `g` 会因为用户习惯插队而「看起来不降序」，属正常） |
-| `twelvekey:topup split head=… rest=…` | `segmentGroupsFor` | 首字母相拼时把码串切成 head/rest 的结果 |
+| `twelvekey:topup split head=… rest=…` | `splitParts` | 首字母相拼时把码串切成 head/rest 的结果（日志名沿用旧名） |
 
 抓日志：
 
@@ -177,19 +183,22 @@ grep "twelvekey:panel order" /tmp/app.log | tail -20
 
 ```bash
 export JAVA_HOME=$HOME/opt/jdk17/jdk-17.0.9
-./gradlew :app:testDebugUnitTest        # 全部 JVM 单测（15 个用例，约 2 s）
+./gradlew :app:testDebugUnitTest        # 全部 JVM 单测（2026-11-11 时 140 个用例）
 ```
 
 | 文件 | 用例数 | 覆盖什么 |
 |---|---|---|
 | `core/twelvekey/CandidateRankingTest.kt` | 12 | 候选条：词组分区/截断/去空/稳定性 + 面板：组内三级排序、分组顺序、组数上限、段组关联排序 + 两条真实数据校验 |
-| `core/twelvekey/SyllableGroupCountTest.kt` | 3 | `MAX_SYLLABLE_GROUPS` 取值守门（常量为 8、平均覆盖 ≥ 40%、最差首码 ≥ 27%、每首码组数） |
+| `core/twelvekey/SyllableGroupCountTest.kt` | 数条 | 段組音節數上限（`SEGMENT_SYLLABLE_LIMIT`/`_RICH`）覆盖率守门 + 每首码组数 |
+| `core/twelvekey/PanelGoldenTest.kt` | 1 | App 五源 vs `panel_probe.py json` 的 32 码 golden 对拍（改面板规则时必跑） |
 
 设计原则：**能用纯函数测的绝不点 UI**。UI 只用来验证「装配是否把纯函数结果正确呈现」（例如嵌入式预览与候选条第 0 条是否一致）。
 
-### 6.1 为什么 `MAX_SYLLABLE_GROUPS = 8`
+### 6.1 段組音節數上限（現值 16 / 豐富鍵 24）
 
-`SyllableGroupCountTest` 对 12 个首码（`y9ae1i54w738`）实测「前 N 组覆盖的字频质量」：
+2026-11-10 曾用 `MAX_SYLLABLE_GROUPS = 8`（下表是當時的覆蓋率依據）；2026-11-11 重構後改為
+`SEGMENT_SYLLABLE_LIMIT=16`，可用音節 >16 的「豐富鍵」放開到 `SEGMENT_SYLLABLE_LIMIT_RICH=24`，
+並且「段碼剛好是完整音節」時只列該音節。下表僅作歷史參考：
 
 | N | 最低覆盖 | 平均覆盖 | 最高覆盖 |
 |---|---|---|---|
@@ -198,7 +207,7 @@ export JAVA_HOME=$HOME/opt/jdk17/jdk-17.0.9
 | **8** | **28.8%** | **44.2%** | **76.0%** |
 | 12 | 39.6% | 55.9% | 87.5% |
 
-一屏可见 6 行，8 组 = 一屏 + 两行滚动；8→12 只多 11.7 个百分点却要多滚近两屏，收益递减。字表大改后重跑测试看表再调。
+字表/音節規則大改後重跑 `SyllableGroupCountTest` 看覆蓋表再調。
 
 ---
 
@@ -212,7 +221,7 @@ export JAVA_HOME=$HOME/opt/jdk17/jdk-17.0.9
 | 段组放面板、不放候选条 | 用户 2026-11-10：「只在固定候选栏上做改变」后被否决，改回面板承担「逐段选字」 | 候选条只放引擎候选（词组优先），面板负责拆段选字 |
 | 拆段不再依赖 `'` | 用户 2026-11-10：「普通输入也要能逐段选」 | `splitFirstSyllable` 自动拆，`'` 仅作显式边界 |
 | 空读音组排最后 | 原先它排在单音节组之后、多音节组之前，位置尴尬 | 兜底分组永远最后 |
-| 首字母相拼只列高频音节 | 用户：「不可能每个首字母的所有组合都罗列，那不科学也没必要」 | `syllablesForSegment(head, 8)` |
+| 首字母相拼只列高频音节 | 用户：「不可能每个首字母的所有组合都罗列，那不科学也没必要」 | `syllablesForSegment(head, 16/24)`；完整音節段只列該音節 |
 
 ---
 
