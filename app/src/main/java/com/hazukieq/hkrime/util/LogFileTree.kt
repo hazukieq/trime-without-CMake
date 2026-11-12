@@ -48,6 +48,11 @@ class LogFileTree(private val context: Context) : Timber.Tree() {
     private val lock = Any()
     private val buffer = ArrayDeque<String>()
 
+    /** 落盤丟到單一後台線程：緩衝滿了就整批寫，**不要在按鍵主線程做外部存儲 I/O**。 */
+    private val ioExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+        Thread(r, "hkrime-log-flush").apply { isDaemon = true }
+    }
+
     init {
         instance = this
     }
@@ -69,10 +74,15 @@ class LogFileTree(private val context: Context) : Timber.Tree() {
                 append(Log.getStackTraceString(t))
             }
         }
-        synchronized(lock) {
+        val batch: List<String>? = synchronized(lock) {
             buffer.addLast(line)
-            if (buffer.size >= FLUSH_THRESHOLD) flushLocked()
+            if (buffer.size >= FLUSH_THRESHOLD) {
+                val copy = ArrayList(buffer)
+                buffer.clear()
+                copy
+            } else null
         }
+        batch?.let { ioExecutor.execute { writeBatch(it) } }
     }
 
     fun flush() = synchronized(lock) { flushLocked() }
@@ -103,18 +113,20 @@ class LogFileTree(private val context: Context) : Timber.Tree() {
 
     private fun flushLocked() {
         if (buffer.isEmpty()) return
+        val batch = ArrayList(buffer)
+        buffer.clear()
+        // 顯式 flush（退到後台/IME 隱藏/崩潰前）走同步，保證內容真的落盤。
+        writeBatch(batch)
+    }
+
+    /** 真正寫文件；只由 [ioExecutor] 或顯式 flush 調用。 */
+    private fun writeBatch(lines: List<String>) {
         runCatching {
             val f = currentFile() ?: return
-            val text = buildString {
-                while (buffer.isNotEmpty()) {
-                    append(buffer.removeFirst()).append('\n')
-                }
-            }
-            f.appendText(text)
+            f.appendText(buildString { lines.forEach { append(it).append('\n') } })
         }.onFailure {
             // 不能在這裡再用 Timber（會遞歸），直接走 android.util.Log
             Log.w("LogFileTree", "flush failed: ${it.message}")
-            buffer.clear()
         }
     }
 

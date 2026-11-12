@@ -38,7 +38,13 @@ class TrimeApplication : Application() {
             if (BuildConfig.DEBUG) {
                 // 每次進程啟動清空診斷檔（用戶 2026-11-11：排查要能「通通寫進 hkrime/logs」）
                 runCatching { com.hazukieq.hkrime.util.DiagLog.reset() }
-                Timber.plant(Timber.DebugTree())
+                // 12 鍵每鍵幾十條 DEBUG/VERBOSE 日誌；DebugTree 每條都走 logcat IPC，
+                // 在按鍵熱路徑上是實打實的卡頓源。DEBUG 級別只進 LogFileTree（文件），
+                // logcat 保留 INFO 以上，排查照樣看 /sdcard/hkrime/logs。
+                Timber.plant(object : Timber.DebugTree() {
+                    override fun isLoggable(tag: String?, priority: Int): Boolean =
+                        priority > Log.DEBUG && super.isLoggable(tag, priority)
+                })
             }else{
                 Timber.plant(CrashReportingTree())
             }

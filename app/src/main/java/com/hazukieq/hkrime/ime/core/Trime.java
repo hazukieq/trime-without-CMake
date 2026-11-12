@@ -1261,6 +1261,7 @@ public class Trime extends LifecycleInputMethodService {
 
   /** 更新Rime的中西文狀態、編輯區文本 */
   public int updateComposing() {
+    final long __perfT0 = System.nanoTime();
     final @Nullable InputConnection ic = getCurrentInputConnection();
     activeEditorInstance.updateComposingText();
     if (ic != null && !isWinFixed()) isCursorUpdated = ic.requestCursorUpdates(1);
@@ -1299,6 +1300,10 @@ public class Trime extends LifecycleInputMethodService {
       }
     }
 
+    final long __perfMs = (System.nanoTime() - __perfT0) / 1_000_000L;
+    if (__perfMs >= 6) {
+      com.hazukieq.hkrime.util.DiagLog.INSTANCE.d("perf", "compose=" + __perfMs + "ms");
+    }
     return startNum;
   }
 

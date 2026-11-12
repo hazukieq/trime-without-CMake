@@ -273,6 +273,8 @@ public class Candidate extends View {
   }
 
   private void removeHighlight() {
+    // 每次刷新都 requestLayout 會讓候選條整條重新 measure/layout；沒有高亮時沒必要。
+    if (highlightIndex == -1) return;
     highlightIndex = -1;
     invalidate();
     requestLayout();
@@ -476,18 +478,6 @@ public class Candidate extends View {
     int avail = expectWidth > 0 ? expectWidth : getMeasuredWidth();
     if (avail <= 0) avail = getResources().getDisplayMetrics().widthPixels;
 
-    if (numCandidates > 0) {
-      StringBuilder sb = new StringBuilder();
-      for (int i = 0; i < Math.min(5, numCandidates); i++) {
-        sb.append('[')
-            .append(candidates[i + startNum].text)
-            .append('/')
-            .append(candidates[i + startNum].comment)
-            .append(']');
-      }
-    } else {
-    }
-
     // 圖標只在「沒有候選」時出現：菜單（左）／配色 / 收起鍵盤（右）。
     // Gboard 工具欄規格：24dp 圖標 + 48dp 觸摸盒 + 8dp 頁邊距，盒相鄰即 24dp 視覺間隔。
     final float density = getResources().getDisplayMetrics().density;
@@ -546,11 +536,14 @@ public class Candidate extends View {
 
   private void applyLayoutParams(int width) {
     LayoutParams params = getLayoutParams();
-    params.width = width;
-    params.height =
+    int height =
         (showCommentRow && isCommentOnTop)
             ? candidateViewHeight + commentHeight
             : candidateViewHeight;
+    // 每鍵都 setLayoutParams 會讓整條候選欄重新 measure/layout；寬高沒變就別碰。
+    if (params.width == width && params.height == height) return;
+    params.width = width;
+    params.height = height;
     setLayoutParams(params);
   }
 

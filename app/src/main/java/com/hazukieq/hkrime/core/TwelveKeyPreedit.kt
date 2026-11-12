@@ -1343,12 +1343,24 @@ object TwelveKeyPreedit {
      * @param engineText 引擎 menu 第一條的文本（沒有 App 快照時的兜底）
      * @param engineComment 引擎 menu 第一條的 comment
      */
+    // 一次按鍵會有多處取 preedit（候選條、懸浮窗、內嵌預覽），輸入參數通常相同；
+    // 快取上一次結果，避免重複 split/查表/拼字（用戶 2026-11-12 反饋 preedit 顯示耗性能）。
+    private var renderCacheKey: String? = null
+    private var renderCacheValue: String? = null
+    private var renderCacheUsedRawCode: Boolean = false
+
     fun render(
         rawPreedit: String?,
         engineText: String? = null,
         engineComment: String? = null,
     ): String? {
         if (rawPreedit.isNullOrEmpty() || table.isEmpty()) return null
+        val cacheKey = rawPreedit + "\u0001" + engineText + "\u0001" + engineComment + "\u0001" +
+            preferredText + "\u0001" + preferredComment + "\u0001" + pendingPrefix
+        if (cacheKey == renderCacheKey) {
+            lastRenderUsedRawCode = renderCacheUsedRawCode
+            return renderCacheValue
+        }
         // 1) 讀音來源：App 快照發布的「候選條第一條」優先（所見即所讀），否則退回引擎 menu 第一條。
         val hasBarHint = !preferredText.isNullOrEmpty()
         val hint = if (hasBarHint) preferredText else engineText
@@ -1360,12 +1372,15 @@ object TwelveKeyPreedit {
         // 3) App 側暫存（兜底逐段選字，引擎候選裡沒有那些字）顯示在最前面。
         val pending = pendingPrefix
         val rendered = (if (pending.isNullOrEmpty()) "" else pending) + decoded
-        if (com.hazukieq.hkrime.BuildConfig.DEBUG) {
+        if (com.hazukieq.hkrime.BuildConfig.DEBUG && com.hazukieq.hkrime.util.DiagLog.verbose) {
             Timber.d(
                 "dbgpre: raw=[%s] hint=[%s] preferred=[%s] pending=[%s] decoded=[%s]",
                 rawPreedit, hint, preferred, pending, rendered,
             )
         }
+        renderCacheKey = cacheKey
+        renderCacheValue = rendered
+        renderCacheUsedRawCode = lastRenderUsedRawCode
         return rendered
     }
 

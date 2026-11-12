@@ -540,15 +540,7 @@ public class Composition extends AppCompatTextView {
    */
   public int setWindow(int stringMinLength, int candidateMinCheck) {
     if (getVisibility() != View.VISIBLE) return 0;
-    StackTraceElement[] stacks = new Throwable().getStackTrace();
-    Timber.d(
-        "setWindow Rime.getComposition()"
-            + ", [1]"
-            + stacks[1].toString()
-            + ", [2]"
-            + stacks[2].toString()
-            + ", [3]"
-            + stacks[3].toString());
+    // 這裡每次按鍵都會走 2~4 次；抓 stack trace 打日誌在這個熱路徑上代價太高，已移除。
     Rime.RimeComposition r = Rime.getComposition();
     if (r == null) return 0;
     String s = r.getText();

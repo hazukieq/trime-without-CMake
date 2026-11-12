@@ -20,6 +20,10 @@ object DiagLog {
 
     const val ENABLED = true
 
+    /** 逐鍵/逐次渲染的調試日誌（dbgpre 等）；默認關，排查時改 true 再重編。 */
+    @Volatile
+    var verbose: Boolean = false
+
     @Volatile
     private var dir: File? = null
 
