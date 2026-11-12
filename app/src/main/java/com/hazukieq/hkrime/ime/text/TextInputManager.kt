@@ -534,6 +534,18 @@ class TextInputManager private constructor() :
      * 同時把「選中前的完整碼串」壓進 `heldPicks`：用戶按退格反悔時整段還原
      * （用戶 2026-11-12：選了加油再退格改選家有，最後卻上屏「加油家有」——暫存狀態沒撤）。
      */
+    /**
+     * 引擎目前**還沒被消費**的輸入尾巴（已選中的段不算）。
+     *
+     * librime 的 `RimeGetInput()` 在部分選中後仍回整串原始碼；用整串去算「還剩幾個音節」
+     * 會把已選的前綴重複算一次。快照的 `remaining` 已扣掉 `consumedEnd`，優先用它。
+     */
+    private fun unconsumedCode(): String {
+        val rem = twelveKeyController?.snapshot?.remaining.orEmpty()
+        if (rem.isNotEmpty()) return rem
+        return withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
+    }
+
     private fun holdPartialPick(
         text: String,
         reading: String,
@@ -544,14 +556,24 @@ class TextInputManager private constructor() :
         val code = input.ifEmpty {
             withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
         }
-        val remaining = TwelveKeyPreedit.remainingCodeAfter(reading, code)
+        // 已經選過前面的段（引擎 consumedEnd > 0）時，`code` 仍是整串原始輸入；
+        // 判斷「這次選的讀音吃不吃得完」要從**還沒消費的尾巴**算，否則第二段明明是最後一段
+        // 也會被誤判成 part（用戶 2026-11-12：lang ki 選冷→選起，被 hold 成 起ki→上屏 起冷起）。
+        val base = unconsumedCode().ifEmpty { code }
+        val remaining = TwelveKeyPreedit.remainingCodeAfter(reading, base)
         if (remaining.isEmpty()) return false
         // 學習要在清組合前記（key 是這次完整碼串）。
         if (engineIndex >= 0) learnCandidatePick(text, reading) else if (code.isNotEmpty()) {
             PhraseMemory.learnPick(code, text, reading)
         }
-        heldPicks.addLast(HeldPick(text, code))
-        pendingPick.append(text)
+        // 引擎 preedit 裡「已選未提交」的前綴（如「冷」）不是 pendingPick 管的，clearComposition 前
+        // 要併進來，否則被丟掉；heldPicks 記完整碼串，退格時還原整串（含前綴未選中的狀態）。
+        val enginePrefix = uncommittedPrefix.ifEmpty {
+            withEngineLock { runCatching { Rime.getCompositionPrefix() }.getOrNull() }.orEmpty()
+        }
+        uncommittedPrefix = ""
+        heldPicks.addLast(HeldPick(enginePrefix + text, code))
+        pendingPick.append(enginePrefix).append(text)
         updatePendingPick()
         setSegmentAnchor(text.lastOrNull())
         withEngineLock { Rime.clearComposition() }
@@ -578,7 +600,8 @@ class TextInputManager private constructor() :
         // 合成候選只覆蓋輸入前幾個音節時，剩餘碼要在清組合後重新餵回引擎
         // （同 pickAssociationWord；用戶 2026-11-11：灵机一动 | 来的 後半丟失）。
         val input = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
-        val remaining = TwelveKeyPreedit.remainingCodeAfter(item.comment, input)
+        val base = unconsumedCode().ifEmpty { input }
+        val remaining = TwelveKeyPreedit.remainingCodeAfter(item.comment, base)
         com.hazukieq.hkrime.util.DiagLog.d(
             "phrase",
             "input=$input comment=${item.comment} remaining=$remaining rest=${item.restCode}",
