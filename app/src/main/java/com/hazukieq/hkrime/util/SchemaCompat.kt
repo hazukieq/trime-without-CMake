@@ -106,12 +106,13 @@ object SchemaCompat {
         return ids
     }
 
-    /** @return true = 寫了文件（之前沒有 patch / 需要補 keep_comments） */
+    /**
+     * @return true 表示補建或更新了方案適配 patch。
+     */
     private fun ensurePatched(file: File): Boolean {
         val text = if (file.isFile) file.readText(Charsets.UTF_8) else ""
         if (text.contains("always_show_comments")) {
-            // 舊版 patch 沒帶 keep_comments：rime-ice 的 corrector.lua 會把 comment 清空
-            // （除非 translator/keep_comments 為 true），面板左列就又只剩「…」。
+            // 補 translator/keep_comments，避免 Lua corrector 清空面板需要的精確讀音。
             if (text.contains("keep_comments")) return false
             val anchor = "\"translator/always_show_comments\""
             val at = text.indexOf(anchor)

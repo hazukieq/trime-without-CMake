@@ -1,43 +1,6 @@
 #!/usr/bin/env bash
-#
-# build-jni-so.sh — 从上游 osfans/trime 源码构建 arm64-v8a 的 librime_jni.so，
-#                   并把 JNI 类路径 / 导出符号从 com.osfans.trime 全量改造成 --pkg 指定的包名
-#                   （本项目：com.hazukieq.hkrime）。
-#
-# 背景：
-#   hkrime 的 Java/Kotlin 侧（Rime.java / OpenCCDictManager.kt）是上游 trime v3.2.7 时代的
-#   JNI API（snake_case native 方法）。v3.3.x 起上游改成 Kotlin RimeApi，符号/类路径全变，
-#   所以必须钉在 v3.2.7 这个 ref 上构建，再把包名改掉。
-#
-# 本脚本做的事（顺序固定）：
-#   1. 探测 SDK / NDK / cmake / ninja（--ndk 优先；否则 local.properties 的 sdk.dir →
-#      ANDROID_HOME → ANDROID_SDK_ROOT → /home/hazukie/Android/Sdk）。
-#   2. 取源码：git clone 上游（--upstream-ref，默认 v3.2.7）+ git submodule update --recursive，
-#      然后逐个校验子模块 commit == 上游 gitlink（不匹配直接失败）。
-#      也可以用 --src-dir 复用一份已准备好的源码树（离线/CI 场景）。
-#   3. 打 patch：把 librime_jni/{rime_jni.cc,key_table.cc,levers.cc,opencc.cc,jni-utils.h} 与
-#      librime_jni/CMakeLists.txt 里的 com.osfans.trime / Java_com_osfans_trime_ 改成新包名。
-#      pattern 找不到就报错退出（绝不静默跳过）；已打过则跳过（幂等）。
-#   4. cmake（NDK toolchain，绕开 gradle）+ ninja 构建目标 rime_jni。
-#   5. llvm-strip --strip-unneeded。
-#   6. 安装到 app/libs/<abi>/librime_jni.so（或 --out-dir），写 .sha256。
-#   7. 调 script/verify-jni-symbols.sh 校验 73 个 JNI 符号与 hkrime 源码声明一致、无旧包名残留。
-#
-# 用法：
-#   ./script/build-jni-so.sh                       # 全默认：clone v3.2.7 到 ../jni-build，出 arm64-v8a
-#   ./script/build-jni-so.sh --clean               # 先清掉源码树与构建目录再从头来（幂等）
-#   ./script/build-jni-so.sh --build-type Release  # 出 -O2 优化版（约 6MB；默认 Debug 与现有 13.5MB 库一致）
-#   ./script/build-jni-so.sh --src-dir /path/to/trime-v3.2.7   # 复用已 clone 好的源码（不联网）
-#   ./script/build-jni-so.sh --out-dir /tmp/out    # 只装到临时目录（不动 app/libs）
-#
-# 默认值：
-#   upstream-repo   https://github.com/osfans/trime.git
-#   upstream-ref    v3.2.7
-#   pkg             com.hazukieq.hkrime    （旧包名固定为 com.osfans.trime）
-#   abi             arm64-v8a
-#   build-type      Debug（= 上游 gradle debug variant / 仓库现有 13.5MB 库的同构产物）
-#   android-platform android-21
-#
+# 參考構建腳本，不用於當前 hkrime Native 產物。
+# 當前庫必須由工作區 rime-jni/script/build.sh 以 Release 構建；契約見 ../docs/02-jni-so.md。
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -69,7 +32,7 @@ info() { echo "  $*"; }
 step() { echo; echo "==> $*"; }
 
 usage() {
-  sed -n '2,45p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,3p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   exit 0
 }
 

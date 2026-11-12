@@ -6,25 +6,9 @@ import java.io.File
 import timber.log.Timber
 
 /**
- * 12 鍵 App 側那些「字典表」的統一讀取入口。
- *
- * 背景（用戶 2026-11-09 在 dsh mobile 反饋「添加新條目到詞庫不生效」，2026-11-11 落 PC 修）：
- * `TwelveKeyPreedit` 以前只用 `context.assets.open("rime/hakka.dict.yaml")` 讀 **APK 內置**
- * 的那份字典 —— 既不讀共享目錄 `/sdcard/hkrime`，也不展開 YAML 頭裡的 `import_tables`。
- * 於是「磁盤上編譯進 `hakka_zon` 的新詞」對引擎（librime 直接讀共享目錄）可見，
- * 對 12 鍵的段組字表 / 聯想詞 / 字頻排序卻完全不可見。
- *
- * 現在統一改成：
- * 1. **共享目錄優先**：`<userDataDir>/<name>.dict.yaml` 存在就用它，否則才退回 APK 內置
- *    `assets/rime/<name>.dict.yaml`（發佈版不帶用戶改動時行為不變）；
- * 2. **自己展開 `import_tables`**：支持 block（`- name`）與 inline（`[a, b]`）兩種寫法，
- *    遞歸上限 [MAX_IMPORT_DEPTH] 並按名字去重，所以「新建一個詞表掛進 import_tables」
- *    不改代碼也能被 App 看到；
- * 3. 只取**字典本體**（跳過 `---` 頭與 `...` 終結符之前的 YAML 元數據），
- *    避免把 `version:`/`name:` 這類行餵給字表解析。
- *
- * 生效時機：字典在輸入法進程啟動時讀入（`TwelveKeyPreedit.init`），改完 yaml 需要
- * **重開輸入法（或重啟 App）** 才生效——組裝/編譯（deploy）本身不會通知 App 重讀。
+ * App 字典與輔助文本的統一讀取入口。
+ * 優先 userDataDir，缺失回退 assets；遞歸展開 import_tables 並去重、限制深度。
+ * 字表解析僅使用 YAML 頭結束後本體。進程啟動時載入，部署後須重啟才能重建 App 索引。
  */
 object RimeDictSource {
 

@@ -1,29 +1,17 @@
-## PR Info
-#### Issue tracker
-Fixes will automatically close the related issue
+## 问题与最终行为
 
-Fixes #
+说明具体触发条件、修复或新增行为，并关联相关 issue。
 
-#### Manual testing
-- [ ] Done
+## 修改范围
 
-#### Build tasks success
-Successfully running following tasks on local
-- [ ] [CONTRIBUTING](CONTRIBUTING.md)
-- [ ] `./gradlew spotlessCheck`
-- [ ] `./gradlew assembleDebug`
+说明 App / 资源 / JNI / librime 边界与相关文档更新。
 
-#### Code Reviews
-1. No wildcards import
-2. Manual build and test pass
-3. GitHub action ci pass
-4. At least one contributor reviews and votes
-5. Can be merged clean without conflicts
-6. PR will be merged by rebase upstream base
+## 验证
 
-#### Daily build for review
-Fetch artifact after login
+- [ ] 相关 JVM 测试与 App 构建通过
+- [ ] 资源 / JNI 契约检查按改动范围通过
+- [ ] 面板规则同步脚本与 golden，并通过真实语料测试
+- [ ] 设备输入验收与性能门禁按改动范围通过
+- [ ] 已说明未验证项，日志不含个人内容，未提交签名秘密
 
-https://github.com/osfans/trime/actions
-
-#### Additional Info
+执行约定见 [CONTRIBUTING.md](../CONTRIBUTING.md)。不运行 spotlessApply。

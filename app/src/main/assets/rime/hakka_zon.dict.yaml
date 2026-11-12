@@ -1,7 +1,7 @@
 #
 ---
 name: hakka_zon
-version: "20.20.20"
+version: "2026.11.12"
 sort: by_weight
 use_preset_vocabulary: true
 ...
@@ -3537,3 +3537,5 @@ claude	ke lau de
 claude	ke lau
 claude code	ke lau keu de
 code	keu de
+Linux	li nak si	1000
+linux	li nak si	1000

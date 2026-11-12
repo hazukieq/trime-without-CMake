@@ -9,13 +9,7 @@ import org.junit.BeforeClass
 import org.junit.Test
 import java.io.File
 
-/**
- * 面板與候選條**同源**：都用 PhraseMemory 的學習詞（詞 + 完整讀音）。
- *
- * 回歸點（用戶 2026-11-11）：候選條能顯示 `B站`（候選條走 mergeLearnedPhrases，
- * PhraseMemory 裡是 `aaa4 → B站 / bi cam`），但面板音節組沒有 `bi cam` 行——
- * 因為面板 reading 索引只吃詞表。現在面板也吃 PhraseMemory，兩邊一致。
- */
+/** 驗證 PhraseMemory 學習詞同時供候選條與面板使用。 */
 class LearnedWordSourceTest {
 
     companion object {

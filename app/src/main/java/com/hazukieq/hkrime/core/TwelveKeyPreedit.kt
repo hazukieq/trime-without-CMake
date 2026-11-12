@@ -16,11 +16,7 @@ import java.util.HashMap
  */
 object TwelveKeyPreedit {
     /**
-     * App 側「已選但還沒上屏」的字（面板段組字在引擎候選裡找不到時走兜底，先累積在這裡）。
-     *
-     * 用戶 2026-11-11：「用戶都沒選完時不應該只在 preedit 嗎？怎麼能突然 commit」——
-     * 於是兜底不再立刻 `commitText`，而是把字暫存進來、由 [Rime.getComposition] 拼在 preedit 前面，
-     * 等整串選完（或引擎 commit）再一次性上屏。
+     * App 已選未提交前綴，由 TextInputManager 更新；組合未完成時僅留在 preedit。
      */
     @Volatile
     @JvmField
@@ -40,20 +36,12 @@ object TwelveKeyPreedit {
     /** 單字 → 音節（取字典裡第一次出現的讀音），用來在歧義時對齊第一個候選字。 */
     private val charTable = HashMap<String, String>()
     /**
-     * 兩字詞的「聯想索引」：key = (第一字音節, 第二字音節首字母)，value = 詞 → 出現次數。
-     *
-     * 詞表（hakka_sougou_words / mobilewords / oftenwords / places / poems / website / zon / cn_en）
-     * 只存詞條、沒有讀音，所以用 [charTable]（hakka.dict.yaml 的 `字<TAB>音節`）反推：
-     * 這樣才能回答「song 開頭、下一個音節是 g 開頭」有哪些詞 —— 也就是用戶要的 `song g**`。
+     * 原始聯想計數以首音節與第二音節首字母關聯詞面。
+     * 帶讀音條目直接解析；無讀音詞表可用 charTable 反推。面板對外標題仍用具體完整音節。
      */
     private val assocWords = HashMap<String, LinkedHashMap<String, Int>>()
 
-    // ---- App 學習詞（PhraseMemory）索引 ----
-    // 面板匹配與候選條**同源**：候選條把 PhraseMemory 的學習詞當合成候選混進去
-    // （見 TwelveKeySnapshotBuilder.mergeLearnedPhrases），面板也該用同一份「詞→讀音」。
-    // 用戶 2026-11-11：「候選條能拿到 B站，為甚麼面板不行」——根因就是面板的
-    // reading 索引只吃詞表，沒吃這份學習記憶（PhraseMemory 裡有 `aaa4 → B站 / bi cam`）。
-    // 只在 PhraseMemory.version 變化時重建（≤200 條，成本可忽略）。
+    // 學習詞讀音索引來自 PhraseMemory，與候選條共享文字和讀音，不讀 userdb 快照。
 
     private var learnedIndexVersion = -1
     private var learnedAssoc: Map<String, Map<String, List<String>>> = emptyMap()
@@ -62,11 +50,7 @@ object TwelveKeyPreedit {
     private var learnedWords: Set<String> = emptySet()
 
     /**
-     * 詞條的整串碼：`Linux` → tokens `[li, nak, si]` → `5i4a57i`。
-     *
-     * 聯想索引（assocByFirst）只按「前兩個音節」建 key，三音節以上的詞（`Linux` = `li nak si`）
-     * 打到第三節就查不到（用戶 2026-11-11：`li nak s` 面板沒有 Linux）。這裡額外保一份
-     * 「整串碼 + 讀音 + 詞面」的表，查詢端直接做碼串前綴匹配，天然支援任意音節數與半截碼。
+     * 整串碼前綴索引收錄自帶完整讀音的詞條，用於多音節詞行輕量查詢。
      */
     private data class WordCodeEntry(
         val tokens: List<String>,
@@ -77,11 +61,7 @@ object TwelveKeyPreedit {
     private val wordCodeEntries = ArrayList<WordCodeEntry>()
 
     /**
-     * 只能出現在**詞尾**的音節（用戶 2026-11-11：「关于 r，这是一个儿后缀的读音。
-     * 所以它默认不做首字母拼，只能出现在后面，这是特殊规则」）。
-     *
-     * 規則：`r` 不參與首字母簡拼展開、不能當第一段/中間段；只有「該段後面已經沒有碼」
-     * （即它是這次輸入的最後一個音節）時才允許出現。
+     * 後綴音節僅允許詞尾，不能作第一段或中間段簡拼。
      */
     internal val SUFFIX_ONLY_SYLLABLES = setOf("r")
 
@@ -91,21 +71,13 @@ object TwelveKeyPreedit {
     private val syllableSet = HashSet<String>()
 
     /**
-     * 已發布的整串碼索引（**不可變**，[finishWordIndex] 時整體替換）。
-     *
-     * 不能在查詢端直接遍歷 [wordCodeEntries]：詞表在後台線程邊讀邊加，按鍵線程同時遍歷會
-     * `ConcurrentModificationException` —— 那會讓整輪面板組裝（`buildPanelRows`）拋異常、所有組
-     * 一起消失（用戶 2026-11-11：「連單音節和聯想詞分組全部消失了」）。
+     * 發布不可變整串碼索引，完成構建後整體替換；查詢不遍歷可變載入列表。
      */
     @Volatile
     private var wordCodeIndex: List<WordCodeEntry> = emptyList()
 
     /**
-     * 聯想詞的**查詢索引**：第一音節 → (第二音節 → 詞列表)。
-     *
-     * 面板每次按鍵都會重建快照，如果查詢時還要遍歷所有 8 千多個「第一音節|第二音節」鍵
-     * 並 split 字符串，按鍵線程會明顯卡頓（用戶 2026-11-10 反饋「補聯想詞後來卡了」）。
-     * 這裡在詞表載入完成後一次性建好，查詢只做兩次 HashMap 查找。
+     * 按第一音節和第二音節建立精確聯想索引，避免每鍵全表掃描或拆分字串。
      */
     @Volatile
     private var assocByFirst: Map<String, Map<String, List<String>>> = emptyMap()
@@ -119,19 +91,14 @@ object TwelveKeyPreedit {
      */
     @Volatile
     /**
-     * 音節首字母 → 該首字母下的全部音節（字典序）。
-     *
-     * 聯想行（`ASSOC` 源）改按**首字母序列**匹配後用它：碼只約束每個音節的首字母，
-     * 元音完全自由（用戶 2026-11-11：「必須走首字母序列匹配，不是碼前綴」）。
+     * 首字母序列索引只約束每個音節的首字母，元音自由。
      */
     private var syllablesByInitial: Map<Char, List<String>> = emptyMap()
 
     private var initialPatternIndex: Map<String, List<Pair<String, List<String>>>> = emptyMap()
 
     /**
-     * 「簡拼 + 完整音節」索引：key = `前 N-1 個音節首字母拼接|末音節`
-     * （如 `b|can`）→ 讀音 → 詞列表。用戶 2026-11-11：`abc abc abc mno`（碼 `aaa4`）
-     * 要能得到 `b cam` / `b can` 這類組合。
+     * 簡拼+完整末音節的模式索引，如 b|can；末節按完整音節匹配。
      */
     private var hybridPatternIndex: Map<String, List<Pair<String, List<String>>>> = emptyMap()
 
@@ -204,8 +171,7 @@ object TwelveKeyPreedit {
     }
 
     private fun load(context: Context) {
-        // 共享目錄（/sdcard/hkrime）優先、assets 兜底；並展開 import_tables（見 [RimeDictSource]）。
-        // 用戶 2026-11-09 反饋「往詞庫加新條目不生效」，根因就是這裡只讀 APK 內置字典。
+        // 主詞典優先從實際用戶目錄讀取，缺失時回退 assets。
         val t0 = System.nanoTime()
         var counts = loadDictLines(RimeDictSource.body(context, MAIN_DICT).asSequence())
         if (counts.isEmpty()) {
@@ -241,10 +207,7 @@ object TwelveKeyPreedit {
 
         finishLoading(counts)
 
-        // 兩字詞聯想索引（song gong 這類聯想行）——詞表只有詞條、沒有讀音，
-        // 依賴上面 finishLoading 建好的 charTable 反推，所以必須放在它後面。
-        // 8 個詞表合計 2MB+，同步讀會讓第一次按鍵卡住（用戶 2026-11-10 反饋），
-        // 因此丟到後台線程：面板在索引就緒前只是暫時沒有聯想詞行。
+        // 詞表與聯想索引在後台載入，完成後發布不可變索引。
         val appContext = context.applicationContext
         Thread({
             val t0 = System.nanoTime()
@@ -286,14 +249,7 @@ object TwelveKeyPreedit {
      * 抽出來是為了單測：JVM 測試讀 assets 文件的行直接餵進來，驗證的正是 App 實際用的邏輯。
      */
     /**
-     * 音節集合**只從主詞典取**（`finishLoading(counts)` 的 counts.keys）。
-     *
-     * 用戶 2026-11-11 定調：「實際上 hakka 字典沒有的音節，注定不會有字，所以為了減少性能消耗，
-     * 默認獲取 hakka 字典的音節集合」——
-     * - 詞表解析（聯想/整串詞行）用它做校驗：讀音含集合外音節（`li xing` 的 `xing`）整條丟棄；
-     * - 不再讀 `assets/rime/hakka_syllables.txt`：那份是**標準集定稿（841 個）**，用途是
-     *   **約束 `tools/panel_probe.py` / `RealCorpusTest` 等腳本與測試**，不是 App 運行時資料源；
-     * - 這樣少一次 asset 讀取+解析，也天然保證「有字 ⇒ 有音節 ⇒ 可用」。
+     * 標準音節資產僅供測試與腳本約束；App 運行時集合來自主詞典 counts.keys。
      */
     internal fun applySyllableSet(text: String): Int {
         val parsed = LinkedHashSet<String>()
@@ -365,13 +321,7 @@ object TwelveKeyPreedit {
             val tab = line.indexOf('\t')
             val word = (if (tab >= 0) line.substring(0, tab) else line).trim()
             if (word.isEmpty()) return@forEach
-            // 詞表有兩種格式：
-            //  1) `詞<TAB>讀音`（hakka.dict / hakka_zon 這種）：讀音列直接可用，
-            //     不必拿 charTable 反推——`Linux<TAB>li nak si` 這種**非漢字詞**也只能靠它；
-            //  2) 純詞表（sougou/places/poems…）：只有詞面，用 charTable 反推前兩字讀音。
-            // 第 2 欄是讀音，第 3 欄起是權重/頻次（`Linux\tli nak si\t1000`）——只取第 2 欄。
-            // 否則最後一節會變成 `si\t1000`，codeOf 出來的整串碼對不上輸入（用戶 2026-11-11：
-            // `li nak s` 面板沒有 Linux，根因正是權重欄污染了讀音）。
+            // 帶權重詞條僅第二欄是讀音，避免把第三欄權重拼入音節。
             val reading = if (tab >= 0) line.substring(tab + 1).split('\t')[0].trim() else ""
             val syllables = if (reading.isNotEmpty()) {
                 reading.split(' ', '\u3000')
@@ -383,7 +333,7 @@ object TwelveKeyPreedit {
                 val r2 = charTable[word.substring(1, 2)] ?: return@forEach
                 listOf(r1, r2)
             }
-            // 這是「聯想索引只收雙音節以上詞」的詞長判斷，不是面板分檔（docs/19 §9.1 禁的是分檔）。
+            // 此處按詞長過濾至少兩音節條目；面板分檔另以 reading token 數判斷。
             if (syllables.size < 2) return@forEach
             // 只認**客家話音節集合**裡的音節：目錄裡可能還有 luna_pinyin 這類別的方案詞表
             // （`例行 → li xing`），把它們當音節用會讓面板長出根本不是客家話的聯想行。
@@ -392,20 +342,14 @@ object TwelveKeyPreedit {
             val r1 = syllables[0]
             val r2 = syllables[1]
             if (r1.isEmpty() || r2.isEmpty()) return@forEach
-            // 詞長：漢字詞 2~4 字（三/四字詞整詞上屏更有用，用戶 2026-11-10）；
-            // 非漢字詞（Linux、iPhone…）放寬——它們通常只有 1 個「詞」，靠讀音定位。
+            // 漢字詞收 2~4 字；其它詞條依含字元與顯式讀音條件過濾。
             val cjkOnly = word.all { isCjk(it) }
             if (cjkOnly && word.length !in 2..4) return@forEach
             if (!cjkOnly && word.length !in 1..16) return@forEach
             val key = "$r1|$r2"
             val bucket = assocWords.getOrPut(key) { LinkedHashMap() }
             bucket[word] = (bucket[word] ?: 0) + 1
-            // 整串碼索引（三音節以上的詞只能靠它）；簡拼/半截由查詢端做前綴匹配。
-            //
-            // **只收「詞表自帶讀音」的詞條**（第 2 欄）。純詞表（sougou/places…）是用
-            // `charTable` 反推前兩字讀音的，本來就是兩音節、聯想索引已覆蓋，再存一份只會
-            // 把条目数从 2 千撑到 17 萬（真机上詞表加载 1s → 18s、内存暴涨，用戶 2026-11-11
-            // 撞到的「面板分组全消失」就是加载线程与按键线程抢这份大表）。
+            // 整串碼索引只加入自帶讀音的條目；純詞表僅用於聯想，避免索引膨脹。
             if (reading.isNotEmpty()) {
                 val fullCode = syllables.joinToString("") { codeOf(it) }
                 if (fullCode.isNotEmpty()) {
@@ -433,15 +377,8 @@ object TwelveKeyPreedit {
     }
 
     /**
-     * 上屏「App 側詞條」後應重新餵回引擎的剩餘碼串（沒有剩餘返回空串）。
-     *
-     * 用戶 2026-11-11：輸入「灵机一动来的」只上屏「灵机一动」，後面「来的」丟了——
-     * 聯想詞/學習詞是 App 自己整詞 commit + `clearComposition()`，沒有 librime
-     * `select_candidate` 的「選中不提交、剩餘輸入保留」語義。這裡把剩餘碼算出來，
-     * 上屏後重新 `onText` 進引擎。
-     *
-     * 只有 input **以該詞的完整碼開頭**時才成立（簡拼輸入時詞碼可能不是前綴，
-     * 那就無從得知剩餘，維持原行為整詞上屏）。
+     * 按實際輸入解碼的前 N 個音節扣除已選讀音的音節數，返回剩餘碼。
+     * 不將候選讀音重新編碼作字串前綴扣除；無可靠解碼時不猜剩餘。
      */
     internal fun remainingCodeAfter(wordReading: String, input: String): String {
         if (wordReading.isEmpty() || input.isEmpty()) return ""
@@ -499,7 +436,9 @@ object TwelveKeyPreedit {
         learnedIndexVersion = version
     }
 
-    /** 該詞是否為 App 學習詞（面板選行時給更高優先，見 docs/17 §7.2）。 */
+    /**
+     * 學習詞在面板選行階段優先，最終顯示仍按讀音排序。
+     */
     internal fun isLearnedWord(word: String): Boolean {
         ensureLearnedIndex()
         return word in learnedWords
@@ -538,8 +477,7 @@ object TwelveKeyPreedit {
     /** 詞表載入完後把索引整理成「按熱度降序」的列表，避免每次查詢都排序。 */
     internal fun finishWordIndex() {
         assocWords.values.forEach { bucket ->
-            // 索引維持「熱度降序」：它決定「取哪幾條」（selection）。
-            // 顯示時再對著截斷後的小列表按字母序排（display），兩件事分開（用戶 2026-11-10）。
+            // 先按熱度取有限候選，再對保留結果按字典序顯示。
             val sorted = bucket.entries
                 .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
                 .map { it.key }
@@ -571,9 +509,7 @@ object TwelveKeyPreedit {
     }
 
     /**
-     * 「以 [syllable] 為第一段、第二段以 [initial] 開頭」的聯想兩字詞，按熱度降序取前 [limit] 條。
-     *
-     * 用戶 2026-11-10：面板要列 `song g**` / `song h**` 這種聯想詞，而不是另一種切法標籤。
+     * 按第一音節與第二段條件查聯想詞。面板標題必須為兩個完整音節。
      */
     /**
      * 依「輸入碼前綴」查整詞（任意音節數，容許最後一節半截）：
@@ -593,9 +529,7 @@ object TwelveKeyPreedit {
         val rows = LinkedHashMap<String, LinkedHashSet<String>>()
         for (entry in entries) {
             if (entry.tokens.size < 2) continue
-            // 第一個音節必須**打全**：詞行的第一段是「已完成的音節」，後面的碼才算第二段前綴。
-            // 否則打 `ia`（= ga）時會把 `gam se`（= ia4|7e）這類「第一段還沒打完」的詞也列出來
-            // （用戶 2026-11-11：`ia8i3` 面板只看到 `ga j/z*`，腳本卻列出 gam se）。
+            // 整串前綴詞查詢要求第一音節完整編碼已包含在輸入中。
             val firstCode = codeOf(entry.tokens[0])
             if (firstCode.isEmpty() || !prefix.startsWith(firstCode)) continue
             if (!entry.code.startsWith(prefix)) continue
@@ -620,16 +554,13 @@ object TwelveKeyPreedit {
                 if (merged.size >= limit) break@outer    // 取哪幾條由熱度決定
             }
         }
-        // 顯示按詞面字典序（用戶 2026-11-10：聯想詞也要按字母排）
+        // 詞面顯示按字典序排列。
         return merged.sorted()
     }
 
     /**
-     * 以 [syllable] 為第一段、**第二段是確切音節**的聯想詞（用戶 2026-11-10：
-     * 行標題要跟引擎一樣是完整讀音，不是 `h**` 這種通配）。
-     *
-     * 只保留第二音節首字母在 [initials] 裡的組合；每個讀音最多 [limitPerReading] 條，
-     * 讀音行最多 [maxReadings] 個（按整桶熱度降序）。
+     * 第一段固定音節，第二段按首字母集合選具體音節。
+     * 每讀音最多 limitPerReading 詞，先按熱度取 maxReadings 行，再按讀音顯示。
      */
     fun associatedByReading(
         syllable: String,
@@ -645,20 +576,14 @@ object TwelveKeyPreedit {
             // 先按熱度取前 N 條，再按詞面字典序顯示
             rows.add(second to words.take(limitPerReading).sorted())
         }
-        // selection：按「行內候選詞總量」熱度取前 maxReadings 行；
-        // display：選出來的行再按讀音字典序排（用戶 2026-11-10）。
-        // 注意順序：必須先截斷再排序，否則高熱度行會被字母序擠掉（`than` 就這麼丟過）。
+        // 先按熱度截斷到 maxReadings，再按讀音字典序顯示。
         val chosen = rows.sortedByDescending { it.second.size }.take(maxReadings)
         return chosen.sortedBy { it.first }
     }
 
     /**
-     * 「第一段確切音節 × 第二段以 [secondCode] 開頭的**確切音節**」的聯想行。
-     *
-     * 行標題一律是兩個完整讀音（`than dung`），不用 `d**` 這種通配——索引本來就是
-     * (第一音節, 第二音節) 的哈希，精確查才用得上它（用戶 2026-11-10）。
-     * 第二段候選音節從 [syllablesForSegment] 取（與面板同一份），每行按熱度取 [perRow] 條，
-     * 行數封頂 [maxRows]（先按熱度選行，選完再按讀音字典序顯示）。
+     * 第一音節精確匹配，第二段按 secondCode 展開為具體音節並精確查聯想索引。
+     * 行標題為兩個完整音節；先按熱度取有限行，再按讀音顯示。
      */
     fun associatedBySegmentCode(
         syllable: String,
@@ -681,8 +606,7 @@ object TwelveKeyPreedit {
     }
 
     /**
-     * 該碼位能覆蓋多少個音節（精確碼 + 前綴命中），面板用它決定「這個鍵音節構成是否豐富」：
-     * 豐富的鍵放 24 個音節組，普通鍵放 16 個（用戶 2026-11-10）。
+     * 計算碼位可覆蓋的音節數，供面板選擇普通 16 或豐富鍵 24 的音節配額。
      */
     fun syllableCountForCode(code: String): Int {
         if (code.isEmpty()) return 0
@@ -700,8 +624,7 @@ object TwelveKeyPreedit {
         // syllablesForSegment 前 N 條裡找——那種取法可能前 8 條全是同一首字母。
         val weightByInitial = LinkedHashMap<Char, Int>()
         codeToSyllables.forEach { (syllableCode, list) ->
-            // 注意：`==` 也要收——像 `r` 這種「整碼就是一個音節」的鍵，
-            // 它的首字母只會出現在精確碼裡，漏掉就會讓聯想詞只剩另一邊（用戶 2026-11-10 的 v/r 就是這個坑）。
+            // 包含精確碼命中的首字母，確保單碼完整音節參與候選。
             if (syllableCode.length < code.length || !syllableCode.startsWith(code)) return@forEach
             list.forEach { entry ->
                 val initial = entry.syllable.firstOrNull() ?: return@forEach
@@ -731,8 +654,7 @@ object TwelveKeyPreedit {
         }
         initialLettersByCode = normal.mapValues { it.value.sorted() }
         initialLettersByCodeLast = last.mapValues { it.value.sorted() }
-        // 聯想行用的「首字母 → 全部音節」索引：只收字典音節集合，按字典序固定，
-        // 兩份實現（App/腳本）才能逐行對拍（docs/19 §9.1）。
+        // 首字母索引只收主詞典音節，按字典序固定以與腳本逐行對拍。
         syllablesByInitial = syllableSet
             .filter { it.isNotEmpty() }
             .groupBy { it.first() }
@@ -740,12 +662,8 @@ object TwelveKeyPreedit {
     }
 
     /**
-     * 「整段碼的前綴恰好是一個完整音節」的那些音節（`8e99` → ze/zet；`8i` → zi/ji）。
-     *
-     * 面板聯想行用它處理「三音節以上、第二音節已打全」的輸入：`vu zet t`（338e99）的第二段
-     * `8e99` 不是一整個音節，舊實現（把整段 rest 當一個前綴展開）會展開不到任何音節，
-     * 聯想行只能退回「第一音節的全部後續音節」，於是找不到 `vu zet`（含 武则天）這一行。
-     * 這裡改成「找 rest 開頭已完成的音節」，沒有命中再退回首字母通配。
+     * 返回輸入前綴已完成的音節，如 8e99 的 ze/zet。
+     * 供聯想查詢精確定位第二音節，未命中時由調用方回退首字母查詢。
      */
     internal fun syllablesCompletingPrefix(code: String): List<String> {
         if (code.isEmpty()) return emptyList()
@@ -758,12 +676,8 @@ object TwelveKeyPreedit {
     }
 
     /**
-     * 詞面 → 逐字首讀音拼出的完整碼；任一字在 [charTable] 裡沒有讀音就回 `null`。
-     *
-     * 只給「推薦組排序」用：純詞表（sougou 等）只有詞面、沒有讀音，卻仍可能是
-     * `jen cin kung z` 這種已打前綴的目標詞（用戶 2026-11-11：遠程控制在推薦裡看不到）。
-     * 面板行本身仍只按前兩音節索引，這裡只是拿字表反推完整碼做前綴匹配；
-     * 多音字取首讀音，推錯最多影響排序，不影響候選文字。
+     * 由詞面逐字首讀音反推完整碼，只供推薦排序。
+     * 任一字沒有讀音返回 null；多音字取首讀音，不改變候選文字。
      */
     internal fun derivedWordCode(word: String): String? {
         if (word.isEmpty()) return null
@@ -830,10 +744,8 @@ object TwelveKeyPreedit {
     }
 
     /**
-     * 「簡拼 + 完整音節」規則（用戶 2026-11-11）：前面的鍵各出一個音節首字母，
-     * **最後一段碼串恰好是一個完整音節**。`aaa4` 拆 `a` + `aa4`（aa4 = cam/ban/can）
-     * → `b·cam`、`b·ban`、`b·can`…；所有切法都試（k=1..n-1）。
-     * 完整音節的判定走音節集合（[isSingleSyllable] / [syllablesForSegment] 的 exact 音節）。
+     * 前段各鍵提供一個音節首字母，最後碼段必須是完整音節。
+     * 枚舉各切法，完整性由 isSingleSyllable / exact 音節集合判定。
      */
     internal fun initialHybridPatterns(codes: String): List<InitialPattern> {
         val clean = codes.replace("'", "")
@@ -990,8 +902,7 @@ object TwelveKeyPreedit {
         // 避免同一個碼位的音節被重複 append（會讓「輪轉取 limit 個」變少）。
         table.clear()
         codeToSyllables.clear()
-        // 音節集合 = 主詞典自帶音節（用戶 2026-11-11：「字典沒有的音節注定不會有字，
-        // 為減少性能消耗，默認取 hakka 字典的音節集合」）。標準集資產只約束腳本/測試。
+        // 運行時音節集合取主詞典 counts.keys；標準集資產僅約束腳本與測試。
         syllableSet.clear()
         syllableSet.addAll(counts.keys)
         counts.forEach { (syllable, freq) ->
@@ -1096,9 +1007,7 @@ object TwelveKeyPreedit {
                 list.sortWith(compareByDescending<Entry> { it.freq }.thenBy { it.syllable })
             }
         }
-        // 桶順序必須**完全確定**（不能依賴 HashMap 的迭代順序）：外層按「桶內最高頻」降序、
-        // 同頻按 next-code 碼位；內層按音節首字母。腳本 `panel_probe.py` 用同一 key 排序，
-        // golden 對拍才能逐行一致（docs/19 §6「純函數可測」）。
+        // 桶按最高頻降序、同頻按 next-code 排；桶內按首字母，與腳本排序鍵一致。
         val order = outer.entries
             .sortedWith(
                 compareByDescending<Map.Entry<Char, LinkedHashMap<Char, MutableList<Entry>>>> { entry ->
@@ -1106,8 +1015,7 @@ object TwelveKeyPreedit {
                 }.thenBy { it.key }
             )
             .map { it.value }
-        // limit = **每個首字母**最多取幾個（用戶 2026-11-10：常數應對應「各取一份」而不是平分）；
-        // 總數另有上限 MAX_SYLLABLES_TOTAL，避免一個鍵覆蓋 3 個聲母時左列過長。
+        // limit 是每個首字母的音節配額，總數另受 MAX_SYLLABLES_TOTAL 限制。
         val distinctExact = exactSorted.map { it.syllable }.distinct()
         val totalCap = maxOf(limit, minOf(limit * order.size, totalLimit))
         val diversified = ArrayList<Entry>()
@@ -1132,8 +1040,7 @@ object TwelveKeyPreedit {
             }
             round++
         }
-        // 排序規則（用戶 2026-11-10）：先按首字母、再按次字母……即讀音字典序，
-        // 這樣哪怕高頻音節少、也能靠字母位置快速找到；精確碼（整段音節）仍固定排第一。
+        // 讀音按字典序顯示，精確碼音節固定在前。
         return (distinctExact + diversified.map { it.syllable }
             .distinct()
             .sorted())
@@ -1148,13 +1055,8 @@ object TwelveKeyPreedit {
      * 點單字上屏後把 [second] 重新餵回引擎繼續輸入。
      */
     /**
-     * 一個碼串可能有多種「合法第一段」切法：`744ii` 可以是 `744|ii`（son+gi，引擎給的那種），
-     * 也可以是 `744i|i`（song + 以 g/h 開頭的下一段）。只列引擎挑中的那種，用戶就看不到
-     * 「song g / song h」這些組合（用戶 2026-11-10）。
-     *
-     * 規則：由長到短找「head 恰好是一個完整音節」的切法（長音節更具體，避免 `74`=po 搶先）；
-     * 一個都切不出（純首碼簡拼，如 `855`）時退回「第一個碼位 + 其餘碼」；
-     * [limit] 控制最多幾種切法。
+     * 由長到短找完整首音節的切法，最多 limit 種；
+     * 純簡拼無完整切法時回退第一碼位與剩餘碼，保留不同合法首段入口。
      */
     /** 整串碼剛好是一個音節（`we` = the、`nz` = ngin…）：這種情況不該再拆段。 */
     /** 單字/詞的首字讀音，用於「沒有 comment」的候選組按字母序兜底排序。 */
@@ -1189,8 +1091,7 @@ object TwelveKeyPreedit {
         if (codes.length < 2) return null
         val total = decode(codes)?.split(' ')?.size ?: 0
         if (total == 0) {
-            // 簡拼/首字母相拼（如 `nh`、`jkl`）：整串解不出完整音節，按「第一個碼位 + 其餘」切。
-            // 面板左列由此得到「以該字母開頭的音節」組（n**、h**…）。
+            // 純簡拼無完整切法時取第一碼與剩餘碼，單字組將首碼展開成具體音節。
             return codes.substring(0, 1) to codes.substring(1)
         }
         if (total < 2) return null
@@ -1207,11 +1108,8 @@ object TwelveKeyPreedit {
     }
 
     /**
-     * 音節 → 該讀音的字（字典順序；需要按常用度排時用 [rankChars]）。
-     *
-     * [limit] 由調用方決定：面板段組要「列完整」，傳
-     * [com.hazukieq.hkrime.core.twelvekey.TwelveKeyTuning.SEGMENT_CHARS_LIMIT]；
-     * 別再用「60 字」這種小預設值截斷（用戶 2026-11-11 報「字沒列完整」）。
+     * 音節對應字按字典順序返回；按常用度顯示時再調 rankChars。
+     * 段組傳 SEGMENT_CHARS_LIMIT，避免任意小上限截斷可選字。
      */
     fun charsForSyllable(
         syllable: String,
@@ -1268,12 +1166,8 @@ object TwelveKeyPreedit {
         )
 
     /**
-     * 把碼串切成音節串；切不出來回傳 null（保持原 preedit）。
-     *
-     * 用戶按下「分詞」鍵（theme 的 `composing: delimiter`）會在碼串裡插入 `'`：
-     * 那是用戶**明確表達的音節邊界**，不能像以前那樣直接濾掉再重新合併
-     * （否則 `5'e` 會顯示成 `le`，看起來像分隔沒生效）。這裡按 `'`/空白分段，
-     * 每段各自切音節，切不出來的段保留原碼（如 `5`）。
+     * 碼串按明確分隔符逐段解碼；切不出完整音節的段保留原碼。
+     * 分詞鍵插入的引號代表音節邊界，不能濾掉後重新合併。
      */
     fun decode(preedit: String?, hint: String? = null): String? {
         if (preedit.isNullOrBlank() || table.isEmpty()) return null
@@ -1299,12 +1193,8 @@ object TwelveKeyPreedit {
         return aligned.joinToString(" ")
     }
 
-    // ---- 候選條第一條的發布快照（docs/14）----
-    //
-    // preedit 讀音要對齊「用戶看到的第一條候選」。候選條順序是 App 排過的（詞組優先 /
-    // SegmentMemory 記憶），`Rime.mContext.getCandidates()[0]` 是引擎 menu 順序，兩者可能不一致，
-    // 所以由快照發布點（TextInputManager.onTwelveKeySnapshot）把候選條第一條寫到這裡。
-    // 空快照時寫 null，自然退回「本地解碼」的舊行為。
+    // preedit 首選讀音由發布快照的候選條第一項提供，不能另取引擎第 0 項。
+    // 空快照設為 null，回退本地解碼。
 
     /** 候選條第一條候選的文本；preedit 用它對齊讀音（歧義時對齊第一個字）。 */
     @Volatile
@@ -1317,34 +1207,16 @@ object TwelveKeyPreedit {
     var preferredComment: String? = null
 
     /**
-     * 改寫 librime 給的 preedit：**保留已選中的前綴**，只把尾部「未選中的鍵碼」換成拼音。
-     *
-     * librime 的 preedit 形如 `咧5e`（咧 = 已選字，5e = 剩餘碼）；之前把整串都當碼去 decode，
-     * 前綴被丟掉 → 用戶選完第一個字後「字消失了」。這裡只切尾部連續 ASCII 當碼段。
-     *
-     * 讀音對齊（docs/14）：候選條第一條的 comment 是引擎給的**精確拼音**，
-     * 本地 DP 只會切出「音節數最少」的猜測（`5i34i w` → `kiung the`，而首條「共產」讀 `kiung than`）。
-     *
-     * 12 鍵是多對多的（同一串碼可對應多種音節切法），所以**沒有唯一正確解碼**：
-     * [preferred] 一律優先，只有它為空時才用本地解碼兜底。
-     *
-     * @param hint 首條候選文本（歧義時對齊第一個字的讀音）
-     * @param preferred 首條候選的 comment（引擎精確拼音，可為 null）
-     * @return 改寫後文本；若沒有可改寫的碼段（例如已全部選完 `咧`）回傳 null，保持 librime 原樣
+     * 保留引擎已選前綴，只改寫尾部未選碼。首選 comment 的精確讀音優先，
+     * 沒有可用首選時回退本地解碼；同碼多音節不存在唯一解碼。
+     * @param hint 首條候選文字
+     * @param preferred 首條候選讀音
      */
     /**
-     * **preedit 的唯一入口**（Rime.getComposition() 只調用它，不再自己拼 hint/前綴）。
-     *
-     * 把「候選條第一條（App 排序）優先、引擎 menu 第一條兜底、App 暫存前綴、已選前綴、
-     * 尾部原始碼補齊」這幾件事收在一處，避免規則散落在 Java/Kotlin 兩邊漂移
-     * （用戶 2026-11-11：preedit 與候選區的關聯代碼維護性很差）。
-     *
-     * @param rawPreedit librime 原始 preedit（形如 `以8‸`）
-     * @param engineText 引擎 menu 第一條的文本（沒有 App 快照時的兜底）
-     * @param engineComment 引擎 menu 第一條的 comment
+     * preedit 統一入口：App 快照首選優先，引擎首選兜底，
+     * 合併 App 暫存前綴與引擎已選前綴，並補齊未覆蓋原碼。
      */
-    // 一次按鍵會有多處取 preedit（候選條、懸浮窗、內嵌預覽），輸入參數通常相同；
-    // 快取上一次結果，避免重複 split/查表/拼字（用戶 2026-11-12 反饋 preedit 顯示耗性能）。
+    // 相同參數的 preedit 渲染復用最近結果，減少重複解碼、查表和字串分配。
     private var renderCacheKey: String? = null
     private var renderCacheValue: String? = null
     private var renderCacheUsedRawCode: Boolean = false
@@ -1403,29 +1275,13 @@ object TwelveKeyPreedit {
             ?.map { if (it.all { ch -> ch in CODE_LETTERS }) codeLetters(it) else it }
             ?.takeIf { it.isNotEmpty() }
         val engine = parseComment(preferred)
-        // 本地解碼的「字元跨度」：每個音節吃掉幾個碼位 —— 只用來算「comment 覆蓋到哪裡」，
-        // 不用它的音節內容去拼湊顯示（用戶 2026-11-10：「不要試圖去拼湊」）。
-        // 但它切不出完整音節時（`5i4a57` 尾端 `7` 只是聲母鍵）會整串回 null，覆蓋長度就算不出來，
-        // 尾碼就丟了（用戶 2026-11-11 報 `ki mak` 少了 `7`）。所以先用 comment 自己的音節碼
-        // 逐節吃掉輸入碼位（[coveredCodeLength]）——那是「comment 承諾覆蓋的碼」的客觀長度，
-        // 跟本地切法無關；對不上才退回舊的 spans 算法。
-        // 尾碼邊界：**用 comment 音節的「標準碼長」之和**，不用本地 DP。
-        //
-        // 12 鍵是同碼多音節（`5i`→ki|li、`ia9`→gap|kiap…），本地 DP 的切法與 comment
-        // 給的讀音根本不是同一個世界：`ii4yia44`（gin nziamm）本地能切 3 節，於是誤補 `a44`；
-        // 而 `5i4a57`（ki mak + 半截 `7`）本地又切不出來，尾巴整段丟掉。
-        // comment 的音節碼長度是確定的（ki→5i 兩位、mak→4a5 三位），加起來就是它承諾吃掉的碼位：
-        //   - 和 < 輸入長 → 剩下的原樣顯示（`ki mak` + `7`）；
-        //   - 和 >= 輸入長 → 簡拼/半截（`8 8` = ji jen、`5i34i w`），comment 已解釋整串，不補尾碼。
-        // 用戶 2026-11-11：「按下的鍵必須全部顯示」+ 不要重複/多餘的碼。
+        // 本地 spans 僅用於計算碼位覆蓋；顯示優先使用首選 comment。
+        // comment 逐節覆蓋輸入碼，失配時使用跨度或碼長兜底，未覆蓋尾碼原樣保留。
         val commentCodeLen = engine?.sumOf { syl ->
             runCatching { codeOf(syl).length }.getOrDefault(0)
         } ?: 0
-        // 尾碼邊界：優先「按 comment 的音節碼逐節吃掉輸入的前綴」——這樣才能處理
-        // 「打 `9999999`、首條補全 6 個 `qa`」這種**簡拼吃掉每個碼位元**的情況：
-        // 逐節匹配時 `qa` 對不上 `99…`，退一步只吃 1 個碼位 → 剩下第 7 個 `9` 原樣顯示
-        // （用戶 2026-11-11：「再打一個 q 居然不顯示了」＝尾碼被吞）。
-        // 對不上（第一節就匹配失敗）才退回「碼長之和」的舊算法。
+        // 優先按 comment 音節逐節匹配輸入前綴；簡拼只消耗對應首碼。
+        // 第一節失配時回退碼長之和，未覆蓋尾碼保持原始字元。
         val coverage = resolveCovered(cleanCodes, engine)
         val consumed = when {
             engine == null -> cleanCodes.length
@@ -1454,15 +1310,9 @@ object TwelveKeyPreedit {
         private set
 
     /**
-     * comment 的音節依次吃掉輸入碼的多少碼位（前綴匹配），以及每個位置該顯示的讀音。
-     *
-     * - 完整碼能對上 → 吃它的碼長，顯示 comment 的讀音；
-     * - 對不上，但輸入碼從這裡能切出**完整音節**且首字母與 comment 相同 →
-     *   這是「編碼形成的組合音節」，comment 只是別名拼寫（`cw` 之於 `cu`，schema 的
-     *   `derive/w$/u/`）：吃整節碼，顯示本地解碼讀音（用戶 2026-11-12 報 `cw 3`）；
-     * - 其餘（`i` 對 `ha` 這種簡拼引申）→ 只吃一個碼位，顯示 comment 讀音。
-     *
-     * 第一節就無法匹配 → 回 null（不猜，退回舊的長度算法）。
+     * 依次計算 comment 音節覆蓋的輸入碼位與顯示讀音。
+     * 完整碼匹配時整節消耗；合法別名按本地完整音節消耗；簡拼消耗一碼。
+     * 第一節無法匹配時返回 null，由調用方採用長度兜底。
      */
     private fun resolveCovered(codes: String, engine: List<String>?): Pair<Int, List<String>>? {
         if (engine.isNullOrEmpty() || codes.isEmpty()) return null
@@ -1570,12 +1420,7 @@ object TwelveKeyPreedit {
 
     /** 候選 comment → 音節列表（剝掉 `［…］` 包裝；空/無 comment 回 null）。 */
     /**
-     * librime preedit 裡的「已選中前綴」（`已選字 + 碼串 + ‸` 裡的那些漢字）。
-     *
-     * 舊寫法是「從尾部跳過 ASCII，剩下的就是前綴」——但末尾的光標 `‸`(U+2038) 本身就是非 ASCII，
-     * 於是 `8 8‸` 這種「一格都沒選」的 preedit 會被整串當成前綴，嵌入式預覽把它寫進輸入框，
-     * 上屏時就出現 `88˄以` 這種把原始碼串當文字提交的怪相（用戶 2026-11-11 報）。
-     * 碼串一定是 ASCII、光標一定是 `‸`，所以直接「只留非 ASCII 且非光標的字」最穩。
+     * 提取 librime preedit 的已選前綴：僅保留非 ASCII 且不是光標標記的文字。
      */
     fun compositionPrefix(preedit: String?): String {
         if (preedit.isNullOrEmpty()) return ""
@@ -1598,10 +1443,8 @@ object TwelveKeyPreedit {
     internal fun decodeSingle(input: String): List<String>? = decodeSpans(input)?.map { it.second }
 
     /**
-     * 單段碼串 → [(佔用的碼串, 音節)]；切不出完整音節回傳 null。
-     *
-     * 只給 [rewrite] 判斷「comment 覆蓋到第幾個碼位元」用：沒被覆蓋的尾部要原樣顯示碼，
-     * 不能拿這裡的音節去拼（用戶 2026-11-10）。
+     * 單段碼解碼為碼跨度與音節；無法切成完整音節時返回 null。
+     * 跨度僅協助覆蓋判斷，不能用推測讀音替代首選 comment。
      */
     private fun decodeSpans(input: String): List<Pair<String, String>>? {
         if (input.isEmpty()) return null

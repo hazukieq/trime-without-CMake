@@ -6,18 +6,7 @@ import org.junit.BeforeClass
 import org.junit.Test
 import java.io.File
 
-/**
- * `syllablesForSegment` 的「多首字母覆蓋 + 頻次排序」測試（用戶 2026-11-10：
- * 「這些不要老是真機 UI 測試」）。
- *
- * 12 鍵一個鍵覆蓋多個聲母（`ghi` = g/h/i，`mno` = m/n/o…），面板左列要
- * **每個聲母都能看到自己的高頻音節**，而不是被字數最多的一類佔滿。
- * 這裡直接對純函數斷言，不碰 UI。
- *
- * 注意一個語義細節（用戶 2026-11-10 指出）：[SyllableBucketTest] 驗的是
- * 「limit 是**總數**，在多個聲母桶之間輪轉平分」，所以 `limit=8` 且 2 個桶時
- * 是 4 + 4，而不是每個桶 8。
- */
+/** 驗證多首字母音節覆蓋、每首字母配額、總上限及讀音字典序。 */
 class SyllableBucketTest {
 
     companion object {
@@ -73,15 +62,13 @@ class SyllableBucketTest {
 
     @Test
     fun limitIsPerInitialBucket() {
-        // 2026-11-10 定案：limit 是「每個首字母」的名額（不是總數），總數另有上限 16。
-        // i 鍵有 g/h 兩桶、各 8 → 共 16；輪轉順序 g1 h1 g2 h2 …
+        // limit 是每首字母配額，總數另有上限。
         val got = TwelveKeyPreedit.syllablesForSegment("i", 8)
         assertEquals("i 鍵 limit=8（每桶）應回 16 個音節", 16, got.size)
         val byInitial = got.groupingBy { initialOf(it) }.eachCount()
         assertEquals("g 桶應拿到 8 個", 8, byInitial['g'])
         assertEquals("h 桶應拿到 8 個", 8, byInitial['h'])
-        // 2026-11-10 追加約定：最終列表按讀音字典序（先首字母、再次字母），
-        // 所以 g 系列一定排在 h 之前，且同一首字母內按字母升序。
+        // 保留的音節按讀音字典序顯示。
         assertEquals('g', initialOf(got.first()))
         assertEquals('h', initialOf(got.last()))
         assertTrue("列表應按字典序：$got", got == got.sorted())
@@ -89,7 +76,7 @@ class SyllableBucketTest {
 
     @Test
     fun eachBucketIsOrderedByDictFrequencyDescending() {
-        // 選哪些音節由「字典字數」決定；但最終列表按字母序排（用戶 2026-11-10 要求）。
+        // 字典頻次決定選取，字典序決定顯示。
         val got = TwelveKeyPreedit.syllablesForSegment("i", 16)
         val byInitial = got.groupBy { initialOf(it) }
         assertTrue("i 鍵應同時有 g/h 兩桶", byInitial.containsKey('g') && byInitial.containsKey('h'))
@@ -108,8 +95,7 @@ class SyllableBucketTest {
 
     @Test
     fun thKeyListsThanNotOnlyThe() {
-        // `w` = th 鍵：前綴音節有 than（產）、the（洗/西…）、then、thet…
-        // 只按首字母分桶時全落進 t 桶、the 系列把 than 擠掉（用戶 2026-11-10：共產黨打不出來）。
+        // 不同後續碼桶都應有代表音節。
         val got = TwelveKeyPreedit.syllablesForSegment("w", 8)
         // 產 = than（用戶就是打不出「共產黨」）：必須出現，且不能只有 the 系列
         assertTrue("th 鍵應該給出 than，實際 $got", got.contains("than"))

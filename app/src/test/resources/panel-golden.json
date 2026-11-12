@@ -5369,7 +5369,15 @@
         }
       ],
       "combo": [],
-      "whole_word": []
+      "whole_word": [
+        {
+          "reading": "li nak si",
+          "items": [
+            "Linux",
+            "linux"
+          ]
+        }
+      ]
     },
     "merged": [
       {
@@ -5790,6 +5798,14 @@
         "items": [
           "丽娜",
           "李娜英"
+        ]
+      },
+      {
+        "reading": "li nak si",
+        "segment": 1,
+        "items": [
+          "Linux",
+          "linux"
         ]
       },
       {
@@ -20358,9 +20374,10 @@
           ]
         },
         {
-          "reading": "ki zong",
+          "reading": "li nak si",
           "items": [
-            "区长"
+            "Linux",
+            "linux"
           ]
         },
         {
@@ -21118,13 +21135,6 @@
         ]
       },
       {
-        "reading": "ki zong",
-        "segment": 1,
-        "items": [
-          "区长"
-        ]
-      },
-      {
         "reading": "kiu cit",
         "segment": 1,
         "items": [
@@ -21282,6 +21292,14 @@
           "离港",
           "里港乡",
           "里讲"
+        ]
+      },
+      {
+        "reading": "li nak si",
+        "segment": 1,
+        "items": [
+          "Linux",
+          "linux"
         ]
       },
       {

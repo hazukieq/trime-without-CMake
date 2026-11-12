@@ -4,17 +4,8 @@ import android.content.Context
 import android.content.SharedPreferences
 
 /**
- * App 側「逐段拼出來的組詞」記憶（見 docs/10 §15.64）。
- *
- * 為什麼要 App 自己記：`enable_sentence: false`，librime 不會把「逐段選出的多字串」裝配成一條詞；
- * 引擎 userdb 只學「選中的那條候選」（單字粒度）。而用戶逐段拼出來的詞（如 `以液難`）下次再打同一串碼時
- * 引擎依然給不出來 —— 這份記憶正是補這個缺口：第 2 次起把它作為**合成候選**塞回候選條。
- *
- * 存儲：SharedPreferences `twelvekey_phrases`
- * - key   = 正規化碼串（去掉 `'` 與空白、小寫），如 `8i8e4`
- * - value = 多條詞條編碼成一行行：`文字\u0001讀音\u0001次數\u0001上次使用時間(ms)`，行間 `\n`
- *
- * 只在 12 鍵（hakka_jiugong）使用；26 鍵不參與（調用方 schemaId 門控）。
+ * App 本地組詞記憶，使用正規化碼串關聯文字/讀音及手拼、曝光、點選統計。
+ * 達 MIN_COUNT 後參與候選混排，讀音索引同時供面板使用；不修改引擎候選的存儲。
  */
 object PhraseMemory {
 
@@ -26,7 +17,9 @@ object PhraseMemory {
     /** 同一個碼串最多留幾條不同文字的詞條。 */
     const val MAX_PER_CODE = 8
 
-    /** 累計多少次才生效（用戶 2026-11-11：「累計 2 次生效」）。 */
+    /**
+     * 累計手拼和點選至少 2 次才參與合成候選。
+     */
     const val MIN_COUNT = 2
 
     /** 次數上限（避免一個詞無限漲權）。 */
@@ -43,13 +36,8 @@ object PhraseMemory {
     const val EXPOSURE_DISCOUNT = 0.5
 
     /**
-     * 自動清理（**只對 App 記憶裡、且引擎給不出的創制詞**生效）：曝光 ≥ 8 次、一次沒被選、
-     * 手拼 ≤ 2 次 → 判定為誤造詞，直接刪。
-     *
-     * 門檻必須是「手拼 ≤ 2」：詞條要（typed + picked）≥ [MIN_COUNT] = 2 才會露面，
-     * 若寫 1，`typed ≤ 1 && picked == 0` 的詞條永遠露不了面，清理規則**永遠不可能觸發**
-     * （2026-11-11 自查發現：手拼 2 次、露面 10 次沒人選的創制詞刪不掉）。
-     * 引擎自己給出的候選不參與這套算法（用戶 2026-11-11：不要把手伸到引擎那一側）。
+     * 只清理 App 合成記憶：曝光達門檻、從未點選且手拼不超門檻的創制詞。
+     * 引擎候選不參與此清理。
      */
     const val PURGE_SHOWN = 8
     const val PURGE_MAX_TYPED = 2
@@ -99,17 +87,9 @@ object PhraseMemory {
         }
 
     /**
-     * 推薦分 = 鮮度 × 平滑 CTR × 需求（用戶 2026-11-11 定案，參考 Beta-Binomial 平滑、
-     * 曝光偏置建模與「未點擊降權」的成熟做法）：
-     *
-     * ```
-     * ctr   = (picked + α) / (picked + γ·shown + α + β)     // α=1, β=2, γ=0.5
-     * fresh = 0.5^(齡 / 7 天)                               // 時間衰減
-     * score = fresh × ctr × (1 + ln(1 + typed))             // 手拼需求，邊際遞減
-     * ```
-     *
-     * 直覺：反复展示卻沒人選 → `shown` 漲、`ctr` 掉 → 自動沉底（誤造詞）；
-     * 手拼或點選過 → `ctr` 與需求項一起漲 → 排前面。
+     * 合成詞分數 = fresh × ctr × (1+ln(1+typed))。
+     * fresh 為 7 天半衰期；ctr=(picked+1)/(picked+0.5×shown+3)。
+     * 曝光未點降低分數，手拼與點選提高分數。
      */
     fun score(entry: Entry, now: Long): Double {
         val age = (now - entry.lastUsedAt).coerceAtLeast(0L)
@@ -120,7 +100,9 @@ object PhraseMemory {
         return fresh * ctr * demand
     }
 
-    /** 誤造詞：反复展示、一次沒選、也不曾手拼過 → 應該被清掉。 */
+    /**
+     * 檢查低需求、無點選且曝光達門檻的 App 創制詞。
+     */
     fun shouldPurge(entry: Entry): Boolean =
         entry.shown >= PURGE_SHOWN && entry.picked == 0 && entry.typed <= PURGE_MAX_TYPED
 
@@ -160,7 +142,9 @@ object PhraseMemory {
             .sortedBy { it.lastUsedAt }
     }
 
-    /** 編碼：一行一條詞（6 欄；舊版只有 4 欄，decode 時 shown/picked 補 0）。 */
+    /**
+     * 每行編碼一條六欄記錄；decode 允許四欄輸入，缺 shown/picked 時補 0。
+     */
     fun encode(entries: List<Entry>): String =
         entries.joinToString(LINE.toString()) { e ->
             listOf(
@@ -210,15 +194,8 @@ object PhraseMemory {
     }
 
     /**
-     * 點「聯想詞行」等面板詞上屏：把這次點選記進學習。
-     *
-     * 用戶 2026-11-11：在固定候選條/展開面板點「遠程」3 次以上，排位仍不動。
-     * 原因：面板聯想詞走 `pickAssociationWord`，只 `commitText`，既不經 librime
-     * `select_candidate`（引擎學不到），也沒寫 [PhraseMemory]。
-     *
-     * 這裡記成「手拼 1 次 + 點選 1 次」：首次點就達到 [MIN_COUNT] 露面的門檻；
-     * 之後每次再沿 [bumpPicked] 累加 picked，`score` 的分數會越過引擎候選的偽分數 1.0，
-     * 第 2 次起就能排到候選條/推薦前面（用戶要求的「重複點選 → 排前」）。
+     * 面板詞點選記 App 學習：增加手拼和點選以達露面門檻，後續點選累加分數。
+     * 僅收至少兩字的詞，與引擎自身學習分別維護。
      */
     fun learnPick(code: String, text: String, readings: String) {
         val key = normalizeCode(code)
@@ -250,7 +227,9 @@ object PhraseMemory {
         write(key, updated, now)
     }
 
-    /** 點合成候選上屏：點選計數 +1（用戶 2026-11-11：「重複組成/選擇時權重也要變化」）。 */
+    /**
+     * 點選合成候選後 picked 加 1。
+     */
     fun bumpPicked(code: String, text: String) {
         val key = normalizeCode(code)
         if (key.isEmpty() || text.length < 2) return
@@ -269,10 +248,8 @@ object PhraseMemory {
     }
 
     /**
-     * 合成候選「顯示了但本輪沒被選」：曝光 +1（弱負信號）。
-     *
-     * 這是誤造詞判定的唯一信息來源（用戶 2026-11-11：反复出現在候選條卻沒人選，可能就是誤造）。
-     * 曝光本身不刪詞，只透過 [score] 的平滑 CTR 讓它沉底；到 [PURGE_SHOWN] 次且從沒被選才清掉。
+     * 記一次合成候選曝光，作為平滑 CTR 的弱負信號。
+     * 曝光只影響評分；達清理條件後才刪除 App 記憶。
      */
     fun noteShown(code: String, text: String) {
         val key = normalizeCode(code)

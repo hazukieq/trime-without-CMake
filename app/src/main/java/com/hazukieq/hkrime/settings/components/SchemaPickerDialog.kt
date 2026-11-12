@@ -52,14 +52,7 @@ class SchemaPickerDialog(
     }
 
     /**
-     * 取方案列表前先確保 librime 初始化過。
-     *
-     * 用戶 2026-11-11 反饋「設置裡點選擇方案直接 crash」：設置界面是**新進程**，
-     * 若沒先 `Rime.get(context)`，deployer 的 `shared_data_dir/user_data_dir` 還是空的，
-     * `SwitcherSettings::GetAvailableSchemasFromDirectory("")` 會去 iterate `.`——
-     * Android 上 cwd 不可讀 → 原生層 `fs::filesystem_error` 沒被 catch → abort（整個進程掛掉）。
-     *
-     * 兩邊都補：這裡先初始化 + try/catch；librime fork 裡也加了空路徑/異常的防護。
+     * 讀方案列表前先初始化 Rime 的實際資料目錄，避免未初始化 deployer 的空路徑。
      */
     private fun availableSchemaList(): List<Map<String?, String?>> = runCatching {
         Rime.get(context, false)

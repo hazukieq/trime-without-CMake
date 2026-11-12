@@ -11,19 +11,8 @@ import com.hazukieq.hkrime.ime.text.FlowLayoutManager
 import com.hazukieq.hkrime.ime.text.CandidatePanelAdapter
 
 /**
- * 展開面板的視圖控制：只負責「把快照畫出來 / 收放面板」，不碰 librime。
- *
- * 交互（設計 §5）：
- * - 左列 = 快照的 comment 分組；點組只切右格視圖，不調引擎、不動 caret。
- * - 右格 = 當前組的全部候選；點候選回調給上層，由上層 Rime.select_candidate(全局下標)。
- * - 面板保持打開，直到 ▼/⌄/退格清空輸入。
- *
- * 連續消費手感（P1）：
- * - 開面板 / 新按鍵一律落第 0 組（「推薦」組，候選條放不下的續頁），不跟候選條對齊；
- * - 上屏後 input 可能不變、groups 變了：若當前 reading 仍在新組列表裡就保持該組，
- *   否則回第 0 組；
- * - 不主動 scrollToPosition(0)，靠 ListAdapter + DiffUtil 原地更新，避免跳頂/閃爍；
- * - 只有「點左列切組」才把右格滾到頂，左列自己的滾動位置不動。
+ * 展開面板僅控制展示、活躍組與開合，候選點擊回調 TextInputManager，不訪問引擎。
+ * 新輸入回第 0 組，連續選字盡量保留仍存在的活躍讀音組，不按候選條首選自動滾動。
  */
 class CandidatePanelController(
     context: Context,
@@ -122,8 +111,7 @@ class CandidatePanelController(
         if (inputChanged) lastInput = next.input
 
         if (inputChanged) {
-            // 新按鍵 / 新輸入：一律回第 0 組（面板左列的「推薦」）——
-            // 不再跟候選條第一條的讀音對齊（用戶 2026-11-11 定案：取消滾動定位）。
+            // 新輸入回第 0 組，不隨候選條首選自動滾動定位。
             activeGroup = 0
         } else {
             // 連續消費：input 不變、groups 變了；當前讀音還在就保持，否則回第 0 組。

@@ -3,24 +3,9 @@ package com.hazukieq.hkrime.core.twelvekey
 import com.hazukieq.hkrime.core.TwelveKeyPreedit
 
 /**
- * 展開面板左列的**流水線行模型**（只存在於邏輯層，不進 UI）。
- *
- * 為什麼需要它：`TwelveKeySnapshotBuilder` 以前把五種來源（合成音節 / 備選切法 / 聯想詞 /
- * 整串碼詞行 / 引擎候選）揉在一個大函數裡，各自順手去重、各自順手排序，
- * 出問題時無法判斷「哪一源多給了/少給了/被誰吞了」（見 docs/19）。
- *
- * 現在固定成一條流水線：
- *
- * ```
- * 每源純函數（SYNTH_SINGLE / SPLIT_SINGLE / ASSOC / INITIAL_COMBO / WHOLE_WORD / ENGINE）
- *   → [mergeRows]         唯一合併點（同 reading 合成一行）
- *   → [collapsePrefixRows] 多音節行按最長已有前綴收斂
- *   → [tierAndSort]        固定分檔（單音節 → 多音節 → 無讀音），檔內按讀音字典序
- *   → [capRows]            全局行數上限
- *   → project 成 [SyllableGroup]（UI 契約完全不變）
- * ```
- *
- * [PanelRow.sources] 只給診斷日誌用，投影時**丟棄**，不得讓 UI 觀察到「這行來自哪一源」。
+ * 面板內部行流水線：五個 App 源與引擎源
+ * → mergeRows → collapsePrefixRows → tierAndSort → capRows → SyllableGroup。
+ * sources 僅供診斷，投影時丟棄，不向 UI 暴露來源。
  */
 internal enum class RowSource {
     /** 整串碼恰好是一個完整音節（`ia` → ga/ha）的單字組。 */
@@ -63,7 +48,9 @@ internal data class PanelRow(
     /** 讀音有幾個音節（`ko thiau fa` = 3）；空白讀音 = 0。**禁止**用 `syllables.size` 判檔。 */
     val syllableCount: Int get() = reading.split(' ').count { it.isNotBlank() }
 
-    /** 投影成 UI 契約類型：字段與舊構造完全一致，`sources` 不帶出去。 */
+    /**
+     * 投影到 UI 模型，sources 與 hasUserWord 不帶出邏輯層。
+     */
     fun toSyllableGroup(): SyllableGroup = SyllableGroup(
         reading = reading,
         syllables = if (reading.isBlank() || reading == TwelveKeyTuning.BLANK_READING) {
@@ -77,16 +64,9 @@ internal data class PanelRow(
 }
 
 /**
- * **唯一合併點**：同讀音（大小寫不敏感）的行合成一行。
- *
- * 規則：
- * 1. 行位置 = 首次出現位置（`LinkedHashMap`，保持來源拼接順序）；
- * 2. `items` 文字去重：含 `WHOLE_WORD` 的行大小寫不敏感（`Linux`/`linux` 是同一個詞），
- *    其餘來源用**精確文字**（引擎會同時給 `J`/`j`，小寫去重會吞掉大寫候選），保留先出現的那一條
- *    （引擎項在拼接順序裡已排在 App 補集之前）；
- * 3. `segment` / `restCode` 取**首行**：來源拼接順序固定為「段組 → 引擎 → 聯想 → 組合 → 詞行」，
- *    所以「單字組(0) 優先於詞行(1)」「整串音節的空 restCode 優先於備選切法」自然成立；
- * 4. `sources` 取並集（只進日誌）。
+ * 按小寫 reading 合成一行，保留首行位置、segment 和 restCode，合併來源集合。
+ * 追加 WHOLE_WORD 行時按小寫文字去重，其它來源按精確文字去重；保留先出現項。
+ * 固定拼接順序為段組、引擎、聯想、組合、整串詞。
  */
 internal fun mergeRows(rows: List<PanelRow>): List<PanelRow> {
     if (rows.size < 2) return rows
@@ -98,9 +78,7 @@ internal fun mergeRows(rows: List<PanelRow>): List<PanelRow> {
             out[key] = row
             return@forEach
         }
-        // 文字去重：整串詞行（WHOLE_WORD）大小寫不敏感（`Linux`/`linux` 是同一個詞）；
-        // 其餘來源用**精確文字**——引擎會同時給 `J` 和 `j`，按小寫去重會把大寫候選吞掉
-        // （`8e` 的 `ze` 組實測少了 `J`）。
+        // 追加 WHOLE_WORD 行按小寫文字去重，其它來源按精確文字去重以保留 J/j。
         val caseInsensitive = row.sources.any { it == RowSource.WHOLE_WORD }
         val seen = existing.items.mapTo(HashSet(existing.items.size)) {
             if (caseInsensitive) it.text.lowercase() else it.text
@@ -117,13 +95,7 @@ internal fun mergeRows(rows: List<PanelRow>): List<PanelRow> {
 }
 
 /**
- * 多音節行按「開頭相同」收斂：`ko thiau fa` 並進 `ko thiau`、`ka thu di` 並進 `ka thu`。
- *
- * 為什麼需要（用戶 2026-11-11）：「整串碼查詢是按開頭匹配的，那 `ko thiau` 和 `ko thiau fa`
- * 就是同一個 list，為什麼面板裡是兩行」——顯示語義必須跟著查詢語義走。
- *
- * 限制：**只收斂多音節行（≥2 音節）之間**，單音節行不吸收詞行，
- * 否則 `ka then` 這種詞會跑到單字格里，破壞「單音節組 = 這一段能選的字」的語義。
+ * 多音節行並入最長已有多音節前綴；單音節不吸收詞行，保持單字組語義。
  */
 internal fun collapsePrefixRows(rows: List<PanelRow>): List<PanelRow> {
     if (rows.size < 2) return rows
@@ -167,13 +139,9 @@ internal fun collapsePrefixRows(rows: List<PanelRow>): List<PanelRow> {
 }
 
 /**
- * 固定分檔 + 檔內排序：
- * 1. 檔位 = **讀音音節數**：1 → 0 檔，≥2 → 1 檔，空讀音 → 2 檔；
- *    注意 `BLANK_READING`（`…`）是「一個非空 token」，所以實際落在 0 檔並用首候選的字典讀音排序
- *    （與重構前 `readingSyllableCount` 的行為一致；docs/17 §8 已按實際行為更正）。
- *    **禁止**用 `syllables.size` 判檔（引擎組的 `syllables` 歷史上只有 1 個元素）；
- * 2. 檔內按 `reading.lowercase()` 字典序；無讀音組用首候選的字典讀音兜底；
- * 3. 再同按首候選文字（穩定、可重現）。
+ * 按 reading 非空 token 數分單音節、多音節、空串三檔；檔內按讀音，再按首候選文字。
+ * BLANK_READING 的省略號是一個 token，實際在單音節檔，用首候選反查讀音排序。
+ * 分檔不可使用 syllables 容器長度。
  */
 internal fun tierAndSort(rows: List<PanelRow>): List<PanelRow> = rows.sortedWith(
     compareBy(

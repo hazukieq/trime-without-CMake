@@ -206,8 +206,7 @@ public class Config {
         e.printStackTrace();
       }
     }
-    // 從舊版 hkrime（/sdcard/rime）把「用戶詞庫」搬過來：舊目錄只讀不寫。
-    // 詞典 yaml 本倉庫已自帶並逐字節一致，這裡只補用戶學習到的詞（userdb）。
+    // 從 /sdcard/rime 補充用戶學習數據，來源目錄保持只讀。
     migrateLegacyUserDict(methodName);
     Timber.d("%sRime.get", methodName);
     Rime.get(context, !isExist); // 覆蓋時不強制部署
@@ -215,9 +214,7 @@ public class Config {
   }
 
   /**
-   * 舊版 hkrime 的數據在 /sdcard/rime；新版默認 /sdcard/hkrime。
-   * 把舊的 *.userdb（用戶學習詞）與 custom_phrase.txt 一次性搬到新目錄，
-   * 不刪也不改舊目錄，避免影響舊輸入法。
+   * 從 /sdcard/rime 補充缺失的 userdb 與 custom_phrase.txt，不覆蓋目標已有項。
    */
   private void migrateLegacyUserDict(String methodName) {
     try {
@@ -409,9 +406,7 @@ public class Config {
     Timber.d("init() themeName=%s schema_id=%s", themeName, schema_id);
     try {
       String file_name = themeName + ".yaml";
-      // build/ 裡是 rime 編譯後的緩存；只判斷「存在」會導致用戶改了主題源文件後
-      // 仍然讀到舊緩存（2026-11-08 實測：改 hakka_theme 的 window 不生效）。
-      // 這裡比較源文件與緩存的 mtime，源文件更新就重新部署這一張主題。
+      // 比較主題源文件與 build 緩存的 mtime，源文件更新時重新部署該主題。
       boolean needDeploy = !skip_delopy;
       if (skip_delopy) {
         File build = new File(

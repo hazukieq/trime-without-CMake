@@ -31,8 +31,7 @@ import sys
 import time
 from datetime import datetime
 
-# 基准来自 vivo V2520A（2026-11-10 实测：decode 0.02 / segment 0.21 / assoc 0.29 / merge 0.08ms）
-# 阈值给约 5 倍余量：能容忍设备差异，又能抓住「实现退化成 O(n) 扫描」这类回归。
+# 性能閾值用於檢測回歸，結果必須註明實際設備與樣本條件。
 DEFAULT_THRESHOLDS = {
     "decode": 0.2,
     "segment": 1.5,
@@ -87,8 +86,7 @@ def parse(text: str) -> dict:
     out: dict = {"ops": {}, "ready": None, "latencies": [], "builds": [], "builds_full": [],
                  "assoc_load": None, "total": None}
     lines = text.splitlines()
-    # 只統計「本次進程啟動之後」的按鍵延遲：日誌是跨進程累積的，
-    # 舊版本的慢樣本不該影響今天的判定。
+    # 只統計本次進程樣本，避免跨進程日誌混入。
     start = 0
     for idx, line in enumerate(lines):
         if "perfgate: process-start" in line:

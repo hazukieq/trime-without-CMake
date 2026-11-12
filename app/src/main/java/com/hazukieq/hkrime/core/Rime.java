@@ -253,9 +253,7 @@ public class Rime {
     }
 
     /**
-     * 方案開關對話框的行標籤：`✓ 颜文字/表情：当前 关（点按切到 情）`。
-     *
-     * 舊版是「關 → 情」，用戶完全看不出哪邊是開哪邊是關（2026-11-09 反饋）。
+     * 方案開關標籤同時顯示名稱、當前狀態與點按後狀態。
      */
     public String[] getSwitchDialogLabels() {
       if (switches.isEmpty()) return new String[0];
@@ -350,10 +348,7 @@ public class Rime {
   private static Rime self;
 
   /**
-   * 主線程啟動時不在主線程 join 維護：大方案（霧凇拼音 60MB table、melt_eng 8.5MB prism…）
-   * 部署要 1~2 分鐘，主線程 join 會讓 splash/界面整段白屏假死（2026-11-09 用戶反饋）。
-   * 這裡改成：維護丟到背景線程，init 先不建 session；維護完成後在主線程補建 session、
-   * 重讀方案並讓輸入法重綁鍵盤。
+   * 主線程不等待維護：先標記 pending，交背景 join，完成後建立 session、讀方案並重綁鍵盤。
    */
   private static volatile boolean maintenancePending = false;
 
@@ -632,8 +627,7 @@ public class Rime {
   }
 
   public static void getContexts() {
-    // librime session 非線程安全：所有讀寫都要串到同一顆鎖上，否則「後台枚舉候選」
-    // 與「UI 線程 getContexts」並發會 SIGSEGV（RimeGetContext 空指針，2026-11-08 真機 crash）。
+    // session 非線程安全，按鍵、上下文讀取與後台枚舉共用 ENGINE_LOCK。
     synchronized (ENGINE_LOCK) {
       Timber.i("\t<TrimeInput>\tgetContexts() get_context");
       // get_context() 是耗时操作
@@ -950,12 +944,9 @@ public class Rime {
   }
 
   /**
-   * 同上，解析爲 (text, comment) 對；comment 可能爲空串。
-   *
-   * 走 packed native（一次 NewStringUTF）：每鍵 600 條候選時，舊接口要 1200 次 JNI
-   * 字串轉換 + 600 個 String[]，真機實測每鍵 30~87ms（奇偶交替）。packed 串格式：
-   * `text\u0001comment\u0002` 重複；解析出的每個 text/comment 仍是 substring（必需），
-   * 但省掉 JNI 個別轉換與陣列包裝。
+   * 使用 packed native 一次返回 text/comment 串，減少 JNI 字串與陣列分配。
+   * 格式為 text\u0001comment\u0002 重複，解析後保持全局候選下標。
+   * packed 符號不可用時回退逐項枚舉。
    */
   public static List<String[]> candidatesSnapshot(int maxCount) {
     final String packed;
@@ -1050,8 +1041,7 @@ public class Rime {
   }
 
   public static boolean syncUserData(Context context) {
-    // 同 RimeUtils.sync：sync_user_data() 只排任務，必須等維護線程寫完盤再 destroy，
-    // 否則 sync/ 目錄永遠不會出現（用戶 2026-11-11 報）。
+    // sync 任務只排隊；銷毀 session 前必須等待維護完成並寫盤。
     get(context, false);
     boolean b = sync_user_data();
     Timber.i("syncUserData: scheduled=%b", b);

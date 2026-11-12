@@ -1,46 +1,25 @@
 ---
-name: Bug report
-about: Create a report to help us improve
+name: 问题反馈
+about: 报告 hkrime 输入、候选、部署或构建问题
 title: ''
 labels: bug
 assignees: ''
-
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+## 现象与预期
 
-**To Reproduce**
-Steps to reproduce the bug:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See bug
+描述实际结果、期望结果和最小复现步骤；候选问题附实际按键码、目标文字与读音。
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+## 环境
 
-**Log**
-If applicable, add crash log to quick focus your problem.
+- 设备与 Android 版本：
+- hkrime 关于页编译信息和安装包信息：
+- 方案 / 主题 / 实际数据目录：
+- 面板开关、部分选词与退格步骤：
+- 若涉及 Native：JNI 库指纹、librime revision 与补丁：
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+## 证据
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. Xiaomi Mix 4]
- - OS: [e.g. Android 11]
- - Theme: [e.g. Tongwenfeng]
- - Version: [e.g. 3.2.1]
- - Build info: 
-   ```
-   You could find build info in About Activity and click it to copy.
-   e.g. 
-   Build: Commit CI
-   Date: 2022-06-12 10:09 UTC
-   Commit: v3.2.6-58-gd9b4c1f, 2022-06-12 17:58:14 +0800
-   Branch: develop
-   Repository: https://github.com/osfans/trime
-   ```
-**Additional context**
-Add any other context about the problem here.
-
+附相关 diag、App 或部署日志和必要截图，先清除个人输入内容。
+截图前确认 IME 窗口属于 com.hazukieq.hkrime。
+性能问题提供 perf-gate 结果、样本输入与设备；构建问题提供失败任务和错误输出。

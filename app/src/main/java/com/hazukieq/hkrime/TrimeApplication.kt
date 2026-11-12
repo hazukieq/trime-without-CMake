@@ -36,7 +36,7 @@ class TrimeApplication : Application() {
         instance = this
         try {
             if (BuildConfig.DEBUG) {
-                // 每次進程啟動清空診斷檔（用戶 2026-11-11：排查要能「通通寫進 hkrime/logs」）
+                // 每次進程啟動清空診斷檔。
                 runCatching { com.hazukieq.hkrime.util.DiagLog.reset() }
                 // 12 鍵每鍵幾十條 DEBUG/VERBOSE 日誌；DebugTree 每條都走 logcat IPC，
                 // 在按鍵熱路徑上是實打實的卡頓源。DEBUG 級別只進 LogFileTree（文件），
@@ -54,8 +54,7 @@ class TrimeApplication : Application() {
             // 放在 prefs 初始化之後，才能拿到 userDataDir。
             val logTree = com.hazukieq.hkrime.util.LogFileTree(this@TrimeApplication)
             Timber.plant(logTree)
-            // 性能門禁（tools/perf-gate.py）用它切分出「本次進程」的按鍵延遲樣本，
-            // 否則日誌跨進程累積，舊版本的慢樣本會讓門禁一直 FAIL。
+            // 進程標記供性能門禁隔離當前進程的按鍵延遲樣本。
             Timber.i("perfgate: process-start t=%d", System.currentTimeMillis())
             runCatching { com.hazukieq.hkrime.util.LogFileTree.flushNow() }
             // 把本進程啟動前後的 logcat 也抓一段寫進文件（release 包同樣有效）。

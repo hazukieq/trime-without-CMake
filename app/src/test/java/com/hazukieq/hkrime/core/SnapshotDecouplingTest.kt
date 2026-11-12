@@ -12,18 +12,7 @@ import org.junit.BeforeClass
 import org.junit.Test
 import java.io.File
 
-/**
- * 快照層不變量（用戶 2026-11-11：「編碼/候選怎麼能讓展開面板給影響到呢？你這是解耦嗎？」）。
- *
- * 用戶報的現象：打字時 preedit 顯示原始字母 `dek`、候選條也是兜底；**展開面板再關閉**後變成
- * `de 5` / `邸`。根因是 `fallback` 的判據用了面板分組數（面板關閉時 `wantGroups=false`，
- * `groups` 恆空 → 每一幀都掛 fallback）。
- *
- * 這裡用**注入候選**（`candidatesOverride`，不碰 librime）釘住三條：
- * 1. 同一份引擎候選，`bar` 與 `full` 兩條構建路徑的**候選條/預覽/嵌入式預覽/兜底**必須完全一致；
- * 2. 有候選時**永遠不兜底**（哪怕面板分組是空的）；
- * 3. preedit 只用候選條第一條的 comment，跟 wantGroups 無關。
- */
+/** 驗證 bar/full 候選條、preedit 與兜底一致，不受面板開合影響。 */
 class SnapshotDecouplingTest {
 
     companion object {
@@ -76,13 +65,7 @@ class SnapshotDecouplingTest {
         assertTrue("full 模式必須建出分組", full.groups.isNotEmpty())
     }
 
-    /**
-     * 用戶 2026-11-12：「展開面板又影響到了固定候選條的候選詞變更」。
-     *
-     * 學習詞在引擎候選裡排第 70 條：限流只枚舉 64 條時，它會被當成「引擎沒有的合成候選」
-     * 插到候選條前面；開面板枚舉 600 條時它已在引擎候選裡、留在原位 → 候選條前後不一致。
-     * 修法：候選條一律從「前 BAR_CANDIDATES 條」算，與面板全量解耦。
-     */
+    /** 面板全量枚舉不得改變固定條的學習混排與去重結果。 */
     @Test
     fun barIsUnaffectedByFullPanelEnumeration() {
         PhraseMemory.clear()
@@ -117,10 +100,7 @@ class SnapshotDecouplingTest {
         PhraseMemory.clear()
     }
 
-    /**
-     * 用戶 2026-11-11：`ee5` 引擎裝不出候選時，候選條**不能退成字母**（`eek`），
-     * 應該用面板同源的字典段組（`de` 讀音下的 邸/的/地…），preedit 也就是 `de 5`。
-     */
+    /** 引擎空時先用字典段組兜底，不直接顯示原字母。 */
     @Test
     fun emptyEngineFallsBackToDictionaryNotLetters() {
         val snap = TwelveKeySnapshotBuilder.build(

@@ -1,12 +1,8 @@
 package com.hazukieq.hkrime.core.twelvekey
 
 /**
- * 12 鍵架構的只讀數據模型。
- *
- * 設計原則（見 docs/10-twelve-key-input-design.md §4.2）：
- * - 一次按鍵 = 一個不可變 [TwelveKeySnapshot]；候選條與展開面板都只讀同一份快照。
- * - [CandidateItem.index] 是 librime menu 裡的**全局下標**，直接餵給 Rime.select_candidate(int)。
- * - [SyllableGroup.reading] 即候選 comment（spelling_hints 打開後是精確拼音）。
+ * 不可變候選快照模型；候選條、面板、preedit 與預覽共享。
+ * CandidateItem.index 保留引擎全局下標，reading 使用具體讀音。
  */
 /**
  * 合成候選（App 側「逐段拼出來的組詞」）的 [CandidateItem.segment] 標記。
@@ -53,16 +49,8 @@ data class Fallback(
 )
 
 /**
- * 一次按鍵後的完整輸入快照。
- *
- * @param input librime 的 raw input（12 鍵碼串，如 "1i4ia3"）
- * @param consumedEnd 已選中/已確認段的最大字節 end；0 表示尚無已消費前綴
- * @param remaining 尚未消費的碼串（input 的 consumedEnd 之後部分）
- * @param groups 按 comment 分組的候選；順序 = 首次出現順序，不重排
- * @param fallback 無候選但有輸入時的本地兜底
- * @param degradedToSinglePage native 枚舉不可用，已降級為 getContexts 單頁
- * @param barEntries 候選條專用的「選單順序前 N 條」（不是第 0 組！長輸入時每個候選的
- *   reading 都不同，按組取會只剩 1 條，看起來像候選停了）
+ * 一次按鍵後的不可變快照，包含原始碼、已消耗前綴、剩餘碼、候選條、面板及預覽。
+ * 面板按具體 reading 合併與分檔；index 是全局引擎下標。
  */
 data class TwelveKeySnapshot(
     val input: String,
@@ -95,10 +83,7 @@ data class TwelveKeySnapshot(
 ) {
     val isEmpty: Boolean get() = input.isEmpty()
     /**
-     * 「這一幀有東西可選」。
-     *
-     * 面板關閉時 `groups` 是故意空的（省開銷），所以不能只看 groups —— 否則每一幀都被判成
-     * 「沒候選」，候選條/兜底重試/preedit 全都跟著走錯（用戶 2026-11-11 報 `ee5`）。
+     * 以候選條或面板是否有項判斷可選性；面板關閉時 groups 為空不能單獨作判據。
      */
     val hasCandidates: Boolean get() = barEntries.isNotEmpty() || groups.isNotEmpty()
 

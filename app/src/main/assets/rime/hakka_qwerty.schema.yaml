@@ -98,14 +98,9 @@ speller:
 translator:
   dictionary: hakka
   prism: hakka_qwerty
-  # 打開完整拼音提示（值 = 音節數上限，100 即全量）：候選 comment = 詞典精確拼音。
-  # 展開面板左列的音節索引靠它分組，和 12 鍵完全同一套（用戶 2026-11-09：
-  # 「左列音节索引对全字母也有意义的，所以改成一样来」）。
-  # 固定候選欄本身不顯示這些 comment（CandidateBarBinder 關掉了），只給面板用。
+  # spelling_hints 提供精確候選讀音，供展開面板分組；固定條不顯示讀音。
   spelling_hints: 100
-  # 必須開：librime 默認只在「詞典拼寫 ≠ 用戶輸入的 preedit」時才填 comment。
-  # 全字母方案常常原樣敲出拼寫（如 ni hau），preedit 與拼寫相同 → comment 為空 →
-  # 面板左列只剩一個「…」分組（用戶 2026-11-09 反饋「nihau 展開面板顯示 ...」）。
+  # 持續顯示候選 comment，保留面板需要的讀音。
   always_show_comments: true
   enable_user_dict: true
   enable_sentence: true
@@ -140,9 +135,7 @@ recognizer:
     reverse_lookup: "`[a-z]*'?$"
     punct: "^w([A-Z|a-z]*|[0-9]|10)$"
 
-# 表情/顏文字 filter 的配置段：`filters` 裡寫了 simplifier@ywz / simplifier@lenth，
-# 就必須有同名的段（opencc_config + option_name），否則 librime 構造 filter 失敗 →
-# 開關按了也沒反應（用戶 2026-11-09：「ywz.ocd 似乎沒有生效，聯想詞也沒有」）。
+# OpenCC 擴展按各自 option_name 開關產生多值候選。
 ywz:
   opencc_config: ywz.json
   option_name: ywz

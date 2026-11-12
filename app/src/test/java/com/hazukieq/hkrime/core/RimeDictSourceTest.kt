@@ -3,10 +3,7 @@ package com.hazukieq.hkrime.core
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * `import_tables` 解析（用戶 2026-11-09 在 dsh mobile 反饋「添加新條目到詞庫不生效」：
- * App 側只讀 APK 內置字典、不展開 import_tables，所以磁盤上加的詞表/詞條看不到）。
- */
+/** 驗證 import_tables 解析及帶讀音詞條欄位解析。 */
 class RimeDictSourceTest {
 
     @Test
@@ -54,13 +51,7 @@ class RimeDictSourceTest {
     }
 }
 
-/**
- * 詞表行解析（用戶 2026-11-11：「我輸入 li nak si 都沒見到 li nak si 的聯想詞組」）。
- *
- * 他在 `hakka_zon.dict.yaml` 第 3539-3540 行加了 `Linux`/`linux<TAB>li nak si`，
- * 而舊的 `loadWordLines` 只認「2~4 字全漢字、讀音靠 charTable 反推」的詞，
- * 非漢字詞、以及帶讀音列的詞全被丟掉。
- */
+/** 驗證帶讀音詞條可從主詞典 import 表解析。 */
 class WordLineParsingTest {
 
     @org.junit.Before

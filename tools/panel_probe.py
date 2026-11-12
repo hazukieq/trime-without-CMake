@@ -1,50 +1,10 @@
 #!/usr/bin/env python3
-"""12 键展开面板的「左列音节 / 单字 / 联想词」离线复现脚本。
+"""十二鍵面板規則的 Python 參考實現，與 App 同步維護。
 
-用途：**不装机、不开面板**，用同一份真实词库把展开面板左列算出来，方便对着看、对着测。
-它镜像的是 App 侧 Kotlin 实现：
-
-- `core/TwelveKeyPreedit.kt`：`codeOf` / `decode` / `splitHeads` / `syllablesForSegment` /
-  `charsForSyllable` / 联想索引 / 整串码索引；
-- `core/twelvekey/TwelveKeySnapshotBuilder.kt`：`segmentGroupsFor`（切法/配额/仅精确音节的规则）、
-  联想行、多音节词行、`collapsePrefixRows`、分档排序。
-
-> 脚本是**参考实现**，不是生产代码；行为改了就同步改这里，并且把 §15.3 的样例输出贴进
-> `docs/17-candidate-panel.md`，保证「文档 ↔ 脚本 ↔ App」三方一致。
-
-用法::
-
-    # 1) 准备数据（默认读 /tmp/hkrime-real-data；也可 --data 指定）
-    python3 tools/panel_probe.py pull          # 从真机 adb 拉一份到 /tmp/hkrime-real-data
-
-    # 2) 左列音节组（最常用）：给码串**或键名**，按 App 同一套规则列读音
-    python3 tools/panel_probe.py syllables 4i
-    python3 tools/panel_probe.py syllables "mno ghi"          # 等价于 4i
-    python3 tools/panel_probe.py prefix "kl ghi mno abc ps"   # 等价于 5i4a7
-    python3 tools/panel_probe.py syllables ea
-    python3 tools/panel_probe.py syllables 74ii
-    python3 tools/panel_probe.py syllables 5i4a57
-
-    # 3) 某个音节能出哪些单字（默认全部，--limit 截断）
-    python3 tools/panel_probe.py chars mi
-    python3 tools/panel_probe.py chars ji --limit 20
-
-    # 4) 联想词（两音节，按「第一音节 + 第二音节首字母」）
-    python3 tools/panel_probe.py assoc li n
-    #    整串码前缀联想（多音节词，如 Linux = li nak si）
-    python3 tools/panel_probe.py prefix 5i4a57
-
-    # 5) 整个左列（含联想行/多音节词行/去重/收敛/排序），就是面板最终顺序
-    python3 tools/panel_probe.py panel 5i4a57
-    python3 tools/panel_probe.py panel 5we
-
-    # 6) 结构化输出（App 侧 golden 单测对拍用）：五源 + merged，单个 JSON 到 stdout
-    python3 tools/panel_probe.py json ia 5i4a57
-
-数据文件（与 App 的 `core/RimeDictSource.kt` 一致：共享目录优先，这里就是 --data 目录）：
-
-- `hakka.dict.yaml`：音节表 + 单字表（`字<TAB>读音`）
-- 其它 `*.dict.yaml`：词表（`词<TAB>读音[<TAB>权重]`），只取第 2 列
+讀取 --data 指定目錄（默認 /tmp/hkrime-real-data），只使用主詞典及其 import 表。
+syllables/chars/assoc/prefix/panel 用於診斷，json 輸出五源與 merged 供 golden 對拍，
+preedit 復現讀音與剩餘碼，selftest 驗證規則；build-syllables 生成測試用標準音節集。
+詳見 docs/17-candidate-panel.md 與 docs/19-panel-maintenance.md。
 """
 
 from __future__ import annotations
@@ -82,7 +42,7 @@ SEGMENT_SYLLABLE_LIMIT_RICH = 24
 RICH_SYLLABLE_THRESHOLD = SEGMENT_SYLLABLE_LIMIT
 SECONDARY_SPLIT_DIVISOR = 2
 MAX_SYLLABLES_TOTAL = SEGMENT_SYLLABLE_LIMIT
-# 每個聯想行的行內詞數（用戶 2026-11-11：分組組詞 <20 時完整展示，故上限放到 20）。
+# 聯想行最多 20 詞，不足時完整展示。
 ASSOC_WORDS = 20
 ASSOC_MAX_ROWS = 4
 # 分桶輪轉後每輪實際取幾行：桶數可以很多（(g,b)/(g,c)/(h,b)/(h,c)…），
@@ -90,16 +50,12 @@ ASSOC_MAX_ROWS = 4
 ASSOC_BUCKET_ROW_BUDGET = ASSOC_MAX_ROWS * 3
 ASSOC_PREFIX_READINGS = 4
 
-# --- 首字母組合（INITIAL_COMBO）常量：與 App `TwelveKeyTuning` 及 docs/19 §5.2 同值 ---
-# 影響：面板流水線的 INITIAL_COMBO 源（本腳本對應 `initial_pattern_rows()`）。
-# 現在值 8：`ia8` 有 8 個組合、`ia8i3` 有 32 個；組合全出會淹沒單字組/聯想行。
-# 調大 → 首字母組合行更多（面板更長，單字組被推後）；調小 → `ia8i3` 這類多鍵輸入幾乎只剩單字組。
+# 首字母組合參數與 App TwelveKeyTuning 保持一致。
 INITIAL_COMBO_MAX_ROWS = 8
 # 每個首字母組合**每輪**先出幾行；現在值 1（第一輪每組合保 1 行，第二輪再補第 2 行）。
 # 調大 → 少數高頻組合壟斷行數預算；調小到 0 → 不生成首字母組合行。
 INITIAL_COMBO_ROWS_PER_PATTERN = 1
-# 首字母組合數上限；現在值 64。6 鍵以上笛卡爾積通常超過（2^k），等於「>4 鍵長輸入不生成」。
-# 調大 → 2^k 爆炸風險（組合數 × 詞條查詢變慢）；調小 → 5 鍵以上就沒有首字母組合行。
+# 兩類模式合計上限 64；是否超額取決於實際組合數而非固定碼長。
 INITIAL_COMBO_PATTERN_LIMIT = 64
 
 
@@ -193,15 +149,8 @@ class Data:
             self.code_to_syllables[code_of(syl)].append(syl)
 
     def _load_syllables(self, data_dir: str) -> set[str]:
-        """詞表校驗用的音節集 = **主詞典自帶音節**（與 App 運行時完全一致）。
-
-        用戶 2026-11-11：「實際上 hakka 字典沒有的音節，注定不會有字，所以為了減少性能消耗，
-        默認獲取 hakka 字典的音節集合」——App 端不再讀標準集資產，腳本鏡像同一口徑。
-
-        標準集資產（`assets/rime/hakka_syllables.txt`，841）另行載入到
-        [self.standard_syllables]，用途是**約束與校驗**（selftest 斷言：詞典音節必須 ⊆ 標準集），
-        不是運行時資料源。
-        """
+        """詞表校驗只用主詞典音節，與 App 運行時一致。
+        標準集另存 standard_syllables，僅供 selftest 驗證主詞典集合被完整覆蓋。"""
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         path = os.environ.get(
             "HKRIME_SYLLABLES",
@@ -417,11 +366,7 @@ class Data:
         allow_suffix_only: bool = False,
         total_limit: int = MAX_SYLLABLES_TOTAL,
     ) -> list[str]:
-        """镜像 TwelveKeyPreedit.syllablesForSegment（exact 优先 + 两级桶轮转前缀展开）。
-
-        [allow_suffix_only]：後綴音節（兒化 `r`）只允許落在輸入結尾；見
-        `SUFFIX_ONLY_SYLLABLES`（用戶 2026-11-11 特殊規則）。
-        """
+        """首段音節按 exact/前綴規則產生，r 僅允許沒有剩餘碼的末段。"""
         if not code:
             return []
 
@@ -532,14 +477,9 @@ class Data:
                         "split": index,
                     }
                 )
-            # 首字母組合聯想：把每個拆法的（第一段音節候選 × 第二段候選）命中都收進桶，
-            # 最後跨拆法统一轮转（用戶 2026-11-11：「ghi+abc → g b, g c, h b, h c 4 個通配聯想詞組」）。
-            # 通配桶要覆盖**全部**候选音節（不受面板配額截斷），否则 (g,b) 这类组合会漏。
+            # 按兩段音節首字母分桶，跨桶和切法輪轉選行。
             huge = 1_000_000
-            # 2026-11-11 起改用**首字母序列匹配**，不再用碼前綴：
-            # - 兩音節聯想：第一段只看第一個碼位的首字母（`ee` → {d,f}，元音自由：da/dai/dang/di/de…）；
-            # - 第二段只看剩餘碼第一個碼位的首字母（`5` → {k,l}）；
-            # - 只有一段（剩餘碼為空）時仍按碼前綴展開，列出該音節的全部後續音節。
+            # 聯想按每段第一鍵首字母集合匹配，元音自由。
             if rest:
                 completed_seconds = self.syllables_completing_prefix(rest)
                 last_part = index == len(splits) - 1
@@ -580,8 +520,7 @@ class Data:
                     "source": "assoc",
                 }
             )
-        # 首字母組合行（每鍵一個音節首字母，元音不固定）：`ghi+abc` → g b / g c / h b / h c，
-        # 每個組合找真實詞條，行標題仍是具體讀音（用戶 2026-11-11：「g.* z.*」）。
+        # 按首字母組合查真實詞條，標題保持具體讀音。
         for _label, reading, words in self.initial_pattern_rows(codes):
             groups.append(
                 {
@@ -595,12 +534,7 @@ class Data:
         return groups
 
     def _build_initials_index(self) -> None:
-        """按「音节首字母序列」索引词表（用户 2026-11-11：「g.* z.*」，元音不固定）。
-
-        `首字母组合` 只是**查找规则**：例如 `ghi+abc` 的两个键分别能作 g/h 与 b/c 开头，
-        就去词表里找读音首字母序列恰为 (g,b)/(g,c)/(h,b)/(h,c) 的真实词条，
-        行标题仍然是具体读音（`gong bun`、`han coi`…）。
-        """
+        """按音節首字母序列查詞，元音自由，返回具體讀音與詞面。"""
         self.by_initials: dict[tuple[str, ...], list[tuple[list[str], str]]] = {}
         # 两音节联想词（含纯词表反推出来的）：与 App `buildInitialPatternIndex` 同口径
         for first, by_second in self.assoc.items():
@@ -618,10 +552,7 @@ class Data:
             key = tuple(t[0] for t in tokens)
             bucket = self.by_initials.setdefault(key, [])
             bucket.append((tokens, word))
-        # 简拼+完整音节（用户 2026-11-11）：末音节按完整读音匹配、前面的音节只按首字母。
-        # key = 「前 N-1 个音节首字母拼接 | 末音节」，如 `b|can`。
-        # 纯词表只知道前两个音节，所以只把**两字纯词**当成完整两音节入索引；
-        # 带读音的词表（zon/hakka 等）按整条读音入索引。
+        # 簡拼前段各出一個首字母，最後音節按完整讀音匹配。
         self.by_hybrid: dict[str, list[tuple[list[str], str]]] = {}
         def _add_hybrid(tokens: list[str], word: str) -> None:
             if len(tokens) < 2:
@@ -641,11 +572,7 @@ class Data:
             _add_hybrid(tokens, word)
 
     def key_initial_letters(self, code_char: str, is_last: bool = False) -> list[str]:
-        """某个码位能作音节首字母的字母（排除元音；按音节集合实际出现过的首字母）。
-
-        后缀音节 `r`（儿化）**只能出现在最后一键**（用户 2026-11-11 特殊规则），
-        所以非末位按键不贡献 `r`。
-        """
+        """每鍵取合法首字母，排除元音；後綴 r 僅末鍵允許。"""
         letters = KEY_LETTERS.get(code_char, "")
         initials = sorted(
             {
@@ -675,11 +602,7 @@ class Data:
         return sorted(out)
 
     def syllables_by_initials(self, initials: list[str]) -> list[str]:
-        """首字母集合 → 這些字母打頭的全部音節（字典序、去重）。
-
-        鏡像 App `TwelveKeyPreedit.syllablesByInitials`：鏡像聯想行按首字母序列匹配後，
-        每個音節只由「首字母」約束，元音不釘死（用戶 2026-11-11）。
-        """
+        """每音節只按首字母匹配，返回具體讀音，元音自由。"""
         if not initials:
             return []
         wanted = set(initials)
@@ -705,13 +628,7 @@ class Data:
         return combos
 
     def initial_pattern_hybrids(self, codes: str) -> list[tuple[str, ...]]:
-        """「简拼 + 完整音节」组合（用户 2026-11-11）。
-
-        前面的键各贡献一个音节首字母，**最后一段码串恰好是一个完整音节**：
-        `aaa4` 拆成 `a` + `aa4`（aa4 = cam/ban/can）→ `b·can`、`b·ban`、`c·cam`…
-        所有切法都试（k=1..n-1；suffix 必须是单音节码），前缀组合数受
-        `INITIAL_COMBO_PATTERN_LIMIT` 约束。
-        """
+        """前段各鍵取首字母，末段碼串必須是完整音節；枚舉合法切法。"""
         clean = codes.replace("'", "")
         if len(clean) < 2:
             return []
@@ -753,18 +670,7 @@ class Data:
     def initial_pattern_rows(
         self, codes: str, max_rows: int = INITIAL_COMBO_MAX_ROWS
     ) -> list[tuple[str, str, list[str]]]:
-        """「每键一个音节首字母」的联想行：字母组合×真实词条，行标题仍是具体读音。
-
-        与 App `INITIAL_COMBO` 源同一套**轮转**语义（docs/19 §5.2/步骤 3）：
-
-        - 组合规则直接复用 `initial_pattern_combos()`（`r` 只在末键，元音不作首字母）；
-          组合数超 `INITIAL_COMBO_PATTERN_LIMIT` 或任一键无可用首字母 → 整组不生成；
-        - 第一轮每个组合按读音字典序取第 1 条（保证每个组合都有代表），
-          第二轮再给每个组合补第 2 条；每轮内按 `combos` 顺序塞；
-        - 总行数达 `max_rows`（默认 `INITIAL_COMBO_MAX_ROWS`）即停。
-        - 键数不再做 `>4` 的硬限制，由 `INITIAL_COMBO_PATTERN_LIMIT` 自然封顶
-          （如 `5i4a57` 恰好 64 组仍生成，7 键以上通常超限）。
-        """
+        """鏡像 App INITIAL_COMBO：兩輪選行，每組合每輪一行，總行數受上限限制。"""
         codes = codes.replace("'", "")
         if len(codes) < 2:
             return []
@@ -894,13 +800,7 @@ class Data:
     def assoc_rows_by_initials(
         self, first_candidates: list[str], rest: str, max_rows: int = ASSOC_MAX_ROWS
     ) -> list[tuple[str, list[str]]]:
-        """首字母組合的聯想行（用戶 2026-11-11：「ghi+abc → g b, g c, h b, h c 4 個通配聯想詞組」）。
-
-        通配只是**查找規則**，行標題仍然是具體讀音（`ga zi`、`ha boi`…）：
-        對第一段的每個候選音節（`g*`/`h*`/`i*`…）× 第二段的每個候選音節（由 rest 碼展開），
-        查 `(第一音節, 第二音節)` 精確哈希，湊成具體行；再把這些行按
-        **(第一音節首字母, 第二音節首字母)** 分桶，輪轉取行，保證每個通配組合都有代表。
-        """
+        """按合法首字母組合產生具體讀音聯想行。"""
         second_candidates: list[str] = []
         if rest:
             huge = 1_000_000
@@ -1040,14 +940,7 @@ class Data:
         return out
 
     def existing_readings(self, codes: str) -> list[dict]:
-        """**實際存在**的讀音集：詞典裡真有字、且碼串能讀成它的全部音節（不受面板配額限制）。
-
-        用途（用戶 2026-11-11：「測試脚本 syllables 还应该输出一份实际存在读音集」）：
-        面板左列受 16/24 配額與輪轉限制，可能只顯示一部分；這裡給全量，方便對照
-        「規則漏了哪些」「配額截掉了哪些」。
-
-        每項：`{"split": i, "head": ..., "rest": ..., "kind": "single|split", "readings": [...]}`。
-        """
+        """列出當前編碼可匹配的實際詞表讀音集合，用於對照面板覆蓋。"""
         codes = codes.replace("'", "")
         if not codes:
             return []
@@ -1094,11 +987,7 @@ class Data:
         return out
 
     def cumulative(self, codes: str, min_len: int = 2) -> list[tuple[int, str, list[dict]]]:
-        """逐键累积：2 键、3 键 … 直到整串，返回每个阶段的左列快照。
-
-        用户 2026-11-11：面板是随按键逐步长出来的，脚本要能复现「两个键→三个键→四个键」
-        每一步的左列，并且最后去重展示（同一个读音只保留第一次出现的位置）。
-        """
+        """按逐鍵前綴累積查詢結果，保持首次出現順序。"""
         codes = codes.replace("'", "")
         stages: list[tuple[int, str, list[dict]]] = []
         for length in range(max(1, min_len), len(codes) + 1):
@@ -1117,11 +1006,7 @@ class Data:
         return stages
 
     def cumulative_unique(self, codes: str, min_len: int = 2) -> list[tuple[str, int, str]]:
-        """累积去重：(reading, 首次出现的键数, 类别)。
-
-        用户 2026-11-11：「那你可以这么列呀，li nak, li nak si」——面板会把 3 音节词行
-        `li nak si` 收敛进 `li nak` 联想行，但脚本要**两者都列**（各自一行、互不吞并）。
-        """
+        """累積結果按具體完整讀音去重，保留不同長度讀音供診斷。"""
         seen: "OrderedDict[str, tuple[int, str]]" = OrderedDict()
         for length, prefix, rows in self.cumulative(codes, min_len):
             for g in rows:
@@ -1194,7 +1079,7 @@ KEY_NAME_TO_CODE = {
     "th": "w", "ps": "7", "vur": "3", "zj": "8",
 }
 
-# 後綴音節（兒化 `r`）：不做首字母拼、只能出現在詞尾（用戶 2026-11-11 特殊規則）
+# 後綴 r 只允許詞尾。
 SUFFIX_ONLY_SYLLABLES = {"r"}
 
 # 元音字母（不能作音节首字母）
@@ -1280,9 +1165,7 @@ def cmd_syllables(args, data: Data) -> None:
     if not args.no_stages:
         for length, prefix, rows in data.cumulative(args.codes, args.min_len):
             print(f"## {length} 键  {prefix}")
-            # 1) 合成音节：当前码串**能解码出的全部完整音节**（可能多节；尾端半截忽略）。
-            #    旧口径只看「整串是否恰好一个音节」，`vu zet t`（338e9/338e99）会显示（无），
-            #    但 vu、zet 明明已经打全——用户 2026-11-11 指出这是判定问题。
+            # 已完成的前綴音節逐節顯示，未完成尾碼保持原樣。
             synth = data.synth_syllables(prefix)
             print("   合成音节: " + (", ".join(synth) if synth else "（无）"))
             # 2) 首字母组合（每键一个音节、元音自由；逐键累积）
@@ -1292,7 +1175,7 @@ def cmd_syllables(args, data: Data) -> None:
             tail = "" if len(pure) <= 8 else f" …（共 {len(pure)} 组）"
             print(f"   {length}键组合({len(pure)}): " + (shown + tail if pure else "（无）"))
             print('     注：组合里每个字母都隐含「≥1 个字母」（如 g·b = g.* 与 b.*，元音不限）')
-            # 2b) 简拼 + 完整音节（用户 2026-11-11：前面的键各出一个首字母，最后一段码串是完整音节）
+            # 簡拼與完整末音節共同生成匹配模式。
             if hybrids:
                 hshown = ", ".join("·".join(c) for c in hybrids[:8])
                 htail = "" if len(hybrids) <= 8 else f" …（共 {len(hybrids)} 组）"
@@ -1403,7 +1286,7 @@ def cmd_build_syllables(args) -> None:
     match = re.search(r"SYLLABLE_SOURCE\s*=\s*`(.*?)`", text, re.S)
     body = match.group(1) if match else text
     base = [t for t in body.split() if t.isalpha()]
-    # 字典音節：用戶 2026-11-11 定稿「字典並入後的就是標準集」
+    # 標準集取 JS 源集合與主詞典音節並集。
     dict_path = args.dict or os.path.join(args.data, "hakka.dict.yaml")
     dict_syll: list[str] = []
     if os.path.isfile(dict_path):
@@ -1423,11 +1306,11 @@ def cmd_build_syllables(args) -> None:
     sets = [set(base), set(dict_syll), set(extras)]
     syllables = sorted(set().union(*sets))
     lines = [
-        "# 客家話合法音節標準集（定稿：JS 源檔 ∪ hakka.dict.yaml 自帶音節）",
+        "# 客家話合法音節標準集（JS 源檔 ∪ 主詞典 ∪ 可選補遺）",
         "#   權威來源 Hkdict/neo-frontend/src/data/hakkaSyllables.js；",
-        "#   用戶 2026-11-11 定稿：「字典并入后的就是标准集」（JS 源檔漏收 ji 等，已確認屬人為遺漏）。",
+        "#   用於腳本與測試約束；運行時音節集合僅來自主詞典。",
         f"# 共 {len(syllables)} 個 = JS {len(sets[0])} ∪ 詞典 {len(sets[1])} ∪ 補遺 {len(sets[2])}"
-        "（由 panel_probe.py build-syllables 生成；App 側仍是本檔 ∪ 詞典的運行時並集）。",
+        "（由 panel_probe.py build-syllables 生成；App 不載入本檔）。",
     ] + syllables
     with open(args.out, "w", encoding="utf-8") as handle:
         handle.write("\n".join(lines) + "\n")
@@ -1486,16 +1369,7 @@ def _row_items(g: dict) -> list[str]:
 
 
 def build_json_payload(data: Data, raw_codes: list[str]) -> dict:
-    """把若干码串算成 `{code: {codes, sources, merged}}`（json 子命令与 selftest 共用）。
-
-    五源划分严格镜像 App 侧流水线（docs/19 §3）：
-    - `synth`      = `segment_groups()` 里「整串码本身是一个完整音节」那一组（split 0、rest 空）；
-    - `split`      = `segment_groups()` 里其它切法的单字组（rest 非空）；
-    - `assoc`      = `segment_groups()` 里 `segment == 1` 且 `source == "assoc"` 的行；
-    - `combo`      = `segment_groups()` 里 `source == "initials"` 的行（`initial_pattern_rows` 产生）；
-    - `whole_word` = `prefix_word_rows()` 的整串码前缀词行。
-    `merged` 是 `panel(codes)` 的最终顺序（collapse + 分档排序后），只保留文字。
-    """
+    """鏡像 App 五個本地來源與最終 merged 行；輸出供 golden 對拍。"""
     payload: dict[str, dict] = {}
     for raw in raw_codes:
         codes = parse_code(raw)
@@ -1540,11 +1414,7 @@ def cmd_json(args, data: Data) -> None:
 
 
 def remaining_code_after(data: Data, reading: str, codes: str) -> str:
-    """镜像 `TwelveKeyPreedit.remainingCodeAfter`：按「码串前 N 个音节」算剩余。
-
-    不能用 reading→码 前缀比对：同一个字有多读（动 dung/tung），学习词记的 readings
-    未必等于这次输入实际用的读音；前缀比对会失配，后半个词就丢了（用户 2026-11-12）。
-    """
+    """按輸入的實際音節切分扣除前 N 節，不以讀音重編碼作前綴匹配。"""
     tokens = [t for t in reading.replace("\u3000", " ").split(" ") if t]
     if not tokens or not codes:
         return ""
@@ -1610,8 +1480,7 @@ def cmd_selftest(args, data: Data) -> None:
     ok = any(r["reading"] == "li nak si" for r in data.prefix_word_rows(parse_code("kl ghi mno abc kl ps")))
     expect(ok, "键名写法 kl ghi mno abc kl ps 也能查到 li nak si")
 
-    # 3.6) 合成音节 = 当前码串能解码出的全部完整音节（多节；尾端半截忽略）
-    #      用户 2026-11-11：`vu zet t` 已打全 vu/zet 时不能显示「（无）」。
+    # 完整前綴的 vu/zet 應顯示為已完成音節。
     expect(data.synth_syllables("ia") == ["ga", "ha"], f"合成音节 ia = {data.synth_syllables('ia')}")
     expect(
         set(data.synth_syllables("ee5")) == {"de", "fe"},
@@ -1644,8 +1513,7 @@ def cmd_selftest(args, data: Data) -> None:
         bool(merged) and merged[0]["reading"] in ("li nak", "li nak si"),
         f"整串阶段应出现含 Linux 的行（{merged[0]['reading'] if merged else 'NONE'}）",
     )
-    # 2026-11-11 用户定案：联想改分桶轮转 + 字母序 + 行数 12，面板不一定选中 li nak；
-    # 这里改为验证「联想索引本身有 li+nak（含 Linux）」+「累积汇总里有 li 开头的联想行」。
+    # 聯想按首字母分桶、12 行預算選行，最終按讀音字典序顯示。
     expect(
         any(w.lower() == "linux" for w in (data.assoc.get("li") or {}).get("nak", [])),
         "联想索引 li+nak 应含 Linux",
@@ -1673,7 +1541,7 @@ def cmd_selftest(args, data: Data) -> None:
         "最后一键 vur 应允许 r",
     )
 
-    # 4.45) 首字母組合規則（用戶 2026-11-11：「g.* z.*」，元音自由）
+    # 驗證首字母組合匹配且元音自由。
     c2 = data.initial_pattern_combos("ia")
     expect(
         [tuple(c) for c in c2] == [("g", "b"), ("g", "c"), ("h", "b"), ("h", "c")],
@@ -1712,7 +1580,7 @@ def cmd_selftest(args, data: Data) -> None:
         f"5i4a57 面板與實際存在集應互相覆蓋（顯示 {len(shown57)} / 存在 {len(union57)}）",
     )
 
-    # 4.52) 汇总里 `li nak` 与 `li nak si` 必须各列一条（用戶 2026-11-11：「那你可以这么列呀」）
+    # 累積診斷分別保留 li nak 與 li nak si。
     uniq = data.cumulative_unique("5i4a57", 2)
     readings_only = [r[0] for r in uniq]
     expect(
@@ -1724,7 +1592,7 @@ def cmd_selftest(args, data: Data) -> None:
         "li nak si 的类别应为词行/联想/词",
     )
 
-    # 4.53) 詞行第一段必須是打完的音節（用戶 2026-11-11：打 ia 不該列 gam se）
+    # 整串詞行要求第一音節碼打全。
     ga_code = code_of("ga")
     ga_rows = data.prefix_word_rows(ga_code)
     expect(
@@ -1740,7 +1608,7 @@ def cmd_selftest(args, data: Data) -> None:
         "打 gam 的完整碼時應列 gam se",
     )
 
-    # 4.55) 標準集必須覆蓋詞典音節（用戶 2026-11-11 定稿：字典並入後的就是標準集）
+    # 標準集必須覆蓋主詞典全部音節。
     missing = sorted(set(data.syllable_freq) - set(data.standard_syllables))
     expect(
         not missing,
@@ -1761,7 +1629,7 @@ def cmd_selftest(args, data: Data) -> None:
         f"联想行读音全是客家话音节：{assoc_readings}",
     )
 
-    # 4.7) 後綴音節 r：只能落在詞尾（用戶 2026-11-11 特殊規則）
+    # 後綴 r 僅詞尾可用。
     r_code = code_of("r")
     expect(bool(r_code), f"r 的碼 = {r_code}")
     as_last = [g["reading"] for g in data.segment_groups(r_code)]
@@ -1772,8 +1640,7 @@ def cmd_selftest(args, data: Data) -> None:
     first = [g["reading"] for g in data.segment_groups(phrase) if g["segment"] == 0]
     expect("r" not in first, f"「到下儿」第一段不得含 r：{first}")
 
-    # 5) 联想：li + 4a5（码展开 = mak/nak）→ 行标题是具体两音节、第二音节首字母 ∈ {m,n}
-    #    （2026-11-11 后选行按分桶字母序 + 12 行预算，不再钉死某一行）
+    # 聯想斷言檢查集合與預算，不固定某一行。
     assoc = data.assoc_rows("li", "4a5")
     expect(
         bool(assoc) and all(len(r[0].split(" ")) == 2 for r in assoc),
@@ -1832,7 +1699,7 @@ def cmd_selftest(args, data: Data) -> None:
         len(combo_rows) <= INITIAL_COMBO_MAX_ROWS,
         f"ia8i3 首字母组合行数 ≤ {INITIAL_COMBO_MAX_ROWS}（实际 {len(combo_rows)}）",
     )
-    # 简拼 + 完整音节（用户 2026-11-11：`abc abc abc mno` 应得到 `b cam` / `b can`）
+    # 簡拼+完整末音節應覆蓋 b cam / b can 等合法模式。
     patterns_a4 = data.initial_patterns("aaa4")
     expect(
         ("b", "can") in patterns_a4 and ("b", "cam") in patterns_a4,
@@ -1850,7 +1717,7 @@ def cmd_selftest(args, data: Data) -> None:
         f"5i 首字母组合行数应在 (0, {INITIAL_COMBO_MAX_ROWS}]（实际 {len(combo_rows_5i)}）",
     )
 
-    # preedit / 剩余输入复刻（用户 2026-11-12：灵机一动来的 只上屏前四个字）
+    # 驗證 preedit 切分與部分選詞後剩餘碼。
     code_partial = "5i4ii8i9934i54iei9"
     spans_partial = data.decode(code_partial) or []
     expect(

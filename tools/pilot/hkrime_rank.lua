@@ -1,34 +1,12 @@
---[[
-hkrime_rank.lua —— 「候选排序下移到 librime」第 2 步只读试点脚本（2026-11-10）
-
-用法（只在真机试点，不进正式方案）：
-  1. adb push tools/pilot/hkrime_rank.lua /sdcard/hkrime/lua/hkrime_rank.lua
-  2. 把 hakka_char_rank.txt / hakka_char_freq.txt 也放一份到 /sdcard/hkrime/
-  3. rime.lua 末尾加一行：_G.hkrime_rank = require("hkrime_rank")
-  4. 目标 schema 的 engine/filters 末尾加：- lua_filter@hkrime_rank
-  5. 删 /sdcard/hkrime/build/<schema>.schema.yaml 强制重建，广播 com.hazukieq.hkrime.deploy
-  6. 打字，读 /sdcard/hkrime/hkrime_rank_pilot.log：
-       [load] 数据表规模；[cmp] engine=引擎原序 / lua=按规则重排；
-       [perf] 每次调用耗时（calls/avg/max）。
-  7. 默认 yield 原顺序（只读）；把 switch 打开 hkrime_rank_apply 才真的重排。
-
-实测结论（vivo V2520A，12 键）：
-  - 数据表规模与 App 完全一致：rank=8183 freq=7990 general=9379；
-  - 性能不可接受：309 条候选时 avg 25.7ms / max 94ms（纯 Lua 逐条 UTF-8 解析 + 排序，
-    且跑在按键处理线程上）——App 侧同样排序约 35ms 但在后台线程且有缓存；
-  - 语义上把「权威字频」应用到候选条会覆盖引擎自己的整词词频/学习排序，
-    例如 455 下会把「无奇/无忌…」提到「姥姥家」之前，未必更好（需要产品决策）。
-  所以结论是：排序暂时留在 App；若真要下移，必须先做 Lua 侧性能工程（按首字字节缓存、
-  只重排前 N 条）或改成 C++ filter，并明确「引擎词频 vs 权威字频」的优先级。
-]]
--- hkrime_rank.lua —— 候选排序「下移到 librime」的第 2 步只读试点
+-- 字頻排序試驗工具，未接入隨包方案；不代表當前候選條排序規則。
+-- 實驗 Lua filter，只有顯式配置後才運行。
 local M = {}
 
 local rank, freq, general = {}, {}, {}
 local loaded, load_err = false, nil
 local LOG_PATH = "/sdcard/hkrime/hkrime_rank_pilot.log"
 
--- 老版本 librime-lua 可能没带 utf8 库，这里自带一个小实现。
+-- 自帶 UTF-8 碼點迭代。
 local function utf8_codepoints(s)
   local out, i, n = {}, 1, #s
   while i <= n do

@@ -289,13 +289,14 @@ class AppPrefs(
             const val LAST_BACKGROUND_SYNC = "conf__last_background_sync"
             val EXTERNAL_PATH_PREFIX: String = appContext.getExternalFilesDir(null)!!.absolutePath
 
-            /** 默認數據目錄名（舊版是 rime，2026-11-08 起改為 hkrime）。 */
+            /**
+             * 默認數據目錄名。
+             */
             const val DEFAULT_DIR_NAME = "hkrime"
         }
 
         /**
-         * 舊版默認目錄 `.../rime` 一次性遷移到 `.../hkrime`：
-         * 用戶沒自定義過路徑時直接改寫 pref，避免升級後繼續寫舊目錄。
+         * 將以 /rime 結尾的配置路徑轉成同父目錄下的 /hkrime，並寫回偏好。
          */
         private fun migrateLegacyDefaultDir(raw: String): String {
             if (!raw.endsWith("/rime")) return raw
@@ -310,14 +311,14 @@ class AppPrefs(
         }
 
         /**
-         * shared 與 user 都放公共存儲（和上游 Trime 的 /sdcard/rime 佈局一致）：
-         * 部署時 assets 會複製到這裡，用戶可以直接改 yaml；舊版默認在私有目錄，
-         * 這裡一併遷到 /sdcard/hkrime，避免「/sdcard/hkrime 裡沒有方案文件」的困惑。
+         * shared 與 user 默認都在 /sdcard/hkrime，供部署及用戶直接維護配置。
          */
         var sharedDataDir: String
             get() = dirPref(SHARED_DATA_DIR, "/sdcard/$DEFAULT_DIR_NAME")
             set(v) = prefs.setPref(SHARED_DATA_DIR, v)
-        /** 用戶數據放公共存儲（和上游一致：/sdcard/<dir>），方便用戶自己改 yaml；shared 才用私有目錄。 */
+        /**
+         * 用戶目錄可配置，默認與 shared 相同。
+         */
         var userDataDir: String
             get() = dirPref(USER_DATA_DIR, "/sdcard/$DEFAULT_DIR_NAME")
             set(v) = prefs.setPref(USER_DATA_DIR, v)

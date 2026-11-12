@@ -7,18 +7,12 @@ import com.hazukieq.hkrime.core.TwelveKeyPreedit
 import timber.log.Timber
 
 /**
- * 把 librime 的當前狀態拍成 [TwelveKeySnapshot]。
- *
- * 分兩步，方便把「枚舉 600 條」搬離 UI 線程：
- * - [local]：只讀 input / segments / remaining（O(段數)，很便宜），必須在 UI 線程+引擎鎖內做；
- * - [build]：拿 [Local] 後全量枚舉 + 分組，可在後台線程做（調用方負責持 [TwelveKeyController.ENGINE_LOCK]）。
- *
- * 這裡**不做任何分頁/分批收集**：一次枚舉全量候選（上限 [MAX_CANDIDATES]），
- * 按 comment 分組後直接返回。
+ * 構建不可變候選快照。調用方持 ENGINE_LOCK，local 讀取輸入/分段，
+ * build 枚舉候選並生成候選條、面板與預覽。普通刷新在後台執行。
  */
 object TwelveKeySnapshotBuilder {
 
-    /** 單次最多枚舉的候選數（設計 §7.2）。 */
+
     /** 一次向 librime 要多少條候選（見 [TwelveKeyTuning.MAX_CANDIDATES]）。 */
     const val MAX_CANDIDATES = TwelveKeyTuning.MAX_CANDIDATES
 
@@ -147,8 +141,7 @@ object TwelveKeySnapshotBuilder {
         }
 
         val __tFlat = System.nanoTime()
-        // App 側學習排序：只把「學過的詞」抬前，其餘維持引擎順序（同分看引擎下標）。
-        // 用戶 2026-11-12：取消詞組優先/覆蓋深度傾斜——詞與單字平等競爭，尊重引擎給的候選。
+        // 候選條僅對已學習項調整分數，同分維持引擎順序。
         val ranked = if (applyLearning && SelectionMemory.hasAny()) {
             CandidateRanking.rankWithLearning(flat) {
                 SelectionMemory.score(it.text, it.comment)
@@ -167,22 +160,10 @@ object TwelveKeySnapshotBuilder {
         }
         val __mergeMs = (System.nanoTime() - __tMerge0) / 1_000_000
         if (__mergeMs >= 8) DiagLog.d("perf", "merge=${__mergeMs}ms code=$input n=${ordered.size}")
-        // 分詞（theme 的 composing: delimiter → 送出 '）後，引擎只會給第一段候選；
-        // 這裡按「段」補上字典候選：每段列出該碼對應的讀音與字，點擊後上屏該字、
-        // 再把後面幾段的碼重新餵回引擎 —— 讓「分詞」真正能逐段聯想。
-        // 分詞段組放在最前面：它們才是「逐段選字」的操作入口，往後塞會被幾十個引擎組淹沒。
-        // 多音節輸入一律按「碼位」拆段：面板先列第一個待選段的「高頻音節 → 單字」組
-        // （n**、h**、j**…），點字上屏後把其餘碼餵回引擎繼續——不再依賴用戶按 `'`（用戶 2026-11-10：
-        // 之前 `'` 那套作廢，用這套按序推進的實現）。
-        // 面板關閉時不需要分組（候選條只吃 ranked 順序）：跳過「音節桶輪轉 + 聯想詞 + 分組合併」，
-        // 這是每次按鍵的主要開銷之一（用戶 2026-11-10：補聯想詞後按鍵卡頓）。
-        // 引擎一條候選都沒給（`ee5` 這種碼串在詞典/方案裡裝不出來）時，**候選條不能退成字母**：
-        // 面板本來就會列「第一待選段的字典單字」（`de` 讀音下的 邸/的/地…），候選條也該用同一批。
-        // 這樣候選條、面板、preedit 三者同源（用戶 2026-11-11：候選詞不該一會字母一會 邸）。
+        // 面板按第一待選段構造字典單字與詞行；部分選詞交由輸入層暫存。
+        // 面板關閉且引擎有候選時跳過分組；引擎無候選時用字典段組填候選條。
         val needDictionaryFallback = ordered.isEmpty() && remaining.isNotEmpty()
-        // 左列走**唯一流水線**（見 docs/19 §3）：五源 → mergeRows → collapse → tier/sort → capRows。
-        // 面板關閉（wantGroups=false）時不建分組；但「引擎一條候選都沒有」時要用同一條流水線
-        // 產生的段組給候選條兜底（否則候選條會退成原始字母，見 docs/10 §15.74）。
+        // 面板行統一合併、前綴收斂、分檔與截斷；引擎空時同樣用這條鏈構造字典兜底。
         val panel: PanelBuild = when {
             wantGroups -> buildPanelRows(
                 remaining = remaining,
@@ -194,10 +175,7 @@ object TwelveKeySnapshotBuilder {
                 remaining = remaining,
                 anchor = segmentAnchor,
                 engineGroups = emptyList(),
-                // 引擎一條候選都沒有時（`ee5` 這類裝不出來的碼），面板仍要出**完整五源**
-                // （聯想詞行/首字母組合/整串詞行）：重構前在
-                // `wantGroups || needDictionaryFallback` 時都會算全量，這裡漏成 false 過，
-                // 結果真機 `ee5` 面板只剩 `de`/`fe` 兩個單字組，通配聯想詞全丟（用戶 2026-11-11 報）。
+                // 引擎空時仍構造全部 App 來源，讓段組、聯想、組合與詞行可用。
                 includePanelOnlySources = true,
             )
             else -> PanelBuild(emptyList(), PanelStats.EMPTY)
@@ -205,18 +183,8 @@ object TwelveKeySnapshotBuilder {
         val panelRows = panel.rows
         // 字典兜底只用「單字組」（segment != 1）：候選條不需要聯想/詞行。
         val dictionaryRows = panelRows.filter { it.segment != 1 }
-        // 候選條按「選單順序」取前 N 條：長輸入時 reading 各不相同，
-        // 按第 0 組取會只剩 1 條（用戶 2026-11-08 反饋「打到這麼多就停止候選」）。
-        // 分詞輸入（`5'e`）時，候選條直接列「這一段能選的字」：用戶點一個字就上屏，
-        // 再把剩下的碼餵回引擎，於是第二段接著在候選條出現 —— 全程不開面板（用戶 2026-11-09 指示）。
-        // 有 segmentAnchor（剛上屏的前一個字）時，與它關聯度高的字排前面。
-        // 只剩最後一段時，用引擎候選（引擎本身按詞頻/用戶詞庫排序）再疊用戶關聯度，
-        // 而不是繼續用字典順序 —— 否則「最後一個字」看起來完全不受詞頻影響（用戶 2026-11-09 反饋）。
-        // 候選條永遠只從「前 [TwelveKeyTuning.BAR_CANDIDATES] 條引擎候選」算：
-        // 展開面板時枚舉 600 條，若拿全量再排序，學習詞的「引擎已有同文條目」判定會變
-        // （第 65 條之後才出現的詞，限流時被當成合成候選插到前面，全量時留在原位）
-        // → 同一輸入開面板前後候選條會變（用戶 2026-11-12 報）。
-        // 用同一份窗口算 ranked/merge，兩條路徑的候選條才是同一份。
+        // 候選條固定從前 BAR_CANDIDATES 條引擎窗口計算學習排序與合成詞混排。
+        // 全量面板的窗口外項不能影響候選條去重或排序，bar/full 的前 12 項必須一致。
         val barOrdered = if (wantGroups && flat.size > TwelveKeyTuning.BAR_CANDIDATES) {
             val window = flat.subList(0, TwelveKeyTuning.BAR_CANDIDATES)
             val rankedBar = if (applyLearning && SelectionMemory.hasAny()) {
@@ -241,10 +209,7 @@ object TwelveKeySnapshotBuilder {
         } else {
             barList(barOrdered)
         }
-        // 面板左列第一個「推薦」組 = 聯想詞 + 單字（用戶 2026-11-11 改定：40 個 = 30 詞 + 10 單字）：
-        // 詞收聯想詞行（ASSOC / INITIAL_COMBO / WHOLE_WORD / 引擎詞組）裡出現的詞，
-        // 單字先取引擎候選、再用段組字補位；順序沿用候選條那套（引擎/學習排序 → 詞序），
-        // 詞在前、單字在後，上限見 [TwelveKeyTuning.RECOMMEND_WORDS] / [RECOMMEND_CHARS]。
+        // 推薦組最多 30 詞與 10 單字；詞來自聯想/組合/整串與引擎詞，單字可用段組補位。
         val recommend = recommendWords(ordered, panelRows, local.remaining)
         // 推薦組固定排左列第一（reading 為空 + [RECOMMEND_SEGMENT] 標記）；空的就不插，
         // 這樣「候選全上了條」時段組自然回到第 0 組。
@@ -267,11 +232,7 @@ object TwelveKeySnapshotBuilder {
         // App 側暫存的字（兜底逐段選字）也要算進嵌入式預覽，否則選中的字在輸入框裡看不到。
         val inlineText = TwelveKeyPreedit.pendingPrefix +
             runCatching { Rime.getCompositionPrefix() }.getOrDefault("") + previewText
-        // 兜底的判據只能是「**引擎一條候選都沒有**」（ordered 為空），不能用 groups：
-        // 面板關閉時 wantGroups=false，groups 本來就是空的（故意不建分組），
-        // 用它判斷會讓每一幀都掛上 fallback → 候選條顯示原始字母、preedit 也退成原碼，
-        // 而開面板（wantGroups=true）時又正常 —— 用戶 2026-11-11 報的
-        // 「打字顯示 dek，展開關閉後才是 de 5 / 邸」就是這條（docs/10 §15.74）。
+        // 兜底按引擎和字典候選是否可用判斷，不能把面板關閉的空 groups 當成無候選。
         val fallback = if (shouldShowFallback(barEntries.size, remaining)) {
             val raw = remaining.takeLast(MAX_FALLBACK_CODE)
             val dbg = runCatching { Rime.debug_enumerate_info() }.getOrElse { "n/a(${it.javaClass.simpleName})" }
@@ -314,34 +275,17 @@ object TwelveKeySnapshotBuilder {
     }
 
     /**
-     * 是否該顯示「引擎沒候選」的兜底：判據只能是**引擎候選數為 0**。
-     *
-     * 不能用面板分組數（`groups`）判斷：面板關閉時 `wantGroups=false`，groups 恆為空，
-     * 用它判斷會讓每一幀都掛上 fallback → 候選條/preedit 顯示原始字母，
-     * 開面板卻正常（用戶 2026-11-11：「打字顯示 dek，展開關閉後才是 de 5 / 邸」）。
+     * 判斷引擎候選數是否為零；面板關閉時 groups 為空不能用作此判據。
      */
     internal fun shouldShowFallback(engineCandidateCount: Int, remaining: String): Boolean =
         engineCandidateCount == 0 && remaining.isNotEmpty()
 
     /**
-     * 多音節輸入 → 「第一個待選段」的音節→單字組。
-     *
-     * 不區分「有沒有按分詞鍵」：碼串先去掉 `'`，再按碼位切出第一段與其餘碼。
-     * - 完整拼音（如 `5e5e`）：切成 `5e` + `5e`；
-     * - 首字母相拼（如 `855`、`4i`）：切成第一個碼位 + 其餘碼，`syllablesForSegment` 會展開成
-     *   「以該字母開頭的音節」：**每個首字母**各取高頻前 [TwelveKeyTuning.SEGMENT_SYLLABLE_LIMIT] 個
-     *   （合計受 `TwelveKeyTuning.MAX_SYLLABLES_TOTAL`=16 限制；用戶 2026-11-10 定案）。
-     *
-     * 每項帶 `segment = 0` 與 `restCode = 其餘碼`：點擊 = 上屏這個字 + 其餘碼餵回引擎，
-     * 面板接著列下一段的單字（按順序推進）。
+     * 對待選碼枚舉完整首音節切法；無完整切法時回退首碼。
+     * 按 Tuning 限制每首字母與總音節數，返回第一待選段的單字組來源。
      */
-    // =====================================================================================
-    // 五源流水線（docs/19 §3）
-    //
-    // 固定形狀：每源一個純函數 → mergeRows（唯一合併點）→ collapsePrefixRows
-    //          → tierAndSort（固定分檔）→ capRows（固定截斷）→ project 成 SyllableGroup。
-    // 源函數**不做**跨源去重、不排序、不碰引擎/UI；同一種規則只寫一次。
-    // =====================================================================================
+    // 五源及引擎源只經 mergeRows、collapsePrefixRows、tierAndSort、capRows。
+    // 源內只構造與選行，不另起跨源合併和最終排序。
 
     /**
      * 一種「合法第一段切法」展開後的結果。
@@ -353,7 +297,9 @@ object TwelveKeySnapshotBuilder {
         val head: String,
         val rest: String,
         val syllables: List<String>,
-        /** head 本身就是一個完整音節（`4i`=mi、`ea`=da）→ 只列精確音節，不再前綴展開。 */
+        /**
+         * 完整段碼僅取 exact 音節，避免展開更長前綴音節。
+         */
         val headIsCompleteSyllable: Boolean,
         /** 這段之後已經沒有碼（`rest` 為空）→ 允許 `r` 這種後綴音節。 */
         val allowSuffixOnly: Boolean,
@@ -392,8 +338,7 @@ object TwelveKeySnapshotBuilder {
             // 用戶已經把音節打全了，再展開 `mia/min/nia…`（同前綴的更長音節）屬於噪音。
             // 只有「碼只是前綴」（如 `7` = p/s）時才做前綴展開；exact 為空會自動回退到展開。
             val headIsCompleteSyllable = TwelveKeyPreedit.isSingleSyllable(head)
-            // 兒化後綴 `r`：只有「這段之後沒有碼了」（rest 空）才允許當音節；
-            // 打在中間/開頭時不參與展開（用戶 2026-11-11 特殊規則）。
+            // r 為後綴音節，僅在 rest 為空時允許。
             val allowSuffixOnly = rest.isEmpty()
             val syllables = TwelveKeyPreedit
                 .syllablesForSegment(head, quota, headIsCompleteSyllable, allowSuffixOnly = allowSuffixOnly)
@@ -455,20 +400,9 @@ object TwelveKeySnapshotBuilder {
         }
 
     /**
-     * 源 3：兩音節聯想詞行（`ga zi`、`than dung`）。
-     *
-     * 行標題一律是兩個完整讀音（精確哈希 `(第一音節, 第二音節)`）。選行規則與
-     * `tools/panel_probe.py` 的 `assoc_buckets()` + `pick_bucket_rows()` 完全一致：
-     *
-     * 1. 每個切法的第一段取**全部**音節候選（不受面板配額截斷，否則 `(g,b)` 這類桶會漏）；
-     * 2. 第二段有剩餘碼 → 把它前綴展開成確切音節再逐個查；剩餘碼為空 → 取該第一音節的全部後續音節
-     *    （整輪聯想，行標題仍是完整讀音）；
-     * 3. 命中的行按 **（第一音節首字母, 第二音節首字母）** 分桶；桶內按詞數降序；
-     * 4. 跨桶輪轉取行：每個「第一段首字母」組內先各桶第 1 行、再第 2 行…，組與組之間再輪轉；
-     * 5. 總數受 [TwelveKeyTuning.ASSOC_MAX_ROWS] 封頂，最後按 reading 字典序排。
-     *
-     * 用戶 2026-11-11：「ghi+abc → g b, g c, h b, h c 4 個通配聯想詞組」——分桶就是為了
-     * 每個通配組合都有代表，而不是被高頻桶整批佔滿。
+     * 源 3：按兩個具體音節精確查聯想詞；音節候選依每段第一鍵首字母產生。
+     * 已完成的第二音節採精確候選；按兩音節首字母分桶輪轉，預算 ASSOC_BUCKET_ROW_BUDGET。
+     * 桶內學習詞優先，再按詞數與讀音排序，行內最多 ASSOC_WORDS。
      */
     /**
      * 這一段「一個音節」的首字母集合：只看該段**第一個碼位**的首字母（元音不釘死）。
@@ -485,16 +419,9 @@ object TwelveKeySnapshotBuilder {
         val buckets = LinkedHashMap<Pair<Char, Char>, MutableList<PanelRow>>()
         parts.forEachIndexed { index, part ->
             val isLastPart = index == parts.lastIndex
-            // 聯想行按**首字母序列**匹配，不再按碼前綴（用戶 2026-11-11：
-            // 「必須走首字母序列匹配，不是碼前綴（碼前綴等於把元音釘死為 a/b/c）」）。
-            // - 有剩餘碼（兩音節聯想）：第一段只看第一個碼位的首字母——`ee` → {d,f}，
-            //   於是 da/dai/dang/di/de… 都能進候選，而不是只有元音被釘成 e 的 de/den/det/fen/feu；
-            // - 第二段同理只看剩餘碼第一個碼位的首字母——`5` → {k,l}，元音自由；
-            // - 剩餘碼開頭已經是一個**完整音節**（`8e99` 的 `8e9`=zet、`8i` 的 `8i`=zi）時，
-            //   視為「第二音節已打全」的三音節以上輸入：第一段只取該段 exact 音節（`vu`、`ga`），
-            //   第二段只取這些已完成音節——否則 `vu zet t` 會因為 rest 展開不到音節而丟掉
-            //   `vu zet` 這一行（它含 武则天、无节等整詞），用戶 2026-11-11 報。
-            // - 只有一段（剩餘碼為空）時仍按碼前綴展開，列出該音節的全部後續音節（維持原文行為）。
+            // 有剩餘碼時按每段第一鍵首字母匹配，元音自由。
+            // 剩餘碼開頭有完整音節時只取完成的第二音節，第一段完整則取 exact。
+            // 沒有剩餘碼時按首段前綴展開其後續音節。
             val completedSeconds = if (part.rest.isEmpty()) {
                 emptyList()
             } else {
@@ -527,9 +454,7 @@ object TwelveKeySnapshotBuilder {
             for (first in firstCandidates) {
                 val bySecond = TwelveKeyPreedit.assocSecondMap(first)
                 if (bySecond.isEmpty()) continue
-                // 剩餘碼展開不到任何音節（`we` 這種「像 the 但碼不是 wie」的輸入）→ 取該第一音節的
-                // 全部後續音節（整輪聯想）。這與腳本 `if not second_candidates: allowed = by_second.keys`
-                // 一致；否則 `kiung th` 這種用戶場景會一行聯想都沒有（2026-11-10 報過的問題）。
+                // 第二段無可展開音節時回退第一音節的全部後續，與腳本保持一致。
                 val allowed = secondCandidates
                     ?.takeIf { it.isNotEmpty() }
                     ?.filter { bySecond.containsKey(it) }
@@ -613,21 +538,17 @@ object TwelveKeySnapshotBuilder {
         items = words.map { CandidateItem(text = it, comment = reading, index = -1, segment = 1) },
         segment = 1,
         sources = setOf(RowSource.ASSOC),
-        // 用戶詞庫的詞優先進面板（選行階段，見 pickBucketRows）：B站 這種只在 userdb 裡的詞
-        // 不該因為「同桶詞數少」被 12 行預算擠掉（用戶 2026-11-11）。
+        // 含 PhraseMemory 學習詞的行在桶內優先選取，最終顯示仍按讀音排序。
         hasUserWord = words.any { TwelveKeyPreedit.isLearnedWord(it) },
     )
 
     /**
-     * 源 4：每鍵首字母笛卡爾積 → 按「讀音首字母序列」查詞表的行（`g·b` → `gang bung`）。
-     *
-     * 規則已在 `tools/panel_probe.py` 驗證（`initial_pattern_rows`）；本步驟先留空，
-     * 接入與常數見 docs/19 §7 步驟 3。
+     * 源 4：首字母序列查真實詞行，包含純簡拼與簡拼+完整末音節。
+     * 按組合兩輪選行，總組合數和行數受 Tuning 限制，對應腳本 initial_pattern_rows。
      */
     internal fun initialComboRows(codes: String): List<PanelRow> {
         if (codes.length < 2) return emptyList()
-        // 用戶 2026-11-11：除了「每鍵一個首字母」的純簡拼，還要「簡拼 + 完整音節」
-        // （`aaa4` → `b·cam` / `b·can`）；完整音節的判定走音節集合。
+        // 純簡拼與簡拼+完整末音節共同參與選行；完整音節由集合判定。
         val combos = TwelveKeyPreedit.initialPatterns(codes)
         if (combos.isEmpty()) return emptyList()
         val rows = ArrayList<PanelRow>(INITIAL_COMBO_MAX_ROWS)
@@ -662,11 +583,8 @@ object TwelveKeySnapshotBuilder {
     }
 
     /**
-     * 源 5：整串碼前綴命中的多音節詞條（`li nak si` → Linux）。
-     *
-     * 走**輕路徑**：只按「整串碼前綴」查表（表只有 ~1.4k 條），不做引擎/大排序那條重路徑
-     * （2026-11-11 實測：塞進重路徑會讓面板全量構建卡死幾十秒）。
-     * 第一段必須打全（`wordsByCodePrefix` 已修，別回退）。
+     * 源 5：用輕量整串碼索引查多音節詞，第一音節必須打全。
+     * 不對無讀音大詞表重新建重索引或全量排序。
      */
     internal fun wholeWordRows(remaining: String): List<PanelRow> {
         val codes = remaining.replace("'", "")
@@ -697,12 +615,8 @@ object TwelveKeySnapshotBuilder {
     }
 
     /**
-     * 源 6：引擎候選組。
-     *
-     * 有段組（按碼位自切的單字組）時，引擎的**單音節組**只是同一批字的另一種排法：
-     * 全列出來左列會被 g* 的幾十個讀音灌滿，所以只保留「同讀音的引擎組」（並進段組）
-     * 與「多音節/含非漢字的組」——與重構前的合併口徑一致（單音節引擎組並入段組，只留詞組/非漢字組）。
-     * 判「多音節」用讀音 token 數，不用 `syllables.size`（docs/19 §9.1：引擎組的 syllables 只有 1 個元素）。
+     * 引擎讀音組轉為 PanelRow；有段組時保留同讀音單音節組並入，
+     * 另保留多音節與含非漢字的組。多音節以 reading token 數判斷。
      */
     internal fun engineRows(engineGroups: List<SyllableGroup>, segmentReadings: Set<String>): List<PanelRow> {
         if (engineGroups.isEmpty()) return emptyList()
@@ -760,7 +674,9 @@ object TwelveKeySnapshotBuilder {
         val tierWords: Int = 0,
         val tierBlank: Int = 0,
     ) {
-        /** 每源一行日誌（docs/19 §6.1）：出問題能直接判斷「哪源多給/少給/被截斷」。 */
+        /**
+         * 記錄各源、合併、收斂和截斷數量，供定位候選行。
+         */
         fun line(): String = "panel sources synth=$synth split=$split assoc=$assoc combo=$combo" +
             " word=$word engine=$engine → merged=$merged collapsed=$collapsed" +
             " tier=[single:$tierSingles word:$tierWords blank:$tierBlank] capped=$capped"
@@ -907,12 +823,13 @@ object TwelveKeySnapshotBuilder {
     private const val INITIAL_COMBO_MAX_ROWS = TwelveKeyTuning.INITIAL_COMBO_MAX_ROWS
     private const val INITIAL_COMBO_ROWS_PER_PATTERN = TwelveKeyTuning.INITIAL_COMBO_ROWS_PER_PATTERN
 
-    /** 兼容舊調用：同步一次做完（UI 線程慎用）。 */
+    /**
+     * 同步完成 local 與 build；調用方負責執行線程和引擎鎖。
+     */
     fun build(): TwelveKeySnapshot = build(local())
 
     /**
-     * 已消費前綴的結束位置：所有 status >= 2（selected/confirmed）的段的最大 end。
-     * start/end 都是 raw input 的 UTF-8 字節偏移（設計 §2.5）。
+     * 已選/已確認（status>=2）段的最大 end，使用 raw input 的 UTF-8 字節偏移。
      */
     fun consumedEnd(input: String): Int {
         val segs = runCatching { Rime.getRimeCompositionSegments() }.getOrNull() ?: return 0
@@ -1004,8 +921,7 @@ object TwelveKeySnapshotBuilder {
         if (ranked.isEmpty() || code.isEmpty()) return ranked
         val phrases = PhraseMemory.candidatesFor(code, now)
         if (phrases.isEmpty()) return ranked
-        // 引擎自己也會學（userdb / custom_phrase）：同一條詞已經在引擎候選裡就不再塞合成候選，
-        // 否則候選條會出現兩個一模一樣的詞（用戶 2026-11-11 報「重複詞條」）。
+        // 與引擎同文的合成項在此去重，保留學習分數回填的引擎項。
         val engineTexts = ranked.mapTo(HashSet()) { it.text }
         // 學習分數同時用於「引擎已有同文條目」的抬升（見 mergePhraseCandidates 的 boostByText）。
         val scoreByText = phrases.associate { it.text to PhraseMemory.score(it, now) }
@@ -1032,30 +948,14 @@ object TwelveKeySnapshotBuilder {
         CandidateRanking.rankBar(ranked, BAR_ITEMS)
 
     /**
-     * 面板「推薦」組的內容 = **全部聯想詞語**（按候選條同一套順序，最多
-     * [TwelveKeyTuning.RECOMMEND_WORDS] 條）。
-     *
-     * 用戶 2026-11-11：「推薦那裡的顯示的詞語，改為所有聯想詞語的排序顯示（按照候選條顯示的
-     * 算法來做），數量取至多 20 個」。
-     *
-     * 順序：
-     * 1. 引擎/學習排序後的候選先過 [CandidateRanking.fullBarOrder]（= 候選條的唯一來源，
-     *    去重 + 詞前字後），只留 CJK 詞組（ASCII/顏文字不算聯想詞）；
-     * 2. 再接面板聯想詞行裡的詞（App 側補的 `ga zi` / `li nak si` 這類不在引擎候選裡的詞），
-     *    按面板行序；同一文字只留第一條（引擎條目優先，保留 comment/index）。
-     *
-     * 為什麼不再用「候選條續頁」口徑：推薦組只放詞，才能一屏看完所有聯想詞；
-     * 單字續頁由候選條/段組承擔，不再擠進推薦。
+     * 推薦候選沿引擎/學習基礎順序取詞，結合面板詞行和段組單字補位。
      */
     internal fun recommendWords(
         engineCandidates: List<CandidateItem>,
         panelRows: List<PanelRow>,
         code: String = "",
     ): List<CandidateItem> {
-        // 用戶 2026-11-11 改定：推薦組 = 40 個 = **30 詞 + 10 單字**（詞在前、單字在後）。
-        // 詞的順序沿用候選條那套（引擎/學習排序 → 面板詞行）；單字先取引擎候選裡的單字，
-        // 不足再從面板段組的字補位（點擊語義沿用各自條目：引擎單字走 select_candidate、
-        // 段組單字走 onPickPanelCandidate 的 segment>=0 分支）。
+        // 推薦組配額為 30 詞+10 單字，詞在前、單字在後。
         val seen = HashSet<String>()
         val words = ArrayList<CandidateItem>(TwelveKeyTuning.RECOMMEND_WORDS)
         val chars = ArrayList<CandidateItem>(TwelveKeyTuning.RECOMMEND_CHARS)

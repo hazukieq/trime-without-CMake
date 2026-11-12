@@ -21,13 +21,8 @@ object RimeUtils {
     }
 
     /**
-     * Deploy means reset Rime instance.
-     *
-     * @param full 完整重建（重編譯全部詞典/表）。**默認 false = 增量部署**：
-     *   librime 的 start_maintenance(false) 會先 detect_modifications，只重建改動過的
-     *   文件。裝了大方案（如霧凇拼音，table 60MB）時，full=true 每次都全量重建，
-     *   要 1~2 分鐘，看起來像「卡住」（用戶 2026-11-09 反饋）；增量一般幾秒。
-     *   只有需要強制重建（開發/排查）才傳 true。
+     * 重新初始化並部署 Rime，默認 full=false 增量檢測變更；full=true 強制完整重建。
+     * 在 IO 線程執行，記錄部署前後狀態與本次 glog，完成後通知界面。
      */
     suspend fun deploy(context: Context, full: Boolean = false) = withContext(Dispatchers.IO) {
         // 全字母方案（客語 26 鍵、朙月拼音…）先補 App 適配 patch，再部署讓 patch 生效。
@@ -62,17 +57,9 @@ object RimeUtils {
     }
 
     /**
-     * 同步用戶數據（librime 的 `sync_user_data`）。
-     *
-     * **注意時序**（用戶 2026-11-11 報「設置裡點同步，hkrime 裡沒有 sync 文件夾」）：
-     * `RimeSyncUserData()` 只是「排任務（installation_update / backup_config_files /
-     * user_dict_sync）+ 啟動 maintenance 線程」，真正的寫盤在後台線程裡。
-     * 舊實現排完任務立刻 `destroy()`，維護線程還沒跑就被拆掉 → `sync/` 永遠不會出現。
-     *
-     * 所以：先確保 librime 按 App 的目錄初始化（設置界面可能是冷啟動進程），
-     * 排任務後 `join_maintenance_thread()` 等它跑完，再 destroy + 全量部署。
-     *
-     * @return `true` 表示同步任務已排隊並執行完成（librime 的語義）
+     * 初始化 Rime 後排本地同步任務，等待維護寫盤完成再銷毀並重新初始化。
+     * 只在 IO 線程 join；同步導出不代表上傳至網絡。
+     * @return 同步任務是否成功排隊執行
      */
     suspend fun sync(context: Context): Boolean = withContext(Dispatchers.IO) {
         Rime.get(context, false)          // 冷啟動時先按 App 的 shared/user dir 初始化

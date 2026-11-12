@@ -1368,10 +1368,7 @@ public class Trime extends LifecycleInputMethodService {
   }
 
   /**
-   * 長按 ⌘（meta/Menu）鍵：輸入方案選單 —— 切換當前方案（點一下即切）＋ 啟用/停用方案。
-   *
-   * <p>以前這個長按打開的是「設置輸入法／其它輸入法」對話框，內容與按鍵語義不符
-   * （用戶 2026-11-09：「meta键长按弹出菜单的内容不对，应该是输入方案切换以及启用」）。
+   * 長按 meta/Menu 顯示方案選單，支持切換當前方案及啟用/停用方案。
    */
   public void showSchemaMenuDialog() {
     final String[] names = Rime.getSchemaNames();

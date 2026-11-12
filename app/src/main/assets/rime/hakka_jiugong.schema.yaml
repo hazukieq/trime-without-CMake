@@ -28,8 +28,6 @@ switches:
   #- name: full_shape
    # states: [ "全","半" ]
 
-  # 舊的 _key_Hide 開關沒有任何代碼消費（全倉庫僅此處定義），
-  # 卻會在空候選區渲染成一個大 ▽，與右側展開箭頭混淆 —— 移除。
 
 menu:
   # 候選條一屏條數；12 鍵面板改走全量枚舉（Rime.enumerateCandidates），
@@ -101,9 +99,7 @@ translator:
   dictionary: hakka
   prism: hakka
   enable_user_dict: true
-  # 簡拼（all-initial abbrev）讓每個位置的分支爆炸，句子模式（MakeSentence）會對
-  # 用戶詞庫做 DFS，長輸入時主線程卡死 20s+（真機 ANR，2026-11-08）。
-  # 關掉句子裝配；詞庫裡的詞/多音節詞仍可透過 abbrev 拼寫直接命中。
+  # 簡拼分支較多，關閉句子裝配以控制搜索；詞典多音節詞仍可直接命中。
   enable_sentence: false
 
   # 12 鍵的核心開關：讓每條候選的 comment = 詞典原始精確拼音（如 人→nzin、任教→nzim gau）。

@@ -1,23 +1,23 @@
-## 隱私權政策
+# hkrime 隐私说明
 
-**同文**爲開源安卓漢語輸入法項目，讀取以下資訊是爲了協助使用者更快速的輸入文字。
-應用本身不會蒐集和上傳任何個人隱私數據至任何外部服務和伺服器，尤其用戶的輸入數據。
+hkrime 在设备本地处理按键、候选、词典与学习记录。当前 App manifest 未声明 INTERNET 权限，
+项目没有用于上传输入历史的自有网络服务。
 
-讀取如下資訊和權限：
+## 本地数据
 
-* 存儲空間：用於保存用戶詞典數據和配置信息。
-* 麥克風：用於系統語音輸入，如不需要可關閉。
+- 方案、词典、用户词库、同步导出与配置默认存放 `/sdcard/hkrime`；目录可在设置中修改。
+- 候选选择、用字和组词学习保存在本地 SharedPreferences 或 librime 用户词典。
+- 剪贴板与草稿功能会保存用户使用这些功能时的文本。
+- 诊断日志可能记录输入码、候选文字和提交文字，默认在用户数据目录的 logs 下。
+  公共存储中的数据可被具有相应文件权限的其它应用或用户读取。
 
-2017年7月25日更新
+## 权限与外部服务
 
-## Privacy Policy
+存储/所有文件访问用于读写方案、词典与用户文件；麦克风用于可选语音输入；
+悬浮窗用于相应输入界面能力，振动用于按键反馈。
+语音由 Android 系统选定的 SpeechRecognizer 服务处理，该服务可能联网，适用其自身隐私设置。
+用户主动打开浏览器链接或分享/导出数据时，接收应用按其自身规则处理数据。
+本地 sync 生成用户词库导出，不自动构成云端备份。
 
-**TRIME** is an open source project for Android input method.
-It won't collect or upload any user's privacy to any external service or server especially the user's input history.
-
-Permissions application needs:
-
-* Storage(NEED): Used to keep the dictionary data and configuration file.
-* Microphone(OPTIONAL): Used for voice input. 
-
-Updated on 2017.7.25
+共享日志、导出或备份前自行检查个人内容；停用学习或删除本地记录应使用相应设置，
+卸载前按实际数据目录备份需要保留的文件，不能假定公共目录会随卸载清除。

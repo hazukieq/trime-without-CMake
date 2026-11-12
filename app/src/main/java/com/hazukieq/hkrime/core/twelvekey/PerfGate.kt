@@ -5,22 +5,15 @@ import com.hazukieq.hkrime.core.TwelveKeyPreedit
 import timber.log.Timber
 
 /**
- * 12 鍵鍵盤的「性能門禁」（perf gate）。
- *
- * 為什麼要有它：每次調整分組/聯想詞/排序，都可能悄悄把某條熱路徑變慢
- * （2026-11-10 就出現過「補聯想詞後按鍵卡頓」）。這裡把熱路徑拆成可重複的微基準，
- * 一條廣播就能跑一遍、輸出固定格式日誌，再由 `tools/perf-gate.py` 對照門檻 PASS/FAIL。
- *
- * 設計原則：
- * - **只讀**：不餵鍵、不改組字狀態、不寫用戶字典；什麼時候跑都不影響正在打的字；
- * - 固定輸入集：覆蓋「多碼長輸入 / 完整拼音 / 首字母簡拼 / 混合碼 / 單鍵 / 超長」；
- * - 輸出穩定：每行 `perfgate: op=… avg=…ms n=…`，腳本按 key=value 解析。
+ * 候選熱路徑只讀微基準，測解碼、段組、聯想、合併與當前組合枚舉；輸出固定格式供工具判定。
  */
 object PerfGate {
 
-    /** 覆蓋典型形狀的輸入集（用戶 2026-11-10 報過的組合都在裡面）。 */
+    /**
+     * 固定微基準輸入集，用於可重複的性能比較。
+     */
     private val INPUTS = listOf(
-        "744ii",        // ps mno mno ghi ghi → son gi / song g**
+        "744ii",        // ps mno mno ghi ghi，涵蓋多種合法首段切法。
         "5e5e",         // 完整拼音（le le）
         "855",          // 首字母簡拼 → j**
         "i44yi",        // 混合碼（song nzi）

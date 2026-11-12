@@ -7,14 +7,9 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 直接寫進 `<userDataDir>/logs/diag.log` 的診斷日誌（**不經 Timber、不經 logcat**）。
- *
- * 為什麼另起一份（用戶 2026-11-11 要求「通通寫入 hkrime/logs」）：
- * - logcat 會被系統日誌沖掉；
- * - Timber 的 LogFileTree 會被 2MB 輪轉、按進程分檔，排查時常常「剛好那段在另一個檔」；
- * - 面板/快照這種「卡死」場景最需要的是**能確認最後走到哪一步**，所以這裡每條都即時 append + flush。
- *
- * 只在 debug 構建裡寫（[enabled]）。
+ * 診斷寫入 userDataDir/logs/diag.log，獨立於 Timber/logcat。
+ * 由 ENABLED 控制，當前為 true；每次同步 appendText，進程啟動 reset 清空。
+ * verbose 另控制逐鍵細節，不由 BuildConfig 自動限制為 Debug。
  */
 object DiagLog {
 

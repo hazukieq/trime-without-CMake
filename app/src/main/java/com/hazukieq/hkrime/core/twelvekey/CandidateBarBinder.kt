@@ -3,10 +3,8 @@ package com.hazukieq.hkrime.core.twelvekey
 import com.hazukieq.hkrime.ime.text.Candidate
 
 /**
- * 把快照的「當前組」寫進單行候選條（[Candidate]）。
- *
- * 候選條只讀快照第 0 組；末尾的 ▼/⌄ 由 [Candidate] 自己繪製。
- * **不調 Rime.getCandidates()**，避免候選條與面板讀到不同版本的數據。
+ * 把快照 barItems 綁到固定候選條；barItems 優先 barEntries，僅缺失時回退首組。
+ * 不獨立讀引擎；展開圖示由 Candidate 繪製。
  */
 class CandidateBarBinder(private val candidateView: Candidate?) {
 
@@ -29,16 +27,13 @@ class CandidateBarBinder(private val candidateView: Candidate?) {
         }
         if (keys == lastEntries) return
         lastEntries = keys
-        // 固定候選欄不再顯示拼音提示（用戶 2026-11-09：「关闭固定候选栏的第一个汉字拼音提示」）。
+        // 固定候選條關閉拼音提示，讀音留給面板左列。
         view.setShowComment(false)
         view.setCandidates(entries)
     }
 
     /**
-     * 離開 12 鍵路徑時恢復「候選條自己找 Rime.getCandidates()」的舊行為。
-     *
-     * 註釋仍然關閉：拼音只給展開面板左列分組用，固定候選欄在所有方案裡都不顯示拼音提示，
-     * 高度才統一（用戶 2026-11-09：全字母鍵盤候選區高度要和 12 鍵一致）。
+     * 非 12 鍵模式由候選條讀 Rime.getCandidates，仍關閉固定條讀音提示。
      */
     fun clear() {
         lastEntries = null

@@ -5,20 +5,8 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 
 /**
- * 不等寬的流式佈局（標籤流）：每個 item 按自身內容測寬，寬度不夠就換行。
- *
- * 為甚麼不用 GridLayoutManager / StaggeredGridLayoutManager：
- * - GridLayoutManager 的單元格等寬，長詞會被截斷；
- * - StaggeredGridLayoutManager 只支持「同列寬、不同高」，不支持「不同寬」。
- * 12 鍵候選的長短差異主要來自字數與拼音長度，所以這裡要的是「每行高度一致、
- * 每個 item 寬度不同」的標籤流。
- *
- * 對齊：**每行整體水平居中**。候選只有 1~3 個時，行寬遠小於可用寬度，左對齊會在右側
- * 留下大片空白（用戶 2026-11-08 明確指出）；居中讓少數候選也落在視覺重心上，
- * 行排滿時則與左對齊無異。
- *
- * 面板一組候選通常只有十幾到幾十個（1224 條候選分散在 69 組裡），因此這裡
- * 一次量完並擺好全部 item，換來簡單且可預期的滾動；不做二級回收。
+ * 不等寬候選流式佈局：按內容測寬，行內左對齊，寬度不足時換行。
+ * 按行高度計算滾動範圍，維持垂直 scrollOffset。
  */
 class FlowLayoutManager(private val gap: Int) : RecyclerView.LayoutManager() {
 
@@ -84,7 +72,7 @@ class FlowLayoutManager(private val gap: Int) : RecyclerView.LayoutManager() {
         }
         if (row.items.isNotEmpty()) rows.add(row)
 
-        // ③ 定位：左對齊（用戶 2026-11-08 否決了居中）；縱向從 -scrollOffset 開始
+        // 行內左對齊，縱向從 -scrollOffset 開始。
         var y = paddingTop - scrollOffset
         for (r in rows) {
             var x = paddingLeft

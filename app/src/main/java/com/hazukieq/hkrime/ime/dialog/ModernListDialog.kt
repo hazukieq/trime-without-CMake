@@ -46,8 +46,7 @@ class ModernListDialog private constructor(
 
     private val checkedFlags: BooleanArray? = initialChecked?.copyOf()
     private fun isChecked(index: Int): Boolean =
-        // 單選模式必須看 currentIndex：之前這裡用的是構造時的 checkedIndex，
-        // 於是點一行只改了 currentIndex、勾選記號卻永遠不動，看起來像「選不了」。
+        // 單選標記讀取當前 currentIndex。
         if (checkedFlags != null) checkedFlags[index] else index == currentIndex
 
     private var currentIndex = checkedIndex
@@ -252,8 +251,7 @@ class ModernListDialog private constructor(
                         button(android.R.string.ok, true) {
                             onConfirmInput?.invoke(inputField?.text?.toString() ?: "")
                             onConfirm(currentIndex)
-                            // 多選確定：把勾選狀態交回調用方（之前漏了這一步，導致
-                            // 「啟用 / 停用方案…」點確定後什麼都不會發生）
+                            // 多選確定時將當前勾選狀態交回調用方。
                             checkedFlags?.let { onConfirmMulti?.invoke(it.copyOf()) }
                             dismiss()
                         },

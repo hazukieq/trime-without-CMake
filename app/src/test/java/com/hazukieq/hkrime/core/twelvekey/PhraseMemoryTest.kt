@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** App 側組詞記憶（docs/10 §15.64）與合成候選混排的純邏輯測試。 */
+/** 驗證當前輸入與面板規則。 */
 class PhraseMemoryTest {
 
     private val day = 24L * 3600 * 1000
@@ -49,8 +49,7 @@ class PhraseMemoryTest {
 
     @Test
     fun `learnPick makes repeated association picks outrank engine top`() {
-        // 用戶 2026-11-11：面板聯想詞點 3 次以上，排位仍不動。
-        // learnPick 首次點就記「手拼 1 + 點選 1」，重複點選把分數推過引擎首條的偽分數 1.0。
+        // 累計學習達門檻後合成詞可以露面。
         PhraseMemory.clear()
         val code = "8e4ai4534i8"
         PhraseMemory.learnPick(code, "远程", "")
@@ -193,8 +192,7 @@ class PhraseMemoryTest {
 
     @Test
     fun `boost lifts an engine item that was picked repeatedly`() {
-        // 用戶 2026-11-11：同一個詞（引擎已給）點 3 次以上仍不動。
-        // 學習分數要能抬升引擎條目，而不是只有「不在引擎裡」的合成候選才能插隊。
+        // 詞與單字依引擎/學習分數平等混排。
         val ranked = listOf(item("醫院", "ji jen", 0), item("遠程", "jen cin", 1))
         val merged = CandidateRanking.mergePhraseCandidates(
             ranked = ranked,
@@ -220,7 +218,7 @@ class PhraseMemoryTest {
 
     @Test
     fun `synthetic candidates merge into the bar by score, no word-slots cap`() {
-        // 用戶 2026-11-12：取消詞組優先/詞區名額，合成候選按分數混排後原樣截斷。
+        // 點選和手拼均更新學習統計。
         val words = listOf("醫院", "這種", "一樣", "由於", "作者", "預約")
         val ranked = words.mapIndexed { i, w -> item(w, "ci", i) }
         val synthetics = listOf("以液難", "以液", "液難").map { synthetic(it, "ji jek nan", "8i8e4") }
@@ -274,7 +272,7 @@ class PhraseMemoryTest {
         PhraseMemory.clear()
     }
 
-    // ---------- 去重（用戶 2026-11-11 報「候選條出現重複詞條」） ----------
+    // 與引擎同文的學習詞去重且保留提升分數。
 
     @Test
     fun `learned phrase already present in engine candidates is not duplicated`() {

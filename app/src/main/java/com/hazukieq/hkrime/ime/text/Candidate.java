@@ -118,12 +118,7 @@ public class Candidate extends View {
   private int candidateViewHeight, commentHeight, candidateSpacing, candidatePadding;
   private boolean shouldShowComment = true, isCommentOnTop, candidateUseCursor;
   /**
-   * 當前這批候選是否「真的」有拼音註釋要畫。
-   *
-   * <p>只有真的有註釋才給註釋單獨留一行；否則候選條會比 12 鍵（關閉註釋）高出一行
-   * comment_height，同一台機器上 12 鍵與全字母鍵盤的候選區高度就不一致
-   * （用戶 2026-11-09：全字母鍵盤高度應該和 12 鍵一致）。hakka_qwerty 等方案沒有
-   * spelling_hints，候選 comment 全空，不該白留一行。
+   * 只在當前候選確實含 comment 時預留註釋行，避免空註釋增加候選條高度。
    */
   private boolean showCommentRow = false;
 
@@ -316,8 +311,7 @@ public class Candidate extends View {
         float wordY =
             computedCandidates.get(0).getGeometry().centerY()
                 - (candidatePaint.ascent() + candidatePaint.descent()) / 2;
-        // 有拼音註釋時整排候選詞一起讓出註釋行的高度，否則第一個候選（唯一帶註釋的）
-        // 會被壓低、與後面的字不在同一水平線（用戶 2026-11-08 指出）。
+        // 有 comment 時整排候選共同預留註釋高度，保持文字基線一致。
         if (showCommentRow) {
           wordY += isCommentOnTop ? commentHeight / 2.0f : -commentHeight / 2.0f;
         }
@@ -467,8 +461,7 @@ public class Candidate extends View {
     computedCandidates.clear();
     updateCandidates();
 
-    // 註釋行只在「真的有註釋」時才佔高度：沒有註釋的方案（hakka_qwerty 等全字母方案）
-    // 和 12 鍵候選條保持同樣高度（用戶 2026-11-09：全字母鍵盤高度要和 12 鍵一致）。
+    // 有實際 comment 時才預留註釋高度。
     showCommentRow =
         shouldShowComment
             && numCandidates > 0
@@ -554,10 +547,7 @@ public class Candidate extends View {
   }
 
   /**
-   * 固定候選欄不再滾動（用戶 2026-11-09：去掉滾動條與滾動行為）：
-   * 手指移動超過 touch slop 就整體當作「拖動」，抬手時不上屏任何候選 ——
-   * 以前左滑會被 ScrollView 當成「展開面板」手勢，誤觸率很高；
-   * 現在滑動一律忽略，只有點擊才生效。
+   * 固定候選條只接受點擊；移動超過 touch slop 視為拖動，抬手不選字。
    */
   @SuppressLint("ClickableViewAccessibility")
   @Override

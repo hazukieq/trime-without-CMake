@@ -8,12 +8,7 @@ import org.junit.BeforeClass
 import org.junit.Test
 import java.io.File
 
-/**
- * 面板「聯想詞組」行（`song g**` / `song h**`）的數據層測試（用戶 2026-11-10 要求）。
- *
- * 詞表只有詞條、沒有讀音，讀音靠 `hakka.dict.yaml` 的單字首讀音反推；
- * 這裡直接用 assets 的同一份數據驗證索引與查詢語義，避免真機上才發現「一行詞都沒有」。
- */
+/** 驗證聯想行使用兩個具體音節、首字母匹配、整串前綴與 r 後綴規則。 */
 class AssociatedWordsTest {
 
     companion object {
@@ -68,7 +63,7 @@ class AssociatedWordsTest {
 
     @Test
     fun initialsForPrefixEnumeratesDistinctInitials() {
-        // 碼段 `i` = g/h/i 開頭的音節 → 至少要能看到 g 與 h（用戶 2026-11-10 報過只有 g）。
+        // 多字母鍵必須覆蓋 g/h 等全部合法首字母。
         val initials = preedit.initialsForPrefix("i", limit = 2)
         assertEquals("i 碼應展開出兩個首字母：$initials", 2, initials.size)
         assertTrue("應包含 g：$initials", initials.contains('g'))
@@ -77,11 +72,7 @@ class AssociatedWordsTest {
 
     @Test
     fun mixedCodeMatrixKeepsAssociationRows() {
-        // 12 鍵覆蓋矩陣（用戶 2026-11-10：「你的測試用例還有問題，12鍵根本沒有覆蓋完全」）：
-        // 每個混合碼都要能出「第一段音節組 + 至少一行聯想詞」。
-        // 2026-11-11 起聯想行按**首字母序列**匹配（元音自由），行標題不再固定首音節：
-        // 例如 `5i34iwe` 的第一個碼位 `5` 給 {k,l}，聯想行可能是 `kiung than`、`kau hak`、`len he`…
-        // 所以這裡斷言「第一音節首字母落在該鍵的首字母集合裡」，不再釘死具體讀音。
+        // 聯想行按首字母匹配，標題使用具體讀音。
         val cases = mapOf(
             "5i34iwe" to setOf('k', 'l'),   // 5 → k/l
             "744ii" to setOf('p', 's'),     // 7 → p/s
@@ -108,8 +99,7 @@ class AssociatedWordsTest {
 
     @Test
     fun wordsByCodePrefixRequiresFirstSyllableFullyTyped() {
-        // 用戶 2026-11-11：`ia8i3` 面板只看到 `ga j/z*`，腳本卻列出 `gam se`——
-        // 因為 `ia` 只是 `gam`（= ia4）的第一段前綴，詞行的第一段必須是**打完的音節**。
+        // 整串詞前綴要求第一音節已打全。
         val word = "网易云"
         val firstCode = TwelveKeyPreedit.codeOf("mong")
         val fullCode = listOf("mong", "ji", "jun").joinToString("") { TwelveKeyPreedit.codeOf(it) }
@@ -124,8 +114,7 @@ class AssociatedWordsTest {
 
     @Test
     fun suffixOnlySyllableRAppearsOnlyAtWordEnd() {
-        // 用戶 2026-11-11：「关于 r，这是一个儿后缀的读音。所以它默认不做首字母拼，
-        // 只能出现在后面，这是特殊规则」。
+        // r 僅允許作末段後綴。
         val rCode = TwelveKeyPreedit.codeOf("r")
         assertTrue("r 的碼不應為空", rCode.isNotEmpty())
 
@@ -151,7 +140,7 @@ class AssociatedWordsTest {
 
     @Test
     fun associatedBySegmentCodeUsesExactSyllables() {
-        // 用戶 2026-11-10：行標題必須是兩個完整讀音（`than dung`），不能是 `than d`。
+        // 聯想選行遵守分桶和字典序規則。
         val rows = preedit.associatedBySegmentCode("than", "e", perRow = 6, maxRows = 2)
         assertTrue("應有行，實際 $rows", rows.isNotEmpty())
         for ((reading, words) in rows) {
@@ -164,13 +153,7 @@ class AssociatedWordsTest {
 
     @Test
     fun kiungPlusTheStillEmitsAssociationRows() {
-        // 用戶 2026-11-10：「kiung th d —— th 和 def 合成 the，導致什麼聯想詞都沒有」。
-        // 剩餘碼 `we` 展開不到任何音節（`we` 不是任何音節的碼前綴）→ 面板必須回退到
-        // 「該第一音節的全部後續音節」，照樣出聯想行，而不是一行都沒有。
-        //
-        // 2026-11-11 用戶改定「分桶輪轉 + 字母序 + 行數 12」：具體選中哪幾行由桶的字母序決定
-        // （`kiun bak` 這類桶排在 `kiung than` 前面），所以這裡不再釘死某一行，只釘
-        // 「有聯想行、行標題是具體兩音節、內容非空」。
+        // 空引擎仍需生成完整聯想來源。
         val groups = com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder
             .debugSegmentGroups("5i34iwe")
         val assoc = groups.filter { it.segment == 1 }
@@ -185,8 +168,7 @@ class AssociatedWordsTest {
 
     @Test
     fun kiungFollowedByThanListsCommunistParty() {
-        // 用戶 2026-11-10：打 kiung + th 想選「共產黨」三個字，但面板既沒有 than 音節、
-        // 也沒有 kiung than 這行聯想詞。這裡釘住：索引要收 3~4 字詞，並按 (第一音節, 第二音節) 命中。
+        // 聯想行配額覆蓋實際可選詞。
         val rows = preedit.associatedByReading("kiung", setOf('t'), limitPerReading = 6, maxReadings = 6)
         val thanRow = rows.firstOrNull { it.first == "than" }
         assertTrue("應有 kiung than 行，實際 ${rows.map { it.first }}", thanRow != null)
@@ -231,11 +213,7 @@ class AssociatedWordsTest {
         assertEquals("kiung than", preedit.rewrite("5i34i w\u2038", "共产", "kiung than"))
     }
 
-    /**
-     * 首條是**多字詞**、讀音段數與本地解碼不同：`5i34i` 本地切出 1 段 kiung，
-     * 但首條「理會」讀 `li voi`（2 段，5i|34i 正好吃完 5i34i）—— preedit 要顯示 `li voi`
-     * （用戶 2026-11-10 指出：只看段數相等的舊規則會把這種最常見的情況擋掉）。
-     */
+    /** 詞候選 comment 優先決定 preedit 顯示讀音。 */
     @Test
     fun rewriteUsesWordReadingWhenFirstCandidateIsAWord() {
         assertEquals("li voi", preedit.rewrite("5i34i\u2038", "理会", "li voi"))
@@ -283,14 +261,10 @@ class AssociatedWordsTest {
         assertEquals("li voi w", preedit.rewrite("5i34iw", "理會", "li voi"))
     }
 
-    /**
-     * 首要規則（用戶 2026-11-10）：「輸入的編碼一定要顯示」。
-     * 首條候選只覆蓋前面幾節時，後面沒覆蓋的節要用本地解碼補上，不能讓 preedit 比輸入短。
-     */
+    /** 首選僅覆蓋前段時，未覆蓋尾碼原樣顯示。 */
     @Test
     fun rewriteAppendsRawCodeWhenFirstCandidateCoversOnlyPart() {
-        // 用戶 2026-11-10：「comment 節數 >= 本地解碼節數 → 只用 comment；否則 comment + 原始編碼。
-        // 不要試圖去拼湊。」共產 / kiung than 之於三音節碼 → 尾巴原樣顯示未覆蓋的碼。
+        // 較長輸入不得被 preedit 渲染吞掉尾碼。
         assertEquals("kiung than e44i", preedit.rewrite("5i34iwa4e44i", "共产", "kiung than"))
     }
 
@@ -303,16 +277,8 @@ class AssociatedWordsTest {
         assertEquals("zung get nzin min 5i34ie4ie9", out)
     }
 
-    /**
-     * 用戶 2026-11-11：打 `qqqqqq`（= `999999`…）時首條會補全成一串 `qa`，但**再按的鍵會被吞**。
-     * 逐節前綴匹配：`qa` 對不上 `99…` → 每節只吃 1 個碼位；超出的那個碼位要原樣顯示。
-     */
-    /**
-     * 用戶 2026-11-12：輸入 `ha cu`（iaa3）後在面板選「下」，剩餘碼 a3 的 preedit 卻顯示 `cw 3`。
-     * 原因：首條 comment 是 `cw`（次），schema 用 `derive/w$/u/` 讓 cw 也能拼成 cu（碼 a3）；
-     * App 只按 codeOf(cw)=aw 做前綴匹配，對不上就只吃一個碼位，尾巴 `3` 被原樣補上。
-     * 編碼形成的完整音節要整節吃掉，並顯示本地解碼讀音。
-     */
+    /** 合法拼寫別名按本地完整音節消耗碼位。 */
+
     @Test
     fun rewriteConsumesWholeEncodedSyllableForDerivedSpellingAlias() {
         // 顯示仍用 comment（所見即所讀），但整個 a3 都被吃掉，不能再補一個 `3`。
@@ -334,14 +300,8 @@ class AssociatedWordsTest {
         assertEquals("qa qa qa qa qa qa", preedit.rewrite("999999\u2038", "哈哈", comment))
     }
 
-    /**
-     * 用戶 2026-11-11：打 `li nak s`（碼 `5i4a57`）時面板必須能出 `li nak si` → Linux。
-     * 舊聯想索引只按前兩音節建 key，三音節詞打到第三節就查不到。
-     */
-    /**
-     * 用戶 2026-11-11：真機 `hakka_zon.dict.yaml` 的寫法是 `Linux\tli nak si\t1000`（帶權重欄），
-     * 舊解析把權重算進最後一節 → 整串碼對不上輸入 → 面板查不到 Linux。
-     */
+    /** 帶權重詞條僅第二欄作讀音。 */
+
     @Test
     fun weightColumnInReadingDoesNotBreakLookup() {
         TwelveKeyPreedit.loadWordLines(sequenceOf("Linux\tli nak si\t1000"))
@@ -363,11 +323,7 @@ class AssociatedWordsTest {
     }
 
 
-    /**
-     * 用戶 2026-11-11 報：`5i4a57`（ki mak + 半截 `7`）只顯示 `ki mak`，尾碼被吃掉。
-     * 本地 DP 切不出完整音節（`7` 是單鍵），舊寫法算不出覆蓋長度 → 用 comment 自己的音節碼
-     * 逐節吃碼位（ki→5i、mak→4a5 = 5 個），剩下的 `7` 原樣顯示。
-     */
+    /** 未完成尾碼保留於詞候選讀音之後。 */
     @Test
     fun rewriteKeepsPartialTailAfterWordReading() {
         assertEquals("ki mak 7", preedit.rewrite("5i 4a57\u2038", "气脉", "ki mak"))
@@ -406,11 +362,7 @@ class AssociatedWordsTest {
     }
 
     /** 尾端沒有碼段（已全部選完）時回傳 null，保持 librime 原樣。 */
-    /**
-     * 用戶 2026-11-11：打 `ee5` 時 preedit/候選條顯示原始字母（dek），展開面板再關閉才變成
-     * `de 5`/`邸`。根因是「兜底」判據用了面板分組數（bar 模式下恆為空），
-     * 於是每一幀都掛 fallback。這裡釘住正確判據：只有**引擎候選為 0** 才兜底。
-     */
+    /** 僅引擎與字典都無候選時退為原字母。 */
     @Test
     fun fallbackOnlyWhenEngineHasNoCandidates() {
         val builder = com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder

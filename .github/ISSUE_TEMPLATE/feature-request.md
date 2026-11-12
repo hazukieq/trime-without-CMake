@@ -1,21 +1,20 @@
 ---
-name: Feature request
-about: Suggest an idea for this project
+name: 功能建议
+about: 提议 hkrime 的输入或开发能力改进
 title: ''
 labels: enhancement
 assignees: ''
-
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+## 使用场景
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+描述具体输入任务及当前遇到的问题。
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+## 期望行为
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+给出按键、候选、读音、点击或设置的具体示例，以及如何判断实现成功。
 
+## 影响范围
+
+说明涉及 12 键、全字母方案、主题、词库或 Native；如改变面板标题、合并、排序或上屏语义，
+明确期望规则与性能约束。

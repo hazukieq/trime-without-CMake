@@ -7,12 +7,7 @@ import org.junit.BeforeClass
 import org.junit.Test
 import java.io.File
 
-/**
- * 12 鍵**全鍵位**覆蓋（用戶 2026-11-10：「你確定測試完整 12 鍵了？比如 ng、nz 呢」）。
- *
- * 之前只挑 i/5/4/w 幾個鍵測，這次把 12 個鍵帽全部列出來，
- * 再按「鍵 × 鍵」的二元組跑組裝，保證每一種混合碼都能出單字組。
- */
+/** 驗證全鍵位段組、後綴 r、聯想配額、空引擎兜底與組合模式。 */
 class TwelveKeyCoverageTest {
 
     companion object {
@@ -75,8 +70,7 @@ class TwelveKeyCoverageTest {
 
     @Test
     fun multiLetterKeysCoverEveryAvailableInitial() {
-        // 後綴音節（兒化 `r`，用戶 2026-11-11 特殊規則）不參與首字母拼、只能落在詞尾，
-        // 所以「鍵 → 首字母覆蓋」要分兩種口徑：非結尾段不含 r，結尾段才含。
+        // 後綴 r 不作前段首字母。
         val suffixInitials = TwelveKeyPreedit.SUFFIX_ONLY_SYLLABLES.map { it.first() }.toSet()
         val multiLetter = listOf('a', 'e', 'i', '5', '4', '7', '3', '8', '9')
         for (code in multiLetter) {
@@ -149,9 +143,7 @@ class TwelveKeyCoverageTest {
 
     @Test
     fun afterPickingFirstSegmentRemainingTwoCodesCoverBothReadings() {
-        // 用戶 2026-11-10：「kiung 被選中「共」時，剩下那兩個編碼不是兩個了嗎？
-        // 每兩個處理完->遞歸」。`we` 既是完整音節 the，也要按 w|e 拆出 th* 各音節，
-        // 否則面板只剩 the 系列、常用高頻（than 等）全丟。
+        // 部分選字後應按剩餘編碼重新生成段組。
         val groups = TwelveKeySnapshotBuilder.debugSegmentGroups("we")
         val readings = groups.map { it.reading }
         println("PROBE we groups(single)=" + groups.filter { it.segment == 0 }.map { it.reading })
@@ -164,23 +156,20 @@ class TwelveKeyCoverageTest {
         // 聯想行：第二段只按首字母匹配（th* + d/e/f），行標題形如 `than d`
         val assoc = groups.filter { it.segment == 1 }
         assertTrue("we 應有首字母級聯想行（如 than d），實際 ${assoc.map { it.reading }}", assoc.isNotEmpty())
-        // 用戶 2026-11-11：分組組詞不足 20 時要完整展示，行內詞數上限 = ASSOC_WORDS（20）。
+        // 不足 20 詞的聯想行完整列出。
         val wordCap = com.hazukieq.hkrime.core.twelvekey.TwelveKeyTuning.ASSOC_WORDS
         assertTrue(
             "聯想行詞數應 ≤ $wordCap，實際 ${assoc.first().items.size}",
             assoc.first().items.size <= wordCap,
         )
-        // 總行數要收斂（用戶 2026-11-10：增補聯想組不要給太多，影響性能就截斷；
-        // 2026-11-11 分桶輪轉後預算放開到 ASSOC_BUCKET_ROW_BUDGET = ASSOC_MAX_ROWS×3）
+        // 聯想行總額遵守 ASSOC_BUCKET_ROW_BUDGET。
         val budget = com.hazukieq.hkrime.core.twelvekey.TwelveKeyTuning.ASSOC_BUCKET_ROW_BUDGET
         assertTrue("聯想行總數應 ≤$budget，實際 ${assoc.size}：${assoc.map { it.reading }}", assoc.size <= budget)
     }
 
     @Test
     fun singleLetterKeysNgNzSplitLikeOtherKeys() {
-        // ng→1、nz→y 是「單碼位 = 音節前綴」特的兩個鍵（nz 的 y 碼、ng 的 1 碼）。
-        // 用戶 2026-11-10 追問「ng、nz 你測過嗎」：這裡釘住它們與 we 同構 ——
-        // 首碼出本鍵音節族，剩餘碼交給 restCode 遞歸。
+        // ng/nz 等特殊聲母遵守相同段組規則。
         val ngGroups = TwelveKeySnapshotBuilder.debugSegmentGroups("1e")
         val nzGroups = TwelveKeySnapshotBuilder.debugSegmentGroups("ye")
         // 只看單字組（segment 0）：聯想行現在按首字母序列匹配，行標題可能是 `ga fui`/`ngen ci` 等。
@@ -205,9 +194,7 @@ class TwelveKeyCoverageTest {
 
     @Test
     fun engineEmptyFallbackPanelKeepsAssociationRows() {
-        // 用戶 2026-11-11：`ee5`（鍵面 def def kl）引擎裝不出候選，但展開面板必須照樣看到
-        // 「d·k / f·l…」這些通配聯想行（腳本 `panel ee5` 有 12 行），不能只剩 de/fe 兩個單字組。
-        // 回歸點：重構時 needDictionaryFallback 分支漏傳 includePanelOnlySources=true。
+        // 空引擎仍保留聯想、組合和整串詞來源。
         val local = TwelveKeySnapshotBuilder.Local(
             input = "ee5",
             consumedEnd = 0,
@@ -241,8 +228,7 @@ class TwelveKeyCoverageTest {
 
     @Test
     fun hybridInitialCombosKeepFullTailSyllable() {
-        // 用戶 2026-11-11：`abc abc abc mno`（碼 aaa4）要能得到「簡拼 + 完整音節」
-        // `b·cam` / `b·can`；完整音節判定走音節集合（aa4 = cam/ban/can）。
+        // 簡拼+完整末音節要產生合法組合。
         val patterns = TwelveKeyPreedit.initialPatterns("aaa4")
         assertTrue(
             "應含 b·can：${patterns.map { it.key }}",
@@ -260,9 +246,7 @@ class TwelveKeyCoverageTest {
 
     @Test
     fun associationRowAndRecommendKeepFullWordsBelowLimit() {
-        // 用戶 2026-11-11：`jen cin kung z` 的「远程控制」不能因為行內配額被擠掉——
-        // ① `jen cin` 分組的組詞不足 20 條時要完整展示（ASSOC_WORDS 已放開到 20）；
-        // ② 推薦組要按「完整碼前綴匹配」把它排到 20 條以內。
+        // 聯想配額保留符合條件的多音節目標詞。
         val code = "8e4ai4534i8"
         val local = TwelveKeySnapshotBuilder.Local(code, 0, code, "")
         val snapshot = TwelveKeySnapshotBuilder.build(

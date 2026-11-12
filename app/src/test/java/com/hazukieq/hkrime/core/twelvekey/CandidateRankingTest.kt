@@ -48,7 +48,7 @@ class CandidateRankingTest {
 
     @Test
     fun `rankBar does not put words before single chars`() {
-        // 用戶 2026-11-12：取消詞組優先，詞/單字平等競爭，順序以引擎為準。
+        // 詞與單字保留引擎順序。
         val ranked = listOf(
             item("以", index = 0),
             item("你好", index = 1),
@@ -240,12 +240,12 @@ class CandidateRankingTest {
         val engine = singles.mapIndexed { i, ch -> item(ch, comment = "ji", index = i) } +
             words.mapIndexed { i, w -> item(w, comment = "ji ji", index = 100 + i) }
         val bar = CandidateRanking.rankBar(engine, barSize = 9)
-        // 用戶 2026-11-12：取消詞組優先，候選條順序 = 引擎給的順序（這裡單字在前、詞在後）
+        // 單字在前或詞在前都不作類型分區。
         assertEquals(engine.take(9).map { it.text }, bar.map { it.text })
         assertEquals(engine.take(9).map { it.index }, bar.map { it.index })
     }
 
-    // ── orderGroups：單音節輸入時左列按常用度排（用戶 2026-11-10）───────────────
+    // 左列各檔按讀音字典序排列。
     @Test
     fun orderGroupsSortsAlphabetically() {
         val g = { reading: String, text: String, index: Int ->
@@ -260,14 +260,13 @@ class CandidateRankingTest {
         )
         val score = mapOf("阿" to 1, "家" to 99, "家加" to 50, "?" to 0)
         val ordered = CandidateRanking.orderGroups(groups, { score[it] ?: 0 }, { 0 })
-        // 單音節組按讀音字母序（a → b），詞組其次，未知讀音最後（用戶 2026-11-10 定案）
+        // 單節與多節檔各自排序。
         assertEquals(listOf("a", "b", "b a", "…"), ordered.map { it.reading })
     }
 
     @Test
     fun orderGroupsKeepsAssociationRowsInTheirOwnBucket() {
-        // 用戶 2026-11-10：「單音節排自己的，聯想詞排自己的，不要搞混」。
-        // 分檔必須是：單音節 → 聯想詞(segment=1) → 引擎詞組 → 無讀音。
+        // 不同檔位不互相混排。
         val single = CandidateRanking.groupCandidates(listOf(item("共", "kiung", 0))).first()
         val assoc = CandidateRanking.groupCandidates(listOf(item("共產黨", "kiung than", 1)))
             .first().copy(segment = 1)
@@ -308,7 +307,7 @@ class CandidateRankingTest {
 
     @Test
     fun `rankWithLearning lets single char compete equally`() {
-        // 用戶 2026-11-12：詞/單字平等競爭，學過的單字也能到最前（不再被「詞組優先」壓後）。
+        // 已學單字也能依分數提升至首位。
         val engine = listOf(
             item("里", "li", 0),
             item("理会", "li voi", 1),
@@ -351,7 +350,7 @@ class CandidateRankingTest {
 
     @Test
     fun `fullBarOrder keeps given order and dedupes texts`() {
-        // 用戶 2026-11-12：不再「全部詞 → 全部單字」分區，順序原樣保留。
+        // 混排結果只按文字去重，不另作詞/字分區。
         val ranked = listOf(
             item("以", index = 0),
             item("你好", index = 1),
@@ -387,8 +386,7 @@ class CandidateRankingTest {
 
     @Test
     fun `recommend shows words in candidate bar order then single chars`() {
-        // 引擎/學習排序裡的詞先出（候選條同一套順序），再接 App 側聯想詞行的詞；
-        // 單字最後，先取引擎單字、再補面板段組的字（用戶 2026-11-11：30 詞 + 10 單字）。
+        // 推薦詞在前，單字先引擎再段組補位。
         val engineWords = listOf(item("你好", index = 0), item("爾雅", index = 1))
         val engineSingles = listOf(item("以", index = 2), item("夜", index = 3))
         val appWords = listOf(item("掛紙", index = 10), item("下把", index = 11))
@@ -402,8 +400,7 @@ class CandidateRankingTest {
 
     @Test
     fun `recommend includes mixed CJK engine words like b站`() {
-        // 用戶 2026-11-11：逐字拼出 `b站` 後候選條有、推薦組沒有——isCjkWord 把混合詞漏掉了。
-        // 純 ASCII（Linux）仍不算引擎詞條；含漢字的混合詞要進推薦。
+        // 混合文字詞如 b站 應參與推薦詞判定。
         val engine = listOf(item("你好", index = 0), item("b站", index = 1), item("Linux", index = 2))
         val recommend = TwelveKeySnapshotBuilder.recommendWords(engine, emptyList())
         assertEquals(listOf("你好", "b站"), recommend.map { it.text })

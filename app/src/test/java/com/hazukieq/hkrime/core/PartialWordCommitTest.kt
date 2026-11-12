@@ -5,13 +5,7 @@ import org.junit.BeforeClass
 import org.junit.Test
 import java.io.File
 
-/**
- * 「詞只覆蓋輸入前幾個音節」時，上屏後要把剩餘碼重新餵回引擎。
- *
- * 用戶 2026-11-11：輸入「灵机一动来的」只上屏「灵机一动」，後面「来的」丟失。
- * 關鍵坑：剩餘碼要按「碼串前 N 個音節」算，不能用 reading→碼 前綴比對——
- * 同一個字有多讀（动 dung / tung），學習詞記的 readings 未必等於這次輸入的讀音。
- */
+/** 驗證部分選詞按實際輸入音節數扣碼，保留未選尾碼。 */
 class PartialWordCommitTest {
 
     companion object {

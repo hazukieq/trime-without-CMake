@@ -11,18 +11,9 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 /**
- * 12 鍵輸入的無 View 控制器：按鍵/上屏後重建快照，選候選時走引擎。
- *
- * 線程模型：
- * - UI 線程只做「本地部分」（input / segments / remaining，O(段數)）+ 回調 bind；
- * - 全量枚舉（≤600 條）在 [Dispatchers.Default] 上做，期間 UI 保留上一幀快照，不閃空；
- * - 所有 librime 訪問都串行化在 [ENGINE_LOCK] 上（librime session 非線程安全），
- *   鍵盤事件入口同樣持該鎖，避免「後台枚舉」與「UI 線程 process_key」並發；
- * - [generation] 防止舊的枚舉結果覆蓋新輸入。
- *
- * 所有引擎寫操作只有兩處：
- * - [selectCandidate] → Rime.select_candidate(全局下標)，引擎自己消費若干音節；
- * - [commitFallback] → clearComposition + 本地原文上屏（不學習、不入用戶詞典）。
+ * 12 鍵快照控制器。refresh 在 Default 線程持 ENGINE_LOCK 讀取狀態與構建，Main 發布。
+ * generation 丟棄過期結果；候選條枚舉 64、面板 600。refreshSync 是顯式同步入口。
+ * 選中使用引擎全局下標；部分選詞由 TextInputManager 在點擊入口攔截。
  */
 class TwelveKeyController(
     private val scope: CoroutineScope,
@@ -52,10 +43,7 @@ class TwelveKeyController(
     var segmentMode: Boolean = false
 
     /**
-     * 方案開關（簡/繁、情/聯、全/半…）的版本號。
-     *
-     * 開關一變，引擎的候選就被 filter 改寫（顏文字/聯想詞），但快照緩存鍵只看 input 與分段，
-     * 會把舊候選直接吐回來 → 用戶看到「開關按了沒反應」。所以把版本號也塞進 cacheKey。
+     * 方案開關版本號參與快照緩存鍵，filter 輸出變化時使緩存失效。
      */
     private var optionsVersion = 0
 
@@ -65,12 +53,7 @@ class TwelveKeyController(
     }
 
     /**
-     * 引擎狀態變化（選字/上屏/重新初始化）後調用：讓候選快照緩存失效。
-     *
-     * 用戶 2026-11-11 報「打 `ee5` 候選條先顯示兜底 `deek`，開關面板後才變 `邸`」：
-     * 首幀枚舉時引擎還沒給出候選（或剛被 destroy/重建），兜底快照被**寫進緩存**，
-     * 之後同一輸入直接命中緩存 → 候選條/preedit 一直停在兜底，直到面板走了另一條
-     * `full` 構建路徑才刷新。
+     * 選字、提交或重新初始化後增加引擎版本，使快照緩存失效。
      */
     fun invalidateForEngine() {
         engineVersion++
@@ -203,12 +186,8 @@ class TwelveKeyController(
     }
 
     /**
-     * 引擎原生選中。
-     *
-     * [reading] 是候選的讀音（候選條/面板的 comment）。librime 對「候選 end == 輸入長度」的條目
-     * 會直接 commit 整串（`express_editor` 的 `_auto_commit`）：實測 `5i4ii8i9934i54iei9`
-     * 選 `灵机一动` 時 input 被整串吃光，`来的` 丟失。這裡在 select 之前按讀音音節數算出
-     * 剩餘碼，若選完組合真的沒了，再把剩餘碼餵回引擎（用戶 2026-11-12：灵机一动来的 只上屏前四個字）。
+     * 按全局下標選中引擎候選並通知提交/刷新。
+     * 部分選詞必須先由 TextInputManager.holdPartialPick 攔截；本函數不在提交後補回剩餘碼。
      */
     fun selectCandidate(globalIndex: Int, reading: String = "") {
         if (globalIndex < 0) return
@@ -234,9 +213,7 @@ class TwelveKeyController(
             "select",
             "idx=$globalIndex reading='$reading' input=$inputBefore remaining=$remaining composing=${Rime.isComposing()}",
         )
-        // 注意：這裡**不做**「commit 後把剩餘碼餵回」——那會讓詞先落進編輯框，
-        // 用戶 2026-11-12 明確要求：剩餘碼沒選完時只能停在 preedit，不能上屏。
-        // 部分上屏由 TextInputManager.holdPartialPick() 在點擊入口攔掉（不調 select_candidate）。
+        // 部分選詞在點擊入口暫存到 preedit，不在引擎提交後重餵剩餘碼。
     }
 
     /** 10 鍵碼無候選時的本地兜底：清組合，直接把字母原文上屏。 */
@@ -265,7 +242,9 @@ class TwelveKeyController(
 
     private var fallbackRetryJob: Job? = null
     private var fallbackRetryCount = 0
-    /** 兜底快照後最多重試幾次：無限重試會一直搶 ENGINE_LOCK（用戶 2026-11-11：開面板變卡、點好幾次才開）。 */
+    /**
+     * 兜底重試上限，避免無限刷新持續爭搶 ENGINE_LOCK。
+     */
     private fun scheduleFallbackRetry() {
         if (fallbackRetryCount >= MAX_FALLBACK_RETRIES) return
         fallbackRetryCount++
@@ -282,9 +261,7 @@ class TwelveKeyController(
     companion object {
         /** 面板關閉時只枚舉候選條需要的條數：避免每次按鍵都全量枚舉 600 條（按鍵卡頓）。 */
         /**
-         * 候選條枚舉上限：必須與面板一致（2026-11-09 用戶反饋「展開面板後固定候選區會變」）。
-         * 之前面板關時只枚舉 16 條，開面板換成 600 條，學習排序在更大的集合裡重排，
-         * 候選條前幾名就跳了。統一成全量枚舉，兩邊永遠同一份數據。
+         * 候選條使用固定 64 條引擎窗口，面板全量構建也從此窗口計算相同的候選條。
          */
         private const val BAR_CANDIDATES = TwelveKeyTuning.BAR_CANDIDATES
         /**

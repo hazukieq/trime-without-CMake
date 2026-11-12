@@ -8,17 +8,7 @@ import org.junit.BeforeClass
 import org.junit.Test
 import java.io.File
 
-/**
- * 混合碼串的「按段拆解」覆蓋測試（用戶 2026-11-10 要求）。
- *
- * 12 鍵每個鍵送出的是**碼位**（nz→y、abc→a、kl→5…），用戶口語說的
- * `gong th t k` / `g th ti ki` 這類混打，落到碼串上是 `i44iw95`、`i5i95i` 這種。
- * 這裡直接餵碼串給 `TwelveKeyPreedit.splitFirstSyllable`，驗證：
- * 1) 逐段切分能走到底（不會中途 null 卡死）；
- * 2) 每段 head 非空、rest 嚴格變短；
- * 3) 所有 head 拼起來 == 原碼串（不丟碼、不重複）；
- * 4) 每個 head 都能查回至少一個音節（面板能出組）。
- */
+/** 驗證不同鍵碼的合法首段切法與多首字母覆蓋。 */
 class SegmentSplitTest {
 
     @Test
@@ -129,11 +119,7 @@ class SegmentSplitTest {
         }
     }
 
-    /**
-     * 用戶 2026-11-10 反饋：`ghi` 鍵（碼位 `i`，覆蓋 g/h/i）給出的單音節只有 g 開頭的。
-     * 原因：前綴命中原先只按「該音節在詞典裡的字數」排序，g 系字最多就整批佔滿；
-     * 現在改成「按首字母輪流取」，同一個鍵覆蓋的字母都要有代表。
-     */
+    /** 多字母鍵的每個首字母均有音節覆蓋。 */
     @Test
     fun multiLetterKeyCoversEveryInitial() {
         // i 覆蓋 g/h/i 三個字母
@@ -150,10 +136,7 @@ class SegmentSplitTest {
         assertTrue("4 鍵應同時有 m/n 開頭，實際=$four", four.any { it.startsWith("m") } && four.any { it.startsWith("n") })
     }
 
-    /**
-     * 用戶 2026-11-10：`744ii`（ps mno mno ghi ghi）除引擎挑中的 `son|gi`，
-     * 還要有「song + g 開頭」與「song + h 開頭」這種切法 —— splitHeads 由長到短枚舉第一段音節。
-     */
+    /** 保留不同合法第一音節切法，不只跟隨單一路徑。 */
     @Test
     fun splitHeadsEnumeratesAlternativeFirstSyllables() {
         // 744i = song（4 碼，更長更具體）先；744 = son 次之

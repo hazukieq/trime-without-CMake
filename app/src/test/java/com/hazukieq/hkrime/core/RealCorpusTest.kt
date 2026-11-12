@@ -14,18 +14,8 @@ import org.junit.Test
 import java.io.File
 
 /**
- * **真實語料**驅動的不變量測試（用戶 2026-11-11："app 端的測試用例數據我嚴重懷疑了，
- * 必須改用全部真實數據（可以從真機拿），每個用例都要盡可能考慮所有 cases"）。
- *
- * 語料不是手寫的：
- * 1. `rime-jni/host-test/pull-real-data.sh` 把真機 `/sdcard/hkrime` 的詞庫/詞表拉到
- *    `/tmp/hkrime-real-data`（就是用戶在用的那份，含自加詞條）；
- * 2. `run-host-test.sh --corpus /tmp/hkrime-corpus.jsonl` 用**真的 librime**（PC 版）把
- *    詞庫裡每個詞的碼串、簡拼、以及逐鍵前綴（打字過程的每一幀）餵進去，記錄 librime 給的
- *    原始 `preedit` 與前 40 條候選（含 comment）；
- * 3. 這裡逐條斷言 App 側 `TwelveKeyPreedit.rewrite()` / 面板分組的不變量。
- *
- * 沒有語料時自動跳過（普通 CI 不阻塞），出補丁/發佈前必須跑。
+ * 以實際 librime 生成的詞典/用戶詞庫逐鍵語料驗證 preedit、尾碼與面板不變量。
+ * 缺少任一資料檔時跳過；發佈驗收必須確認無跳過。
  */
 class RealCorpusTest {
 
@@ -44,7 +34,7 @@ class RealCorpusTest {
             File(System.getenv("HKRIME_CORPUS") ?: "/tmp/hkrime-corpus.jsonl")
         }
 
-        /** 用戶詞庫（hakka.userdb）導出的語料：用戶真打出來的音節組合（2026-11-11 要求納入）。 */
+        /** 用戶詞庫導出生成的逐鍵語料。 */
         private val userDbCorpusFile: File by lazy {
             File(System.getenv("HKRIME_CORPUS_USERDB") ?: "/tmp/hkrime-corpus-userdb.jsonl")
         }
@@ -142,13 +132,7 @@ class RealCorpusTest {
     private fun commentCodeLength(comment: List<String>): Int =
         comment.sumOf { runCatching { TwelveKeyPreedit.codeOf(it).length }.getOrDefault(0) }
 
-    /**
-     * comment 依序吃掉輸入碼多少碼位（**實現的鏡像，故意寫成第二份代碼**）：
-     * 每節先按完整碼匹配，對不上就只吃 1 個碼位（簡拼）；第一節就對不上 → 回 null 走舊的長度算法。
-     *
-     * 這條規則是為了 `9999999` / `qa qa qa qa qa qa` 這種「首條把 qa 補全了」的情況：
-     * 逐節匹配每節只吃 1 個碼位，多出來的第 7 個 `9` 必須原樣顯示（用戶 2026-11-11）。
-     */
+    /** 簡拼按實際碼位消耗，保留未覆蓋的末鍵。 */
     private fun coveredCodeLength(comment: List<String>, cleanCode: String): Int? {
         var pos = 0
         for (syllable in comment) {
@@ -176,11 +160,7 @@ class RealCorpusTest {
         return if (sum in 1..cleanCode.length) sum else cleanCode.length
     }
 
-    /**
-     * 期望的 preedit（用戶 2026-11-11 定的規則）：
-     * - comment 覆蓋的碼位 < 輸入長 → comment + 剩下的原始碼（一個字都不能少）；
-     * - 否則（簡拼/半截/剛好覆蓋）→ 只顯示 comment，不補尾巴。
-     */
+    /** 以候選讀音和實際輸入計算預期 preedit。 */
     private fun expectedPreedit(comment: List<String>, cleanCode: String): String {
         val consumed = consumedCodeLength(comment, cleanCode)
         val head = comment.joinToString(" ")
@@ -240,14 +220,7 @@ class RealCorpusTest {
             failures.isEmpty())
     }
 
-    /**
-     * 不變量 3（面板分組，按 docs/10 §15.62 的規則）：
-     * - 段組存在時，引擎裡**同讀音**的組必須並進段組（候選條上能看到的字/字母，面板同一行裡必須有）；
-     * - 引擎的詞組組（≥2 音節）與含非漢字的組必須保留；
-     * - 純漢字單音節、且與段組讀音不同的引擎組，按設計丟掉（避免左列被幾十行灌滿）——丟掉的必須
-     *   確實不屬於任何段組讀音；
-     * - 讀音不重複（一個讀音只有一行）。
-     */
+    /** 引擎組通過同一合併規則，保留多音節與非漢字候選。 */
     @Test
     fun engineRowsFollowMergeAndDropRules() {
         val failures = ArrayList<String>()

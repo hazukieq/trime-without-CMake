@@ -105,12 +105,7 @@ class SyllableGroupCountTest {
         return out
     }
 
-    /**
-     * 與 `TwelveKeyPreedit.syllablesForSegment` 同規則（用戶 2026-11-10 定案）：
-     * - 精確碼的音節排最前；
-     * - 前綴命中的音節**按首字母分桶**，桶內按詞頻降序，桶間輪轉；
-     * - [limit] 是**每個首字母**的名額，總數上限 [MAX_TOTAL]（=16）。
-     */
+    /** 面板配額需維持多首字母音節覆蓋。 */
     private fun syllablesForSegment(
         code: String,
         limit: Int,
@@ -198,22 +193,11 @@ class SyllableGroupCountTest {
         }
     }
 
-    /**
-     * 選定的常數：面板左列**每個首字母**最多列 8 個高頻音節組（多首字母合計上限 16）。
-     *
-     * 依據（見上面打印的表，12 個首碼的實測）：
-     * - 一屏可見 6 行，8 組 = 一屏 + 兩行滾動；
-     * - 「每個首字母 8 個」實測：平均覆蓋 55.3%、最低首碼 44.9%（舊的「總數 8」只有 44.2% / 28.8%）；
-     *   往上再給到 10/12 只多 2–4 個百分點，收益遞減；
-     * - 剩下的音節基本是生僻讀音，且用戶可以「繼續打碼」精確化，不必全羅列
-     *   （用戶 2026-11-10：「不可能每個首字母的所有組合都羅列」）。
-     * 若日後字表/詞典變化很大，跑這個測試看錶再改常數即可。
-     */
+    /** 普通鍵上限 16，豐富鍵上限 24。 */
     @Test
     fun `segment syllable limit is 16 or 24 for rich codes`() {
         load()
-        // 用戶 2026-11-10：有段組時，一個編碼給出的音節上限 16；音節構成很豐富的（可用 > 16）給 24。
-        // 2026-11-10 起這些配額集中在 TwelveKeyTuning（用戶要求常數好找好改）
+        // 檢查產品配額集中定義於 TwelveKeyTuning。
         val tuningSource = File("src/main/java/com/hazukieq/hkrime/core/twelvekey/TwelveKeyTuning.kt")
             .readText()
         assertTrue(

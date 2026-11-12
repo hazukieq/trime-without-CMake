@@ -92,7 +92,7 @@ class CandidateGroupAdapter(
             )
         }
         val bar = android.view.View(context).apply {
-            // 選中豎線佔滿整行高度（用戶 2026-11-09：之前只有 42% 高、上下留空，「太難看」）
+            // 選中指示線佔滿整行高度。
             layoutParams = LinearLayout.LayoutParams(barWidth, rowHeight).apply {
                 marginStart = dp(6f)
             }
@@ -124,8 +124,7 @@ class CandidateGroupAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = getItem(position)
-        // 多音節讀音（`son gi`、聯想詞行的 `song gong`）用小一號字 + 省略號，
-        // 不用跑馬燈：跑馬燈滾起來像亂碼，而且會讓「左列這行到底是什麼」更難讀（用戶 2026-11-10）。
+        // 多音節標題使用小字號與省略號，不啟用跑馬燈。
         val multiSyllable = item.reading.count { it == ' ' } >= 1
         holder.text.isSelected = false
         holder.text.ellipsize = TextUtils.TruncateAt.END
@@ -145,7 +144,7 @@ class CandidateGroupAdapter(
         (holder.bar.background as GradientDrawable).setColor(
             if (item.selected) barColor else Color.TRANSPARENT,
         )
-        // 推薦組（候選條放不下的續頁）沒有讀音，左列顯示「推荐」；其餘照舊顯示拼音。
+        // 推薦組無讀音時顯示“推荐”，其它行顯示具體讀音。
         val label = if (item.reading.isBlank()) "推荐" else item.reading
         holder.text.text = label
         holder.text.setTextColor(
