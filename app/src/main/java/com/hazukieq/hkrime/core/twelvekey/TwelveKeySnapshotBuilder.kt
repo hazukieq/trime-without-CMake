@@ -212,6 +212,26 @@ object TwelveKeySnapshotBuilder {
         // 有 segmentAnchor（剛上屏的前一個字）時，與它關聯度高的字排前面。
         // 只剩最後一段時，用引擎候選（引擎本身按詞頻/用戶詞庫排序）再疊用戶關聯度，
         // 而不是繼續用字典順序 —— 否則「最後一個字」看起來完全不受詞頻影響（用戶 2026-11-09 反饋）。
+        // 候選條永遠只從「前 [TwelveKeyTuning.BAR_CANDIDATES] 條引擎候選」算：
+        // 展開面板時枚舉 600 條，若拿全量再排序，學習詞的「引擎已有同文條目」判定會變
+        // （第 65 條之後才出現的詞，限流時被當成合成候選插到前面，全量時留在原位）
+        // → 同一輸入開面板前後候選條會變（用戶 2026-11-12 報）。
+        // 用同一份窗口算 ranked/merge，兩條路徑的候選條才是同一份。
+        val barOrdered = if (wantGroups && flat.size > TwelveKeyTuning.BAR_CANDIDATES) {
+            val window = flat.subList(0, TwelveKeyTuning.BAR_CANDIDATES)
+            val rankedBar = if (applyLearning && SelectionMemory.hasAny()) {
+                CandidateRanking.rankWithLearning(window) { SelectionMemory.score(it.text, it.comment) }
+            } else {
+                window
+            }
+            if (applyLearning) {
+                mergeLearnedPhrases(rankedBar, PhraseMemory.normalizeCode(input), System.currentTimeMillis())
+            } else {
+                rankedBar
+            }
+        } else {
+            ordered
+        }
         val barEntries = if (ordered.isEmpty() && panelRows.isNotEmpty()) {
             // 字典兜底：取「第一待選段」的音節組候選（與面板左列第 0 組同源），最多候選條格數。
             dictionaryRows
@@ -219,7 +239,7 @@ object TwelveKeySnapshotBuilder {
                 .distinctBy { it.text }
                 .take(TwelveKeyTuning.BAR_ITEMS)
         } else {
-            barList(ordered)
+            barList(barOrdered)
         }
         // 面板左列第一個「推薦」組 = 聯想詞 + 單字（用戶 2026-11-11 改定：40 個 = 30 詞 + 10 單字）：
         // 詞收聯想詞行（ASSOC / INITIAL_COMBO / WHOLE_WORD / 引擎詞組）裡出現的詞，

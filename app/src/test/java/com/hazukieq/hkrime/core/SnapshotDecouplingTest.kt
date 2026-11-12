@@ -1,7 +1,9 @@
 package com.hazukieq.hkrime.core
 
 import com.hazukieq.hkrime.core.twelvekey.CandidateItem
+import com.hazukieq.hkrime.core.twelvekey.PhraseMemory
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder
+import com.hazukieq.hkrime.core.twelvekey.TwelveKeyTuning
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -72,6 +74,47 @@ class SnapshotDecouplingTest {
         assertNull("有候選就不該兜底（bar）", bar.fallback)
         assertNull("有候選就不該兜底（full）", full.fallback)
         assertTrue("full 模式必須建出分組", full.groups.isNotEmpty())
+    }
+
+    /**
+     * 用戶 2026-11-12：「展開面板又影響到了固定候選條的候選詞變更」。
+     *
+     * 學習詞在引擎候選裡排第 70 條：限流只枚舉 64 條時，它會被當成「引擎沒有的合成候選」
+     * 插到候選條前面；開面板枚舉 600 條時它已在引擎候選裡、留在原位 → 候選條前後不一致。
+     * 修法：候選條一律從「前 BAR_CANDIDATES 條」算，與面板全量解耦。
+     */
+    @Test
+    fun barIsUnaffectedByFullPanelEnumeration() {
+        PhraseMemory.clear()
+        val code = "5i34i"
+        val learned = "学习词"
+        repeat(3) { PhraseMemory.learnPick(code, learned, "li voi") }
+        val candidates = (0 until 80).map { i ->
+            if (i == 70) CandidateItem(learned, "li voi", i)
+            else CandidateItem("候选$i", "li voi", i)
+        }
+        val bar = TwelveKeySnapshotBuilder.build(
+            local(code),
+            maxCandidates = TwelveKeyTuning.BAR_CANDIDATES,
+            applyLearning = true,
+            wantGroups = false,
+            candidatesOverride = candidates,
+        )
+        val full = TwelveKeySnapshotBuilder.build(
+            local(code),
+            maxCandidates = TwelveKeyTuning.MAX_CANDIDATES,
+            applyLearning = true,
+            wantGroups = true,
+            candidatesOverride = candidates,
+        )
+        assertEquals(
+            "候選條不能因展開面板（枚舉 600）而變：bar=${bar.barEntries.map { it.text }} " +
+                "full=${full.barEntries.map { it.text }}",
+            bar.barEntries.map { it.text },
+            full.barEntries.map { it.text },
+        )
+        assertEquals("previewText 也要一致", bar.previewText, full.previewText)
+        PhraseMemory.clear()
     }
 
     /**
