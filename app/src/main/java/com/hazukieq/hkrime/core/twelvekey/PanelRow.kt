@@ -105,10 +105,11 @@ internal fun collapsePrefixRows(rows: List<PanelRow>): List<PanelRow> {
     fun tokens(row: PanelRow) = row.reading.split(' ').filter { it.isNotBlank() }
 
     val out = ArrayList<PanelRow>(rows.size)
-    // 1) 單音節/無讀音行原樣保留（順序不變）
-    rows.forEach { if (tokens(it).size < 2) out.add(it) }
+    // 1) 單音節/無讀音行原樣保留（順序不變）；學習詞行不參與前綴收斂，
+    //    否則 `bi cam`（B站）會被更長的組合行吸收，推薦組與面板都看不到。
+    rows.forEach { if (tokens(it).size < 2 || it.hasUserWord) out.add(it) }
     // 2) 多音節行按音節數從短到長處理：短的先就位，長的才有前綴可並
-    rows.filter { tokens(it).size >= 2 }
+    rows.filter { tokens(it).size >= 2 && !it.hasUserWord }
         .sortedBy { tokens(it).size }
         .forEach { row ->
             val rowTokens = tokens(row)
@@ -116,7 +117,9 @@ internal fun collapsePrefixRows(rows: List<PanelRow>): List<PanelRow> {
             var bestLen = 0
             out.forEachIndexed { index, candidate ->
                 val candidateTokens = tokens(candidate)
-                if (candidateTokens.size < 2 || candidateTokens.size >= rowTokens.size) {
+                if (candidateTokens.size < 2 || candidateTokens.size >= rowTokens.size ||
+                    candidate.hasUserWord
+                ) {
                     return@forEachIndexed
                 }
                 if (rowTokens.take(candidateTokens.size) == candidateTokens &&
@@ -173,13 +176,26 @@ internal fun tierAndSort(rows: List<PanelRow>): List<PanelRow> = rows.sortedWith
  */
 internal fun capRows(rows: List<PanelRow>, maxRows: Int = TwelveKeyTuning.MAX_GROUPS): List<PanelRow> {
     if (rows.size <= maxRows) return rows
-    val appSideCount = rows.count { RowSource.INITIAL_COMBO !in it.sources }
-    val comboBudget = (maxRows - appSideCount).coerceAtLeast(0)
-    var comboUsed = 0
+    // 引擎只是候選窗口，App 源（段組/聯想/首字母組合/整串詞行）才是面板的補充。
+    // 超額時先裁引擎行：否則長輸入的 200 條引擎詞會把四鍵組合行整批擠掉。
+    val appSide = rows.filter { RowSource.ENGINE !in it.sources }
+    if (appSide.size >= maxRows) {
+        // 極端情況：App 源自身就超額，才按舊規則壓縮 INITIAL_COMBO 行後截斷。
+        val comboBudget = (maxRows - appSide.count { RowSource.INITIAL_COMBO !in it.sources }).coerceAtLeast(0)
+        var comboUsed = 0
+        return appSide.filter { row ->
+            if (RowSource.INITIAL_COMBO !in row.sources) return@filter true
+            if (comboUsed >= comboBudget) return@filter false
+            comboUsed++
+            true
+        }.take(maxRows)
+    }
+    val engineBudget = maxRows - appSide.size
+    var engineUsed = 0
     return rows.filter { row ->
-        if (RowSource.INITIAL_COMBO !in row.sources) return@filter true
-        if (comboUsed >= comboBudget) return@filter false
-        comboUsed++
+        if (RowSource.ENGINE !in row.sources) return@filter true
+        if (engineUsed >= engineBudget) return@filter false
+        engineUsed++
         true
-    }.take(maxRows)
+    }
 }

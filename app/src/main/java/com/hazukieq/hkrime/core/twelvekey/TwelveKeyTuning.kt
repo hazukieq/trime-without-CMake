@@ -31,9 +31,16 @@ object TwelveKeyTuning {
     const val SEGMENT_CHARS_LIMIT = 1000
 
     /**
-     * 推薦組最多 30 詞；調大增加可見詞與刷新成本，調小減少推薦覆蓋。
+     * 推薦組詞數配額：2 字 / 3 字 / 4 字及以上各 10，合計 30。
+     * 某一档不足时由其余档按出现顺序补满；调大增加刷新成本，调小减少覆盖。
      */
-    const val RECOMMEND_WORDS = 30
+    const val RECOMMEND_WORDS_TWO = 10
+    const val RECOMMEND_WORDS_THREE = 10
+    const val RECOMMEND_WORDS_FOUR_PLUS = 10
+
+    /** 推薦組最多 30 詞（三档配额之和）。 */
+    const val RECOMMEND_WORDS =
+        RECOMMEND_WORDS_TWO + RECOMMEND_WORDS_THREE + RECOMMEND_WORDS_FOUR_PLUS
 
     /**
      * 推薦組最多 10 單字，先引擎候選再段組補位；調大增加候選與滾動，調小減少覆蓋。

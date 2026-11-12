@@ -213,8 +213,8 @@ class TwelveKeyCoverageTest {
             assoc.isNotEmpty(),
         )
         assertTrue(
-            "聯想行標題必須是兩個完整音節：${assoc.map { it.reading }}",
-            assoc.all { it.reading.split(' ').size == 2 },
+            "詞行標題必須是完整音節（不得含空 token）：${assoc.map { it.reading }}",
+            assoc.all { row -> row.reading.split(' ').let { it.size >= 2 && it.all(String::isNotBlank) } },
         )
         assertTrue("推薦組應有聯想詞", snapshot.recommend.isNotEmpty())
         assertTrue(

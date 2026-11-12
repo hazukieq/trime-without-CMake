@@ -2288,7 +2288,56 @@
           ]
         }
       ],
-      "combo": [],
+      "combo": [
+        {
+          "reading": "gi bui jau",
+          "items": [
+            "举杯邀"
+          ]
+        },
+        {
+          "reading": "gai bong zia",
+          "items": [
+            "解放者"
+          ]
+        },
+        {
+          "reading": "ga ca jen",
+          "items": [
+            "加查县"
+          ]
+        },
+        {
+          "reading": "ga ca zia",
+          "items": [
+            "驾车者"
+          ]
+        },
+        {
+          "reading": "ha ban ja",
+          "items": [
+            "下半夜"
+          ]
+        },
+        {
+          "reading": "ha bui zw",
+          "items": [
+            "下辈子"
+          ]
+        },
+        {
+          "reading": "ha cok ji",
+          "items": [
+            "下着雨"
+          ]
+        },
+        {
+          "reading": "ha cw zai",
+          "items": [
+            "下次再"
+          ]
+        }
+      ],
       "whole_word": [
         {
           "reading": "ga zi",
@@ -2589,10 +2638,31 @@
         ]
       },
       {
+        "reading": "ga ca jen",
+        "segment": 1,
+        "items": [
+          "加查县"
+        ]
+      },
+      {
+        "reading": "ga ca zia",
+        "segment": 1,
+        "items": [
+          "驾车者"
+        ]
+      },
+      {
         "reading": "ga zi",
         "segment": 1,
         "items": [
           "挂纸"
+        ]
+      },
+      {
+        "reading": "gai bong zia",
+        "segment": 1,
+        "items": [
+          "解放者"
         ]
       },
       {
@@ -2726,6 +2796,13 @@
         ]
       },
       {
+        "reading": "gi bui jau",
+        "segment": 1,
+        "items": [
+          "举杯邀"
+        ]
+      },
+      {
         "reading": "gin zi",
         "segment": 1,
         "items": [
@@ -2749,6 +2826,34 @@
           "经济困难",
           "经济圈",
           "经济型"
+        ]
+      },
+      {
+        "reading": "ha ban ja",
+        "segment": 1,
+        "items": [
+          "下半夜"
+        ]
+      },
+      {
+        "reading": "ha bui zw",
+        "segment": 1,
+        "items": [
+          "下辈子"
+        ]
+      },
+      {
+        "reading": "ha cok ji",
+        "segment": 1,
+        "items": [
+          "下着雨"
+        ]
+      },
+      {
+        "reading": "ha cw zai",
+        "segment": 1,
+        "items": [
+          "下次再"
         ]
       },
       {
@@ -3018,7 +3123,56 @@
           ]
         }
       ],
-      "combo": [],
+      "combo": [
+        {
+          "reading": "goi but jiu gi",
+          "items": [
+            "盖不由己"
+          ]
+        },
+        {
+          "reading": "giau bin zi ge",
+          "items": [
+            "骄兵之计"
+          ]
+        },
+        {
+          "reading": "gau cit jen gau",
+          "items": [
+            "高职院校"
+          ]
+        },
+        {
+          "reading": "gi cu ji hok",
+          "items": [
+            "基础医学"
+          ]
+        },
+        {
+          "reading": "gon ciang zang git",
+          "items": [
+            "干净整洁"
+          ]
+        },
+        {
+          "reading": "get cuk zi heu",
+          "items": [
+            "结束之后"
+          ]
+        },
+        {
+          "reading": "hang but jiu gin",
+          "items": [
+            "行不由径"
+          ]
+        },
+        {
+          "reading": "heu ca zi gai",
+          "items": [
+            "后车之戒"
+          ]
+        }
+      ],
       "whole_word": [
         {
           "reading": "ga zi",
@@ -3353,6 +3507,48 @@
         ]
       },
       {
+        "reading": "gau cit jen gau",
+        "segment": 1,
+        "items": [
+          "高职院校"
+        ]
+      },
+      {
+        "reading": "get cuk zi heu",
+        "segment": 1,
+        "items": [
+          "结束之后"
+        ]
+      },
+      {
+        "reading": "gi cu ji hok",
+        "segment": 1,
+        "items": [
+          "基础医学"
+        ]
+      },
+      {
+        "reading": "giau bin zi ge",
+        "segment": 1,
+        "items": [
+          "骄兵之计"
+        ]
+      },
+      {
+        "reading": "goi but jiu gi",
+        "segment": 1,
+        "items": [
+          "盖不由己"
+        ]
+      },
+      {
+        "reading": "gon ciang zang git",
+        "segment": 1,
+        "items": [
+          "干净整洁"
+        ]
+      },
+      {
         "reading": "ha ji",
         "segment": 1,
         "items": [
@@ -3374,6 +3570,20 @@
           "下旨",
           "下肢",
           "下至"
+        ]
+      },
+      {
+        "reading": "hang but jiu gin",
+        "segment": 1,
+        "items": [
+          "行不由径"
+        ]
+      },
+      {
+        "reading": "heu ca zi gai",
+        "segment": 1,
+        "items": [
+          "后车之戒"
         ]
       }
     ]
@@ -15038,7 +15248,57 @@
           ]
         }
       ],
-      "combo": [],
+      "combo": [
+        {
+          "reading": "ja kiu ken",
+          "items": [
+            "野球拳"
+          ]
+        },
+        {
+          "reading": "ja kung li",
+          "items": [
+            "夜空里"
+          ]
+        },
+        {
+          "reading": "ja li ki",
+          "items": [
+            "耶利奇",
+            "耶里奇"
+          ]
+        },
+        {
+          "reading": "jau lam li",
+          "items": [
+            "摇篮里"
+          ]
+        },
+        {
+          "reading": "zai kon kon",
+          "items": [
+            "再看看"
+          ]
+        },
+        {
+          "reading": "zai kak liong",
+          "items": [
+            "载客量"
+          ]
+        },
+        {
+          "reading": "zam liang ki",
+          "items": [
+            "占领区"
+          ]
+        },
+        {
+          "reading": "ze lang liong",
+          "items": [
+            "制冷量"
+          ]
+        }
+      ],
       "whole_word": [],
       "isolated": [
         {
@@ -16266,6 +16526,35 @@
         ]
       },
       {
+        "reading": "ja kiu ken",
+        "segment": 1,
+        "items": [
+          "野球拳"
+        ]
+      },
+      {
+        "reading": "ja kung li",
+        "segment": 1,
+        "items": [
+          "夜空里"
+        ]
+      },
+      {
+        "reading": "ja li ki",
+        "segment": 1,
+        "items": [
+          "耶利奇",
+          "耶里奇"
+        ]
+      },
+      {
+        "reading": "jau lam li",
+        "segment": 1,
+        "items": [
+          "摇篮里"
+        ]
+      },
+      {
         "reading": "ji ki",
         "segment": 1,
         "items": [
@@ -16417,6 +16706,34 @@
           "由其",
           "由区",
           "邮区"
+        ]
+      },
+      {
+        "reading": "zai kak liong",
+        "segment": 1,
+        "items": [
+          "载客量"
+        ]
+      },
+      {
+        "reading": "zai kon kon",
+        "segment": 1,
+        "items": [
+          "再看看"
+        ]
+      },
+      {
+        "reading": "zam liang ki",
+        "segment": 1,
+        "items": [
+          "占领区"
+        ]
+      },
+      {
+        "reading": "ze lang liong",
+        "segment": 1,
+        "items": [
+          "制冷量"
         ]
       },
       {
@@ -17338,9 +17655,52 @@
       ],
       "combo": [
         {
-          "reading": "ma long kong",
+          "reading": "met kiun ki",
           "items": [
-            "马螂狂"
+            "灭菌器"
+          ]
+        },
+        {
+          "reading": "mai kai lin",
+          "items": [
+            "迈凯轮"
+          ]
+        },
+        {
+          "reading": "ma li ket",
+          "items": [
+            "马利克"
+          ]
+        },
+        {
+          "reading": "ma li lan",
+          "items": [
+            "马里兰"
+          ]
+        },
+        {
+          "reading": "nap kai ki",
+          "items": [
+            "纳溪区"
+          ]
+        },
+        {
+          "reading": "nam ka lo",
+          "items": [
+            "南卡罗"
+          ]
+        },
+        {
+          "reading": "nau lit ken",
+          "items": [
+            "脑力健",
+            "脑力键"
+          ]
+        },
+        {
+          "reading": "nga loi liau",
+          "items": [
+            "我来了"
           ]
         }
       ],
@@ -18246,10 +18606,31 @@
         ]
       },
       {
-        "reading": "ma long kong",
+        "reading": "ma li ket",
         "segment": 1,
         "items": [
-          "马螂狂"
+          "马利克"
+        ]
+      },
+      {
+        "reading": "ma li lan",
+        "segment": 1,
+        "items": [
+          "马里兰"
+        ]
+      },
+      {
+        "reading": "mai kai lin",
+        "segment": 1,
+        "items": [
+          "迈凯轮"
+        ]
+      },
+      {
+        "reading": "met kiun ki",
+        "segment": 1,
+        "items": [
+          "灭菌器"
         ]
       },
       {
@@ -18365,6 +18746,35 @@
           "物理系",
           "物理诊断",
           "物理试题"
+        ]
+      },
+      {
+        "reading": "nam ka lo",
+        "segment": 1,
+        "items": [
+          "南卡罗"
+        ]
+      },
+      {
+        "reading": "nap kai ki",
+        "segment": 1,
+        "items": [
+          "纳溪区"
+        ]
+      },
+      {
+        "reading": "nau lit ken",
+        "segment": 1,
+        "items": [
+          "脑力健",
+          "脑力键"
+        ]
+      },
+      {
+        "reading": "nga loi liau",
+        "segment": 1,
+        "items": [
+          "我来了"
         ]
       },
       {
@@ -18768,7 +19178,56 @@
           ]
         }
       ],
-      "combo": [],
+      "combo": [
+        {
+          "reading": "piang min gu get",
+          "items": [
+            "病民蛊国"
+          ]
+        },
+        {
+          "reading": "pin men gi ho",
+          "items": [
+            "平面几何"
+          ]
+        },
+        {
+          "reading": "piang min hoi get",
+          "items": [
+            "病民害国"
+          ]
+        },
+        {
+          "reading": "pak nzit gen gui",
+          "items": [
+            "白日见鬼"
+          ]
+        },
+        {
+          "reading": "puk nzi ga ho",
+          "items": [
+            "伏尔加河"
+          ]
+        },
+        {
+          "reading": "sit mi gen gi",
+          "items": [
+            "识微见几"
+          ]
+        },
+        {
+          "reading": "sip mi giu hong",
+          "items": [
+            "十米九糠"
+          ]
+        },
+        {
+          "reading": "sin nzin gau gau",
+          "items": [
+            "成人高校"
+          ]
+        }
+      ],
       "whole_word": [],
       "isolated": [
         {
@@ -19023,6 +19482,13 @@
         ]
       },
       {
+        "reading": "pak nzit gen gui",
+        "segment": 1,
+        "items": [
+          "白日见鬼"
+        ]
+      },
+      {
         "reading": "pan gung",
         "segment": 1,
         "items": [
@@ -19060,6 +19526,20 @@
         ]
       },
       {
+        "reading": "piang min gu get",
+        "segment": 1,
+        "items": [
+          "病民蛊国"
+        ]
+      },
+      {
+        "reading": "piang min hoi get",
+        "segment": 1,
+        "items": [
+          "病民害国"
+        ]
+      },
+      {
         "reading": "pin go",
         "segment": 1,
         "items": [
@@ -19078,6 +19558,13 @@
           "苹果酒",
           "苹果醋",
           "萍果"
+        ]
+      },
+      {
+        "reading": "pin men gi ho",
+        "segment": 1,
+        "items": [
+          "平面几何"
         ]
       },
       {
@@ -19103,6 +19590,13 @@
           "符合",
           "符合国家",
           "符合条件"
+        ]
+      },
+      {
+        "reading": "puk nzi ga ho",
+        "segment": 1,
+        "items": [
+          "伏尔加河"
         ]
       },
       {
@@ -19193,6 +19687,27 @@
           "神学",
           "神学家",
           "神学院"
+        ]
+      },
+      {
+        "reading": "sin nzin gau gau",
+        "segment": 1,
+        "items": [
+          "成人高校"
+        ]
+      },
+      {
+        "reading": "sip mi giu hong",
+        "segment": 1,
+        "items": [
+          "十米九糠"
+        ]
+      },
+      {
+        "reading": "sit mi gen gi",
+        "segment": 1,
+        "items": [
+          "识微见几"
         ]
       },
       {
@@ -19485,7 +20000,56 @@
           ]
         }
       ],
-      "combo": [],
+      "combo": [
+        {
+          "reading": "dan dau kiu",
+          "items": [
+            "单刀球"
+          ]
+        },
+        {
+          "reading": "dai dung liau",
+          "items": [
+            "带动了"
+          ]
+        },
+        {
+          "reading": "dang fu ki",
+          "items": [
+            "鼎湖区"
+          ]
+        },
+        {
+          "reading": "da fu lu",
+          "items": [
+            "打呼噜"
+          ]
+        },
+        {
+          "reading": "fa du ki",
+          "items": [
+            "花都区"
+          ]
+        },
+        {
+          "reading": "fat dau lau",
+          "items": [
+            "活到老"
+          ]
+        },
+        {
+          "reading": "fa fui koi",
+          "items": [
+            "花会开"
+          ]
+        },
+        {
+          "reading": "fa fui liau",
+          "items": [
+            "花费了"
+          ]
+        }
+      ],
       "whole_word": [],
       "isolated": []
     },
@@ -19502,6 +20066,34 @@
         "segment": 0,
         "items": [
           "奊"
+        ]
+      },
+      {
+        "reading": "da fu lu",
+        "segment": 1,
+        "items": [
+          "打呼噜"
+        ]
+      },
+      {
+        "reading": "dai dung liau",
+        "segment": 1,
+        "items": [
+          "带动了"
+        ]
+      },
+      {
+        "reading": "dan dau kiu",
+        "segment": 1,
+        "items": [
+          "单刀球"
+        ]
+      },
+      {
+        "reading": "dang fu ki",
+        "segment": 1,
+        "items": [
+          "鼎湖区"
         ]
       },
       {
@@ -19597,6 +20189,34 @@
           "动力电池",
           "动力设备",
           "动力车"
+        ]
+      },
+      {
+        "reading": "fa du ki",
+        "segment": 1,
+        "items": [
+          "花都区"
+        ]
+      },
+      {
+        "reading": "fa fui koi",
+        "segment": 1,
+        "items": [
+          "花会开"
+        ]
+      },
+      {
+        "reading": "fa fui liau",
+        "segment": 1,
+        "items": [
+          "花费了"
+        ]
+      },
+      {
+        "reading": "fat dau lau",
+        "segment": 1,
+        "items": [
+          "活到老"
         ]
       },
       {
@@ -19785,7 +20405,14 @@
           ]
         }
       ],
-      "combo": [],
+      "combo": [
+        {
+          "reading": "ka det lo fu",
+          "items": [
+            "卡德罗夫"
+          ]
+        }
+      ],
       "whole_word": [],
       "isolated": [
         {
@@ -20041,6 +20668,13 @@
           "砺",
           "蛎",
           "嘞"
+        ]
+      },
+      {
+        "reading": "ka det lo fu",
+        "segment": 1,
+        "items": [
+          "卡德罗夫"
         ]
       },
       {
@@ -21040,7 +21674,14 @@
           ]
         }
       ],
-      "combo": [],
+      "combo": [
+        {
+          "reading": "sak teu zen dau bu",
+          "items": [
+            "石头剪刀布"
+          ]
+        }
+      ],
       "whole_word": [],
       "isolated": [
         {
@@ -22119,6 +22760,13 @@
           "普通高校",
           "普通高等",
           "普通高考"
+        ]
+      },
+      {
+        "reading": "sak teu zen dau bu",
+        "segment": 1,
+        "items": [
+          "石头剪刀布"
         ]
       },
       {

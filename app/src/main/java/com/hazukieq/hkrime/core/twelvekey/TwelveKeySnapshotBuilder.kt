@@ -555,7 +555,13 @@ object TwelveKeySnapshotBuilder {
         val seen = HashSet<String>()
         // 兩輪：第一輪每個組合先出第 1 行（保證「g·b / g·c / h·b / h·c」都有代表），
         // 第二輪再給每個組合補第 2 行。節奏由 INITIAL_COMBO_ROWS_PER_PATTERN 控制。
-        val entriesByCombo = combos.map { TwelveKeyPreedit.wordsByPattern(it) }
+        // 每個組合內若某讀音含學習詞，優先出這一行：否則資產詞表的長尾讀音
+        // （如 `b|cam` 的 `bau cam`）會把學習詞讀音 `bi cam` 擠出組合行上限。
+        val entriesByCombo = combos.map { pattern ->
+            TwelveKeyPreedit.wordsByPattern(pattern).sortedByDescending { hit ->
+                hit.second.any { TwelveKeyPreedit.isLearnedWord(it) }
+            }
+        }
         for (round in 0 until 2) {
             val start = round * INITIAL_COMBO_ROWS_PER_PATTERN
             val stop = start + INITIAL_COMBO_ROWS_PER_PATTERN
@@ -988,13 +994,14 @@ object TwelveKeySnapshotBuilder {
         code: String = "",
     ): List<CandidateItem> {
         // 推薦組配額為 30 詞+10 單字，詞在前、單字在後。
+        // 詞再按字數分三档：2 字 / 3 字 / 4 字及以上，各 10 個；某档不夠由其餘档按順序補滿。
         val seen = HashSet<String>()
-        val words = ArrayList<CandidateItem>(TwelveKeyTuning.RECOMMEND_WORDS)
+        val wordCandidates = ArrayList<CandidateItem>(TwelveKeyTuning.RECOMMEND_WORDS * 2)
         val chars = ArrayList<CandidateItem>(TwelveKeyTuning.RECOMMEND_CHARS)
 
         fun addWord(item: CandidateItem) {
             if (item.text.isEmpty() || !seen.add(item.text)) return
-            if (words.size < TwelveKeyTuning.RECOMMEND_WORDS) words.add(item)
+            wordCandidates.add(item)
         }
 
         fun addChar(item: CandidateItem) {
@@ -1002,6 +1009,13 @@ object TwelveKeySnapshotBuilder {
             if (chars.size < TwelveKeyTuning.RECOMMEND_CHARS) chars.add(item)
         }
 
+        // 學習詞（面板 hasUserWord 行）優先：用戶點過的字詞不能被字數配額擠掉。
+        panelRows.forEach { row ->
+            if (row.segment != 1 || !row.hasUserWord) return@forEach
+            row.items.forEach { item ->
+                if (CandidateRanking.isWordLike(item.text)) addWord(item)
+            }
+        }
         CandidateRanking.fullBarOrder(engineCandidates).forEach { item ->
             when {
                 // 純漢字詞與混合詞（`b站`）都算詞條；純 ASCII 引擎候選仍不進推薦（見 isWordLike）。
@@ -1024,6 +1038,32 @@ object TwelveKeySnapshotBuilder {
         }
         matched.forEach(::addWord)
         others.forEach(::addWord)
+        // 按字數分档選詞：2 字 / 3 字 / 4+ 字各取配額，保序；不足時用剩餘候選補滿總數。
+        val quotas = intArrayOf(
+            TwelveKeyTuning.RECOMMEND_WORDS_TWO,
+            TwelveKeyTuning.RECOMMEND_WORDS_THREE,
+            TwelveKeyTuning.RECOMMEND_WORDS_FOUR_PLUS,
+        )
+        val picked = IntArray(3)
+        val words = ArrayList<CandidateItem>(TwelveKeyTuning.RECOMMEND_WORDS)
+        val overflow = ArrayList<CandidateItem>(wordCandidates.size)
+        wordCandidates.forEach { item ->
+            val bucket = when (item.text.length) {
+                2 -> 0
+                3 -> 1
+                else -> if (item.text.length >= 4) 2 else 0
+            }
+            if (picked[bucket] < quotas[bucket]) {
+                picked[bucket]++
+                words.add(item)
+            } else {
+                overflow.add(item)
+            }
+        }
+        var extra = 0
+        while (words.size < TwelveKeyTuning.RECOMMEND_WORDS && extra < overflow.size) {
+            words.add(overflow[extra++])
+        }
         // 單字補位：面板段組（segment==0）的字，按面板行序。
         panelRows.forEach { row ->
             if (row.segment != 0) return@forEach

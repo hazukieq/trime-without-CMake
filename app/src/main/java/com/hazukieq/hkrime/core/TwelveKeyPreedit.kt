@@ -41,6 +41,14 @@ object TwelveKeyPreedit {
      */
     private val assocWords = HashMap<String, LinkedHashMap<String, Int>>()
 
+    /**
+     * 純詞表（無讀音）的多字詞首字母索引：`jckz -> (jen cin kung ze -> {远程控制})`。
+     *
+     * `assocWords` 只反推前兩字讀音；三字以上的組合行需要逐字反推，收在這一張輕量表裡，
+     * 由 [finishWordIndex] 併入 [initialPatternIndex]。上限只按 CJK 3~6 字，避免 17 萬條全量。
+     */
+    private val multiInitialWords = HashMap<String, LinkedHashMap<String, LinkedHashSet<String>>>()
+
     // 學習詞讀音索引來自 PhraseMemory，與候選條共享文字和讀音，不讀 userdb 快照。
 
     private var learnedIndexVersion = -1
@@ -358,6 +366,29 @@ object TwelveKeyPreedit {
             if (word.isEmpty()) return@forEach
             // 帶權重詞條僅第二欄是讀音，避免把第三欄權重拼入音節。
             val reading = if (tab >= 0) line.substring(tab + 1).split('\t')[0].trim() else ""
+            // 純詞表的多字詞（3~6 個 CJK）逐字反推首讀音，建首字母組合索引。
+            // 兩字詞仍走 assocWords 的聯想索引；這裡只補組合行需要的長詞。
+            if (reading.isEmpty() && word.length in 3..6 && word.all { isCjk(it) }) {
+                val syllables = ArrayList<String>(word.length)
+                var complete = true
+                for (ch in word) {
+                    val syllable = charTable[ch.toString()]
+                    if (syllable == null || syllable.isEmpty() || !syllable.all { it in 'a'..'z' }) {
+                        complete = false
+                        break
+                    }
+                    syllables.add(syllable)
+                }
+                if (complete && (syllableSet.isEmpty() || syllables.all { it in syllableSet })) {
+                    val key = syllables.joinToString("") { it.first().toString() }
+                    if (key.length == word.length) {
+                        multiInitialWords
+                            .getOrPut(key) { LinkedHashMap() }
+                            .getOrPut(syllables.joinToString(" ")) { LinkedHashSet() }
+                            .add(word)
+                    }
+                }
+            }
             val syllables = if (reading.isNotEmpty()) {
                 reading.split(' ', '\u3000')
                     .map { it.trim() }
@@ -496,6 +527,7 @@ object TwelveKeyPreedit {
      */
     internal fun clearWordDataForTest() {
         assocWords.clear()
+        multiInitialWords.clear()
         learnedIndexVersion = -1
         learnedAssoc = emptyMap()
         learnedInitial = emptyMap()
@@ -534,7 +566,31 @@ object TwelveKeyPreedit {
         assocReady = index.isNotEmpty()
         // 整體替換（讀者看到的是舊或新的完整列表，不會看到半截）
         wordCodeIndex = ArrayList(wordCodeEntries)
-        initialPatternIndex = buildInitialPatternIndex(wordCodeEntries)
+        val baseIndex = buildInitialPatternIndex(wordCodeEntries)
+        if (multiInitialWords.isEmpty()) {
+            initialPatternIndex = baseIndex
+        } else {
+            // 詞表首字母索引 + 純詞表多字詞索引：合併後按讀音字典序固定，面板取前幾行才穩定。
+            val merged = HashMap<String, LinkedHashMap<String, List<String>>>()
+            baseIndex.forEach { (key, entries) ->
+                val byReading = merged.getOrPut(key) { LinkedHashMap() }
+                entries.forEach { (reading, words) -> byReading[reading] = words }
+            }
+            multiInitialWords.forEach { (key, byReading) ->
+                val target = merged.getOrPut(key) { LinkedHashMap() }
+                byReading.forEach { (reading, words) ->
+                    val current = target[reading]
+                    if (current == null) {
+                        target[reading] = words.toList()
+                    } else {
+                        target[reading] = (current + words).distinct()
+                    }
+                }
+            }
+            initialPatternIndex = merged.mapValues { (_, byReading) ->
+                byReading.entries.sortedBy { it.key }.map { it.key to it.value }
+            }
+        }
         assocGeneration++
     }
 
@@ -812,11 +868,22 @@ object TwelveKeyPreedit {
         return out
     }
 
-    /** 首字母組合規則 = 純簡拼組合 + 簡拼+完整音節（總數封頂，純組合在前；與腳本同口徑）。 */
+    /**
+     * 首字母組合規則 = 純簡拼組合 + 簡拼+完整音節（總數封頂；與腳本同口徑）。
+     *
+     * 兩類**交錯**排列，不做「純組合全在前」：純詞表的長詞（三/四字）靠純組合就能出詞，
+     * 若把它們排滿 [TwelveKeyTuning.INITIAL_COMBO_MAX_ROWS] 行，簡拼+完整音節（如 `b|cam`）
+     * 就永遠輪不到，學習詞/長音節聯想會被吞掉。
+     */
     internal fun initialPatterns(codes: String): List<InitialPattern> {
         val pure = initialCombos(codes).map { InitialPattern(it) }
         val hybrids = initialHybridPatterns(codes)
-        val all = pure + hybrids
+        val all = ArrayList<InitialPattern>(pure.size + hybrids.size)
+        val max = maxOf(pure.size, hybrids.size)
+        for (i in 0 until max) {
+            if (i < pure.size) all.add(pure[i])
+            if (i < hybrids.size) all.add(hybrids[i])
+        }
         return if (all.size > TwelveKeyTuning.INITIAL_COMBO_PATTERN_LIMIT) {
             all.subList(0, TwelveKeyTuning.INITIAL_COMBO_PATTERN_LIMIT)
         } else {

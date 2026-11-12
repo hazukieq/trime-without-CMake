@@ -107,6 +107,9 @@ class Data:
         self._assoc_freq: dict[str, dict[str, dict[str, int]]] = defaultdict(lambda: defaultdict(dict))
         # 整串码（只收词表自带读音的条目）：code → [(tokens, word)]
         self.word_codes: list[tuple[list[str], str, str]] = []
+        # 纯词表多字词（3~6 个 CJK）逐字反推首读音后的首字母索引：
+        # initials 元组 → [(完整 tokens, 词)]；镜像 App `multiInitialWords`。
+        self.multi_initials: dict[tuple[str, ...], list[tuple[list[str], str]]] = {}
         # 单字 → 首读音（镜像 App 的 charTable）：纯词表（sougou 这类没有读音列的）
         # 靠它反推前两字读音，否则联想索引会比 App 少一大截。
         self.char_first: dict[str, str] = {}
@@ -240,6 +243,12 @@ class Data:
                 # 与 App `loadWordLines` 同口径：先反推前两字读音，再套词长规则
                 #（汉字词 2~4 字；含非汉字的词 1~16 字——`你不上QQ` 这类也收）。
                 cjk_only = all(_is_cjk(c) for c in word)
+                # 多字纯词先记首字母索引（5/6 字词不进联想桶，但组合行要用）。
+                if cjk_only and 3 <= len(word) <= 6:
+                    tokens = [self.char_first.get(c) for c in word]
+                    if all(t and t.isalpha() and t in self.syllables for t in tokens):
+                        key = tuple(t[0] for t in tokens)
+                        self.multi_initials.setdefault(key, []).append((tokens, word))
                 if cjk_only and len(word) not in (2, 3, 4):
                     continue
                 if not cjk_only and not (1 <= len(word) <= 16):
@@ -558,6 +567,12 @@ class Data:
             key = tuple(t[0] for t in tokens)
             bucket = self.by_initials.setdefault(key, [])
             bucket.append((tokens, word))
+        # 純詞表多字詞（App `multiInitialWords` 鏡像）：按整串首字母入索引。
+        for key, entries in self.multi_initials.items():
+            bucket = self.by_initials.setdefault(key, [])
+            for entry in entries:
+                if entry not in bucket:
+                    bucket.append(entry)
         # 簡拼前段各出一個首字母，最後音節按完整讀音匹配。
         self.by_hybrid: dict[str, list[tuple[list[str], str]]] = {}
         def _add_hybrid(tokens: list[str], word: str) -> None:
@@ -665,10 +680,19 @@ class Data:
         return out
 
     def initial_patterns(self, codes: str) -> list[tuple[str, ...]]:
-        """首字母组合规则 = 纯简拼组合 + 简拼+完整音节（总数封顶，保持纯组合在前）。"""
-        pure = self.initial_pattern_combos(codes)
-        hybrids = self.initial_pattern_hybrids(codes)
-        patterns = list(pure) + hybrids
+        """首字母组合规则 = 纯简拼组合 + 简拼+完整音节（总数封顶，两类交错）。
+
+        纯词表长词会让纯组合排满组合行上限；若纯组合全在前，简拼+完整音节
+        （如 b|cam）永远轮不到，学习词/长音节联想会被吞掉。
+        """
+        pure = list(self.initial_pattern_combos(codes))
+        hybrids = list(self.initial_pattern_hybrids(codes))
+        patterns: list[tuple[str, ...]] = []
+        for i in range(max(len(pure), len(hybrids))):
+            if i < len(pure):
+                patterns.append(pure[i])
+            if i < len(hybrids):
+                patterns.append(hybrids[i])
         if len(patterns) > INITIAL_COMBO_PATTERN_LIMIT:
             patterns = patterns[:INITIAL_COMBO_PATTERN_LIMIT]
         return patterns
