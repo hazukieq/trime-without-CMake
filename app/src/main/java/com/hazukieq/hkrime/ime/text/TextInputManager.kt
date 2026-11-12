@@ -261,7 +261,8 @@ class TextInputManager private constructor() :
         if (!isTwelveKeyMode() || !Rime.isComposing()) return false
         val item = currentSnapshot.barItems.firstOrNull()
             ?: return false
-        withEngineLock { twelveKeyController?.selectCandidate(item.index) }
+        if (holdPartialPick(item.text, item.comment, engineIndex = item.index)) return true
+        withEngineLock { twelveKeyController?.selectCandidate(item.index, item.comment) }
         return true
     }
 
@@ -456,15 +457,12 @@ class TextInputManager private constructor() :
         if (text.isEmpty()) return
         // 先記下當前完整碼串：清組合後 input 就沒了，學習的 key 必須是「這次打的碼」。
         val code = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
-        // 詞只覆蓋輸入前幾個音節時（灵机一动 | 来的），剩餘碼上屏後重新餵回引擎，
-        // 對齊 librime select_candidate 的「選中不提交、剩餘輸入保留」。
-        val remaining = TwelveKeyPreedit.remainingCodeAfter(reading, code)
+        // 詞只覆蓋輸入前幾個音節時由 holdPartialPick 攔掉（留在 preedit）；
+        // 這裡只處理「整串被這個詞覆蓋」的上屏。
+        if (holdPartialPick(text, reading, code)) return
         runCatching {
             withEngineLock { Rime.clearComposition() }
             activeEditorInstance.commitText(text, false)
-            if (remaining.isNotEmpty()) {
-                withEngineLock { runCatching { Rime.onText(remaining) } }
-            }
             setSegmentAnchor(text.lastOrNull())
             trime.updateComposing()
             refreshTwelveKey()
@@ -526,6 +524,46 @@ class TextInputManager private constructor() :
      * 它不來自引擎，所以不能走 `select_candidate`；完整碼串放在 `restCode` 裡。
      * 上屏前先把暫存字 flush（保證「之前逐段選的字 + 這個詞」順序正確），再記一次學習。
      */
+    /**
+     * 詞只覆蓋輸入前幾個音節（`灵机一动 | 来的`）時：**不 commit**，先把詞暫存到
+     * `pendingPick`，再把剩餘碼餵回引擎。
+     *
+     * 這樣 preedit = 暫存前綴 + 剩餘段（`灵机一动` + `loi dit`），全部選完才一起上屏。
+     * 用戶 2026-11-12 明確要求：剩餘碼沒選完時只能停在 preedit；librime 的
+     * `select_candidate` 遇到 `end == 輸入長度` 的候選會直接 commit 整串，不能走它。
+     */
+    private fun holdPartialPick(
+        text: String,
+        reading: String,
+        input: String = "",
+        engineIndex: Int = -1,
+    ): Boolean {
+        if (text.isEmpty()) return false
+        val code = input.ifEmpty {
+            withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
+        }
+        val remaining = TwelveKeyPreedit.remainingCodeAfter(reading, code)
+        if (remaining.isEmpty()) return false
+        // 學習要在清組合前記（key 是這次完整碼串）。
+        if (engineIndex >= 0) learnCandidatePick(text, reading) else if (code.isNotEmpty()) {
+            PhraseMemory.learnPick(code, text, reading)
+        }
+        pendingPick.append(text)
+        updatePendingPick()
+        setSegmentAnchor(text.lastOrNull())
+        withEngineLock { Rime.clearComposition() }
+        withEngineLock { Rime.onText(remaining) }
+        trime.updateComposing()
+        refreshTwelveKey()
+        // 組合剛重建，先再刷一次 preedit，避免悬浮窗拿到清組合前的殘留字串。
+        trime.updateComposing()
+        com.hazukieq.hkrime.util.DiagLog.d(
+            "pick",
+            "hold text=$text reading='$reading' code=$code remaining=$remaining preedit='${Rime.getCompositionText()}'",
+        )
+        return true
+    }
+
     private fun commitPhrase(item: CandidateItem) {
         val code = item.restCode
         val text = item.text
@@ -539,6 +577,22 @@ class TextInputManager private constructor() :
         // （同 pickAssociationWord；用戶 2026-11-11：灵机一动 | 来的 後半丟失）。
         val input = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
         val remaining = TwelveKeyPreedit.remainingCodeAfter(item.comment, input)
+        com.hazukieq.hkrime.util.DiagLog.d(
+            "phrase",
+            "input=$input comment=${item.comment} remaining=$remaining rest=${item.restCode}",
+        )
+        if (remaining.isNotEmpty()) {
+            // 剩餘碼沒選完：詞留在 preedit，不能上屏（用戶 2026-11-12）。
+            pendingPick.append(enginePrefix).append(text)
+            updatePendingPick()
+            setSegmentAnchor(text.lastOrNull())
+            withEngineLock { Rime.clearComposition() }
+            withEngineLock { Rime.onText(remaining) }
+            if (code.isNotEmpty()) PhraseMemory.bumpPicked(code, text)
+            trime.updateComposing()
+            refreshTwelveKey()
+            return
+        }
         flushPendingPick()
         runCatching { activeEditorInstance.commitText(enginePrefix + text, false) }
             .onFailure { Timber.e(it, "twelvekey: phrase commit failed") }
@@ -599,10 +653,12 @@ class TextInputManager private constructor() :
             // 原生 select_candidate，選中不提交、剩餘輸入（`来的`）才會保留。
             // 只有 App 側合成的聯想詞/學習詞（index < 0）才整詞上屏。
             if (item.index >= 0) {
+                // 只覆蓋前幾音節的詞：留在 preedit（不走 select_candidate，否則 auto_commit 會整串上屏）。
+                if (holdPartialPick(item.text, item.comment, engineIndex = item.index)) return
                 // 不要 notePickedSegment：這裡是引擎原生選中，引擎會自己管 commit buffer；
                 // 再往 pendingPick 塞一份會在最終上屏時重複。
                 learnCandidatePick(item.text, item.comment)
-                twelveKeyController?.selectCandidate(item.index)
+                twelveKeyController?.selectCandidate(item.index, item.comment)
                 return
             }
             pickAssociationWord(item.text, item.comment)
@@ -628,7 +684,7 @@ class TextInputManager private constructor() :
             val engineIndex = resolveEngineIndexForSegment(item.text, item.comment)
             if (engineIndex >= 0) {
                 learnCandidatePick(item.text, item.comment)
-                twelveKeyController?.selectCandidate(engineIndex)
+                twelveKeyController?.selectCandidate(engineIndex, item.comment)
                 return
             }
             // 引擎沒這個字，最常見的原因是「輸入還沒分段」：`88` 被當成一個詞，候選只有
@@ -646,7 +702,7 @@ class TextInputManager private constructor() :
             return
         }
         notePickedSegment(item.text, item.comment)
-        twelveKeyController?.selectCandidate(item.index)
+        twelveKeyController?.selectCandidate(item.index, item.comment)
     }
 
     /**
@@ -702,7 +758,7 @@ class TextInputManager private constructor() :
                 withEngineLock { Rime.onText(input) }
                 false
             } else {
-                twelveKeyController?.selectCandidate(engineIndex)
+                twelveKeyController?.selectCandidate(engineIndex, item.comment)
                 true
             }
         }.getOrElse {
@@ -1325,6 +1381,10 @@ class TextInputManager private constructor() :
         // 否則非同步刷新/學習重排後會出現「看到的是看、上屏的卻是别字」。
         val item = currentSnapshot.barItems.getOrNull(index)
         if (item != null) {
+            com.hazukieq.hkrime.util.DiagLog.d(
+                "pick",
+                "bar idx=$index text=${item.text} seg=${item.segment} idx=${item.index} comment=${item.comment} rest=${item.restCode}",
+            )
             // 聯想詞（segment = 1）：整詞上屏。
             if (item.segment == 1) {
                 pickAssociationWord(item.text, item.comment)
@@ -1342,15 +1402,16 @@ class TextInputManager private constructor() :
                 val engineIndex = resolveEngineIndexForSegment(item.text, item.comment)
                 if (engineIndex >= 0) {
                     learnCandidatePick(item.text, item.comment)
-                    twelveKeyController?.selectCandidate(engineIndex)
+                    twelveKeyController?.selectCandidate(engineIndex, item.comment)
                     return
                 }
                 pickSegmentedCandidate(item.text, item.restCode)
                 return
             }
+            if (holdPartialPick(item.text, item.comment, engineIndex = item.index)) return
             notePickedSegment(item.text, item.comment)
             learnCandidatePick(item.text, item.comment)
-            twelveKeyController?.selectCandidate(item.index)
+            twelveKeyController?.selectCandidate(item.index, item.comment)
             return
         }
         val fallback = snapshot.fallback

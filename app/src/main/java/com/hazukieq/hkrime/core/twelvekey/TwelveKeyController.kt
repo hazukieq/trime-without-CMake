@@ -191,8 +191,15 @@ class TwelveKeyController(
         return built
     }
 
-    /** 點候選：全局下標；引擎自己決定消費幾個音節，剩餘碼由引擎重算。 */
-    fun selectCandidate(globalIndex: Int) {
+    /**
+     * 引擎原生選中。
+     *
+     * [reading] 是候選的讀音（候選條/面板的 comment）。librime 對「候選 end == 輸入長度」的條目
+     * 會直接 commit 整串（`express_editor` 的 `_auto_commit`）：實測 `5i4ii8i9934i54iei9`
+     * 選 `灵机一动` 時 input 被整串吃光，`来的` 丟失。這裡在 select 之前按讀音音節數算出
+     * 剩餘碼，若選完組合真的沒了，再把剩餘碼餵回引擎（用戶 2026-11-12：灵机一动来的 只上屏前四個字）。
+     */
+    fun selectCandidate(globalIndex: Int, reading: String = "") {
         if (globalIndex < 0) return
         // 先把選中的詞記到本地記憶（候選條/面板下次把同詞排前）——必須在 select 之前拿快照。
         runCatching {
@@ -202,6 +209,8 @@ class TwelveKeyController(
                     .firstOrNull { it.index == globalIndex }
             if (item != null) SelectionMemory.bump(item.text, item.comment)
         }
+        val inputBefore = runCatching { Rime.RimeGetInput() }.getOrNull().orEmpty()
+        val remaining = TwelveKeyPreedit.remainingCodeAfter(reading, inputBefore)
         val ok = runCatching { Rime.select_candidate(globalIndex) }.getOrDefault(false)
         if (!ok) {
             Timber.w("twelvekey: select_candidate(%d) failed", globalIndex)
@@ -210,6 +219,13 @@ class TwelveKeyController(
         runCatching { Rime.getContexts() }
         // commitRimeText → updateComposing → onCandidatesRefreshed → refresh()，只重建一次快照
         onEngineChanged()
+        com.hazukieq.hkrime.util.DiagLog.d(
+            "select",
+            "idx=$globalIndex reading='$reading' input=$inputBefore remaining=$remaining composing=${Rime.isComposing()}",
+        )
+        // 注意：這裡**不做**「commit 後把剩餘碼餵回」——那會讓詞先落進編輯框，
+        // 用戶 2026-11-12 明確要求：剩餘碼沒選完時只能停在 preedit，不能上屏。
+        // 部分上屏由 TextInputManager.holdPartialPick() 在點擊入口攔掉（不調 select_candidate）。
     }
 
     /** 10 鍵碼無候選時的本地兜底：清組合，直接把字母原文上屏。 */

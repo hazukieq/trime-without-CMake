@@ -1539,6 +1539,46 @@ def cmd_json(args, data: Data) -> None:
     print(json.dumps(build_json_payload(data, args.codes), ensure_ascii=False, indent=2))
 
 
+def remaining_code_after(data: Data, reading: str, codes: str) -> str:
+    """镜像 `TwelveKeyPreedit.remainingCodeAfter`：按「码串前 N 个音节」算剩余。
+
+    不能用 reading→码 前缀比对：同一个字有多读（动 dung/tung），学习词记的 readings
+    未必等于这次输入实际用的读音；前缀比对会失配，后半个词就丢了（用户 2026-11-12）。
+    """
+    tokens = [t for t in reading.replace("\u3000", " ").split(" ") if t]
+    if not tokens or not codes:
+        return ""
+    spans = data.decode(codes)
+    if not spans or len(spans) < len(tokens):
+        return ""
+    consumed = sum(len(seg) for seg in spans[: len(tokens)])
+    return codes[consumed:]
+
+
+def cmd_preedit(args, data: Data) -> None:
+    """复现 App preedit 切分，以及「选中只覆盖前几音节的词之后剩余什么码」。
+
+    PC 侧对拍 librime 引擎行为的命令见 `rime-jni/host-test/run-host-test.sh --probe <code> --select <i>`；
+    这里复现的是 App 自己的判定（TwelveKeyPreedit.decode / remainingCodeAfter）。
+    """
+    codes = parse_code(args.codes)
+    spans = data.decode(codes) or []
+    print(f"input={codes}")
+    print("preedit=" + (" ".join(spans) if spans else "（未切出完整音节）"))
+    if not args.pick:
+        return
+    reading = args.pick.strip()
+    tokens = [t for t in reading.replace("\u3000", " ").split(" ") if t]
+    remaining = remaining_code_after(data, reading, codes)
+    print(f"pick={reading} syllables={len(tokens)}")
+    if remaining:
+        rem_spans = data.decode(remaining) or []
+        print(f"remaining={remaining}")
+        print("remaining_preedit=" + (" ".join(rem_spans) if rem_spans else "（切不出完整音节）"))
+    else:
+        print("remaining=（整串被这个词覆盖 / 切不出音节）")
+
+
 def cmd_selftest(args, data: Data) -> None:
     """把文档里的关键样例跑一遍，任何一条不符就退出码 1（可放进 CI / 本地回归）。"""
 
@@ -1810,6 +1850,30 @@ def cmd_selftest(args, data: Data) -> None:
         f"5i 首字母组合行数应在 (0, {INITIAL_COMBO_MAX_ROWS}]（实际 {len(combo_rows_5i)}）",
     )
 
+    # preedit / 剩余输入复刻（用户 2026-11-12：灵机一动来的 只上屏前四个字）
+    code_partial = "5i4ii8i9934i54iei9"
+    spans_partial = data.decode(code_partial) or []
+    expect(
+        spans_partial == ["5i4", "ii", "8i9", "934i", "54i", "ei9"],
+        f"preedit 切分 = {spans_partial}",
+    )
+    expect(
+        remaining_code_after(data, "lin gi jit dung", code_partial) == "54iei9",
+        "灵机一动(dung) + 输入用 tung：remaining 应为 54iei9（按音节数扣，不按 reading→码 前缀）",
+    )
+    expect(
+        remaining_code_after(data, "lin gi jit dung", "5i4ii8i9e34i54iei9") == "54iei9",
+        "灵机一动(dung) + 输入用 dung：remaining 也应为 54iei9",
+    )
+    expect(
+        remaining_code_after(data, "lin gi jit dung", "5i4ii8i9e34i") == "",
+        "词码吃掉整串：remaining 应为空",
+    )
+    expect(
+        remaining_code_after(data, "lin gi jit dung", "aiaa4") == "",
+        "切不出完整音节的简拼码串：不猜剩余",
+    )
+
     print(f"[selftest] {len(failures)} 条失败")
     if failures:
         sys.exit(1)
@@ -1850,6 +1914,11 @@ def main() -> None:
     p_json = sub.add_parser("json", help="结构化输出五源 + merged（App 侧 golden 单测对拍）")
     p_json.add_argument("codes", nargs="+", help="一个或多个码串/键名，如 5i4a57 'kl ghi mno abc ps'")
     p_json.set_defaults(func=cmd_json)
+
+    p_pre = sub.add_parser("preedit", help="复现 preedit 切分与「选词后剩余输入」（App remainingCodeAfter）")
+    p_pre.add_argument("codes")
+    p_pre.add_argument("--pick", default="", help="被选中的词读音，如 'lin gi jit dung'")
+    p_pre.set_defaults(func=cmd_preedit)
 
     p_bs = sub.add_parser("build-syllables", help="从 hakkaSyllables.js 同步标准音节集到 assets")
     p_bs.add_argument(

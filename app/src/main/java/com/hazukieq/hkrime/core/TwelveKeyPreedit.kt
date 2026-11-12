@@ -445,9 +445,17 @@ object TwelveKeyPreedit {
      */
     internal fun remainingCodeAfter(wordReading: String, input: String): String {
         if (wordReading.isEmpty() || input.isEmpty()) return ""
-        val wordCode = codeOfReading(wordReading)
-        if (wordCode.isEmpty() || !input.startsWith(wordCode) || input.length <= wordCode.length) return ""
-        return input.substring(wordCode.length)
+        val tokens = wordReading.split(' ', '\u3000').filter { it.isNotEmpty() }
+        if (tokens.isEmpty()) return ""
+        // 用「碼串前 N 個音節」算消耗量，**不要**用 reading→碼 的前綴比對：
+        // 同一個字可能有多個讀音（动 dung/tung），學習詞記下的 readings 未必等於
+        // 這次輸入實際用的讀音（實測：`灵机一动` 記的是 dung，但用戶打的是 tung 934i），
+        // 前綴比對會失配 → 剩餘碼算不出來 → 後半截照樣丟。
+        val spans = decodeSpans(input) ?: return ""
+        if (spans.size < tokens.size) return ""
+        var consumed = 0
+        for (i in 0 until tokens.size) consumed += spans[i].first.length
+        return if (input.length > consumed) input.substring(consumed) else ""
     }
 
     /** PhraseMemory 變化時重建「學習詞 → 讀音」索引（面板與候選條同源）。 */

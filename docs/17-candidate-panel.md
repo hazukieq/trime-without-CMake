@@ -461,6 +461,16 @@ flowchart TD
 - preedit = 候选条**第一条**的 `comment`（读音）+ 未覆盖的原始码（`TwelveKeyPreedit.render`）；
 - 尾码边界用「comment 音节逐个吃掉输入前缀」，最后剩余码**原样**补上（不能吞键、不能拼凑）；
 - 面板/候选条/preedit 必须同源（同一份快照），否则会出现「开面板才变」的诡异现象。
+- **部分上屏**（2026-11-12）：librime 的候选如果 `end == 输入长度`（`express_editor` 的
+  `_auto_commit`），调 `select_candidate` 会直接 commit 整串。**所以这类候选不能走
+  `select_candidate`**：`TextInputManager.holdPartialPick()` 在点击入口拦掉，把词先塞进
+  `pendingPick`（`TwelveKeyPreedit.pendingPrefix` 会拼在 preedit 前面），再 `clearComposition`
+  + `onText(剩余码)`——字只停在 preedit，**不 commit**（用户 2026-11-12：剩余码没选完时怎能上屏）。
+  剩余码按「码串前 N 个音节」扣（`remainingCodeAfter`），**不能**用 reading→码前缀（多读音会失配）。
+  `TwelveKeyController.selectCandidate` 只做原生选中，**不再**在 commit 后兜底喂剩余码。
+  只有「词覆盖整串」或最后一段选完时才 `commitText(pendingPick + 引擎 commit)`。
+- PC 复刻：`rime-jni/host-test/run-host-test.sh --probe <code> --select <i>`（引擎行为）与
+  `hkrime/tools/panel_probe.py preedit <code> --pick "<reading>"`（App 判定）。
 
 ### 10.5 面板内退格
 

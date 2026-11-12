@@ -42,12 +42,20 @@ cd rime-jni/host-test
 ./run-host-test.sh                     # 全量覆盖测试（约 10s，含部署）
 ./run-host-test.sh --bench             # 性能：每个不同 code 的 feed+全量枚举耗时
 ./run-host-test.sh --probe 5i4a57i     # 单个码串的候选前 12 条
+./run-host-test.sh --probe 5i4ii8i9e34i54iei9 --select 1
+                                        # 选中第 1 条后：commit / 剩余 input / preedit / 分段（复刻「部分上屏」）
 ./run-host-test.sh --dump 547          # 单个码串的全部候选
 ./run-host-test.sh --queryd "li nak si" # 直接问表：这条音節序列在表里有哪些词条
 ./run-host-test.sh --syll 5i4a57i      # 音節图：edges / Dictionary::Lookup 的 chunk 统计
 ./run-host-test.sh --prism w           # prism 里这个键映射到哪些音節（简拼诊断）
 ```
 
+> `--select` 是「部分上屏」的复刻入口：`express_editor` 的 `_auto_commit` 会让
+> **候选 end == 输入长度**的条目直接 commit 整串（实测 `5i4ii8i9934i54iei9` 选 `灵机一动`
+> 后 input 清空）；候选 end 小于输入时才会切成 `已选中段 + 剩余段`。App 侧据此**不走**
+> `select_candidate`（`holdPartialPick` 把词留在 preedit 的 pendingPick、剩余码重喂组合），
+> PC 复刻见 `hkrime/tools/panel_probe.py preedit <code> --pick "<reading>"`。
+>
 > 测试程序内部用 `RimeTraits` + `RimeInitialize` + 维护线程部署，等价于真机启动路径；
 > `coverage_test_nofallback` 是编译期关掉「全码路径兜底」的对照组（`-DHKRIME_NO_FULLPATH_FALLBACK`）。
 
