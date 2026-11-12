@@ -475,6 +475,11 @@ flowchart TD
   不会出现「旧词 + 新词」一起上屏（用户 2026-11-12 报「加油家有」）。
 - PC 复刻：`rime-jni/host-test/run-host-test.sh --probe <code> --select <i>`（引擎行为）与
   `hkrime/tools/panel_probe.py preedit <code> --pick "<reading>"`（App 判定）。
+- **拼寫別名**（2026-11-12）：schema 的 `derive` 規則讓同一個音節有多種拼寫（`cw` ↔ `cu`、`gap` ↔ `gat`…）。
+  引擎 comment 給的是詞典拼寫，未必等於這次按鍵的拼寫：輸入 `iaa3` 選「下」後剩 `a3`，comment 是 `cw`（次），
+  但 `a3` 是 `cu` 的碼。preedit 覆蓋長度必須按**本地解碼出的完整音節**整節消耗（`a3` 吃 2 碼），
+  不能只按 `comment` 首字母吃 1 碼——否則尾巴 `3` 會被當原始碼補上，顯示成 `下 cw 3`。
+  判定別名用 `canonicalSpelling`（w→u、p→t、m→n、am→an…），不同音節（`than` vs `the`）不能套用。
 
 ### 10.5 面板内退格
 

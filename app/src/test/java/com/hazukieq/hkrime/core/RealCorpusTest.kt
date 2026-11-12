@@ -166,7 +166,11 @@ class RealCorpusTest {
 
     /** 本用例裡 comment 實際吃掉的碼位數（前綴匹配優先，對不上退回碼長之和）。 */
     private fun consumedCodeLength(comment: List<String>, cleanCode: String): Int {
-        val covered = coveredCodeLength(comment, cleanCode)
+        // 走 App 真正的覆蓋規則（含 derive 別名：cw 之於 cu，a3 要整節吃掉，不能只吃首字母）。
+        val covered = TwelveKeyPreedit.coveredCodeLengthForTest(
+            cleanCode,
+            comment.joinToString(" "),
+        )
         if (covered != null) return covered.coerceIn(0, cleanCode.length)
         val sum = commentCodeLength(comment)
         return if (sum in 1..cleanCode.length) sum else cleanCode.length

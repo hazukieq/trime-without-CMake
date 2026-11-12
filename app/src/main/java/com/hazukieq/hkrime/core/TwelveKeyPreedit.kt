@@ -1426,10 +1426,10 @@ object TwelveKeyPreedit {
         // 逐節匹配時 `qa` 對不上 `99…`，退一步只吃 1 個碼位 → 剩下第 7 個 `9` 原樣顯示
         // （用戶 2026-11-11：「再打一個 q 居然不顯示了」＝尾碼被吞）。
         // 對不上（第一節就匹配失敗）才退回「碼長之和」的舊算法。
-        val covered = coveredCodeLength(cleanCodes, engine)
+        val coverage = resolveCovered(cleanCodes, engine)
         val consumed = when {
             engine == null -> cleanCodes.length
-            covered != null -> covered.coerceIn(0, cleanCodes.length)
+            coverage != null -> coverage.first.coerceIn(0, cleanCodes.length)
             commentCodeLen in 1..cleanCodes.length -> commentCodeLen
             else -> cleanCodes.length
         }
@@ -1438,10 +1438,12 @@ object TwelveKeyPreedit {
         } else {
             ""
         }
+        val shownBase = coverage?.second ?: engine
         val shown = when {
             engine == null -> own
-            rawTail.isEmpty() -> engine
-            else -> engine + rawTail
+            shownBase == null -> own
+            rawTail.isEmpty() -> shownBase
+            else -> shownBase + rawTail
         } ?: return null
         return prefix + shown.joinToString(" ")
     }
@@ -1452,24 +1454,79 @@ object TwelveKeyPreedit {
         private set
 
     /**
-     * comment 的音節依次吃掉輸入碼的多少碼位（前綴匹配）：
-     * 先按完整碼（[codeOf]）匹配，匹配不上再按「簡拼只吃一個碼位」退一步。
+     * comment 的音節依次吃掉輸入碼的多少碼位（前綴匹配），以及每個位置該顯示的讀音。
+     *
+     * - 完整碼能對上 → 吃它的碼長，顯示 comment 的讀音；
+     * - 對不上，但輸入碼從這裡能切出**完整音節**且首字母與 comment 相同 →
+     *   這是「編碼形成的組合音節」，comment 只是別名拼寫（`cw` 之於 `cu`，schema 的
+     *   `derive/w$/u/`）：吃整節碼，顯示本地解碼讀音（用戶 2026-11-12 報 `cw 3`）；
+     * - 其餘（`i` 對 `ha` 這種簡拼引申）→ 只吃一個碼位，顯示 comment 讀音。
+     *
      * 第一節就無法匹配 → 回 null（不猜，退回舊的長度算法）。
      */
-    private fun coveredCodeLength(codes: String, engine: List<String>?): Int? {
+    private fun resolveCovered(codes: String, engine: List<String>?): Pair<Int, List<String>>? {
         if (engine.isNullOrEmpty() || codes.isEmpty()) return null
         var pos = 0
-        for (syllable in engine) {
-            val full = runCatching { codeOf(syllable) }.getOrNull().orEmpty()
-            if (full.isEmpty()) return null
-            when {
-                codes.startsWith(full, pos) -> pos += full.length
-                pos < codes.length && codes[pos] == full[0] -> pos += 1
-                else -> return if (pos == 0) null else pos
+        val shown = ArrayList<String>(engine.size)
+        for ((index, syllable) in engine.withIndex()) {
+            if (pos >= codes.length) {
+                // 簡拼：comment 的後半段是引擎按 abbrev 補出來的（一個鍵對多個音節），
+                // 沒有對應輸入碼可吃；整段照抄，不能把 comment 截短。
+                shown.addAll(engine.subList(index, engine.size))
+                break
             }
-            if (pos > codes.length) return codes.length
+            val full = runCatching { codeOf(syllable) }.getOrNull().orEmpty()
+            if (full.isNotEmpty() && codes.startsWith(full, pos)) {
+                shown += syllable
+                pos += full.length
+                continue
+            }
+            val span = decodeSpans(codes.substring(pos))?.firstOrNull()
+            if (span != null && span.first.length > 1 &&
+                isSpellingAlias(syllable, span.second)
+            ) {
+                // 顯示仍用 comment（所見即所讀），但按輸入碼整節消耗，不把尾巴留成 `3`。
+                shown += syllable
+                pos += span.first.length
+            } else {
+                shown += syllable
+                pos += 1
+            }
+            if (pos > codes.length) return codes.length to shown
         }
-        return pos
+        if (pos == 0) return null
+        return pos.coerceAtMost(codes.length) to shown
+    }
+
+    /** 單測用：comment 覆蓋的碼位長度（走真正的 [resolveCovered] 規則）。 */
+    internal fun coveredCodeLengthForTest(codes: String, comment: String?): Int? =
+        resolveCovered(codes, parseComment(comment))?.first
+
+    /**
+     * 兩個讀音是否只是 schema 的 derive 規則造成的拼寫別名（`cw` ↔ `cu`、`gap` ↔ `gat` …），
+     * 而不是兩個不同的音節（`than` vs `the`）。別名才可以把 comment 換成本地解碼讀音。
+     */
+    private fun isSpellingAlias(a: String, b: String): Boolean {
+        if (a.isEmpty() || b.isEmpty()) return false
+        return canonicalSpelling(a) == canonicalSpelling(b)
+    }
+
+    /** 把 schema `derive` 規則的變體拼寫歸一到同一形（只用於別名判定）。 */
+    private fun canonicalSpelling(syllable: String): String {
+        var s = syllable
+        s = when {
+            s.endsWith("iam") -> s.dropLast(3) + "ian"
+            s.endsWith("am") -> s.dropLast(2) + "an"
+            s.endsWith("om") -> s.dropLast(2) + "on"
+            s.endsWith("im") -> s.dropLast(2) + "in"
+            s.endsWith("em") -> s.dropLast(2) + "en"
+            s.endsWith("ap") -> s.dropLast(2) + "at"
+            s.endsWith("ep") -> s.dropLast(2) + "et"
+            s.endsWith("up") -> s.dropLast(2) + "ut"
+            s.endsWith("w") -> s.dropLast(1) + "u"
+            else -> s
+        }
+        return s
     }
 
     /** librime preedit 的光標標記 `‸`(U+2038)。 */

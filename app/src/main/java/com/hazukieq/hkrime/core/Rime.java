@@ -451,6 +451,13 @@ public class Rime {
       String engineText = (cs != null && cs.length > 0) ? cs[0].text : null;
       String engineComment = (cs != null && cs.length > 0) ? cs[0].comment : null;
       String decoded = TwelveKeyPreedit.INSTANCE.render(composition.preedit, engineText, engineComment);
+      if (com.hazukieq.hkrime.util.DiagLog.INSTANCE.getVerbose()) {
+        com.hazukieq.hkrime.util.DiagLog.INSTANCE.d(
+            "preedit",
+            "raw=[" + composition.preedit + "] engine=[" + engineText + "/" + engineComment
+                + "] decoded=[" + decoded + "]"
+        );
+      }
       if (decoded != null && !decoded.equals(composition.preedit)) {
         // 只改「返回給 UI 的副本」：mContext.composition 是 librime context 的鏡像，
         // 寫回去會讓下一次讀到的 raw 已經是被改寫過的拼音，也會讓 getCompositionPrefix()

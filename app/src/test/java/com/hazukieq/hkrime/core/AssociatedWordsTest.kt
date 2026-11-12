@@ -307,6 +307,26 @@ class AssociatedWordsTest {
      * 用戶 2026-11-11：打 `qqqqqq`（= `999999`…）時首條會補全成一串 `qa`，但**再按的鍵會被吞**。
      * 逐節前綴匹配：`qa` 對不上 `99…` → 每節只吃 1 個碼位；超出的那個碼位要原樣顯示。
      */
+    /**
+     * 用戶 2026-11-12：輸入 `ha cu`（iaa3）後在面板選「下」，剩餘碼 a3 的 preedit 卻顯示 `cw 3`。
+     * 原因：首條 comment 是 `cw`（次），schema 用 `derive/w$/u/` 讓 cw 也能拼成 cu（碼 a3）；
+     * App 只按 codeOf(cw)=aw 做前綴匹配，對不上就只吃一個碼位，尾巴 `3` 被原樣補上。
+     * 編碼形成的完整音節要整節吃掉，並顯示本地解碼讀音。
+     */
+    @Test
+    fun rewriteConsumesWholeEncodedSyllableForDerivedSpellingAlias() {
+        // 顯示仍用 comment（所見即所讀），但整個 a3 都被吃掉，不能再補一個 `3`。
+        assertEquals("cw", preedit.rewrite("a3", "次", "cw"))
+        assertEquals("ha cw", preedit.rewrite("iaa3", "下次", "ha cw"))
+    }
+
+    /** 簡拼引申（一個鍵代表一個音節）仍然只吃一個碼位，不能誤吃後面。 */
+    @Test
+    fun rewriteKeepsSingleKeyForAbbreviatedSyllable() {
+        assertEquals("ha", preedit.rewrite("i", "下", "ha"))
+        assertEquals("ha cu", preedit.rewrite("ia3", "下厨", "ha cu"))
+    }
+
     @Test
     fun rewriteKeepsExtraKeysWhenCommentOnlyCoversPrefixByAbbreviation() {
         val comment = List(6) { "qa" }.joinToString(" ")
