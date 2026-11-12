@@ -54,18 +54,22 @@ generalScore(ch) = max( percentile(hakka_char_freq, ch), percentile(hakka_char_r
 ```
 Rime.candidatesSnapshot(600)
    → TwelveKeySnapshotBuilder 组装 CandidateItem(text, comment, index)   // index = 全局下标
-   → SelectionMemory 学习排序（点过的靠前）
+   → SelectionMemory 学习排序（只抬学过的词；同分按引擎 index；不再按「覆盖音节数」分层）
    → CandidateRanking.rankBar(ranked, BAR_ITEMS = 12)
-        ① wordsFirst : 稳定分区，CJK 词组全部提前（组内相对顺序不变）
-        ② take(12)
-        ③ filter { text.isNotEmpty() }
+        ① fullBarOrder : distinctBy(text) 去重，保留引擎/学习混排顺序
+        ② filter { text.isNotEmpty() }
+        ③ take(12)
    → barEntries
    → previewText = barEntries.first().text
    → inlineText  = librime 已选前缀 + previewText   （嵌入式预览「首选」模式）
 ```
 
-- `isCjkWord(text)`：长度 ≥ 2 且每个字符码点落在 `0x3400..0x4DBF`（扩展 A）或 `0x4E00..0x9FFF`。颜文字 `(＞﹏＜)`、ASCII、单字都不算词组。
-- 「词组优先」必须**在全部排序之后**做（用户 2026-11-09 明确要求）：否则会把词频/习惯顺序盖掉。
+- **2026-11-12 起取消「词组优先」**（用户原话：「取消词组优先，改为平等竞争，并尊重 engine 给出的候选，
+  在此基础上只做少量添加或者删改 by app 现在的算法」）：词与单字同池竞争，顺序以引擎候选为基准；
+  App 只做三件小事——学习词 boost（`SelectionMemory` 分数，同分引擎在前）、合成学习词混排
+  （`mergePhraseCandidates`）、按文字去重。**没有**「词区 ≤ N 条」「全部词提前」这类分区规则。
+- `isCjkWord(text)`：长度 ≥ 2 且每个字符码点落在 `0x3400..0x4DBF`（扩展 A）或 `0x4E00..0x9FFF`；
+  面板/推荐组仍用它筛「整词」，但候选条排序不再用它分区。
 - 候选条与「空格上屏」共用同一份 `currentSnapshot.barEntries`（`TextInputManager` 单一状态源），点第 N 条 = `barItems[N]`，用它的 `index` 交给引擎，所以排序只改**展示顺序**，不改点击语义。
 - 段组（`segment = 0`）的候选**不进候选条**，只进面板：候选条只放引擎候选。
 
@@ -73,11 +77,11 @@ Rime.candidatesSnapshot(600)
 
 | 不变量 | 用例 |
 |---|---|
-| 词组必须全部排在非词组之前 | `rankBar puts words first...` / `real data - bar puts word list entries before single chars` |
-| 词组之间、非词组之间的相对顺序不变（稳定分区） | `wordsFirst is a stable partition...` |
-| 截断到 12 条、空文字丢弃 | `rankBar puts words first...` |
+| 保持传入顺序（引擎 → 学习调整后的顺序），**不按词/字分区** | `rankBar does not put words before single chars` |
+| 同文去重，保留先出现的那条 | `rankBar dedupes identical texts but keeps engine order` |
+| 截断到 12 条、空文字丢弃（先滤空再截） | `rankBar keeps engine order, truncates and drops empties` |
 | 单字之间保持引擎原顺序（不许按自己喜好重排） | `rankBar keeps engine order among single chars` |
-| 全词/全非词时原样返回（不做无意义搬动） | `wordsFirst leaves list untouched...` |
+| 学习只抬分数字（同分引擎下標），不按覆盖深度分层 | `rankWithLearning keeps engine order when nothing learned` 等 |
 
 ---
 
@@ -218,7 +222,7 @@ export JAVA_HOME=$HOME/opt/jdk17/jdk-17.0.9
 | 词组必须永远在单字前 | 用户 2026-11-09：「候选栏应该永远是组词先，再单字的排序（根据所有因素排序后的列表再做分区）」 | 稳定分区，不重排两级内部 |
 | 面板单字按频度排序 | 用户 2026-11-10：词典无 weight，生僻字挤掉「以」 | 用户字频 → 权威字频 → 引擎序 |
 | 权威字频用 rime-ice 8105 | 用户提示「雾凇可能包含已发布的高频排序」 | 25 亿字语料权重，比自造规则可信 |
-| 段组放面板、不放候选条 | 用户 2026-11-10：「只在固定候选栏上做改变」后被否决，改回面板承担「逐段选字」 | 候选条只放引擎候选（词组优先），面板负责拆段选字 |
+| 段组放面板、不放候选条 | 用户 2026-11-10：「只在固定候选栏上做改变」后被否决，改回面板承担「逐段选字」 | 候选条只放引擎候选（2026-11-12 起按引擎顺序，不再词组优先），面板负责拆段选字 |
 | 拆段不再依赖 `'` | 用户 2026-11-10：「普通输入也要能逐段选」 | `splitFirstSyllable` 自动拆，`'` 仅作显式边界 |
 | 空读音组排最后 | 原先它排在单音节组之后、多音节组之前，位置尴尬 | 兜底分组永远最后 |
 | 首字母相拼只列高频音节 | 用户：「不可能每个首字母的所有组合都罗列，那不科学也没必要」 | `syllablesForSegment(head, 16/24)`；完整音節段只列該音節 |

@@ -31,115 +31,50 @@ class CandidateRankingTest {
     }
 
     @Test
-    fun `wordsFirst is a stable partition - words keep their order, rest keeps theirs`() {
-        val input = listOf(
-            item("以", index = 0),
-            item("你好", index = 1),
-            item("abc", index = 2),
-            item("爾雅", index = 3),
-            item("吧", index = 4),
-            item("(＞﹏＜)", index = 5),
-        )
-        val out = CandidateRanking.wordsFirst(input)
-        assertEquals(listOf("你好", "爾雅", "以", "abc", "吧", "(＞﹏＜)"), out.map { it.text })
-        // 穩定：兩個詞組之間、其餘項目之間各自保持原順序（用 index 驗證）
-        assertEquals(listOf(1, 3, 0, 2, 4, 5), out.map { it.index })
-    }
-
-    @Test
-    fun `wordsFirst leaves list untouched when all or none are words`() {
-        val allWords = listOf(item("你好", index = 1), item("再見", index = 0))
-        assertEquals(allWords, CandidateRanking.wordsFirst(allWords))
-        val allSingles = listOf(item("你", index = 1), item("a", index = 0))
-        assertEquals(allSingles, CandidateRanking.wordsFirst(allSingles))
-        assertEquals(emptyList<CandidateItem>(), CandidateRanking.wordsFirst(emptyList()))
-    }
-
-    @Test
-    fun `rankBar puts words first, truncates to bar size, drops empty entries`() {
+    fun `rankBar keeps engine order, truncates and drops empties`() {
         val ranked = listOf(
             item("以", index = 0),
-            item("而", index = 1),
+            item("你好", index = 1),
             item("", index = 2), // 空文字不顯示
-            item("你好", index = 3),
-            item("abc", index = 4),
-            item("爾雅", index = 5),
+            item("而", index = 3),
+            item("爾雅", index = 4),
+            item("abc", index = 5),
         )
         val bar = CandidateRanking.rankBar(ranked, barSize = 4)
-        assertEquals(listOf("你好", "爾雅", "以", "而"), bar.map { it.text })
+        assertEquals(listOf("以", "你好", "而", "爾雅"), bar.map { it.text })
         // 原始下標必須保留（點擊要回傳引擎全局下標）
-        assertEquals(listOf(3, 5, 0, 1), bar.map { it.index })
+        assertEquals(listOf(0, 1, 3, 4), bar.map { it.index })
     }
 
     @Test
-    fun `rankBar caps the word zone and fills the rest with single chars`() {
-        // 用戶 2026-11-11：左邊詞組區嚴格 ≤ 4 條，右邊單字區（單字不再被詞組擠掉）
-        val wordTexts = listOf("山水", "風雨", "日月", "江河", "雲霧", "星辰", "花草", "樹木", "鳥獸")
-        val singleTexts = listOf("水", "風", "月", "河", "霧", "星", "花", "木", "鳥")
-        val words = wordTexts.mapIndexed { i, w -> item(w, index = i) }
-        val singles = singleTexts.mapIndexed { i, ch -> item(ch, index = 100 + i) }
-        val bar = CandidateRanking.rankBar(words + singles, barSize = 12)
-        // 詞組區嚴格 4 條（超額詞組不進候選條）
-        assertEquals(wordTexts.take(4), bar.take(4).map { it.text })
-        assertEquals(12, bar.size)
-        // 第 5 條起全部是單字，且保持原順序
-        assertEquals(singleTexts.take(8), bar.drop(4).map { it.text })
-    }
-
-    // ---- 候選條佈局的全部 case（用戶 2026-11-11：不能只假設最佳情況）----------------
-
-    @Test
-    fun `rankBar with only singles keeps them all`() {
-        val singles = (1..12).map { item("字$it", index = it) } // 注意：含數字 → 不算詞
-        val bar = CandidateRanking.rankBar(singles, barSize = 12)
-        assertEquals(singles.map { it.text }, bar.map { it.text })
-    }
-
-    @Test
-    fun `rankBar with only words fills the whole bar`() {
-        // 特例（用戶 2026-11-11）：沒有單字時，詞組可以佔滿候選條（不再卡 4 條）
-        val words = listOf("山水", "風雨", "日月", "江河", "雲霧", "星辰").mapIndexed { i, w ->
-            item(w, index = i)
-        }
-        val bar = CandidateRanking.rankBar(words, barSize = 12)
-        assertEquals(words.map { it.text }, bar.map { it.text })
-        // 詞組數量超過候選條也照樣截斷
-        // 詞組數量超過候選條也照樣截斷（2026-11-11 起候選條按文字去重，所以要用不同文字）
-        val many = (1..20).map { item("詞" + it, index = it) }
-        assertEquals(12, CandidateRanking.rankBar(many, barSize = 12).size)
-    }
-
-    @Test
-    fun `rankBar does not top up with words while any single exists`() {
-        // 用戶 2026-11-11 原話：只有「完全沒有單字」時詞組才能佔滿。
-        // 只要有 1 條單字，詞組區就還是 4 條 —— 候選條變短也不拿詞組去補。
-        val wordTexts = listOf("山水", "風雨", "日月", "江河", "雲霧", "星辰")
-        val words = wordTexts.mapIndexed { i, w -> item(w, index = i) }
-        val bar = CandidateRanking.rankBar(words + listOf(item("水", index = 100)), barSize = 12)
-        assertEquals(wordTexts.take(4) + "水", bar.map { it.text })
-    }
-
-    @Test
-    fun `rankBar respects word slots when bar size is smaller`() {
-        val words = listOf("山水", "風雨", "日月").mapIndexed { i, w -> item(w, index = i) }
-        val singles = listOf("水", "風", "月").mapIndexed { i, ch -> item(ch, index = 10 + i) }
-        val bar = CandidateRanking.rankBar(words + singles, barSize = 2)
-        assertEquals(listOf("山水", "風雨"), bar.map { it.text })
-    }
-
-    @Test
-    fun `rankBar with fewer words than slots fills the rest with singles`() {
-        val bar = CandidateRanking.rankBar(
-            listOf(item("山水", index = 0), item("水", index = 1), item("風", index = 2)),
-            barSize = 12,
+    fun `rankBar does not put words before single chars`() {
+        // 用戶 2026-11-12：取消詞組優先，詞/單字平等競爭，順序以引擎為準。
+        val ranked = listOf(
+            item("以", index = 0),
+            item("你好", index = 1),
+            item("而", index = 2),
+            item("爾雅", index = 3),
         )
-        assertEquals(listOf("山水", "水", "風"), bar.map { it.text })
+        val bar = CandidateRanking.rankBar(ranked, barSize = 12)
+        assertEquals(listOf("以", "你好", "而", "爾雅"), bar.map { it.text })
+    }
+
+    @Test
+    fun `rankBar dedupes identical texts but keeps engine order`() {
+        val ranked = listOf(
+            item("半截碼", "ban zet ma", 0),
+            item("半截碼", "ban zet ma", 1),
+            item("半截", "ban zet", 2),
+            item("半", "ban", 3),
+        )
+        val bar = CandidateRanking.rankBar(ranked, barSize = 12)
+        assertEquals(listOf("半截碼", "半截", "半"), bar.map { it.text })
+        assertEquals(listOf(0, 2, 3), bar.map { it.index })
     }
 
     @Test
     fun `rankBar on empty or blank input returns what remains`() {
         assertEquals(emptyList<CandidateItem>(), CandidateRanking.rankBar(emptyList(), barSize = 12))
-        // 全是空文字：過濾後為空
         assertEquals(
             emptyList<CandidateItem>(),
             CandidateRanking.rankBar(listOf(item("", index = 0), item("", index = 1)), barSize = 12),
@@ -305,12 +240,9 @@ class CandidateRankingTest {
         val engine = singles.mapIndexed { i, ch -> item(ch, comment = "ji", index = i) } +
             words.mapIndexed { i, w -> item(w, comment = "ji ji", index = 100 + i) }
         val bar = CandidateRanking.rankBar(engine, barSize = 9)
-        // 前 N 條必須全是詞組（詞組區上限 4；詞組數量不足時才輪到單字）
-        val groupCut = minOf(words.size, TwelveKeyTuning.BAR_WORD_SLOTS, bar.size)
-        bar.take(groupCut).forEach { assertTrue("候選條前段應是詞組：${bar.map { it.text }}", CandidateRanking.isCjkWord(it.text)) }
-        // 字表順序在單字之間保持
-        val barSingles = bar.filter { !CandidateRanking.isCjkWord(it.text) }.map { it.text }
-        assertEquals(singles.take(barSingles.size), barSingles)
+        // 用戶 2026-11-12：取消詞組優先，候選條順序 = 引擎給的順序（這裡單字在前、詞在後）
+        assertEquals(engine.take(9).map { it.text }, bar.map { it.text })
+        assertEquals(engine.take(9).map { it.index }, bar.map { it.index })
     }
 
     // ── orderGroups：單音節輸入時左列按常用度排（用戶 2026-11-10）───────────────
@@ -348,64 +280,56 @@ class CandidateRankingTest {
         )
     }
 
-    // -------------------------------------------------- 學習排序（覆蓋深度優先）
+    // -------------------------------------------------- 學習排序（少量調整，尊重引擎順序）
 
     @Test
-    fun rankWithLearningKeepsDeeperCandidateFirst() {
-        // 用戶 2026-11-10：「打完整 kiung than dong，最後一個 dong 被吃掉」。
-        // 候選條第一條必須是覆蓋三音節的「共產黨」，不能是以前選過、只覆蓋兩音節的「共產」。
+    fun `rankWithLearning keeps engine order when nothing learned`() {
         val engine = listOf(
             item("共产党", "kiung than dong", 0),
             item("共产", "kiung than", 1),
             item("穷", "kiung", 2),
         )
-        val learned = mapOf("共产" to 9000, "穷" to 9000)
-        val ranked = CandidateRanking.rankWithLearning(engine, topSyllables = 3) { learned[it.text] ?: 0 }
-        assertEquals(listOf("共产党", "共产", "穷"), ranked.map { it.text })
+        val ranked = CandidateRanking.rankWithLearning(engine) { 0 }
+        assertEquals(engine.map { it.text }, ranked.map { it.text })
     }
 
     @Test
-    fun rankWithLearningReordersWithinSameDepth() {
-        // 同一覆蓋深度（都是兩音節）：學習分數說話 —— 這是「選過的詞往前排」的本意。
+    fun `rankWithLearning lifts picked word but keeps engine order for the rest`() {
         val engine = listOf(
             item("穷酸", "kiung thon", 0),
             item("共产", "kiung than", 1),
             item("穷", "kiung", 2),
         )
-        val ranked = CandidateRanking.rankWithLearning(engine, topSyllables = 2) {
+        val ranked = CandidateRanking.rankWithLearning(engine) {
             if (it.text == "共产") 9000 else 0
         }
         assertEquals(listOf("共产", "穷酸", "穷"), ranked.map { it.text })
     }
 
     @Test
-    fun rankWithLearningHandlesSingleCharDepth() {
-        // 兩音節輸入時單字是「淺一層」：學習過也要排在兩音節詞後面（詞組優先），
-        // 但同為單字時學習分數仍然有效。
+    fun `rankWithLearning lets single char compete equally`() {
+        // 用戶 2026-11-12：詞/單字平等競爭，學過的單字也能到最前（不再被「詞組優先」壓後）。
         val engine = listOf(
             item("里", "li", 0),
             item("理会", "li voi", 1),
             item("柳眉", "liu mei", 2),
             item("柳", "liu", 3),
         )
-        val ranked = CandidateRanking.rankWithLearning(engine, topSyllables = 2) {
+        val ranked = CandidateRanking.rankWithLearning(engine) {
             when (it.text) {
                 "里" -> 9000
                 "柳眉" -> 8000
                 else -> 0
             }
         }
-        assertEquals(listOf("柳眉", "理会", "里", "柳"), ranked.map { it.text })
+        assertEquals(listOf("里", "柳眉", "理会", "柳"), ranked.map { it.text })
     }
 
     @Test
-    fun rankWithLearningFallsBackToPureLearningWhenDepthUnknown() {
-        // 引擎沒給 comment（方案沒開 spelling_hints）→ 深度未知，退化為純學習排序。
+    fun `rankWithLearning falls back to engine order when scores all zero`() {
         val engine = listOf(item("甲", "", 0), item("乙", "", 1))
-        val ranked = CandidateRanking.rankWithLearning(engine, topSyllables = 0) {
-            if (it.text == "乙") 9000 else 0
-        }
-        assertEquals(listOf("乙", "甲"), ranked.map { it.text })
+        val ranked = CandidateRanking.rankWithLearning(engine) { 0 }
+        assertEquals(listOf("甲", "乙"), ranked.map { it.text })
     }
 
     @Test
@@ -426,14 +350,15 @@ class CandidateRankingTest {
     // ------------------------------------------------------------------ 推薦組（候選條續頁）
 
     @Test
-    fun `fullBarOrder puts all words before all singles and keeps relative order`() {
+    fun `fullBarOrder keeps given order and dedupes texts`() {
+        // 用戶 2026-11-12：不再「全部詞 → 全部單字」分區，順序原樣保留。
         val ranked = listOf(
             item("以", index = 0),
             item("你好", index = 1),
             item("爾雅", index = 2),
             item("吧", index = 3),
         )
-        assertEquals(listOf("你好", "爾雅", "以", "吧"), CandidateRanking.fullBarOrder(ranked).map { it.text })
+        assertEquals(listOf("以", "你好", "爾雅", "吧"), CandidateRanking.fullBarOrder(ranked).map { it.text })
     }
 
     @Test

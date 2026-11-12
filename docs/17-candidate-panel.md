@@ -379,6 +379,7 @@ flowchart TD
 1. 引擎/学习候选先走 `CandidateRanking.fullBarOrder`（与候选条同一排序）：**CJK 词**及
    **含汉字的混合词**（`b站`、`3D打印`，`isWordLike`）进词区，**单个 CJK 字**进单字区
    （保持引擎 `index`，点击走 `select_candidate`）；纯 ASCII 引擎候选不进词区；
+   注意：这是**推荐组**自己的呈现分区，固定候选条已於 2026-11-12 取消词/字分区（見 docs/12 §2）；
 2. 再接面板词行（`panelRows.filter { it.segment == 1 }`）的全部 `items`——`ASSOC` / `INITIAL_COMBO` /
    `WHOLE_WORD` / 引擎词行，**ASCII 词（如 `Linux`）也收**；
 3. 面板词再过一遍**完整碼前綴優先**：`TwelveKeyPreedit.derivedWordCode(word)` 用字表逐字首讀音拼出完整碼，
@@ -722,7 +723,7 @@ $ python3 tools/panel_probe.py selftest
 
 | 想改 | 改这里 |
 |---|---|
-| 候选条 12 格里词/单字比例 | `TwelveKeyTuning.BAR_WORD_SLOTS` |
+| 候选条 12 格顺序 | 引擎候选顺序 + `SelectionMemory` 学习 boost（2026-11-12 起無詞區名額） |
 | 「推荐」组条数 | `TwelveKeyTuning.RECOMMEND_WORDS`（=30 词）+ `RECOMMEND_CHARS`（=10 单字） |
 | 段组每个音节列多少字 | `TwelveKeyTuning.SEGMENT_CHARS_LIMIT` |
 | 段组给多少个音节 | `SEGMENT_SYLLABLE_LIMIT(_RICH)`、`RICH_SYLLABLE_THRESHOLD` |

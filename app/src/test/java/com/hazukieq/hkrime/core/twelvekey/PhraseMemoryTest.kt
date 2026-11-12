@@ -219,8 +219,8 @@ class PhraseMemoryTest {
     }
 
     @Test
-    fun `synthetic candidates do not break the word slots of the bar`() {
-        // 合成候選也是「詞條」：詞區仍然受 BAR_WORD_SLOTS 約束
+    fun `synthetic candidates merge into the bar by score, no word-slots cap`() {
+        // 用戶 2026-11-12：取消詞組優先/詞區名額，合成候選按分數混排後原樣截斷。
         val words = listOf("醫院", "這種", "一樣", "由於", "作者", "預約")
         val ranked = words.mapIndexed { i, w -> item(w, "ci", i) }
         val synthetics = listOf("以液難", "以液", "液難").map { synthetic(it, "ji jek nan", "8i8e4") }
@@ -230,8 +230,9 @@ class PhraseMemoryTest {
             syntheticScore = { 9.0 },
             engineScore = { i -> 1.0 - i.toDouble() / ranked.size },
         )
-        val bar = CandidateRanking.rankBar(merged + listOf(item("以", "ji", 99)), barSize = 12)
-        assertEquals(TwelveKeyTuning.BAR_WORD_SLOTS, bar.count { it.text.length > 1 })
+        val input = merged + listOf(item("以", "ji", 99))
+        val bar = CandidateRanking.rankBar(input, barSize = 12)
+        assertEquals(input.take(12).map { it.text }, bar.map { it.text })
     }
 
     // ---------- 快照構造：記憶 → 合成候選 → 混排 ----------

@@ -3736,3 +3736,18 @@ perf-gate 需要真實鍵盤會話（本次未跑，待你正常打字時再確�
 
 副作用：面板引擎詞組點擊現在會走 librime 學習/提交路徑，`uncommittedPrefix` 那套「多字詞選中不提交」
 的既有邏輯不變；App 合成詞仍記 PhraseMemory（`learnPick`/`bumpPicked`）。
+
+## 15.72 固定候選條取消「詞組優先」（2026-11-12）
+
+用戶原話：「现在固定候选条取消 词组优先，改为平等竞争，并尊重 engine 给出的候选，在此基础上只做少量添加或者删改 by app 现在的算法」。
+
+改動：
+
+- `CandidateRanking.rankBar` = `fullBarOrder` → 濾空 → `take(12)`，不再「詞區 ≤4 條 + 單字區」分區；
+- `fullBarOrder` 只按文字去重（保留先出現的那條），順序原樣保留；
+- `rankWithLearning` 去掉「覆蓋音節多者優先」（舊的 `topSyllables` 深度鍵），只按學習分數降序、
+  同分按引擎下標——詞與單字平等競爭；
+- `TwelveKeyTuning.BAR_WORD_SLOTS` 刪除。
+
+保留的 App 調整（「少量」）：`SelectionMemory` 學習 boost、`mergePhraseCandidates` 合成學習詞混排、
+按文字去重。展開面板/推薦組的呈現分區不受影響（那是「推薦組」自己的詞/字分區，見 docs/17 §7.6）。

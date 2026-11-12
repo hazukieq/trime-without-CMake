@@ -32,67 +32,36 @@ object CandidateRanking {
         text.length == 1 && (text[0].code in 0x3400..0x4DBF || text[0].code in 0x4E00..0x9FFF)
 
     /**
-     * 固定候選區的「詞組優先」：對**已排好序**的候選做穩定分區。
+     * 固定候選區最終列表：**引擎順序（已含 App 的少量學習調整）+ 去重 + 截斷**。
      *
-     * 要求（用戶 2026-11-09）：候選欄永遠「組詞 > 單字」，但必須在全部排序之後做，
-     * 否則會蓋掉詞頻/用戶習慣的順序。單字、顏文字、拉丁詞之間保持原相對順序。
-     */
-    fun wordsFirst(items: List<CandidateItem>): List<CandidateItem> {
-        if (items.size < 2) return items
-        val words = ArrayList<CandidateItem>(items.size)
-        val rest = ArrayList<CandidateItem>(items.size)
-        items.forEach { if (isCjkWord(it.text)) words.add(it) else rest.add(it) }
-        if (words.isEmpty() || rest.isEmpty()) return items
-        return words + rest
-    }
-
-    /**
-     * 固定候選區最終列表：**左邊詞組區（嚴格 ≤[wordSlots] 條）+ 右邊單字區** → 取前 [barSize] 條。
+     * 用戶 2026-11-12：取消「詞組優先」，詞/單字**平等競爭**，尊重 engine 給出的候選順序，
+     * App 只在這個基礎上做少量添加/刪改（學習詞 boost、合成學習詞、按文字去重）。
+     * 不再把 CJK 詞穩定分區到前面，也不再有「詞區 ≤ N 條」的上限。
      *
-     * 用戶 2026-11-11：詞組優先不變（永遠在左），但數量要嚴格限制 —— 否則多音節輸入時
-     * 整個候選條被詞組佔滿，高頻單字一個都露不出來（24 鍵輸入實測「共产党 共产 理会 柳眉 球迷」全是詞）。
-     * 超額的詞組不進候選條（仍留在 [ranked] 裡，展開面板看得到）。
-     *
-     * @param ranked 已按「引擎詞頻 / 用戶記憶 / 關聯度」排好的候選（順序即最終順序）
-     * @param barSize 候選條總條數（詞組區 + 單字區）
-     * @param wordSlots 詞組區上限（見 [TwelveKeyTuning.BAR_WORD_SLOTS]）
+     * @param ranked 已按引擎順序 + App 少量調整排好的候選（順序即最終順序）
+     * @param barSize 候選條總條數
      */
     fun rankBar(
         ranked: List<CandidateItem>,
         barSize: Int = 12,
-        wordSlots: Int = TwelveKeyTuning.BAR_WORD_SLOTS,
     ): List<CandidateItem> {
-        val order = fullBarOrder(ranked)
-        if (order.isEmpty()) return order
-        val words = order.filter { isCjkWord(it.text) }
-        val others = order.filterNot { isCjkWord(it.text) }
-        // 特例（用戶 2026-11-11 原話）：**完全沒有單字時**，詞組才可以佔滿整條候選條
-        // —— 只要存在任何單字（含 ASCII/顏文字等非詞組候選），詞組區仍然嚴格 ≤ wordSlots，
-        // 即使候選條因此變短也不拿詞組去補（用戶明確：不做「單字不夠就補詞」的推廣）。
-        if (others.isEmpty()) {
-            return order.take(barSize).filter { it.text.isNotEmpty() }
-        }
-        val head = if (wordSlots > 0) words.take(wordSlots) else emptyList()
-        return (head + others).take(barSize).filter { it.text.isNotEmpty() }
+        if (ranked.isEmpty()) return ranked
+        return fullBarOrder(ranked).asSequence()
+            .filter { it.text.isNotEmpty() }
+            .take(barSize)
+            .toList()
     }
 
     /**
-     * 詞/字的最終順序（候選條與面板「推薦」組的**唯一來源**）：去重 → 全部詞 → 全部單字，
-     * 各段保持 [ranked] 內的相對順序。
+     * 候選條與面板「推薦」組的**唯一來源**：只按文字去重（保留先出現的那條），順序原樣保留。
      *
-     * 為什麼不直接拿 [rankBar] 的結果 `drop(12)`：`rankBar` 會把第 5 個起的詞丟掉
-     * （詞組區嚴格 ≤ `wordSlots`），那些詞如果只靠候選條，就永遠看不到；
-     * 面板「推薦」組要把「放不下的續頁」連同這些超額詞一起收進去（用戶 2026-11-11 定案）。
+     * 用戶 2026-11-12：不再「全部詞 → 全部單字」分區；引擎/學習混排後是什麼順序，候選條就
+     * 取前 [barSize] 條，不再按詞/字重排。去重仍是必要的（候選條不顯示 comment，同文重複
+     * 就是重複詞條；引擎的 userdb + custom_phrase 也可能各給一份）。
      */
     fun fullBarOrder(ranked: List<CandidateItem>): List<CandidateItem> {
         if (ranked.isEmpty()) return ranked
-        // 候選條不顯示 comment，同一個詞出現兩次就是「重複詞條」（用戶 2026-11-11 報）。
-        // 引擎本身也可能重複（userdb + custom_phrase 各學一份），這裡按文字去重、保留先出現的那條。
-        val deduped = ranked.distinctBy { it.text }
-        val words = ArrayList<CandidateItem>(deduped.size)
-        val others = ArrayList<CandidateItem>(deduped.size)
-        deduped.forEach { if (isCjkWord(it.text)) words.add(it) else others.add(it) }
-        return if (others.isEmpty()) words else words + others
+        return ranked.distinctBy { it.text }
     }
 
     /**
@@ -187,21 +156,17 @@ object CandidateRanking {
      */
     fun rankWithLearning(
         items: List<CandidateItem>,
-        topSyllables: Int,
         score: (CandidateItem) -> Int,
     ): List<CandidateItem> {
         if (items.size <= 1) return items
-        // 先算好排序鍵再排：舊寫法把 syllableCount(comment)（split）與 score()
-        // 放進 Comparator，n log n 次重算，600 條候選時每鍵白燒十幾毫秒。
-        data class Keyed(val item: CandidateItem, val depth: Int, val score: Int)
+        // 先算好排序鍵再排：舊寫法把 score() 放進 Comparator，n log n 次重算。
+        // 用戶 2026-11-12：取消「覆蓋音節多者優先」的詞組傾斜——詞/單字平等競爭，
+        // 只有「學過的詞」才有分數（少量調整），同分維持引擎下標（引擎順序）。
+        data class Keyed(val item: CandidateItem, val score: Int)
         val keyed = ArrayList<Keyed>(items.size)
-        for (item in items) {
-            val depth = if (topSyllables <= 0) 0 else minOf(syllableCount(item.comment), topSyllables)
-            keyed.add(Keyed(item, depth, score(item)))
-        }
+        for (item in items) keyed.add(Keyed(item, score(item)))
         keyed.sortWith(
-            compareByDescending<Keyed> { it.depth }
-                .thenByDescending { it.score }
+            compareByDescending<Keyed> { it.score }
                 .thenBy { it.item.index },
         )
         return keyed.map { it.item }

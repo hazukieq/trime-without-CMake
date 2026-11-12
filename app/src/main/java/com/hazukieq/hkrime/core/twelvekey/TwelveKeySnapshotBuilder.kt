@@ -147,14 +147,10 @@ object TwelveKeySnapshotBuilder {
         }
 
         val __tFlat = System.nanoTime()
-        // App 側學習排序：選過的詞（同讀音+同詞）排前，候選條與面板都吃這個順序。
-        // 但學習只能在「同一覆蓋深度」內重排 —— 否則學過的兩音節詞（共產 / kiung than）
-        // 會把覆蓋全部輸入的三音節詞（共產黨 / kiung than dong）擠下去，
-        // preedit 跟著少一個音節（用戶 2026-11-10：「打完整 kiung than dong，最後一個 dong 被吃掉」）。
-        val topSyllables = flat.firstOrNull { it.text.isNotEmpty() }
-            ?.let { CandidateRanking.syllableCount(it.comment) } ?: 0
+        // App 側學習排序：只把「學過的詞」抬前，其餘維持引擎順序（同分看引擎下標）。
+        // 用戶 2026-11-12：取消詞組優先/覆蓋深度傾斜——詞與單字平等競爭，尊重引擎給的候選。
         val ranked = if (applyLearning && SelectionMemory.hasAny()) {
-            CandidateRanking.rankWithLearning(flat, topSyllables) {
+            CandidateRanking.rankWithLearning(flat) {
                 SelectionMemory.score(it.text, it.comment)
             }
         } else {
