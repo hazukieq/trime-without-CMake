@@ -1,0 +1,9 @@
+# 引擎側 userdb 學習：真機 userdb 裡有「邻居一通来的」(lin gi jit tung loi dit)，
+# 引擎候選第一條就是它；PC 需先跑 pull-real-data.sh（含 *.userdb LevelDB）。
+#   rime-jni/host-test/pull-real-data.sh
+#   python3 tools/preedit_flow.py --scenario tools/flow-scenarios/userdb-learned.flow
+type 5i4ii8i9934i54iei9
+assert bar_first 邻居一通来的
+pick 邻居一通来的
+assert committed 邻居一通来的
+assert composing 0

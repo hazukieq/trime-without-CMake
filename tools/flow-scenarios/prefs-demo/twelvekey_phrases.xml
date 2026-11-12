@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8' standalone='yes' ?>
 <map>
-    <!-- 冷起 typed=3 → typed+picked>=2，PhraseMemory 可見，作為合成候選進候選條 -->
-    <string name="5a4i5i">冷起&#1;lang ki&#1;3&#1;1794497486755&#1;0&#1;0</string>
+    <!-- 冷起 typed=9/picked=9 → score 高於引擎順序分，作為合成候選排在候選條前面 -->
+    <string name="5a4i5i">冷起&#1;lang ki&#1;9&#1;1794497486755&#1;0&#1;9</string>
 </map>

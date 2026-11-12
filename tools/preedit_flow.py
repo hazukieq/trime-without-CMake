@@ -177,6 +177,25 @@ class PhraseMemory:
         self.by_code[key] = entries[: self.MAX_PER_CODE]
         self.version += 1
 
+    def record(self, code: str, text: str, readings: str) -> None:
+        """逐段拼出的整串：typed +1（App PhraseMemory.applyRecord）。"""
+        key = self.normalize(code)
+        if not key or len(text) < 2:
+            return
+        now = int(time.time() * 1000)
+        entries = list(self.by_code.get(key, []))
+        hit = next((e for e in entries if e.text == text), None)
+        if hit is not None:
+            hit.typed = min(hit.typed + 1, self.MAX_COUNT)
+            hit.last_used_at = now
+            if readings:
+                hit.readings = readings
+        else:
+            entries.append(PhraseEntry(text, readings, 1, now))
+        entries.sort(key=lambda e: (-self.score(e, now), -e.last_used_at))
+        self.by_code[key] = entries[: self.MAX_PER_CODE]
+        self.version += 1
+
     def bump_picked(self, code: str, text: str) -> None:
         key = self.normalize(code)
         for e in self.by_code.get(key, []):
@@ -334,6 +353,11 @@ class Sim:
         self.committed = ""          # 目前已上屏文字
         self.left_reading = ""       # 面板左列目前選中的段音節
         self.failures = 0            # assert 失敗數（scenario 當回歸測試用）
+        # 逐段拼出的整串（App maybeRecordPhrase 的口徑）
+        self.picked_code = ""
+        self.picked_pieces = 0
+        self.picked_text = ""
+        self.picked_readings: list[str] = []
         self._reset_from(self.state)
 
     # ---------- 引擎狀態同步 ----------
@@ -363,11 +387,42 @@ class Sim:
         return [s for s in self.state.segs if s.status < 2]
 
     # ---------- 上屏 ----------
+    def _note_picked(self, text: str, reading: str, code: str) -> None:
+        if not text:
+            return
+        if not self.picked_code:
+            self.picked_code = code
+        self.picked_pieces += 1
+        self.picked_text += text
+        self.picked_readings.append(reading)
+        if not reading:
+            self.picked_readings = [""]  # 缺讀音就不記整串
+
+    def _maybe_record_phrase(self) -> None:
+        if not self.apply_learning:
+            self._reset_picked()
+            return
+        readings = " ".join(r for r in self.picked_readings if r)
+        complete = bool(self.picked_readings) and all(self.picked_readings)
+        if (len(self.picked_text) >= 2 and self.picked_pieces >= 2
+                and self.picked_code and complete):
+            self.phrase.record(self.picked_code, self.picked_text, readings)
+        self._reset_picked()
+
+    def _reset_picked(self) -> None:
+        self.picked_code = ""
+        self.picked_pieces = 0
+        self.picked_text = ""
+        self.picked_readings = []
+
     def _absorb_commit(self, st: EngineState) -> None:
         if st.commit:
             self.committed += self.pending + st.commit
             self.pending = ""
             self.held.clear()
+            self._maybe_record_phrase()
+        elif not st.composing and self.picked_pieces:
+            self._maybe_record_phrase()
 
     # ---------- 選中 ----------
     def _decode(self, code: str) -> list[str]:
@@ -400,8 +455,10 @@ class Sim:
         pairs.sort(key=lambda p: (-p[1], 1 if p[0].index < 0 else 0))
         return [p[0] for p in pairs]
 
-    def bar_items(self) -> list[BarItem]:
-        flat = self._engine_items()
+    BAR_WINDOW = 64
+    BAR_ITEMS = 12
+
+    def _ordered(self, flat: list[BarItem]) -> list[BarItem]:
         ranked = flat
         if self.apply_learning and self.sel.has_any():
             ranked = sorted(
@@ -417,6 +474,15 @@ class Sim:
             seen.add(it.text)
             out.append(it)
         return out
+
+    def bar_items(self) -> list[BarItem]:
+        """App 候選條：永遠只取前 64 條引擎候選做學習排序+學習詞混排，展示 12 項。"""
+        flat = self._engine_items()[: self.BAR_WINDOW]
+        return self._ordered(flat)[: self.BAR_ITEMS]
+
+    def panel_items(self) -> list[BarItem]:
+        """展開面板：全量引擎候選（host-test 最多印 600）再排序，供左列/右列查找。"""
+        return self._ordered(self._engine_items())
 
     def bar(self, n: int) -> None:
         items = self.bar_items()
@@ -473,6 +539,7 @@ class Sim:
                 if len(it.text) >= 2:
                     self.phrase.learn_pick(self.state.input, it.text, it.comment)
                     self.sel.bump(it.text, it.comment)
+            self._note_picked(it.text, it.comment, self.state.input)
             st = self.engine.send("clear")
             self._reset_from(st)
             if rest:
@@ -489,6 +556,7 @@ class Sim:
                 self.sel.bump(it.text, it.comment)
                 if len(it.text) >= 2:
                     self.phrase.learn_pick(self.state.input, it.text, it.comment)
+            self._note_picked(it.text, it.comment, self.state.input)
             st = self.engine.send(f"select {it.index}")
             self._reset_from(st)
             self._absorb_commit(st)
@@ -496,7 +564,7 @@ class Sim:
     # ---------- 面板 ----------
     def left(self, reading: str) -> None:
         self.left_reading = reading
-        matches = [it for it in self.bar_items()
+        matches = [it for it in self.panel_items()
                    if reading_syllables(it.comment)[:1] == [reading]]
         print(f"  左列 {reading}: {len(matches)} 項")
         for it in matches[:16]:
@@ -505,7 +573,7 @@ class Sim:
 
     def right(self, text: str) -> bool:
         wanted = self.left_reading
-        for it in self.bar_items():
+        for it in self.panel_items():
             if it.text == text and (not wanted or reading_syllables(it.comment)[:1] == [wanted]):
                 self._pick_item(it)
                 return True
@@ -541,6 +609,40 @@ class Sim:
         self.pending = ""
         self.held.clear()
         self.left_reading = ""
+        self._reset_picked()
+
+    # ---------- 記憶持久化 ----------
+    def save_prefs(self, prefs_dir: str) -> list[str]:
+        os.makedirs(prefs_dir, exist_ok=True)
+        written: list[str] = []
+
+        def esc(value: str) -> str:
+            return (value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                    .replace("\u0001", "&#1;").replace("\n", "&#10;"))
+
+        phrase_lines = ["<?xml version='1.0' encoding='utf-8' standalone='yes' ?>", "<map>"]
+        for code, entries in self.phrase.by_code.items():
+            if not entries:
+                continue
+            body = "\n".join(
+                "\u0001".join([e.text, e.readings, str(e.typed), str(e.last_used_at),
+                                str(e.shown), str(e.picked)])
+                for e in entries
+            )
+            phrase_lines.append(f'    <string name="{esc(code)}">{esc(body)}</string>')
+        phrase_lines.append("</map>")
+        with open(os.path.join(prefs_dir, "twelvekey_phrases.xml"), "w", encoding="utf-8") as f:
+            f.write("\n".join(phrase_lines) + "\n")
+        written.append("twelvekey_phrases.xml")
+
+        sel_lines = ["<?xml version='1.0' encoding='utf-8' standalone='yes' ?>", "<map>"]
+        for key, value in self.sel.scores.items():
+            sel_lines.append(f'    <int name="{esc(key)}" value="{value}" />')
+        sel_lines.append("</map>")
+        with open(os.path.join(prefs_dir, "twelvekey_selection.xml"), "w", encoding="utf-8") as f:
+            f.write("\n".join(sel_lines) + "\n")
+        written.append("twelvekey_selection.xml")
+        return written
 
     # ---------- 顯示 ----------
     def dump(self) -> None:
@@ -620,6 +722,30 @@ class Sim:
         self.dump()
 
 
+def push_prefs(serial: str, prefs_dir: str) -> None:
+    """把本地保存的記憶 XML 寫回裝置（需 debug 包 run-as；會 force-stop App）。"""
+    pkg = "com.hazukieq.hkrime"
+    subprocess.run(["adb", "-s", serial, "shell", "am", "force-stop", pkg],
+                   capture_output=True, text=True)
+    for name in ("twelvekey_phrases.xml", "twelvekey_selection.xml"):
+        path = os.path.join(prefs_dir, name)
+        if not os.path.isfile(path):
+            continue
+        data = open(path, encoding="utf-8").read()
+        r = subprocess.run(
+            ["adb", "-s", serial, "shell",
+             f"run-as {pkg} sh -c 'cat > shared_prefs/{name}'"],
+            input=data, capture_output=True, text=True)
+        if r.returncode != 0:
+            print(f"  ! 推送 {name} 失敗：{(r.stderr or r.stdout).strip()[:160]}")
+        else:
+            print(f"  已推送 {name} → {serial}:/data/data/{pkg}/shared_prefs/")
+    # force-stop 會切走預設 IME，重設回本 App。
+    subprocess.run(["adb", "-s", serial, "shell", "ime", "set",
+                    f"{pkg}/.TrimeImeService"], capture_output=True, text=True)
+    print("  已重設輸入法；如 App 仍在舊進程，請重開鍵盤。")
+
+
 DEMO = """
 # 部分選中：lang ki → 面板選「冷」→ 候選條選「起」→ 應上屏「冷起」
 type 5a4i5i
@@ -643,6 +769,10 @@ def main() -> int:
                     help="不載入 PhraseMemory/SelectionMemory（純引擎順序）")
     ap.add_argument("--pull-prefs", metavar="SERIAL",
                     help="先從裝置拉 twelvekey_phrases/selection.xml 到 --prefs-dir")
+    ap.add_argument("--save-prefs", action="store_true",
+                    help="跑完把學習記憶寫回 --prefs-dir（xml）")
+    ap.add_argument("--push-prefs", metavar="SERIAL",
+                    help="跑完寫回 --prefs-dir，再推回裝置（debug run-as）")
     args = ap.parse_args()
 
     if args.pull_prefs:
@@ -686,6 +816,11 @@ def main() -> int:
         engine.close()
 
     print(f"\n== 最終上屏: {sim.committed!r}")
+    if args.save_prefs or args.push_prefs:
+        names = sim.save_prefs(args.prefs_dir)
+        print(f"== 已保存學習記憶: {', '.join(names)} → {args.prefs_dir}")
+    if args.push_prefs:
+        push_prefs(args.push_prefs, args.prefs_dir)
     if sim.failures:
         print(f"== 斷言失敗 {sim.failures} 條")
         return 1
