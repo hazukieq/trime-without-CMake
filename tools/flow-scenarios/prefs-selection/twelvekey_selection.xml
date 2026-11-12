@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <!-- 冷气 選過 9 次（lang ki + text），候選條應排第一 -->
+    <int name="lang ki&#1;冷气" value="9005" />
+    <int name="~seq" value="5" />
+</map>

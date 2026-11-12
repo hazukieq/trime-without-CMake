@@ -1,0 +1,5 @@
+# SelectionMemory：冷气 (lang ki) 選過 9 次，打字後候選條第一項必須是它。
+#   python3 tools/preedit_flow.py --prefs-dir tools/flow-scenarios/prefs-selection \
+#       --scenario tools/flow-scenarios/selection-memory.flow
+type 5a4i5i
+assert bar_first 冷气

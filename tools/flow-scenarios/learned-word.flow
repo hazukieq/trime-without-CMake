@@ -1,0 +1,10 @@
+# PhraseMemory 學習詞：冷起 (typed=3) 應以合成候選進候選條，點它直接上屏。
+# 需搭配 --prefs-dir tools/flow-scenarios/prefs-demo 執行：
+#   python3 tools/preedit_flow.py --prefs-dir tools/flow-scenarios/prefs-demo \
+#       --scenario tools/flow-scenarios/learned-word.flow
+type 5a4i5i
+bar
+pick 冷起
+assert committed 冷起
+assert pending ""
+assert composing 0

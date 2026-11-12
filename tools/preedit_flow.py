@@ -30,9 +30,12 @@ App 側在 Python 裡復刻 TextInputManager 的 pendingPick / heldPicks / uncon
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import subprocess
 import sys
+import time
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -52,6 +55,180 @@ def data():
 
         _DATA = panel_probe.Data(os.path.join(REPO, "app", "src", "main", "assets", "rime"))
     return _DATA
+
+
+# ---------- App 側記憶（與 Kotlin 同口徑） ----------
+
+
+@dataclass
+class PhraseEntry:
+    text: str
+    readings: str
+    typed: int
+    last_used_at: int
+    shown: int = 0
+    picked: int = 0
+
+
+def _parse_prefs_xml(path: str):
+    """Android 的 SharedPreferences XML 會寫 &#1; 這種 XML 1.0 非法控制字元，
+    ElementTree 直接 parse 會炸；先用哨兵替換再還原。"""
+    raw = open(path, encoding="utf-8").read()
+    raw = raw.replace("&#1;", "@@SEP@@").replace("&#10;", "@@NL@@")
+    return ET.fromstring(raw)
+
+
+class PhraseMemory:
+    """twelvekey_phrases.xml：學習詞 table（碼串 → 詞條）。"""
+
+    MAX_PER_CODE = 8
+    MIN_COUNT = 2
+    MAX_COUNT = 9
+    HALF_LIFE_MS = 7 * 24 * 3600 * 1000
+    CTR_ALPHA = 1.0
+    CTR_BETA = 2.0
+    EXPOSURE_DISCOUNT = 0.5
+
+    def __init__(self, prefs_dir: str | None):
+        self.by_code: dict[str, list[PhraseEntry]] = {}
+        self.version = 0
+        path = os.path.join(prefs_dir, "twelvekey_phrases.xml") if prefs_dir else ""
+        if path and os.path.isfile(path):
+            try:
+                root = _parse_prefs_xml(path)
+            except ET.ParseError:
+                root = None
+            if root is not None:
+                for node in root.findall("string"):
+                    code = node.get("name") or ""
+                    if not code:
+                        continue
+                    entries = self.decode(node.text or "")
+                    if entries:
+                        self.by_code[code] = entries
+
+    @staticmethod
+    def normalize(code: str) -> str:
+        return "".join(c for c in code if c != "'" and not c.isspace()).lower()
+
+    @classmethod
+    def decode(cls, raw: str) -> list[PhraseEntry]:
+        out: list[PhraseEntry] = []
+        raw = raw.replace("@@NL@@", "\n").replace("@@SEP@@", "\u0001")
+        for line in raw.split("\n"):
+            parts = line.split("\u0001")
+            if len(parts) < 4:
+                continue
+            text = parts[0]
+            if not text:
+                continue
+            try:
+                typed = int(parts[2])
+                last = int(parts[3])
+            except ValueError:
+                continue
+            shown = int(parts[4]) if len(parts) > 4 and parts[4].isdigit() else 0
+            picked = int(parts[5]) if len(parts) > 5 and parts[5].isdigit() else 0
+            out.append(PhraseEntry(text, parts[1], max(1, min(typed, cls.MAX_COUNT)),
+                                   last, shown, picked))
+        return out[: cls.MAX_PER_CODE]
+
+    @classmethod
+    def score(cls, e: PhraseEntry, now: int) -> float:
+        age = max(0, now - e.last_used_at)
+        fresh = math.pow(0.5, age / cls.HALF_LIFE_MS)
+        denom = e.picked + cls.EXPOSURE_DISCOUNT * e.shown + cls.CTR_ALPHA + cls.CTR_BETA
+        ctr = (e.picked + cls.CTR_ALPHA) / denom
+        demand = 1.0 + math.log1p(e.typed)
+        return fresh * ctr * demand
+
+    @classmethod
+    def should_purge(cls, e: PhraseEntry) -> bool:
+        return e.shown >= 8 and e.picked == 0 and e.typed <= 2
+
+    def candidates_for(self, code: str, now: int | None = None) -> list[PhraseEntry]:
+        now = now or int(time.time() * 1000)
+        entries = self.by_code.get(self.normalize(code), [])
+        visible = [
+            e for e in entries
+            if (e.typed + e.picked) >= self.MIN_COUNT
+            and len(e.text) >= 2
+            and not self.should_purge(e)
+        ]
+        visible.sort(key=lambda e: (-self.score(e, now), -e.last_used_at))
+        return visible
+
+    def has_any(self) -> bool:
+        return bool(self.by_code)
+
+    def learn_pick(self, code: str, text: str, readings: str) -> None:
+        key = self.normalize(code)
+        if not key or len(text) < 2:
+            return
+        now = int(time.time() * 1000)
+        entries = list(self.by_code.get(key, []))
+        hit = next((e for e in entries if e.text == text), None)
+        if hit is not None:
+            hit.picked = min(hit.picked + 1, self.MAX_COUNT)
+            hit.last_used_at = now
+        else:
+            entries.append(PhraseEntry(text, readings, 1, now, picked=1))
+        entries.sort(key=lambda e: (-self.score(e, now), -e.last_used_at))
+        self.by_code[key] = entries[: self.MAX_PER_CODE]
+        self.version += 1
+
+    def bump_picked(self, code: str, text: str) -> None:
+        key = self.normalize(code)
+        for e in self.by_code.get(key, []):
+            if e.text == text:
+                e.picked = min(e.picked + 1, self.MAX_COUNT)
+                e.last_used_at = int(time.time() * 1000)
+                self.version += 1
+                return
+
+
+class SelectionMemory:
+    """twelvekey_selection.xml：選中次數 * 1000 + 最近序號。"""
+
+    def __init__(self, prefs_dir: str | None):
+        self.scores: dict[str, int] = {}
+        path = os.path.join(prefs_dir, "twelvekey_selection.xml") if prefs_dir else ""
+        if path and os.path.isfile(path):
+            root = _parse_prefs_xml(path)
+            for node in root.findall("int"):
+                name = (node.get("name") or "").replace("@@SEP@@", "\u0001")
+                if name == "~seq":
+                    continue
+                try:
+                    self.scores[name] = int(node.get("value") or 0)
+                except ValueError:
+                    pass
+
+    def has_any(self) -> bool:
+        return bool(self.scores)
+
+    @staticmethod
+    def key(text: str, comment: str) -> str:
+        return text if not comment else f"{comment}\u0001{text}"
+
+    def score(self, text: str, comment: str) -> int:
+        return self.scores.get(self.key(text, comment), 0)
+
+    def bump(self, text: str, comment: str) -> None:
+        if not text:
+            return
+        k = self.key(text, comment)
+        old = self.scores.get(k, 0)
+        count = min(old // 1000 + 1, 9)
+        seq = max(self.scores.values(), default=0) % 1000 + 1
+        self.scores[k] = count * 1000 + seq
+
+
+@dataclass
+class BarItem:
+    text: str
+    comment: str
+    index: int  # 引擎候選下標；-1 表示 App 學習詞（合成候選）
 
 
 @dataclass
@@ -145,8 +322,12 @@ def reading_syllables(comment: str) -> list[str]:
 class Sim:
     """App 側狀態機：pendingPick / heldPicks / unconsumedCode / 上屏折疊。"""
 
-    def __init__(self, engine: Engine):
+    def __init__(self, engine: Engine, prefs_dir: str | None = None,
+                 apply_learning: bool = True):
         self.engine = engine
+        self.apply_learning = apply_learning
+        self.phrase = PhraseMemory(prefs_dir) if apply_learning else PhraseMemory(None)
+        self.sel = SelectionMemory(prefs_dir) if apply_learning else SelectionMemory(None)
         self.state = EngineState()
         self.pending = ""            # pendingPick：已選但未上屏的詞（preedit 前綴）
         self.held: list[tuple[str, str]] = []  # (text, 選中前完整碼)
@@ -189,72 +370,145 @@ class Sim:
             self.held.clear()
 
     # ---------- 選中 ----------
-    def _pick_index(self, index: int) -> None:
-        cands = self.state.cands
-        text, comment = ("", "")
-        if 0 <= index < len(cands):
-            text, comment = cands[index]
-        tokens = reading_syllables(comment)
-        remaining_code = self.unconsumed()
-        pieces = self._decode(remaining_code)
-        # App：候選只覆蓋前幾音節時不調 select，避免 auto-commit 整串。
-        # App 只在「多音節整詞」被部分覆蓋時 hold；單音節/單字走引擎原生部分選中。
-        if len(tokens) >= 2 and pieces and len(pieces) > len(tokens):
-            covered = "".join(pieces[: len(tokens)])
-            rest = remaining_code[len(covered):]
-            prefix = self.selected_prefix()
-            picked = prefix + text
-            self.pending += picked
-            self.held.append((picked, self.state.input))
-            st = self.engine.send("clear")
-            self._reset_from(st)
-            if rest:
-                st = self.engine.send("type " + rest)
-                self._reset_from(st)
-            else:
-                # 沒有剩餘碼時不能留在 clear 空組字，直接 commit pending。
-                self.committed += self.pending
-                self.pending = ""
-                self.held.clear()
-            self._absorb_commit(st)
-        else:
-            st = self.engine.send(f"select {index}")
-            self._reset_from(st)
-            self._absorb_commit(st)
-
     def _decode(self, code: str) -> list[str]:
         try:
             return data().decode(code) or []
         except Exception:
             return [code] if code else []
 
+    # ---------- 候選條（引擎 + SelectionMemory + PhraseMemory） ----------
+    def _engine_items(self) -> list[BarItem]:
+        return [BarItem(t, c, i) for i, (t, c) in enumerate(self.state.cands)]
+
+    def _merge_learned(self, ranked: list[BarItem], code: str) -> list[BarItem]:
+        now = int(time.time() * 1000)
+        phrases = self.phrase.candidates_for(code, now)
+        if not phrases:
+            return ranked
+        score_by_text = {e.text: self.phrase.score(e, now) for e in phrases}
+        engine_texts = {it.text for it in ranked}
+        n = max(1, len(ranked))
+        pairs: list[tuple[BarItem, float]] = []
+        for i, it in enumerate(ranked):
+            engine_score = 1.0 - i / n
+            boost = score_by_text.get(it.text)
+            pairs.append((it, max(engine_score, boost) if boost is not None else engine_score))
+        for e in phrases:
+            if e.text in engine_texts:
+                continue
+            pairs.append((BarItem(e.text, e.readings, -1), score_by_text[e.text]))
+        pairs.sort(key=lambda p: (-p[1], 1 if p[0].index < 0 else 0))
+        return [p[0] for p in pairs]
+
+    def bar_items(self) -> list[BarItem]:
+        flat = self._engine_items()
+        ranked = flat
+        if self.apply_learning and self.sel.has_any():
+            ranked = sorted(
+                flat,
+                key=lambda it: (-self.sel.score(it.text, it.comment), it.index),
+            )
+        ordered = self._merge_learned(ranked, self.state.input) if self.apply_learning else ranked
+        seen: set[str] = set()
+        out: list[BarItem] = []
+        for it in ordered:
+            if not it.text or it.text in seen:
+                continue
+            seen.add(it.text)
+            out.append(it)
+        return out
+
     def bar(self, n: int) -> None:
-        self._pick_index(n)
+        items = self.bar_items()
+        if 0 <= n < len(items):
+            self._pick_item(items[n])
+        else:
+            print(f"  ! 候選條沒有第 {n} 項（共 {len(items)}）")
+
+    def _print_bar(self) -> None:
+        for i, it in enumerate(self.bar_items()[:16]):
+            mark = "合成" if it.index < 0 else f"#{it.index}"
+            print(f"    [{i}] {it.text}  ({it.comment}) {mark}")
 
     def pick(self, text: str) -> bool:
-        for i, (t, _c) in enumerate(self.state.cands):
-            if t == text:
-                self._pick_index(i)
+        for it in self.bar_items():
+            if it.text == text:
+                self._pick_item(it)
                 return True
         print(f"  ! 候選條找不到「{text}」")
         return False
 
+    def _pick_item(self, it: BarItem) -> None:
+        if it.index < 0:
+            # App 合成詞（學習詞）：直接併入 pending 並上屏，不經引擎 select。
+            self.pending += it.text
+            self.committed += self.pending
+            self.pending = ""
+            self.held.clear()
+            if self.apply_learning:
+                # App commitPhrase：合成詞已存在時只 bumpPicked。
+                if any(e.text == it.text for e in
+                       self.phrase.by_code.get(PhraseMemory.normalize(self.state.input), [])):
+                    self.phrase.bump_picked(self.state.input, it.text)
+                else:
+                    self.phrase.learn_pick(self.state.input, it.text, it.comment)
+                self.sel.bump(it.text, it.comment)
+            st = self.engine.send("clear")
+            self._reset_from(st)
+            return
+
+        tokens = reading_syllables(it.comment)
+        remaining_code = self.unconsumed()
+        pieces = self._decode(remaining_code)
+        # App：只在「多音節整詞」被部分覆蓋時 hold；單音節/單字走引擎原生部分選中。
+        if len(tokens) >= 2 and pieces and len(pieces) > len(tokens):
+            covered = "".join(pieces[: len(tokens)])
+            rest = remaining_code[len(covered):]
+            prefix = self.selected_prefix()
+            picked = prefix + it.text
+            self.pending += picked
+            self.held.append((picked, self.state.input))
+            if self.apply_learning:
+                # App holdPartialPick：engineIndex>=0 與 App 詞都記 learnPick（單字不記）。
+                if len(it.text) >= 2:
+                    self.phrase.learn_pick(self.state.input, it.text, it.comment)
+                    self.sel.bump(it.text, it.comment)
+            st = self.engine.send("clear")
+            self._reset_from(st)
+            if rest:
+                st = self.engine.send("type " + rest)
+                self._reset_from(st)
+            else:
+                self.committed += self.pending
+                self.pending = ""
+                self.held.clear()
+            self._absorb_commit(st)
+        else:
+            if self.apply_learning:
+                # App：selectCandidate 前先 bump 排序記憶；多字詞同時記 PhraseMemory.learnPick。
+                self.sel.bump(it.text, it.comment)
+                if len(it.text) >= 2:
+                    self.phrase.learn_pick(self.state.input, it.text, it.comment)
+            st = self.engine.send(f"select {it.index}")
+            self._reset_from(st)
+            self._absorb_commit(st)
+
     # ---------- 面板 ----------
     def left(self, reading: str) -> None:
         self.left_reading = reading
-        matches = [(i, t, c) for i, (t, c) in enumerate(self.state.cands)
-                   if reading_syllables(c)[:1] == [reading]]
+        matches = [it for it in self.bar_items()
+                   if reading_syllables(it.comment)[:1] == [reading]]
         print(f"  左列 {reading}: {len(matches)} 項")
-        for i, t, c in matches[:16]:
-            print(f"    #{i:<3} {t}  ({c})")
+        for it in matches[:16]:
+            mark = "合成" if it.index < 0 else f"#{it.index}"
+            print(f"    {it.text}  ({it.comment}) {mark}")
 
     def right(self, text: str) -> bool:
         wanted = self.left_reading
-        for i, (t, c) in enumerate(self.state.cands):
-            if t == text and (not wanted or reading_syllables(c)[:1] == [wanted]):
-                self._pick_index(i)
+        for it in self.bar_items():
+            if it.text == text and (not wanted or reading_syllables(it.comment)[:1] == [wanted]):
+                self._pick_item(it)
                 return True
-        # 左列匹配不到就退化成任何同文候選（模擬 App 的 fallback 選詞）
         return self.pick(text)
 
     # ---------- 退格 / 上屏 ----------
@@ -317,6 +571,9 @@ class Sim:
             got = self.state.input
         elif key == "composing":
             got = "1" if self.state.composing else "0"
+        elif key in ("bar0", "bar_first"):
+            items = self.bar_items()
+            got = items[0].text if items else ""
         else:
             self.failures += 1
             print(f"  ASSERT FAILED: 未知斷言 {key}")
@@ -338,7 +595,10 @@ class Sim:
             self._reset_from(st)
             self._absorb_commit(st)
         elif cmd == "bar":
-            self.bar(int(arg))
+            if arg:
+                self.bar(int(arg))
+            else:
+                self._print_bar()
         elif cmd in ("pick", "sel"):
             self.pick(arg)
         elif cmd == "left":
@@ -377,7 +637,27 @@ def main() -> int:
     ap.add_argument("--exec", dest="inline", help="以分號分隔的命令字串")
     ap.add_argument("--scenario", help="命令檔路徑，一行一命令")
     ap.add_argument("--host-runner", default=HOST_RUNNER)
+    ap.add_argument("--prefs-dir", default=os.environ.get(
+        "HKRIME_FLOW_PREFS", "/tmp/hkrime-flow-prefs"))
+    ap.add_argument("--no-learning", action="store_true",
+                    help="不載入 PhraseMemory/SelectionMemory（純引擎順序）")
+    ap.add_argument("--pull-prefs", metavar="SERIAL",
+                    help="先從裝置拉 twelvekey_phrases/selection.xml 到 --prefs-dir")
     args = ap.parse_args()
+
+    if args.pull_prefs:
+        os.makedirs(args.prefs_dir, exist_ok=True)
+        for name in ("twelvekey_phrases.xml", "twelvekey_selection.xml"):
+            with open(os.path.join(args.prefs_dir, name), "w", encoding="utf-8") as f:
+                r = subprocess.run(
+                    ["adb", "-s", args.pull_prefs, "shell",
+                     f"run-as com.hazukieq.hkrime cat shared_prefs/{name}"],
+                    capture_output=True, text=True)
+                if r.returncode != 0 or not r.stdout.strip():
+                    print(f"  ! 拉取 {name} 失敗：{r.stderr.strip()[:120]}")
+                else:
+                    f.write(r.stdout)
+                    print(f"  已拉取 {name} → {args.prefs_dir}")
 
     if not os.path.exists(args.host_runner):
         print(f"找不到 {args.host_runner}")
@@ -393,8 +673,12 @@ def main() -> int:
         lines = [x for x in DEMO.splitlines()]
 
     engine = Engine(args.host_runner)
-    sim = Sim(engine)
-    print("== 資料源與引擎就緒（host-test --script）")
+    sim = Sim(engine, args.prefs_dir, not args.no_learning)
+    learn = "off" if args.no_learning else "on"
+    print(f"== 資料源與引擎就緒（host-test --script）；學習記憶 {learn}")
+    if not args.no_learning:
+        print(f"   PhraseMemory code 數={len(sim.phrase.by_code)}，"
+              f"SelectionMemory 條目={len(sim.sel.scores)}（{args.prefs_dir}）")
     try:
         for line in lines:
             sim.run(line)
