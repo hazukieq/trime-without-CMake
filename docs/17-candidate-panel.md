@@ -64,7 +64,9 @@ WHOLE_WORD 仅通过轻量整串码索引查询，不把无读音的大词表塞
   例如 `55` 列出所有 k/l 開頭音節，標準集音節也納入，按音節詞頻降序）。
 - 显示：左列字母行（reading=字母，不带数量）；点字母行右列列出该字母下全部单音节；
   点音节进入钻取层，右列列出该音节的字，首项是「← 返回」。
-- 选字：只消耗首键，剩余码重新喂回引擎继续组下一音节；不写 PhraseMemory（单字不记词条）。
+- 选字：与左列单字组同一暂存语义——先进 `pendingPick` 留在 preedit、只消耗首键，
+  剩余码重新喂回引擎继续组下一音节；`heldPicks` 记完整原码，退格整段反悔并还原；
+  不写 PhraseMemory（单字不记词条）。
 - 位置：固定排在推荐组之后、单字组之前（tierAndSort 给 -1 档），行数也计入 capRows。
 - 与 `panel_probe.py` 的 `Data.isolated_syllables()` 同口径。
 
@@ -94,8 +96,8 @@ isolated + synth + split + engine + assoc + combo + wholeWord
 
 TextInputManager 先判断部分选词，pendingPick 保留在 preedit，heldPicks 支持退格整段反悔。
 能交给引擎的完整选择保留全局 index；所有最终提交与学习都在统一输入层执行。
-孤单联想行点字母 → 换右列（不改输入）；点音节 → 钻取字；点字 → 上屏该字、只消耗首键、
-剩余码重新喂回引擎；「← 返回」只恢复快照右列。
+孤单联想行点字母 → 换右列（不改输入）；点音节 → 钻取字；点字 → 存 pendingPick 留在 preedit、
+只消耗首键，剩余码重新喂回引擎；退格按 heldPicks 整段还原原码；「← 返回」只恢复快照右列。
 全量构建走后台；ENGINE_LOCK 保证与按键互斥。首次无快照开面板的 refreshSync 是当前待关注入口。
 
 修改规则前先更新文档并确认语义；改后同步 panel_probe.py 与 golden，运行 selftest、JVM、

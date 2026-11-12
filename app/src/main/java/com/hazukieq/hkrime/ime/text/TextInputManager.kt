@@ -677,20 +677,24 @@ class TextInputManager private constructor() :
     }
 
     /**
-     * 孤單聯想：選字上屏，只消耗首鍵（剩下的碼重新餵回引擎繼續組下一個音節）。
+     * 孤單聯想：選字與左列單字組的行為一致——先留在 preedit（pendingPick），
+     * 只消耗首鍵，剩下的碼重新餵回引擎繼續組下一個音節；退格可整段反悔還原原碼。
      */
     private fun onPickIsolatedChar(text: String) {
         if (text.isEmpty()) return
         val input = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
         val rest = if (input.length > 1) input.substring(1) else ""
         runCatching {
-            activeEditorInstance?.commitText(text, false)
+            heldPicks.addLast(HeldPick(text, input))
+            pendingPick.append(text)
+            updatePendingPick()
             withEngineLock { Rime.clearComposition() }
             if (rest.isNotEmpty()) {
                 withEngineLock { Rime.onText(rest) }
             }
             trime.updateComposing()
             refreshTwelveKey()
+            trime.updateComposing()
         }.onFailure { Timber.e(it, "twelvekey: isolated pick failed") }
     }
 
