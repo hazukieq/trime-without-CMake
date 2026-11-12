@@ -1017,6 +1017,29 @@ class Data:
                 seen.setdefault(row["reading"], (length, "词行"))
         return [(reading, length, kind) for reading, (length, kind) in seen.items()]
 
+    def isolated_syllables(self, codes: str) -> list[tuple[str, list[str]]]:
+        """孤單聯想：整串碼不能構成完整音節時，首鍵字母各列可達單音節。
+
+        可達 = 該音節的碼以目前輸入為前綴（繼續按鍵就能得到它）。
+        只針對多鍵輸入（單鍵已由合成音節/單字行覆蓋）；整串碼恰好就是一個
+        完整音節時（ea7→dap、eai→dai）也不生成。
+        """
+        clean = codes.replace("'", "")
+        if len(clean) < 2 or self.code_to_syllables.get(clean):
+            return []
+        letters = self.key_initial_letters(clean[0], is_last=len(clean) == 1)
+        out: list[tuple[str, list[str]]] = []
+        for letter in letters:
+            syls = [
+                syl
+                for syl in self.syllable_freq
+                if syl.startswith(letter) and (code_of(syl) or "").startswith(clean)
+            ]
+            syls.sort(key=lambda syl: (-self.syllable_freq[syl], syl))
+            if syls:
+                out.append((letter, syls))
+        return out
+
     @staticmethod
     def merge_groups(groups: list[dict]) -> list[dict]:
         """唯一合并点（镜像 App `PanelRow.mergeRows`）：同 reading 的行合并 item。
@@ -1278,6 +1301,12 @@ def cmd_syllables(args, data: Data) -> None:
             print(f"  {part['readings'][0]:<18} 词: {'/'.join(part.get('items', [])[:6])}")
     else:
         print("# 整串詞行：無")
+    isolated = data.isolated_syllables(args.codes)
+    if isolated:
+        print()
+        print("# 孤單聯想（整串碼不能構成完整音節；首鍵字母各列可達單音節，按頻率）")
+        for letter, syls in isolated:
+            print(f"  {letter}.* → " + ", ".join(syls))
 
 
 def cmd_build_syllables(args) -> None:
