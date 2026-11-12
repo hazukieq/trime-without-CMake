@@ -1,0 +1,12 @@
+# 部分選中鏈：灵机一动 只覆蓋前 4 個音節，後面 loi dit 留在 preedit 再選。
+type 5i4ii8i9934i54iei9
+pick 灵机一动
+assert pending 灵机一动
+assert composing 1
+pick 来
+# 來是單音節，走引擎原生部分選中：選中段在 preedit 裡，但不進 pendingPick。
+assert pending 灵机一动
+assert composing 1
+pick 的
+assert committed 灵机一动来的
+assert composing 0

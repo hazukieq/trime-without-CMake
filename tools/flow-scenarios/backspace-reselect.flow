@@ -1,0 +1,13 @@
+# 退格整段反悔：選 灵机一动 後退格，應還原整串碼且不留下 pending；
+# 再重選一次並補完，上屏只能是最後那次。
+type 5i4ii8i9934i54iei9
+pick 灵机一动
+assert pending 灵机一动
+back
+assert pending ""
+assert input 5i4ii8i9934i54iei9
+assert composing 1
+pick 灵机一动
+pick 来
+pick 的
+assert committed 灵机一动来的

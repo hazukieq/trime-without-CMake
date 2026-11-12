@@ -1,0 +1,12 @@
+# 部分選中：lang ki → 面板左列 lang 選「冷」→ 候選條/面板選「起」
+# 期望：上屏「冷起」，不得出現「起冷起」或 preedit 殘留。
+type 5a4i5i
+left lang
+right 冷
+assert pending ""
+assert composing 1
+left ki
+right 起
+assert committed 冷起
+assert pending ""
+assert composing 0
