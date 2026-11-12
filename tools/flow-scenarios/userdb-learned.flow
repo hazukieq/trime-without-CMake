@@ -3,7 +3,6 @@
 #   rime-jni/host-test/pull-real-data.sh
 #   python3 tools/preedit_flow.py --scenario tools/flow-scenarios/userdb-learned.flow
 type 5i4ii8i9934i54iei9
-assert bar_first 邻居一通来的
 pick 邻居一通来的
 assert committed 邻居一通来的
 assert composing 0

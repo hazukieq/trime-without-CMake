@@ -219,3 +219,6 @@ Icon
 
 # 构建产物校验和（build-jni-so.sh 生成）
 app/libs/**/*.so.sha256
+
+# PC 上屏模拟的本地学习记忆
+tools/flow-data/

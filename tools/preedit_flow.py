@@ -44,6 +44,7 @@ WORKSPACE = os.path.dirname(REPO)
 HOST_RUNNER = os.path.join(WORKSPACE, "rime-jni", "host-test", "run-host-test.sh")
 
 _DATA = None
+DEFAULT_PREFS = os.path.join(HERE, "flow-data")
 
 
 def data():
@@ -722,30 +723,6 @@ class Sim:
         self.dump()
 
 
-def push_prefs(serial: str, prefs_dir: str) -> None:
-    """把本地保存的記憶 XML 寫回裝置（需 debug 包 run-as；會 force-stop App）。"""
-    pkg = "com.hazukieq.hkrime"
-    subprocess.run(["adb", "-s", serial, "shell", "am", "force-stop", pkg],
-                   capture_output=True, text=True)
-    for name in ("twelvekey_phrases.xml", "twelvekey_selection.xml"):
-        path = os.path.join(prefs_dir, name)
-        if not os.path.isfile(path):
-            continue
-        data = open(path, encoding="utf-8").read()
-        r = subprocess.run(
-            ["adb", "-s", serial, "shell",
-             f"run-as {pkg} sh -c 'cat > shared_prefs/{name}'"],
-            input=data, capture_output=True, text=True)
-        if r.returncode != 0:
-            print(f"  ! 推送 {name} 失敗：{(r.stderr or r.stdout).strip()[:160]}")
-        else:
-            print(f"  已推送 {name} → {serial}:/data/data/{pkg}/shared_prefs/")
-    # force-stop 會切走預設 IME，重設回本 App。
-    subprocess.run(["adb", "-s", serial, "shell", "ime", "set",
-                    f"{pkg}/.TrimeImeService"], capture_output=True, text=True)
-    print("  已重設輸入法；如 App 仍在舊進程，請重開鍵盤。")
-
-
 DEMO = """
 # 部分選中：lang ki → 面板選「冷」→ 候選條選「起」→ 應上屏「冷起」
 type 5a4i5i
@@ -764,15 +741,13 @@ def main() -> int:
     ap.add_argument("--scenario", help="命令檔路徑，一行一命令")
     ap.add_argument("--host-runner", default=HOST_RUNNER)
     ap.add_argument("--prefs-dir", default=os.environ.get(
-        "HKRIME_FLOW_PREFS", "/tmp/hkrime-flow-prefs"))
+        "HKRIME_FLOW_PREFS", DEFAULT_PREFS))
     ap.add_argument("--no-learning", action="store_true",
                     help="不載入 PhraseMemory/SelectionMemory（純引擎順序）")
     ap.add_argument("--pull-prefs", metavar="SERIAL",
                     help="先從裝置拉 twelvekey_phrases/selection.xml 到 --prefs-dir")
-    ap.add_argument("--save-prefs", action="store_true",
-                    help="跑完把學習記憶寫回 --prefs-dir（xml）")
-    ap.add_argument("--push-prefs", metavar="SERIAL",
-                    help="跑完寫回 --prefs-dir，再推回裝置（debug run-as）")
+    ap.add_argument("--no-save", action="store_true",
+                    help="跑完不落盤（默認寫回 --prefs-dir，供下一次模擬續用）")
     args = ap.parse_args()
 
     if args.pull_prefs:
@@ -816,11 +791,9 @@ def main() -> int:
         engine.close()
 
     print(f"\n== 最終上屏: {sim.committed!r}")
-    if args.save_prefs or args.push_prefs:
+    if not args.no_save:
         names = sim.save_prefs(args.prefs_dir)
-        print(f"== 已保存學習記憶: {', '.join(names)} → {args.prefs_dir}")
-    if args.push_prefs:
-        push_prefs(args.push_prefs, args.prefs_dir)
+        print(f"== 已保存本地學習記憶: {', '.join(names)} → {args.prefs_dir}")
     if sim.failures:
         print(f"== 斷言失敗 {sim.failures} 條")
         return 1
