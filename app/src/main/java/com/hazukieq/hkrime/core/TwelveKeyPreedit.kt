@@ -70,6 +70,15 @@ object TwelveKeyPreedit {
     /** 客家話音節集合（由主詞典「字→讀音」建立）；詞表解析只認集合內的音節。 */
     private val syllableSet = HashSet<String>()
 
+    /** 音節 → 主詞典詞頻（孤單聯想/音節排序用）。 */
+    private val syllableFreq = HashMap<String, Int>()
+
+    /** 標準音節集（assets/rime/hakka_syllables.txt）；只用於「整串是否完整音節」判定。 */
+    private val standardSyllables = LinkedHashSet<String>()
+
+    /** 標準音節集的碼 → 完整音節（`gia` 不在主詞典但標準集有，`iia` 必須視為完整音節）。 */
+    private val standardSyllableCodes = HashSet<String>()
+
     /**
      * 發布不可變整串碼索引，完成構建後整體替換；查詢不遍歷可變載入列表。
      */
@@ -205,6 +214,31 @@ object TwelveKeyPreedit {
             Timber.i("TwelveKeyPreedit: charRank=%d", charRank.size)
         }.onFailure { Timber.w(it, "TwelveKeyPreedit: load char rank failed") }
 
+        // 標準音節集（可選資源）：只參與「孤單聯想」的完整音節判定與通配列表，
+        // 不擴大運行時搜索集合（主詞典 694 仍是段組/聯想的口徑）。
+        runCatching {
+            RimeDictSource.textLines(context, "hakka_syllables.txt")?.let { lines ->
+                loadStandardSyllableLines(lines.asSequence())
+            }
+            Timber.i("TwelveKeyPreedit: standardSyllables=%d", standardSyllables.size)
+        }.onFailure { Timber.w(it, "TwelveKeyPreedit: load standard syllables failed") }
+
+        // 進口詞典（尤其 hakka_zon）的單字讀音並入運行時音節/字表：方言用字（`渠 gia`）
+        // 只在 zon 收錄，主詞典沒有；不併會讓標準集音節有字卻無法在面板顯示。
+        runCatching {
+            val names = RimeDictSource.namesWithImports(context, MAIN_DICT).filter { it != MAIN_DICT }
+            val allowed = standardSyllables
+            names.forEach { name ->
+                val extra = loadDictLines(RimeDictSource.body(context, name).asSequence())
+                extra.forEach { (syllable, count) ->
+                    // 只並入標準音集收錄的音節；進口詞典可能混有方案外的拼寫（bon/hop）。
+                    if (allowed.isEmpty() || syllable in allowed) {
+                        counts[syllable] = (counts[syllable] ?: 0) + count
+                    }
+                }
+            }
+            Timber.i("TwelveKeyPreedit: merged imports=%d", names.size)
+        }.onFailure { Timber.w(it, "TwelveKeyPreedit: merge import dicts failed") }
         finishLoading(counts)
 
         // 詞表與聯想索引在後台載入，完成後發布不可變索引。
@@ -271,7 +305,8 @@ object TwelveKeyPreedit {
             val tab = raw.indexOf('\t')
             if (tab < 0) return@forEach
             val ch = raw.substring(0, tab).trim()
-            val syllable = raw.substring(tab + 1).trim()
+            // 只取讀音欄：詞條第三欄是權重（`char\tsyl\tweight`），整段拿去當音節會漏字。
+            val syllable = raw.substring(tab + 1).split('\t')[0].trim()
             if (ch.length == 1) {
                 charTable.putIfAbsent(ch, syllable)
                 val chars = syllableToChars.getOrPut(syllable) { ArrayList() }
@@ -905,6 +940,8 @@ object TwelveKeyPreedit {
         // 運行時音節集合取主詞典 counts.keys；標準集資產僅約束腳本與測試。
         syllableSet.clear()
         syllableSet.addAll(counts.keys)
+        syllableFreq.clear()
+        syllableFreq.putAll(counts)
         counts.forEach { (syllable, freq) ->
             val code = codeOf(syllable)
             val old = table[code]
@@ -1069,6 +1106,56 @@ object TwelveKeyPreedit {
         if (codes.isEmpty()) return false
         val decoded = decode(codes) ?: return false
         return decoded.split(' ').size == 1
+    }
+
+    /**
+     * 載入標準音節集；只用於孤單聯想的完整音節判定與通配列表，不擴大運行時集合。
+     */
+    internal fun loadStandardSyllableLines(lines: Sequence<String>) {
+        standardSyllables.clear()
+        standardSyllableCodes.clear()
+        lines.forEach { raw ->
+            val syllable = raw.trim()
+            if (syllable.isEmpty() || syllable.startsWith("#")) return@forEach
+            standardSyllables.add(syllable)
+            standardSyllableCodes.add(codeOf(syllable))
+        }
+    }
+
+    /** 標準音節集快照（只讀；測試與診斷用）。 */
+    internal fun standardSyllablesSnapshot(): Set<String> = standardSyllables
+
+    /**
+     * 整串碼恰好是一個完整音節（孤單聯想互斥）。
+     *
+     * 判定必須看**標準音節集**：`gia` 不在主詞典（運行時 694）但標準集有，
+     * 它的碼 `iia` 已是完整音節，不能再列孤單聯想。
+     */
+    internal fun hasFullSyllable(code: String): Boolean {
+        val clean = code.replace("'", "")
+        return isSingleSyllable(clean) || clean in standardSyllableCodes
+    }
+
+    /**
+     * 孤單聯想：多鍵輸入且整串不是完整音節時，首鍵字母各列該字母下的**全部**單音節。
+     *
+     * 列表是通配口徑：只看音節首字母，不受剩餘碼前綴限制（`55` → 所有 k/l 開頭音節），
+     * 所以不會出現 `gia*` 這種「按剩餘碼前綴收窄」的假組合。標準集音節也納入。
+     */
+    internal fun isolatedSyllables(code: String): List<Pair<Char, List<String>>> {
+        val clean = code.replace("'", "")
+        if (clean.length < 2 || hasFullSyllable(clean)) return emptyList()
+        val universe = LinkedHashSet<String>(syllableSet.size + standardSyllables.size)
+        universe.addAll(syllableSet)
+        universe.addAll(standardSyllables)
+        val out = ArrayList<Pair<Char, List<String>>>(2)
+        keyInitialLetters(clean[0], isLast = false).forEach { letter ->
+            val syls = universe
+                .filter { it.firstOrNull() == letter }
+                .sortedWith(compareByDescending<String> { syllableFreq[it] ?: 0 }.thenBy { it })
+            if (syls.isNotEmpty()) out.add(letter to syls)
+        }
+        return out
     }
 
     fun splitHeads(codes: String, limit: Int = 2): List<Pair<String, String>> {

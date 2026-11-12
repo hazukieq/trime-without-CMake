@@ -33,9 +33,25 @@ class PanelGoldenTest {
         fun loadAssets() {
             TwelveKeyPreedit.clearWordDataForTest()
             val main = File("src/main/assets/rime/hakka.dict.yaml")
-            TwelveKeyPreedit.finishLoading(
-                TwelveKeyPreedit.loadDictLines(main.readLines().asSequence())
+            val counts = TwelveKeyPreedit.loadDictLines(main.readLines().asSequence())
+            TwelveKeyPreedit.loadStandardSyllableLines(
+                File("src/main/assets/rime/hakka_syllables.txt").readLines().asSequence(),
             )
+            val standard = TwelveKeyPreedit.standardSyllablesSnapshot()
+            // 與生產 load() 同口徑：進口詞典的單字讀音只並入標準音集收錄的音節
+            // （`渠 gia` 只在 zon；`bon/hop` 這類方案外拼寫不要）。
+            listOf(
+                "hakka_sougou_words", "hakka_mobilewords", "hakka_oftenwords", "hakka_places",
+                "hakka_poems", "hakka_website", "hakka_zon", "hakka_cn_en",
+            ).forEach { name ->
+                val f = File("src/main/assets/rime/$name.dict.yaml")
+                if (f.isFile) {
+                    TwelveKeyPreedit.loadDictLines(f.readLines().asSequence()).forEach { (syllable, count) ->
+                        if (syllable in standard) counts[syllable] = (counts[syllable] ?: 0) + count
+                    }
+                }
+            }
+            TwelveKeyPreedit.finishLoading(counts)
             listOf(
                 "hakka_places", "hakka_sougou_words", "hakka_poems", "hakka_zon",
                 "hakka_mobilewords", "hakka_oftenwords", "hakka_website", "hakka_cn_en",

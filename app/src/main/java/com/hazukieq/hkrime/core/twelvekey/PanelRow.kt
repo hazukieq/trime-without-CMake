@@ -25,6 +25,9 @@ internal enum class RowSource {
 
     /** librime 候選組（引擎源，經 [mergeRows] 並入面板）。 */
     ENGINE,
+
+    /** 孤單聯想字母行（`d`/`f`）：items 是可延伸單音節，固定排在單字組前面。 */
+    ISOLATED,
 }
 
 /**
@@ -146,9 +149,10 @@ internal fun collapsePrefixRows(rows: List<PanelRow>): List<PanelRow> {
 internal fun tierAndSort(rows: List<PanelRow>): List<PanelRow> = rows.sortedWith(
     compareBy(
         {
-            when (it.syllableCount) {
-                0 -> 2
-                1 -> 0
+            when {
+                RowSource.ISOLATED in it.sources -> -1
+                it.syllableCount == 0 -> 2
+                it.syllableCount == 1 -> 0
                 else -> 1
             }
         },

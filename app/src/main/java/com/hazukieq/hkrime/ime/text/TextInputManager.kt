@@ -11,6 +11,9 @@ import com.hazukieq.hkrime.core.twelvekey.CandidateBarBinder
 import com.hazukieq.hkrime.core.twelvekey.CandidateItem
 import com.hazukieq.hkrime.core.twelvekey.Fallback
 import com.hazukieq.hkrime.core.twelvekey.PhraseMemory
+import com.hazukieq.hkrime.core.twelvekey.ISOLATED_BACK_SEGMENT
+import com.hazukieq.hkrime.core.twelvekey.ISOLATED_CHAR_SEGMENT
+import com.hazukieq.hkrime.core.twelvekey.ISOLATED_SEGMENT
 import com.hazukieq.hkrime.core.twelvekey.SYNTHETIC_SEGMENT
 import com.hazukieq.hkrime.core.twelvekey.CandidatePanelController
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeyController
@@ -644,9 +647,68 @@ class TextInputManager private constructor() :
         Timber.i("twelvekey: phrase record code=[%s] text=[%s] readings=[%s]", code, text, readings)
     }
 
+    /**
+     * 孤單聯想：點字母行（d/f）後，右列列出該字母下所有可延伸單音節。
+     * 只做展示替換，不改輸入。
+     */
+    private fun onPickIsolatedSyllable(syllable: String) {
+        if (syllable.isEmpty()) return
+        val chars = runCatching { TwelveKeyPreedit.charsForSyllable(syllable) }.getOrElse { emptyList() }
+        val items = ArrayList<CandidatePanelAdapter.Item>(chars.size + 1)
+        items.add(
+            CandidatePanelAdapter.Item(
+                text = "← 返回",
+                comment = syllable,
+                index = -1,
+                segment = ISOLATED_BACK_SEGMENT,
+            ),
+        )
+        chars.forEach { ch ->
+            items.add(
+                CandidatePanelAdapter.Item(
+                    text = ch,
+                    comment = "",
+                    index = -1,
+                    segment = ISOLATED_CHAR_SEGMENT,
+                ),
+            )
+        }
+        candidatePanelController?.showDrilldown(items)
+    }
+
+    /**
+     * 孤單聯想：選字上屏，只消耗首鍵（剩下的碼重新餵回引擎繼續組下一個音節）。
+     */
+    private fun onPickIsolatedChar(text: String) {
+        if (text.isEmpty()) return
+        val input = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
+        val rest = if (input.length > 1) input.substring(1) else ""
+        runCatching {
+            activeEditorInstance?.commitText(text, false)
+            withEngineLock { Rime.clearComposition() }
+            if (rest.isNotEmpty()) {
+                withEngineLock { Rime.onText(rest) }
+            }
+            trime.updateComposing()
+            refreshTwelveKey()
+        }.onFailure { Timber.e(it, "twelvekey: isolated pick failed") }
+    }
+
     private fun onPickPanelCandidate(item: CandidatePanelAdapter.Item) {
         if (!isTwelveKeyMode()) {
             pickLegacyPanelCandidate(item)
+            return
+        }
+        if (item.segment == ISOLATED_SEGMENT) {
+            onPickIsolatedSyllable(item.text)
+            return
+        }
+        if (item.segment == ISOLATED_CHAR_SEGMENT) {
+            onPickIsolatedChar(item.text)
+            return
+        }
+        if (item.segment == ISOLATED_BACK_SEGMENT) {
+            candidatePanelController?.restoreGrid()
             return
         }
         if (item.segment == 1) {

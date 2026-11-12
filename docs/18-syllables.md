@@ -4,13 +4,14 @@
 
 | 集合 | 来源 | 用途 |
 |---|---|---|
-| 运行时集合 | TwelveKeyPreedit.finishLoading(counts) 的 counts.keys | App 只认可主词典有字的音节 |
+| 运行时集合 | 主词典 + 進口詞典（`import_tables`，尤其 `hakka_zon`）的單字讀音，经標準集過濾 | App 认可有字的音节（含方言字 `渠 gia`） |
 | 标准集 | `assets/rime/hakka_syllables.txt` | 约束诊断脚本与测试，须覆盖主词典音节 |
 
-随包主词典的运行时集合为 694 个，标准集为 841 个。
-标准集生成源为 Hkdict 的 `neo-frontend/src/data/hakkaSyllables.js` 与主词典集合的并集，
-可带显式补遗。App 不加载该资产，不能为了标准集新增音节就自动扩大运行时搜索。
-实际设备的主词典可不同，计数以实际数据为准。
+主词典 694 个音節；运行时集合再并入进口词典的单字读音，但只保留标准集里有的音节
+（`hakka_zon` 的 `gia` 要收，方案外拼写 `bon/hop` 不要）。标准集为 841 个，
+生成源为 Hkdict 的 `neo-frontend/src/data/hakkaSyllables.js` 与主词典集合的并集，可带显式补遗。
+App 加载标准集仅用于：進口詞典讀音過濾、完整音節判定（孤單聯想互斥）、孤單聯想的通配音節列表；
+不扩大小节搜索的其它口徑。实际设备的主词典可不同，计数以实际数据为准。
 
 ## 规则
 

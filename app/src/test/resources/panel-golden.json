@@ -46,7 +46,8 @@
             "跏",
             "噶",
             "镓",
-            "斝"
+            "斝",
+            "+"
           ]
         },
         {
@@ -68,49 +69,51 @@
       ],
       "split": [
         {
-          "reading": "ga",
+          "reading": "gai",
           "items": [
-            "瓜",
-            "加",
-            "价",
+            "介",
+            "丐",
+            "阶",
+            "戒",
+            "芥",
             "尬",
-            "卦",
-            "呵",
-            "咖",
+            "鸡",
             "佳",
-            "驾",
-            "挂",
-            "架",
-            "贾",
-            "家",
-            "假",
-            "褂",
-            "嫁",
-            "嘉",
-            "寡",
-            "嘎",
-            "稼",
-            "尕",
-            "旮",
-            "伽",
-            "呱",
-            "迦",
-            "珈",
-            "挝",
-            "枷",
-            "尜",
-            "剐",
-            "胍",
-            "牁",
-            "痂",
-            "娲",
-            "笳",
-            "袈",
-            "葭",
-            "跏",
-            "噶",
-            "镓",
-            "斝"
+            "怪",
+            "该",
+            "届",
+            "皆",
+            "界",
+            "诫",
+            "既",
+            "硅",
+            "盖",
+            "谐",
+            "揩",
+            "街",
+            "溉",
+            "概",
+            "解",
+            "稽",
+            "夬",
+            "卟",
+            "玠",
+            "诖",
+            "陔",
+            "垓",
+            "狯",
+            "疥",
+            "蚧",
+            "偕",
+            "喈",
+            "跬",
+            "邂",
+            "廨",
+            "遐",
+            "該",
+            "计",
+            "吤",
+            "嗘"
           ]
         },
         {
@@ -317,7 +320,8 @@
             "龋",
             "羁",
             "罽",
-            "骥"
+            "骥",
+            "其"
           ]
         },
         {
@@ -366,7 +370,8 @@
             "槿",
             "憬",
             "璟",
-            "黥"
+            "黥",
+            "搄"
           ]
         },
         {
@@ -493,30 +498,28 @@
           ]
         },
         {
-          "reading": "hap",
+          "reading": "han",
           "items": [
-            "合",
-            "匣",
-            "侠",
-            "拾",
-            "哈",
-            "峡",
-            "狭",
-            "洽",
-            "恰",
-            "掐",
-            "盒",
-            "颊",
-            "呷",
-            "盍",
-            "铪",
-            "惬",
-            "嗑",
-            "阖",
-            "溘",
-            "瞌",
-            "勰",
-            "歙"
+            "汉",
+            "还",
+            "闲",
+            "罕",
+            "限",
+            "很",
+            "狠",
+            "恨",
+            "痕",
+            "翰",
+            "苋",
+            "岘",
+            "顸",
+            "哏",
+            "蚬",
+            "悭",
+            "娴",
+            "痫",
+            "鹇",
+            "瀚"
           ]
         },
         {
@@ -530,7 +533,9 @@
             "姮",
             "舷",
             "悻",
-            "谖"
+            "谖",
+            "熏",
+            "拫"
           ]
         },
         {
@@ -573,22 +578,22 @@
           ]
         },
         {
-          "reading": "hok",
+          "reading": "hoi",
           "items": [
-            "壳",
-            "学",
-            "赫",
-            "鹤",
-            "霍",
-            "郝",
-            "涸",
-            "鹄",
-            "貉",
-            "嚄",
-            "壑",
-            "攉",
-            "藿",
-            "嚯"
+            "开",
+            "亥",
+            "孩",
+            "骇",
+            "海",
+            "害",
+            "蔼",
+            "氦",
+            "颏",
+            "嗐",
+            "骸",
+            "醢",
+            "胲",
+            "䠽"
           ]
         },
         {
@@ -603,7 +608,8 @@
             "吽",
             "訇",
             "竑",
-            "薨"
+            "薨",
+            "叿"
           ]
         }
       ],
@@ -942,7 +948,8 @@
             "下旬"
           ]
         }
-      ]
+      ],
+      "isolated": []
     },
     "merged": [
       {
@@ -989,7 +996,57 @@
           "跏",
           "噶",
           "镓",
-          "斝"
+          "斝",
+          "+"
+        ]
+      },
+      {
+        "reading": "gai",
+        "segment": 0,
+        "items": [
+          "介",
+          "丐",
+          "阶",
+          "戒",
+          "芥",
+          "尬",
+          "鸡",
+          "佳",
+          "怪",
+          "该",
+          "届",
+          "皆",
+          "界",
+          "诫",
+          "既",
+          "硅",
+          "盖",
+          "谐",
+          "揩",
+          "街",
+          "溉",
+          "概",
+          "解",
+          "稽",
+          "夬",
+          "卟",
+          "玠",
+          "诖",
+          "陔",
+          "垓",
+          "狯",
+          "疥",
+          "蚧",
+          "偕",
+          "喈",
+          "跬",
+          "邂",
+          "廨",
+          "遐",
+          "該",
+          "计",
+          "吤",
+          "嗘"
         ]
       },
       {
@@ -1200,7 +1257,8 @@
           "龋",
           "羁",
           "罽",
-          "骥"
+          "骥",
+          "其"
         ]
       },
       {
@@ -1250,7 +1308,8 @@
           "槿",
           "憬",
           "璟",
-          "黥"
+          "黥",
+          "搄"
         ]
       },
       {
@@ -1397,31 +1456,29 @@
         ]
       },
       {
-        "reading": "hap",
+        "reading": "han",
         "segment": 0,
         "items": [
-          "合",
-          "匣",
-          "侠",
-          "拾",
-          "哈",
-          "峡",
-          "狭",
-          "洽",
-          "恰",
-          "掐",
-          "盒",
-          "颊",
-          "呷",
-          "盍",
-          "铪",
-          "惬",
-          "嗑",
-          "阖",
-          "溘",
-          "瞌",
-          "勰",
-          "歙"
+          "汉",
+          "还",
+          "闲",
+          "罕",
+          "限",
+          "很",
+          "狠",
+          "恨",
+          "痕",
+          "翰",
+          "苋",
+          "岘",
+          "顸",
+          "哏",
+          "蚬",
+          "悭",
+          "娴",
+          "痫",
+          "鹇",
+          "瀚"
         ]
       },
       {
@@ -1436,7 +1493,9 @@
           "姮",
           "舷",
           "悻",
-          "谖"
+          "谖",
+          "熏",
+          "拫"
         ]
       },
       {
@@ -1482,23 +1541,23 @@
         ]
       },
       {
-        "reading": "hok",
+        "reading": "hoi",
         "segment": 0,
         "items": [
-          "壳",
-          "学",
-          "赫",
-          "鹤",
-          "霍",
-          "郝",
-          "涸",
-          "鹄",
-          "貉",
-          "嚄",
-          "壑",
-          "攉",
-          "藿",
-          "嚯"
+          "开",
+          "亥",
+          "孩",
+          "骇",
+          "海",
+          "害",
+          "蔼",
+          "氦",
+          "颏",
+          "嗐",
+          "骸",
+          "醢",
+          "胲",
+          "䠽"
         ]
       },
       {
@@ -1514,7 +1573,8 @@
           "吽",
           "訇",
           "竑",
-          "薨"
+          "薨",
+          "叿"
         ]
       },
       {
@@ -1921,7 +1981,8 @@
             "跏",
             "噶",
             "镓",
-            "斝"
+            "斝",
+            "+"
           ]
         },
         {
@@ -2235,9 +2296,233 @@
             "挂纸"
           ]
         }
+      ],
+      "isolated": [
+        {
+          "reading": "g",
+          "items": [
+            "gi",
+            "gau",
+            "gai",
+            "gin",
+            "ga",
+            "gen",
+            "gu",
+            "gon",
+            "gong",
+            "gan",
+            "gap",
+            "gui",
+            "gam",
+            "geu",
+            "git",
+            "get",
+            "gang",
+            "gok",
+            "go",
+            "gung",
+            "giu",
+            "gak",
+            "giun",
+            "giau",
+            "goi",
+            "gat",
+            "giam",
+            "gio",
+            "giung",
+            "gun",
+            "giang",
+            "gim",
+            "giok",
+            "guk",
+            "ge",
+            "giong",
+            "gip",
+            "giap",
+            "got",
+            "gep",
+            "gik",
+            "giuk",
+            "gut",
+            "gia",
+            "giak",
+            "gek",
+            "gem",
+            "giat"
+          ]
+        },
+        {
+          "reading": "h",
+          "items": [
+            "hai",
+            "han",
+            "hap",
+            "hau",
+            "ham",
+            "hoi",
+            "hon",
+            "heu",
+            "hok",
+            "ha",
+            "hong",
+            "hang",
+            "hen",
+            "ho",
+            "hung",
+            "hat",
+            "hi",
+            "he",
+            "het",
+            "hot",
+            "hak",
+            "hiok",
+            "hiung",
+            "hng",
+            "hu",
+            "hun",
+            "hem",
+            "hiau",
+            "hien",
+            "him",
+            "hiong",
+            "hit",
+            "hiun",
+            "hui",
+            "hek",
+            "hep",
+            "hia",
+            "hiak",
+            "hiam",
+            "hiang",
+            "hiap",
+            "hiat",
+            "hie",
+            "hiet",
+            "hik",
+            "hin",
+            "hio",
+            "hip",
+            "hiu",
+            "hiuk",
+            "hngh",
+            "huk"
+          ]
+        }
       ]
     },
     "merged": [
+      {
+        "reading": "g",
+        "segment": -4,
+        "items": [
+          "gi",
+          "gau",
+          "gai",
+          "gin",
+          "ga",
+          "gen",
+          "gu",
+          "gon",
+          "gong",
+          "gan",
+          "gap",
+          "gui",
+          "gam",
+          "geu",
+          "git",
+          "get",
+          "gang",
+          "gok",
+          "go",
+          "gung",
+          "giu",
+          "gak",
+          "giun",
+          "giau",
+          "goi",
+          "gat",
+          "giam",
+          "gio",
+          "giung",
+          "gun",
+          "giang",
+          "gim",
+          "giok",
+          "guk",
+          "ge",
+          "giong",
+          "gip",
+          "giap",
+          "got",
+          "gep",
+          "gik",
+          "giuk",
+          "gut",
+          "gia",
+          "giak",
+          "gek",
+          "gem",
+          "giat"
+        ]
+      },
+      {
+        "reading": "h",
+        "segment": -4,
+        "items": [
+          "hai",
+          "han",
+          "hap",
+          "hau",
+          "ham",
+          "hoi",
+          "hon",
+          "heu",
+          "hok",
+          "ha",
+          "hong",
+          "hang",
+          "hen",
+          "ho",
+          "hung",
+          "hat",
+          "hi",
+          "he",
+          "het",
+          "hot",
+          "hak",
+          "hiok",
+          "hiung",
+          "hng",
+          "hu",
+          "hun",
+          "hem",
+          "hiau",
+          "hien",
+          "him",
+          "hiong",
+          "hit",
+          "hiun",
+          "hui",
+          "hek",
+          "hep",
+          "hia",
+          "hiak",
+          "hiam",
+          "hiang",
+          "hiap",
+          "hiat",
+          "hie",
+          "hiet",
+          "hik",
+          "hin",
+          "hio",
+          "hip",
+          "hiu",
+          "hiuk",
+          "hngh",
+          "huk"
+        ]
+      },
       {
         "reading": "ga",
         "segment": 0,
@@ -2282,7 +2567,8 @@
           "跏",
           "噶",
           "镓",
-          "斝"
+          "斝",
+          "+"
         ]
       },
       {
@@ -2655,7 +2941,8 @@
             "跏",
             "噶",
             "镓",
-            "斝"
+            "斝",
+            "+"
           ]
         },
         {
@@ -2739,9 +3026,233 @@
             "挂纸"
           ]
         }
+      ],
+      "isolated": [
+        {
+          "reading": "g",
+          "items": [
+            "gi",
+            "gau",
+            "gai",
+            "gin",
+            "ga",
+            "gen",
+            "gu",
+            "gon",
+            "gong",
+            "gan",
+            "gap",
+            "gui",
+            "gam",
+            "geu",
+            "git",
+            "get",
+            "gang",
+            "gok",
+            "go",
+            "gung",
+            "giu",
+            "gak",
+            "giun",
+            "giau",
+            "goi",
+            "gat",
+            "giam",
+            "gio",
+            "giung",
+            "gun",
+            "giang",
+            "gim",
+            "giok",
+            "guk",
+            "ge",
+            "giong",
+            "gip",
+            "giap",
+            "got",
+            "gep",
+            "gik",
+            "giuk",
+            "gut",
+            "gia",
+            "giak",
+            "gek",
+            "gem",
+            "giat"
+          ]
+        },
+        {
+          "reading": "h",
+          "items": [
+            "hai",
+            "han",
+            "hap",
+            "hau",
+            "ham",
+            "hoi",
+            "hon",
+            "heu",
+            "hok",
+            "ha",
+            "hong",
+            "hang",
+            "hen",
+            "ho",
+            "hung",
+            "hat",
+            "hi",
+            "he",
+            "het",
+            "hot",
+            "hak",
+            "hiok",
+            "hiung",
+            "hng",
+            "hu",
+            "hun",
+            "hem",
+            "hiau",
+            "hien",
+            "him",
+            "hiong",
+            "hit",
+            "hiun",
+            "hui",
+            "hek",
+            "hep",
+            "hia",
+            "hiak",
+            "hiam",
+            "hiang",
+            "hiap",
+            "hiat",
+            "hie",
+            "hiet",
+            "hik",
+            "hin",
+            "hio",
+            "hip",
+            "hiu",
+            "hiuk",
+            "hngh",
+            "huk"
+          ]
+        }
       ]
     },
     "merged": [
+      {
+        "reading": "g",
+        "segment": -4,
+        "items": [
+          "gi",
+          "gau",
+          "gai",
+          "gin",
+          "ga",
+          "gen",
+          "gu",
+          "gon",
+          "gong",
+          "gan",
+          "gap",
+          "gui",
+          "gam",
+          "geu",
+          "git",
+          "get",
+          "gang",
+          "gok",
+          "go",
+          "gung",
+          "giu",
+          "gak",
+          "giun",
+          "giau",
+          "goi",
+          "gat",
+          "giam",
+          "gio",
+          "giung",
+          "gun",
+          "giang",
+          "gim",
+          "giok",
+          "guk",
+          "ge",
+          "giong",
+          "gip",
+          "giap",
+          "got",
+          "gep",
+          "gik",
+          "giuk",
+          "gut",
+          "gia",
+          "giak",
+          "gek",
+          "gem",
+          "giat"
+        ]
+      },
+      {
+        "reading": "h",
+        "segment": -4,
+        "items": [
+          "hai",
+          "han",
+          "hap",
+          "hau",
+          "ham",
+          "hoi",
+          "hon",
+          "heu",
+          "hok",
+          "ha",
+          "hong",
+          "hang",
+          "hen",
+          "ho",
+          "hung",
+          "hat",
+          "hi",
+          "he",
+          "het",
+          "hot",
+          "hak",
+          "hiok",
+          "hiung",
+          "hng",
+          "hu",
+          "hun",
+          "hem",
+          "hiau",
+          "hien",
+          "him",
+          "hiong",
+          "hit",
+          "hiun",
+          "hui",
+          "hek",
+          "hep",
+          "hia",
+          "hiak",
+          "hiam",
+          "hiang",
+          "hiap",
+          "hiat",
+          "hie",
+          "hiet",
+          "hik",
+          "hin",
+          "hio",
+          "hip",
+          "hiu",
+          "hiuk",
+          "hngh",
+          "huk"
+        ]
+      },
       {
         "reading": "ga",
         "segment": 0,
@@ -2786,7 +3297,8 @@
           "跏",
           "噶",
           "镓",
-          "斝"
+          "斝",
+          "+"
         ]
       },
       {
@@ -2914,7 +3426,8 @@
             "跏",
             "噶",
             "镓",
-            "斝"
+            "斝",
+            "+"
           ]
         },
         {
@@ -3038,9 +3551,233 @@
         }
       ],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": [
+        {
+          "reading": "g",
+          "items": [
+            "gi",
+            "gau",
+            "gai",
+            "gin",
+            "ga",
+            "gen",
+            "gu",
+            "gon",
+            "gong",
+            "gan",
+            "gap",
+            "gui",
+            "gam",
+            "geu",
+            "git",
+            "get",
+            "gang",
+            "gok",
+            "go",
+            "gung",
+            "giu",
+            "gak",
+            "giun",
+            "giau",
+            "goi",
+            "gat",
+            "giam",
+            "gio",
+            "giung",
+            "gun",
+            "giang",
+            "gim",
+            "giok",
+            "guk",
+            "ge",
+            "giong",
+            "gip",
+            "giap",
+            "got",
+            "gep",
+            "gik",
+            "giuk",
+            "gut",
+            "gia",
+            "giak",
+            "gek",
+            "gem",
+            "giat"
+          ]
+        },
+        {
+          "reading": "h",
+          "items": [
+            "hai",
+            "han",
+            "hap",
+            "hau",
+            "ham",
+            "hoi",
+            "hon",
+            "heu",
+            "hok",
+            "ha",
+            "hong",
+            "hang",
+            "hen",
+            "ho",
+            "hung",
+            "hat",
+            "hi",
+            "he",
+            "het",
+            "hot",
+            "hak",
+            "hiok",
+            "hiung",
+            "hng",
+            "hu",
+            "hun",
+            "hem",
+            "hiau",
+            "hien",
+            "him",
+            "hiong",
+            "hit",
+            "hiun",
+            "hui",
+            "hek",
+            "hep",
+            "hia",
+            "hiak",
+            "hiam",
+            "hiang",
+            "hiap",
+            "hiat",
+            "hie",
+            "hiet",
+            "hik",
+            "hin",
+            "hio",
+            "hip",
+            "hiu",
+            "hiuk",
+            "hngh",
+            "huk"
+          ]
+        }
+      ]
     },
     "merged": [
+      {
+        "reading": "g",
+        "segment": -4,
+        "items": [
+          "gi",
+          "gau",
+          "gai",
+          "gin",
+          "ga",
+          "gen",
+          "gu",
+          "gon",
+          "gong",
+          "gan",
+          "gap",
+          "gui",
+          "gam",
+          "geu",
+          "git",
+          "get",
+          "gang",
+          "gok",
+          "go",
+          "gung",
+          "giu",
+          "gak",
+          "giun",
+          "giau",
+          "goi",
+          "gat",
+          "giam",
+          "gio",
+          "giung",
+          "gun",
+          "giang",
+          "gim",
+          "giok",
+          "guk",
+          "ge",
+          "giong",
+          "gip",
+          "giap",
+          "got",
+          "gep",
+          "gik",
+          "giuk",
+          "gut",
+          "gia",
+          "giak",
+          "gek",
+          "gem",
+          "giat"
+        ]
+      },
+      {
+        "reading": "h",
+        "segment": -4,
+        "items": [
+          "hai",
+          "han",
+          "hap",
+          "hau",
+          "ham",
+          "hoi",
+          "hon",
+          "heu",
+          "hok",
+          "ha",
+          "hong",
+          "hang",
+          "hen",
+          "ho",
+          "hung",
+          "hat",
+          "hi",
+          "he",
+          "het",
+          "hot",
+          "hak",
+          "hiok",
+          "hiung",
+          "hng",
+          "hu",
+          "hun",
+          "hem",
+          "hiau",
+          "hien",
+          "him",
+          "hiong",
+          "hit",
+          "hiun",
+          "hui",
+          "hek",
+          "hep",
+          "hia",
+          "hiak",
+          "hiam",
+          "hiang",
+          "hiap",
+          "hiat",
+          "hie",
+          "hiet",
+          "hik",
+          "hin",
+          "hio",
+          "hip",
+          "hiu",
+          "hiuk",
+          "hngh",
+          "huk"
+        ]
+      },
       {
         "reading": "ga",
         "segment": 0,
@@ -3085,7 +3822,8 @@
           "跏",
           "噶",
           "镓",
-          "斝"
+          "斝",
+          "+"
         ]
       },
       {
@@ -3277,7 +4015,8 @@
             "熘",
             "镏",
             "镠",
-            "鎏"
+            "鎏",
+            "塯"
           ]
         },
         {
@@ -3298,7 +4037,9 @@
             "酋",
             "逑",
             "赇",
-            "裘"
+            "裘",
+            "Q",
+            "q"
           ]
         }
       ],
@@ -3547,7 +4288,8 @@
             "共产党"
           ]
         }
-      ]
+      ],
+      "isolated": []
     },
     "merged": [
       {
@@ -3569,7 +4311,9 @@
           "酋",
           "逑",
           "赇",
-          "裘"
+          "裘",
+          "Q",
+          "q"
         ]
       },
       {
@@ -3630,7 +4374,8 @@
           "熘",
           "镏",
           "镠",
-          "鎏"
+          "鎏",
+          "塯"
         ]
       },
       {
@@ -4166,9 +4911,231 @@
         }
       ],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": [
+        {
+          "reading": "k",
+          "items": [
+            "ki",
+            "kui",
+            "ket",
+            "ken",
+            "kong",
+            "ka",
+            "ko",
+            "ku",
+            "kin",
+            "kiu",
+            "kai",
+            "kiau",
+            "kun",
+            "kiun",
+            "kang",
+            "koi",
+            "ke",
+            "keu",
+            "kip",
+            "kau",
+            "kiam",
+            "kim",
+            "kok",
+            "kiuk",
+            "kuk",
+            "kam",
+            "kiong",
+            "kiung",
+            "kung",
+            "kap",
+            "kat",
+            "kiang",
+            "kak",
+            "kiak",
+            "kan",
+            "kiap",
+            "kon",
+            "kut",
+            "kia",
+            "kiok",
+            "kio",
+            "kit",
+            "kem",
+            "kioi",
+            "kep",
+            "kian",
+            "kek",
+            "kiat",
+            "kie",
+            "kik",
+            "kot"
+          ]
+        },
+        {
+          "reading": "l",
+          "items": [
+            "li",
+            "lin",
+            "lu",
+            "len",
+            "liau",
+            "lit",
+            "liu",
+            "lau",
+            "leu",
+            "long",
+            "lui",
+            "lok",
+            "luk",
+            "lo",
+            "lung",
+            "liong",
+            "la",
+            "lai",
+            "lang",
+            "lap",
+            "lam",
+            "liam",
+            "loi",
+            "lon",
+            "lan",
+            "let",
+            "lun",
+            "le",
+            "lak",
+            "lat",
+            "lim",
+            "lut",
+            "liap",
+            "liang",
+            "lot",
+            "lio",
+            "liak",
+            "liok",
+            "leng",
+            "lip",
+            "lem",
+            "lep",
+            "lek",
+            "lia",
+            "liat",
+            "lik",
+            "liuk",
+            "liung"
+          ]
+        }
+      ]
     },
     "merged": [
+      {
+        "reading": "k",
+        "segment": -4,
+        "items": [
+          "ki",
+          "kui",
+          "ket",
+          "ken",
+          "kong",
+          "ka",
+          "ko",
+          "ku",
+          "kin",
+          "kiu",
+          "kai",
+          "kiau",
+          "kun",
+          "kiun",
+          "kang",
+          "koi",
+          "ke",
+          "keu",
+          "kip",
+          "kau",
+          "kiam",
+          "kim",
+          "kok",
+          "kiuk",
+          "kuk",
+          "kam",
+          "kiong",
+          "kiung",
+          "kung",
+          "kap",
+          "kat",
+          "kiang",
+          "kak",
+          "kiak",
+          "kan",
+          "kiap",
+          "kon",
+          "kut",
+          "kia",
+          "kiok",
+          "kio",
+          "kit",
+          "kem",
+          "kioi",
+          "kep",
+          "kian",
+          "kek",
+          "kiat",
+          "kie",
+          "kik",
+          "kot"
+        ]
+      },
+      {
+        "reading": "l",
+        "segment": -4,
+        "items": [
+          "li",
+          "lin",
+          "lu",
+          "len",
+          "liau",
+          "lit",
+          "liu",
+          "lau",
+          "leu",
+          "long",
+          "lui",
+          "lok",
+          "luk",
+          "lo",
+          "lung",
+          "liong",
+          "la",
+          "lai",
+          "lang",
+          "lap",
+          "lam",
+          "liam",
+          "loi",
+          "lon",
+          "lan",
+          "let",
+          "lun",
+          "le",
+          "lak",
+          "lat",
+          "lim",
+          "lut",
+          "liap",
+          "liang",
+          "lot",
+          "lio",
+          "liak",
+          "liok",
+          "leng",
+          "lip",
+          "lem",
+          "lep",
+          "lek",
+          "lia",
+          "liat",
+          "lik",
+          "liuk",
+          "liung"
+        ]
+      },
       {
         "reading": "kiun",
         "segment": 0,
@@ -4673,9 +5640,231 @@
             "共产党"
           ]
         }
+      ],
+      "isolated": [
+        {
+          "reading": "k",
+          "items": [
+            "ki",
+            "kui",
+            "ket",
+            "ken",
+            "kong",
+            "ka",
+            "ko",
+            "ku",
+            "kin",
+            "kiu",
+            "kai",
+            "kiau",
+            "kun",
+            "kiun",
+            "kang",
+            "koi",
+            "ke",
+            "keu",
+            "kip",
+            "kau",
+            "kiam",
+            "kim",
+            "kok",
+            "kiuk",
+            "kuk",
+            "kam",
+            "kiong",
+            "kiung",
+            "kung",
+            "kap",
+            "kat",
+            "kiang",
+            "kak",
+            "kiak",
+            "kan",
+            "kiap",
+            "kon",
+            "kut",
+            "kia",
+            "kiok",
+            "kio",
+            "kit",
+            "kem",
+            "kioi",
+            "kep",
+            "kian",
+            "kek",
+            "kiat",
+            "kie",
+            "kik",
+            "kot"
+          ]
+        },
+        {
+          "reading": "l",
+          "items": [
+            "li",
+            "lin",
+            "lu",
+            "len",
+            "liau",
+            "lit",
+            "liu",
+            "lau",
+            "leu",
+            "long",
+            "lui",
+            "lok",
+            "luk",
+            "lo",
+            "lung",
+            "liong",
+            "la",
+            "lai",
+            "lang",
+            "lap",
+            "lam",
+            "liam",
+            "loi",
+            "lon",
+            "lan",
+            "let",
+            "lun",
+            "le",
+            "lak",
+            "lat",
+            "lim",
+            "lut",
+            "liap",
+            "liang",
+            "lot",
+            "lio",
+            "liak",
+            "liok",
+            "leng",
+            "lip",
+            "lem",
+            "lep",
+            "lek",
+            "lia",
+            "liat",
+            "lik",
+            "liuk",
+            "liung"
+          ]
+        }
       ]
     },
     "merged": [
+      {
+        "reading": "k",
+        "segment": -4,
+        "items": [
+          "ki",
+          "kui",
+          "ket",
+          "ken",
+          "kong",
+          "ka",
+          "ko",
+          "ku",
+          "kin",
+          "kiu",
+          "kai",
+          "kiau",
+          "kun",
+          "kiun",
+          "kang",
+          "koi",
+          "ke",
+          "keu",
+          "kip",
+          "kau",
+          "kiam",
+          "kim",
+          "kok",
+          "kiuk",
+          "kuk",
+          "kam",
+          "kiong",
+          "kiung",
+          "kung",
+          "kap",
+          "kat",
+          "kiang",
+          "kak",
+          "kiak",
+          "kan",
+          "kiap",
+          "kon",
+          "kut",
+          "kia",
+          "kiok",
+          "kio",
+          "kit",
+          "kem",
+          "kioi",
+          "kep",
+          "kian",
+          "kek",
+          "kiat",
+          "kie",
+          "kik",
+          "kot"
+        ]
+      },
+      {
+        "reading": "l",
+        "segment": -4,
+        "items": [
+          "li",
+          "lin",
+          "lu",
+          "len",
+          "liau",
+          "lit",
+          "liu",
+          "lau",
+          "leu",
+          "long",
+          "lui",
+          "lok",
+          "luk",
+          "lo",
+          "lung",
+          "liong",
+          "la",
+          "lai",
+          "lang",
+          "lap",
+          "lam",
+          "liam",
+          "loi",
+          "lon",
+          "lan",
+          "let",
+          "lun",
+          "le",
+          "lak",
+          "lat",
+          "lim",
+          "lut",
+          "liap",
+          "liang",
+          "lot",
+          "lio",
+          "liak",
+          "liok",
+          "leng",
+          "lip",
+          "lem",
+          "lep",
+          "lek",
+          "lia",
+          "liat",
+          "lik",
+          "liuk",
+          "liung"
+        ]
+      },
       {
         "reading": "kiun",
         "segment": 0,
@@ -4964,7 +6153,8 @@
             "鲮",
             "檩",
             "酃",
-            "麟"
+            "麟",
+            "跉"
           ]
         },
         {
@@ -4984,7 +6174,8 @@
             "磬",
             "檠",
             "罄",
-            "䐃"
+            "䐃",
+            "僸"
           ]
         },
         {
@@ -4998,7 +6189,8 @@
             "衾",
             "揿",
             "噙",
-            "檎"
+            "檎",
+            "㩒"
           ]
         },
         {
@@ -5304,7 +6496,8 @@
           "items": [
             "利玛",
             "利玛窦",
-            "利马"
+            "利马",
+            "鲤嫲"
           ]
         },
         {
@@ -5377,9 +6570,231 @@
             "linux"
           ]
         }
+      ],
+      "isolated": [
+        {
+          "reading": "k",
+          "items": [
+            "ki",
+            "kui",
+            "ket",
+            "ken",
+            "kong",
+            "ka",
+            "ko",
+            "ku",
+            "kin",
+            "kiu",
+            "kai",
+            "kiau",
+            "kun",
+            "kiun",
+            "kang",
+            "koi",
+            "ke",
+            "keu",
+            "kip",
+            "kau",
+            "kiam",
+            "kim",
+            "kok",
+            "kiuk",
+            "kuk",
+            "kam",
+            "kiong",
+            "kiung",
+            "kung",
+            "kap",
+            "kat",
+            "kiang",
+            "kak",
+            "kiak",
+            "kan",
+            "kiap",
+            "kon",
+            "kut",
+            "kia",
+            "kiok",
+            "kio",
+            "kit",
+            "kem",
+            "kioi",
+            "kep",
+            "kian",
+            "kek",
+            "kiat",
+            "kie",
+            "kik",
+            "kot"
+          ]
+        },
+        {
+          "reading": "l",
+          "items": [
+            "li",
+            "lin",
+            "lu",
+            "len",
+            "liau",
+            "lit",
+            "liu",
+            "lau",
+            "leu",
+            "long",
+            "lui",
+            "lok",
+            "luk",
+            "lo",
+            "lung",
+            "liong",
+            "la",
+            "lai",
+            "lang",
+            "lap",
+            "lam",
+            "liam",
+            "loi",
+            "lon",
+            "lan",
+            "let",
+            "lun",
+            "le",
+            "lak",
+            "lat",
+            "lim",
+            "lut",
+            "liap",
+            "liang",
+            "lot",
+            "lio",
+            "liak",
+            "liok",
+            "leng",
+            "lip",
+            "lem",
+            "lep",
+            "lek",
+            "lia",
+            "liat",
+            "lik",
+            "liuk",
+            "liung"
+          ]
+        }
       ]
     },
     "merged": [
+      {
+        "reading": "k",
+        "segment": -4,
+        "items": [
+          "ki",
+          "kui",
+          "ket",
+          "ken",
+          "kong",
+          "ka",
+          "ko",
+          "ku",
+          "kin",
+          "kiu",
+          "kai",
+          "kiau",
+          "kun",
+          "kiun",
+          "kang",
+          "koi",
+          "ke",
+          "keu",
+          "kip",
+          "kau",
+          "kiam",
+          "kim",
+          "kok",
+          "kiuk",
+          "kuk",
+          "kam",
+          "kiong",
+          "kiung",
+          "kung",
+          "kap",
+          "kat",
+          "kiang",
+          "kak",
+          "kiak",
+          "kan",
+          "kiap",
+          "kon",
+          "kut",
+          "kia",
+          "kiok",
+          "kio",
+          "kit",
+          "kem",
+          "kioi",
+          "kep",
+          "kian",
+          "kek",
+          "kiat",
+          "kie",
+          "kik",
+          "kot"
+        ]
+      },
+      {
+        "reading": "l",
+        "segment": -4,
+        "items": [
+          "li",
+          "lin",
+          "lu",
+          "len",
+          "liau",
+          "lit",
+          "liu",
+          "lau",
+          "leu",
+          "long",
+          "lui",
+          "lok",
+          "luk",
+          "lo",
+          "lung",
+          "liong",
+          "la",
+          "lai",
+          "lang",
+          "lap",
+          "lam",
+          "liam",
+          "loi",
+          "lon",
+          "lan",
+          "let",
+          "lun",
+          "le",
+          "lak",
+          "lat",
+          "lim",
+          "lut",
+          "liap",
+          "liang",
+          "lot",
+          "lio",
+          "liak",
+          "liok",
+          "leng",
+          "lip",
+          "lem",
+          "lep",
+          "lek",
+          "lia",
+          "liat",
+          "lik",
+          "liuk",
+          "liung"
+        ]
+      },
       {
         "reading": "ki",
         "segment": 0,
@@ -5481,7 +6896,8 @@
           "衾",
           "揿",
           "噙",
-          "檎"
+          "檎",
+          "㩒"
         ]
       },
       {
@@ -5502,7 +6918,8 @@
           "磬",
           "檠",
           "罄",
-          "䐃"
+          "䐃",
+          "僸"
         ]
       },
       {
@@ -5656,7 +7073,8 @@
           "鲮",
           "檩",
           "酃",
-          "麟"
+          "麟",
+          "跉"
         ]
       },
       {
@@ -5789,7 +7207,8 @@
         "items": [
           "利玛",
           "利玛窦",
-          "利马"
+          "利马",
+          "鲤嫲"
         ]
       },
       {
@@ -6174,9 +7593,193 @@
             "上高啱"
           ]
         }
+      ],
+      "isolated": [
+        {
+          "reading": "p",
+          "items": [
+            "pu",
+            "pi",
+            "pan",
+            "pin",
+            "pui",
+            "pang",
+            "pen",
+            "piau",
+            "pau",
+            "pok",
+            "puk",
+            "pai",
+            "pet",
+            "piang",
+            "pun",
+            "pung",
+            "pak",
+            "pong",
+            "pat",
+            "pit",
+            "po",
+            "poi",
+            "put",
+            "pa",
+            "pe",
+            "peu",
+            "piak",
+            "piong",
+            "pam",
+            "pek",
+            "pia",
+            "pik",
+            "piu",
+            "pot"
+          ]
+        },
+        {
+          "reading": "s",
+          "items": [
+            "si",
+            "sin",
+            "sun",
+            "sen",
+            "song",
+            "su",
+            "siu",
+            "suk",
+            "sit",
+            "sa",
+            "se",
+            "set",
+            "sim",
+            "sang",
+            "sau",
+            "sip",
+            "sung",
+            "sap",
+            "sok",
+            "sui",
+            "sam",
+            "san",
+            "sak",
+            "sut",
+            "sem",
+            "soi",
+            "sai",
+            "so",
+            "sot",
+            "siuk",
+            "siung",
+            "son",
+            "sat",
+            "sek",
+            "sep",
+            "seu",
+            "sia",
+            "siak",
+            "siam",
+            "siap",
+            "siat",
+            "siau",
+            "sik",
+            "sio",
+            "siok",
+            "sw"
+          ]
+        }
       ]
     },
     "merged": [
+      {
+        "reading": "p",
+        "segment": -4,
+        "items": [
+          "pu",
+          "pi",
+          "pan",
+          "pin",
+          "pui",
+          "pang",
+          "pen",
+          "piau",
+          "pau",
+          "pok",
+          "puk",
+          "pai",
+          "pet",
+          "piang",
+          "pun",
+          "pung",
+          "pak",
+          "pong",
+          "pat",
+          "pit",
+          "po",
+          "poi",
+          "put",
+          "pa",
+          "pe",
+          "peu",
+          "piak",
+          "piong",
+          "pam",
+          "pek",
+          "pia",
+          "pik",
+          "piu",
+          "pot"
+        ]
+      },
+      {
+        "reading": "s",
+        "segment": -4,
+        "items": [
+          "si",
+          "sin",
+          "sun",
+          "sen",
+          "song",
+          "su",
+          "siu",
+          "suk",
+          "sit",
+          "sa",
+          "se",
+          "set",
+          "sim",
+          "sang",
+          "sau",
+          "sip",
+          "sung",
+          "sap",
+          "sok",
+          "sui",
+          "sam",
+          "san",
+          "sak",
+          "sut",
+          "sem",
+          "soi",
+          "sai",
+          "so",
+          "sot",
+          "siuk",
+          "siung",
+          "son",
+          "sat",
+          "sek",
+          "sep",
+          "seu",
+          "sia",
+          "siak",
+          "siam",
+          "siap",
+          "siat",
+          "siau",
+          "sik",
+          "sio",
+          "siok",
+          "sw"
+        ]
+      },
       {
         "reading": "pong",
         "segment": 0,
@@ -6523,7 +8126,8 @@
             "骰",
             "屣",
             "噻",
-            "鳃"
+            "鳃",
+            "豺"
           ]
         },
         {
@@ -6634,7 +8238,8 @@
             "肄",
             "屣",
             "樨",
-            "酾"
+            "酾",
+            "俟"
           ]
         },
         {
@@ -6691,7 +8296,8 @@
             "覗",
             "䚇",
             "梓",
-            "惺"
+            "惺",
+            "謃"
           ]
         },
         {
@@ -6728,7 +8334,8 @@
             "浞",
             "搠",
             "蒴",
-            "槊"
+            "槊",
+            "溹"
           ]
         },
         {
@@ -6775,7 +8382,9 @@
             "愫",
             "厮",
             "锶",
-            "澌"
+            "澌",
+            "肆",
+            "自"
           ]
         },
         {
@@ -7086,7 +8695,8 @@
             "洗身子儿"
           ]
         }
-      ]
+      ],
+      "isolated": []
     },
     "merged": [
       {
@@ -7109,7 +8719,8 @@
           "骰",
           "屣",
           "噻",
-          "鳃"
+          "鳃",
+          "豺"
         ]
       },
       {
@@ -7235,7 +8846,8 @@
           "肄",
           "屣",
           "樨",
-          "酾"
+          "酾",
+          "俟"
         ]
       },
       {
@@ -7294,7 +8906,8 @@
           "覗",
           "䚇",
           "梓",
-          "惺"
+          "惺",
+          "謃"
         ]
       },
       {
@@ -7333,7 +8946,8 @@
           "浞",
           "搠",
           "蒴",
-          "槊"
+          "槊",
+          "溹"
         ]
       },
       {
@@ -7381,7 +8995,9 @@
           "愫",
           "厮",
           "锶",
-          "澌"
+          "澌",
+          "肆",
+          "自"
         ]
       },
       {
@@ -7719,7 +9335,8 @@
       "split": [],
       "assoc": [],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": []
     },
     "merged": []
   },
@@ -7730,7 +9347,8 @@
       "split": [],
       "assoc": [],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": []
     },
     "merged": []
   },
@@ -7770,7 +9388,9 @@
             "糜",
             "縻",
             "麋",
-            "芈"
+            "芈",
+            "沕",
+            "冞"
           ]
         },
         {
@@ -7834,7 +9454,8 @@
             "螨",
             "镘",
             "懑",
-            "鳗"
+            "鳗",
+            "浼"
           ]
         },
         {
@@ -7865,7 +9486,8 @@
             "髦",
             "蝥",
             "懋",
-            "蟊"
+            "蟊",
+            "㪞"
           ]
         },
         {
@@ -7931,7 +9553,9 @@
             "糜",
             "縻",
             "麋",
-            "芈"
+            "芈",
+            "沕",
+            "冞"
           ]
         },
         {
@@ -7961,7 +9585,8 @@
             "溟",
             "暝",
             "瞑",
-            "螟"
+            "螟",
+            "纹"
           ]
         },
         {
@@ -7984,7 +9609,8 @@
             "呒",
             "麽",
             "嬷",
-            "耱"
+            "耱",
+            "髍"
           ]
         },
         {
@@ -8103,7 +9729,9 @@
             "凝",
             "咛",
             "佇",
-            "㜣"
+            "㜣",
+            "撚",
+            "甯"
           ]
         },
         {
@@ -8140,17 +9768,19 @@
           ]
         },
         {
-          "reading": "no",
+          "reading": "nong",
           "items": [
-            "奴",
-            "努",
-            "挪",
-            "怒",
-            "懦",
-            "糯",
-            "孥",
-            "傩",
-            "嚅"
+            "浪",
+            "囊",
+            "瓤",
+            "裆",
+            "曩",
+            "攮",
+            "馕",
+            "齉",
+            "阆",
+            "欜",
+            "莨"
           ]
         },
         {
@@ -8176,7 +9806,9 @@
             "侬",
             "哝",
             "秾",
-            "齉"
+            "齉",
+            "齈",
+            "燶"
           ]
         }
       ],
@@ -8457,7 +10089,8 @@
             "蚁公"
           ]
         }
-      ]
+      ],
+      "isolated": []
     },
     "merged": [
       {
@@ -8484,7 +10117,8 @@
           "螨",
           "镘",
           "懑",
-          "鳗"
+          "鳗",
+          "浼"
         ]
       },
       {
@@ -8516,7 +10150,8 @@
           "髦",
           "蝥",
           "懋",
-          "蟊"
+          "蟊",
+          "㪞"
         ]
       },
       {
@@ -8592,7 +10227,9 @@
           "糜",
           "縻",
           "麋",
-          "芈"
+          "芈",
+          "沕",
+          "冞"
         ]
       },
       {
@@ -8623,7 +10260,8 @@
           "溟",
           "暝",
           "瞑",
-          "螟"
+          "螟",
+          "纹"
         ]
       },
       {
@@ -8647,7 +10285,8 @@
           "呒",
           "麽",
           "嬷",
-          "耱"
+          "耱",
+          "髍"
         ]
       },
       {
@@ -8771,7 +10410,9 @@
           "凝",
           "咛",
           "佇",
-          "㜣"
+          "㜣",
+          "撚",
+          "甯"
         ]
       },
       {
@@ -8817,18 +10458,20 @@
         ]
       },
       {
-        "reading": "no",
+        "reading": "nong",
         "segment": 0,
         "items": [
-          "奴",
-          "努",
-          "挪",
-          "怒",
-          "懦",
-          "糯",
-          "孥",
-          "傩",
-          "嚅"
+          "浪",
+          "囊",
+          "瓤",
+          "裆",
+          "曩",
+          "攮",
+          "馕",
+          "齉",
+          "阆",
+          "欜",
+          "莨"
         ]
       },
       {
@@ -8856,7 +10499,9 @@
           "侬",
           "哝",
           "秾",
-          "齉"
+          "齉",
+          "齈",
+          "燶"
         ]
       },
       {
@@ -9190,10 +10835,14 @@
           ]
         },
         {
-          "reading": "vak",
+          "reading": "vai",
           "items": [
-            "划",
-            "画"
+            "歪",
+            "娃",
+            "踒",
+            "抁",
+            "y",
+            "Y"
           ]
         },
         {
@@ -9247,7 +10896,9 @@
             "秽",
             "ヰ",
             "哕",
-            "ヱ"
+            "ヱ",
+            "抁",
+            "喂"
           ]
         },
         {
@@ -9265,13 +10916,16 @@
           "items": [
             "唯",
             "帷",
-            "惟"
+            "惟",
+            "v",
+            "V"
           ]
         },
         {
           "reading": "vin",
           "items": [
-            "紊"
+            "紊",
+            "忟"
           ]
         },
         {
@@ -9441,7 +11095,8 @@
             "愠",
             "媪",
             "韫",
-            "氲"
+            "氲",
+            "圂"
           ]
         }
       ],
@@ -9662,7 +11317,8 @@
           ]
         }
       ],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": []
     },
     "merged": [
       {
@@ -9680,11 +11336,15 @@
         ]
       },
       {
-        "reading": "vak",
+        "reading": "vai",
         "segment": 0,
         "items": [
-          "划",
-          "画"
+          "歪",
+          "娃",
+          "踒",
+          "抁",
+          "y",
+          "Y"
         ]
       },
       {
@@ -9740,7 +11400,9 @@
           "秽",
           "ヰ",
           "哕",
-          "ヱ"
+          "ヱ",
+          "抁",
+          "喂"
         ]
       },
       {
@@ -9760,14 +11422,17 @@
         "items": [
           "唯",
           "帷",
-          "惟"
+          "惟",
+          "v",
+          "V"
         ]
       },
       {
         "reading": "vin",
         "segment": 0,
         "items": [
-          "紊"
+          "紊",
+          "忟"
         ]
       },
       {
@@ -9942,7 +11607,8 @@
           "愠",
           "媪",
           "韫",
-          "氲"
+          "氲",
+          "圂"
         ]
       },
       {
@@ -10244,7 +11910,8 @@
             "趺",
             "釜",
             "晡",
-            "瓿"
+            "瓿",
+            "夫"
           ]
         }
       ],
@@ -10349,7 +12016,10 @@
             "髀",
             "鼙",
             "鐾",
-            "狴"
+            "狴",
+            "揹",
+            "b",
+            "B"
           ]
         },
         {
@@ -10448,7 +12118,8 @@
             "趺",
             "釜",
             "晡",
-            "瓿"
+            "瓿",
+            "夫"
           ]
         },
         {
@@ -10473,7 +12144,8 @@
             "呗",
             "钡",
             "焙",
-            "蜚"
+            "蜚",
+            "捊"
           ]
         },
         {
@@ -11128,7 +12800,8 @@
             "苎麻"
           ]
         }
-      ]
+      ],
+      "isolated": []
     },
     "merged": [
       {
@@ -11234,7 +12907,10 @@
           "髀",
           "鼙",
           "鐾",
-          "狴"
+          "狴",
+          "揹",
+          "b",
+          "B"
         ]
       },
       {
@@ -11337,7 +13013,8 @@
           "趺",
           "釜",
           "晡",
-          "瓿"
+          "瓿",
+          "夫"
         ]
       },
       {
@@ -11363,7 +13040,8 @@
           "呗",
           "钡",
           "焙",
-          "蜚"
+          "蜚",
+          "捊"
         ]
       },
       {
@@ -12071,7 +13749,9 @@
             "髯",
             "靥",
             "魇",
-            "餍"
+            "餍",
+            "蝘",
+            "瘖"
           ]
         },
         {
@@ -12122,7 +13802,8 @@
             "迤",
             "裔",
             "殪",
-            "翳"
+            "翳",
+            "嘢"
           ]
         },
         {
@@ -12344,7 +14025,10 @@
             "襦",
             "懿",
             "邘",
-            "嬬"
+            "嬬",
+            "蠕",
+            "e",
+            "E"
           ]
         },
         {
@@ -12411,7 +14095,8 @@
             "瘿",
             "膺",
             "霪",
-            "瀛"
+            "瀛",
+            "賸"
           ]
         },
         {
@@ -12467,7 +14152,9 @@
             "黝",
             "鞣",
             "鼬",
-            "尢"
+            "尢",
+            "u",
+            "U"
           ]
         },
         {
@@ -12479,7 +14166,8 @@
             "哟",
             "呦",
             "竽",
-            "唷"
+            "唷",
+            "猗"
           ]
         },
         {
@@ -12660,7 +14348,8 @@
             "啁",
             "笤",
             "缲",
-            "璪"
+            "璪",
+            "炤"
           ]
         },
         {
@@ -12680,7 +14369,10 @@
             "霁",
             "齑",
             "ゼ",
-            "ぜ"
+            "ぜ",
+            "哜",
+            "j",
+            "J"
           ]
         },
         {
@@ -12710,7 +14402,10 @@
             "澶",
             "罾",
             "鞯",
-            "戋"
+            "戋",
+            "濽",
+            "橧",
+            "揃"
           ]
         },
         {
@@ -12785,7 +14480,10 @@
             "齑",
             "糍",
             "髭",
-            "鲻"
+            "鲻",
+            "急",
+            "g",
+            "G"
           ]
         },
         {
@@ -12874,7 +14572,9 @@
             "踬",
             "稷",
             "瘠",
-            "螫"
+            "螫",
+            "渍",
+            "揤"
           ]
         },
         {
@@ -12894,7 +14594,8 @@
             "棹",
             "焯",
             "踔",
-            "镯"
+            "镯",
+            "着"
           ]
         },
         {
@@ -12968,7 +14669,8 @@
             "槠",
             "箸",
             "潴",
-            "蠹"
+            "蠹",
+            "子"
           ]
         },
         {
@@ -12999,7 +14701,8 @@
             "粽",
             "踵",
             "螽",
-            "鬃"
+            "鬃",
+            "揰"
           ]
         },
         {
@@ -13336,9 +15039,195 @@
         }
       ],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": [
+        {
+          "reading": "j",
+          "items": [
+            "ji",
+            "jen",
+            "jin",
+            "jiu",
+            "jung",
+            "jit",
+            "jun",
+            "jau",
+            "jong",
+            "jam",
+            "ja",
+            "juk",
+            "jang",
+            "jet",
+            "jui",
+            "je",
+            "jo",
+            "jim",
+            "jok",
+            "jap",
+            "jip",
+            "jat",
+            "jak",
+            "jai",
+            "jan",
+            "jon",
+            "jut",
+            "jek",
+            "jem",
+            "jep",
+            "jeu",
+            "jik",
+            "ju"
+          ]
+        },
+        {
+          "reading": "z",
+          "items": [
+            "zi",
+            "zin",
+            "zu",
+            "zau",
+            "zong",
+            "zen",
+            "zung",
+            "zit",
+            "zw",
+            "za",
+            "zam",
+            "zun",
+            "zak",
+            "ziu",
+            "zang",
+            "ze",
+            "zok",
+            "zai",
+            "zan",
+            "zet",
+            "ziau",
+            "zuk",
+            "zip",
+            "zon",
+            "zui",
+            "ziok",
+            "zot",
+            "zap",
+            "zim",
+            "ziong",
+            "ziang",
+            "zut",
+            "zeu",
+            "zia",
+            "zat",
+            "ziam",
+            "zoi",
+            "zo",
+            "ziap",
+            "zem",
+            "zep",
+            "ziak",
+            "zio",
+            "zek",
+            "ziat",
+            "zik",
+            "ziuk",
+            "ziung"
+          ]
+        }
+      ]
     },
     "merged": [
+      {
+        "reading": "j",
+        "segment": -4,
+        "items": [
+          "ji",
+          "jen",
+          "jin",
+          "jiu",
+          "jung",
+          "jit",
+          "jun",
+          "jau",
+          "jong",
+          "jam",
+          "ja",
+          "juk",
+          "jang",
+          "jet",
+          "jui",
+          "je",
+          "jo",
+          "jim",
+          "jok",
+          "jap",
+          "jip",
+          "jat",
+          "jak",
+          "jai",
+          "jan",
+          "jon",
+          "jut",
+          "jek",
+          "jem",
+          "jep",
+          "jeu",
+          "jik",
+          "ju"
+        ]
+      },
+      {
+        "reading": "z",
+        "segment": -4,
+        "items": [
+          "zi",
+          "zin",
+          "zu",
+          "zau",
+          "zong",
+          "zen",
+          "zung",
+          "zit",
+          "zw",
+          "za",
+          "zam",
+          "zun",
+          "zak",
+          "ziu",
+          "zang",
+          "ze",
+          "zok",
+          "zai",
+          "zan",
+          "zet",
+          "ziau",
+          "zuk",
+          "zip",
+          "zon",
+          "zui",
+          "ziok",
+          "zot",
+          "zap",
+          "zim",
+          "ziong",
+          "ziang",
+          "zut",
+          "zeu",
+          "zia",
+          "zat",
+          "ziam",
+          "zoi",
+          "zo",
+          "ziap",
+          "zem",
+          "zep",
+          "ziak",
+          "zio",
+          "zek",
+          "ziat",
+          "zik",
+          "ziuk",
+          "ziung"
+        ]
+      },
       {
         "reading": "jam",
         "segment": 0,
@@ -13364,7 +15253,9 @@
           "髯",
           "靥",
           "魇",
-          "餍"
+          "餍",
+          "蝘",
+          "瘖"
         ]
       },
       {
@@ -13417,7 +15308,8 @@
           "迤",
           "裔",
           "殪",
-          "翳"
+          "翳",
+          "嘢"
         ]
       },
       {
@@ -13642,7 +15534,10 @@
           "襦",
           "懿",
           "邘",
-          "嬬"
+          "嬬",
+          "蠕",
+          "e",
+          "E"
         ]
       },
       {
@@ -13710,7 +15605,8 @@
           "瘿",
           "膺",
           "霪",
-          "瀛"
+          "瀛",
+          "賸"
         ]
       },
       {
@@ -13767,7 +15663,9 @@
           "黝",
           "鞣",
           "鼬",
-          "尢"
+          "尢",
+          "u",
+          "U"
         ]
       },
       {
@@ -13780,7 +15678,8 @@
           "哟",
           "呦",
           "竽",
-          "唷"
+          "唷",
+          "猗"
         ]
       },
       {
@@ -13966,7 +15865,8 @@
           "啁",
           "笤",
           "缲",
-          "璪"
+          "璪",
+          "炤"
         ]
       },
       {
@@ -13987,7 +15887,10 @@
           "霁",
           "齑",
           "ゼ",
-          "ぜ"
+          "ぜ",
+          "哜",
+          "j",
+          "J"
         ]
       },
       {
@@ -14018,7 +15921,10 @@
           "澶",
           "罾",
           "鞯",
-          "戋"
+          "戋",
+          "濽",
+          "橧",
+          "揃"
         ]
       },
       {
@@ -14094,7 +16000,10 @@
           "齑",
           "糍",
           "髭",
-          "鲻"
+          "鲻",
+          "急",
+          "g",
+          "G"
         ]
       },
       {
@@ -14185,7 +16094,9 @@
           "踬",
           "稷",
           "瘠",
-          "螫"
+          "螫",
+          "渍",
+          "揤"
         ]
       },
       {
@@ -14206,7 +16117,8 @@
           "棹",
           "焯",
           "踔",
-          "镯"
+          "镯",
+          "着"
         ]
       },
       {
@@ -14282,7 +16194,8 @@
           "槠",
           "箸",
           "潴",
-          "蠹"
+          "蠹",
+          "子"
         ]
       },
       {
@@ -14314,7 +16227,8 @@
           "粽",
           "踵",
           "螽",
-          "鬃"
+          "鬃",
+          "揰"
         ]
       },
       {
@@ -14690,7 +16604,8 @@
             "螨",
             "镘",
             "懑",
-            "鳗"
+            "鳗",
+            "浼"
           ]
         },
         {
@@ -14721,7 +16636,8 @@
             "髦",
             "蝥",
             "懋",
-            "蟊"
+            "蟊",
+            "㪞"
           ]
         },
         {
@@ -14809,7 +16725,9 @@
             "糜",
             "縻",
             "麋",
-            "芈"
+            "芈",
+            "沕",
+            "冞"
           ]
         },
         {
@@ -14862,7 +16780,8 @@
             "溟",
             "暝",
             "瞑",
-            "螟"
+            "螟",
+            "纹"
           ]
         },
         {
@@ -14885,7 +16804,8 @@
             "呒",
             "麽",
             "嬷",
-            "耱"
+            "耱",
+            "髍"
           ]
         },
         {
@@ -15038,14 +16958,15 @@
           ]
         },
         {
-          "reading": "ne",
+          "reading": "nem",
           "items": [
-            "呢",
-            "妮",
-            "怩",
-            "昵",
-            "祢",
-            "倪"
+            "念",
+            "捻",
+            "惗",
+            "稔",
+            "黏",
+            "㜣",
+            "腍"
           ]
         },
         {
@@ -15062,7 +16983,9 @@
             "凝",
             "咛",
             "佇",
-            "㜣"
+            "㜣",
+            "撚",
+            "甯"
           ]
         },
         {
@@ -15118,7 +17041,8 @@
             "糯",
             "孥",
             "傩",
-            "嚅"
+            "嚅",
+            "捼"
           ]
         },
         {
@@ -15131,7 +17055,10 @@
             "曩",
             "攮",
             "馕",
-            "齉"
+            "齉",
+            "阆",
+            "欜",
+            "莨"
           ]
         },
         {
@@ -15151,7 +17078,8 @@
           "reading": "nui",
           "items": [
             "内",
-            "馁"
+            "馁",
+            "挼"
           ]
         },
         {
@@ -15164,7 +17092,9 @@
             "侬",
             "哝",
             "秾",
-            "齉"
+            "齉",
+            "齈",
+            "燶"
           ]
         }
       ],
@@ -15414,9 +17344,351 @@
           ]
         }
       ],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": [
+        {
+          "reading": "m",
+          "items": [
+            "mu",
+            "mi",
+            "mau",
+            "men",
+            "min",
+            "man",
+            "mui",
+            "mo",
+            "mong",
+            "meu",
+            "miau",
+            "mun",
+            "me",
+            "ma",
+            "mang",
+            "met",
+            "muk",
+            "mak",
+            "moi",
+            "mung",
+            "mat",
+            "mit",
+            "mok",
+            "mai",
+            "miang",
+            "mut",
+            "mh",
+            "mia",
+            "miu",
+            "meng",
+            "mam"
+          ]
+        },
+        {
+          "reading": "n",
+          "items": [
+            "nzi",
+            "ngh",
+            "ngu",
+            "ngau",
+            "nen",
+            "ni",
+            "nga",
+            "nziam",
+            "ngo",
+            "nziau",
+            "nai",
+            "nau",
+            "ngan",
+            "nzien",
+            "ngok",
+            "ngui",
+            "nzim",
+            "nziun",
+            "nziap",
+            "nziong",
+            "na",
+            "nong",
+            "nzio",
+            "nziuk",
+            "nem",
+            "neu",
+            "ngai",
+            "ngen",
+            "ngoi",
+            "no",
+            "nung",
+            "nziu",
+            "nzu",
+            "ne",
+            "net",
+            "nzia",
+            "nziok",
+            "nam",
+            "ngak",
+            "nu",
+            "nzin",
+            "nap",
+            "ngeu",
+            "ngi",
+            "ngam",
+            "nge",
+            "ngat",
+            "nget",
+            "ngong",
+            "ngut",
+            "niu",
+            "nziak",
+            "nziet",
+            "nziung",
+            "nan",
+            "nang",
+            "nin",
+            "nit",
+            "nak",
+            "nep",
+            "ngap",
+            "niap",
+            "nui",
+            "nuk",
+            "nun",
+            "nziang",
+            "nzip",
+            "nziui",
+            "nat",
+            "neng",
+            "ngang",
+            "ngin",
+            "niau",
+            "nut",
+            "nzian",
+            "nzie",
+            "nzioi",
+            "nzion",
+            "ngek",
+            "ngia",
+            "ngiam",
+            "ngik",
+            "ngio",
+            "ngiung",
+            "nguk",
+            "ngun",
+            "nh",
+            "nia",
+            "niam",
+            "nim",
+            "nio",
+            "niok",
+            "noi",
+            "nok",
+            "non",
+            "not",
+            "nzau",
+            "nziai",
+            "nziat",
+            "nziot",
+            "nzit",
+            "nek",
+            "ngem",
+            "ngep",
+            "ngiai",
+            "ngiak",
+            "ngiang",
+            "ngiap",
+            "ngiat",
+            "ngie",
+            "ngien",
+            "ngiet",
+            "ngim",
+            "ngioi",
+            "ngiok",
+            "ngiong",
+            "ngip",
+            "ngit",
+            "ngiu",
+            "ngiuk",
+            "ngiun",
+            "ngon",
+            "ngot",
+            "ngung",
+            "niak",
+            "nik",
+            "nip",
+            "niuk"
+          ]
+        }
+      ]
     },
     "merged": [
+      {
+        "reading": "m",
+        "segment": -4,
+        "items": [
+          "mu",
+          "mi",
+          "mau",
+          "men",
+          "min",
+          "man",
+          "mui",
+          "mo",
+          "mong",
+          "meu",
+          "miau",
+          "mun",
+          "me",
+          "ma",
+          "mang",
+          "met",
+          "muk",
+          "mak",
+          "moi",
+          "mung",
+          "mat",
+          "mit",
+          "mok",
+          "mai",
+          "miang",
+          "mut",
+          "mh",
+          "mia",
+          "miu",
+          "meng",
+          "mam"
+        ]
+      },
+      {
+        "reading": "n",
+        "segment": -4,
+        "items": [
+          "nzi",
+          "ngh",
+          "ngu",
+          "ngau",
+          "nen",
+          "ni",
+          "nga",
+          "nziam",
+          "ngo",
+          "nziau",
+          "nai",
+          "nau",
+          "ngan",
+          "nzien",
+          "ngok",
+          "ngui",
+          "nzim",
+          "nziun",
+          "nziap",
+          "nziong",
+          "na",
+          "nong",
+          "nzio",
+          "nziuk",
+          "nem",
+          "neu",
+          "ngai",
+          "ngen",
+          "ngoi",
+          "no",
+          "nung",
+          "nziu",
+          "nzu",
+          "ne",
+          "net",
+          "nzia",
+          "nziok",
+          "nam",
+          "ngak",
+          "nu",
+          "nzin",
+          "nap",
+          "ngeu",
+          "ngi",
+          "ngam",
+          "nge",
+          "ngat",
+          "nget",
+          "ngong",
+          "ngut",
+          "niu",
+          "nziak",
+          "nziet",
+          "nziung",
+          "nan",
+          "nang",
+          "nin",
+          "nit",
+          "nak",
+          "nep",
+          "ngap",
+          "niap",
+          "nui",
+          "nuk",
+          "nun",
+          "nziang",
+          "nzip",
+          "nziui",
+          "nat",
+          "neng",
+          "ngang",
+          "ngin",
+          "niau",
+          "nut",
+          "nzian",
+          "nzie",
+          "nzioi",
+          "nzion",
+          "ngek",
+          "ngia",
+          "ngiam",
+          "ngik",
+          "ngio",
+          "ngiung",
+          "nguk",
+          "ngun",
+          "nh",
+          "nia",
+          "niam",
+          "nim",
+          "nio",
+          "niok",
+          "noi",
+          "nok",
+          "non",
+          "not",
+          "nzau",
+          "nziai",
+          "nziat",
+          "nziot",
+          "nzit",
+          "nek",
+          "ngem",
+          "ngep",
+          "ngiai",
+          "ngiak",
+          "ngiang",
+          "ngiap",
+          "ngiat",
+          "ngie",
+          "ngien",
+          "ngiet",
+          "ngim",
+          "ngioi",
+          "ngiok",
+          "ngiong",
+          "ngip",
+          "ngit",
+          "ngiu",
+          "ngiuk",
+          "ngiun",
+          "ngon",
+          "ngot",
+          "ngung",
+          "niak",
+          "nik",
+          "nip",
+          "niuk"
+        ]
+      },
       {
         "reading": "man",
         "segment": 0,
@@ -15441,7 +17713,8 @@
           "螨",
           "镘",
           "懑",
-          "鳗"
+          "鳗",
+          "浼"
         ]
       },
       {
@@ -15473,7 +17746,8 @@
           "髦",
           "蝥",
           "懋",
-          "蟊"
+          "蟊",
+          "㪞"
         ]
       },
       {
@@ -15564,7 +17838,9 @@
           "糜",
           "縻",
           "麋",
-          "芈"
+          "芈",
+          "沕",
+          "冞"
         ]
       },
       {
@@ -15619,7 +17895,8 @@
           "溟",
           "暝",
           "瞑",
-          "螟"
+          "螟",
+          "纹"
         ]
       },
       {
@@ -15643,7 +17920,8 @@
           "呒",
           "麽",
           "嬷",
-          "耱"
+          "耱",
+          "髍"
         ]
       },
       {
@@ -15802,15 +18080,16 @@
         ]
       },
       {
-        "reading": "ne",
+        "reading": "nem",
         "segment": 0,
         "items": [
-          "呢",
-          "妮",
-          "怩",
-          "昵",
-          "祢",
-          "倪"
+          "念",
+          "捻",
+          "惗",
+          "稔",
+          "黏",
+          "㜣",
+          "腍"
         ]
       },
       {
@@ -15828,7 +18107,9 @@
           "凝",
           "咛",
           "佇",
-          "㜣"
+          "㜣",
+          "撚",
+          "甯"
         ]
       },
       {
@@ -15888,7 +18169,8 @@
           "糯",
           "孥",
           "傩",
-          "嚅"
+          "嚅",
+          "捼"
         ]
       },
       {
@@ -15902,7 +18184,10 @@
           "曩",
           "攮",
           "馕",
-          "齉"
+          "齉",
+          "阆",
+          "欜",
+          "莨"
         ]
       },
       {
@@ -15924,7 +18209,8 @@
         "segment": 0,
         "items": [
           "内",
-          "馁"
+          "馁",
+          "挼"
         ]
       },
       {
@@ -15938,7 +18224,9 @@
           "侬",
           "哝",
           "秾",
-          "齉"
+          "齉",
+          "齈",
+          "燶"
         ]
       },
       {
@@ -16481,9 +18769,193 @@
         }
       ],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": [
+        {
+          "reading": "p",
+          "items": [
+            "pu",
+            "pi",
+            "pan",
+            "pin",
+            "pui",
+            "pang",
+            "pen",
+            "piau",
+            "pau",
+            "pok",
+            "puk",
+            "pai",
+            "pet",
+            "piang",
+            "pun",
+            "pung",
+            "pak",
+            "pong",
+            "pat",
+            "pit",
+            "po",
+            "poi",
+            "put",
+            "pa",
+            "pe",
+            "peu",
+            "piak",
+            "piong",
+            "pam",
+            "pek",
+            "pia",
+            "pik",
+            "piu",
+            "pot"
+          ]
+        },
+        {
+          "reading": "s",
+          "items": [
+            "si",
+            "sin",
+            "sun",
+            "sen",
+            "song",
+            "su",
+            "siu",
+            "suk",
+            "sit",
+            "sa",
+            "se",
+            "set",
+            "sim",
+            "sang",
+            "sau",
+            "sip",
+            "sung",
+            "sap",
+            "sok",
+            "sui",
+            "sam",
+            "san",
+            "sak",
+            "sut",
+            "sem",
+            "soi",
+            "sai",
+            "so",
+            "sot",
+            "siuk",
+            "siung",
+            "son",
+            "sat",
+            "sek",
+            "sep",
+            "seu",
+            "sia",
+            "siak",
+            "siam",
+            "siap",
+            "siat",
+            "siau",
+            "sik",
+            "sio",
+            "siok",
+            "sw"
+          ]
+        }
+      ]
     },
     "merged": [
+      {
+        "reading": "p",
+        "segment": -4,
+        "items": [
+          "pu",
+          "pi",
+          "pan",
+          "pin",
+          "pui",
+          "pang",
+          "pen",
+          "piau",
+          "pau",
+          "pok",
+          "puk",
+          "pai",
+          "pet",
+          "piang",
+          "pun",
+          "pung",
+          "pak",
+          "pong",
+          "pat",
+          "pit",
+          "po",
+          "poi",
+          "put",
+          "pa",
+          "pe",
+          "peu",
+          "piak",
+          "piong",
+          "pam",
+          "pek",
+          "pia",
+          "pik",
+          "piu",
+          "pot"
+        ]
+      },
+      {
+        "reading": "s",
+        "segment": -4,
+        "items": [
+          "si",
+          "sin",
+          "sun",
+          "sen",
+          "song",
+          "su",
+          "siu",
+          "suk",
+          "sit",
+          "sa",
+          "se",
+          "set",
+          "sim",
+          "sang",
+          "sau",
+          "sip",
+          "sung",
+          "sap",
+          "sok",
+          "sui",
+          "sam",
+          "san",
+          "sak",
+          "sut",
+          "sem",
+          "soi",
+          "sai",
+          "so",
+          "sot",
+          "siuk",
+          "siung",
+          "son",
+          "sat",
+          "sek",
+          "sep",
+          "seu",
+          "sia",
+          "siak",
+          "siam",
+          "siap",
+          "siat",
+          "siau",
+          "sik",
+          "sio",
+          "siok",
+          "sw"
+        ]
+      },
       {
         "reading": "po",
         "segment": 0,
@@ -17014,7 +19486,8 @@
         }
       ],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": []
     },
     "merged": [
       {
@@ -17268,6 +19741,22 @@
       "synth": [],
       "split": [
         {
+          "reading": "ke",
+          "items": [
+            "茄",
+            "契",
+            "瘸",
+            "挈",
+            "喫",
+            "锲",
+            "憩",
+            "䛴",
+            "啓",
+            "k",
+            "K"
+          ]
+        },
+        {
           "reading": "le",
           "items": [
             "礼",
@@ -17280,21 +19769,15 @@
             "蛎",
             "嘞"
           ]
-        },
-        {
-          "reading": "ke",
-          "items": [
-            "茄",
-            "契",
-            "瘸",
-            "挈",
-            "喫",
-            "锲",
-            "憩"
-          ]
         }
       ],
       "assoc": [
+        {
+          "reading": "ke ke",
+          "items": [
+            "KK唱響"
+          ]
+        },
         {
           "reading": "le le",
           "items": [
@@ -17303,9 +19786,231 @@
         }
       ],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": [
+        {
+          "reading": "k",
+          "items": [
+            "ki",
+            "kui",
+            "ket",
+            "ken",
+            "kong",
+            "ka",
+            "ko",
+            "ku",
+            "kin",
+            "kiu",
+            "kai",
+            "kiau",
+            "kun",
+            "kiun",
+            "kang",
+            "koi",
+            "ke",
+            "keu",
+            "kip",
+            "kau",
+            "kiam",
+            "kim",
+            "kok",
+            "kiuk",
+            "kuk",
+            "kam",
+            "kiong",
+            "kiung",
+            "kung",
+            "kap",
+            "kat",
+            "kiang",
+            "kak",
+            "kiak",
+            "kan",
+            "kiap",
+            "kon",
+            "kut",
+            "kia",
+            "kiok",
+            "kio",
+            "kit",
+            "kem",
+            "kioi",
+            "kep",
+            "kian",
+            "kek",
+            "kiat",
+            "kie",
+            "kik",
+            "kot"
+          ]
+        },
+        {
+          "reading": "l",
+          "items": [
+            "li",
+            "lin",
+            "lu",
+            "len",
+            "liau",
+            "lit",
+            "liu",
+            "lau",
+            "leu",
+            "long",
+            "lui",
+            "lok",
+            "luk",
+            "lo",
+            "lung",
+            "liong",
+            "la",
+            "lai",
+            "lang",
+            "lap",
+            "lam",
+            "liam",
+            "loi",
+            "lon",
+            "lan",
+            "let",
+            "lun",
+            "le",
+            "lak",
+            "lat",
+            "lim",
+            "lut",
+            "liap",
+            "liang",
+            "lot",
+            "lio",
+            "liak",
+            "liok",
+            "leng",
+            "lip",
+            "lem",
+            "lep",
+            "lek",
+            "lia",
+            "liat",
+            "lik",
+            "liuk",
+            "liung"
+          ]
+        }
+      ]
     },
     "merged": [
+      {
+        "reading": "k",
+        "segment": -4,
+        "items": [
+          "ki",
+          "kui",
+          "ket",
+          "ken",
+          "kong",
+          "ka",
+          "ko",
+          "ku",
+          "kin",
+          "kiu",
+          "kai",
+          "kiau",
+          "kun",
+          "kiun",
+          "kang",
+          "koi",
+          "ke",
+          "keu",
+          "kip",
+          "kau",
+          "kiam",
+          "kim",
+          "kok",
+          "kiuk",
+          "kuk",
+          "kam",
+          "kiong",
+          "kiung",
+          "kung",
+          "kap",
+          "kat",
+          "kiang",
+          "kak",
+          "kiak",
+          "kan",
+          "kiap",
+          "kon",
+          "kut",
+          "kia",
+          "kiok",
+          "kio",
+          "kit",
+          "kem",
+          "kioi",
+          "kep",
+          "kian",
+          "kek",
+          "kiat",
+          "kie",
+          "kik",
+          "kot"
+        ]
+      },
+      {
+        "reading": "l",
+        "segment": -4,
+        "items": [
+          "li",
+          "lin",
+          "lu",
+          "len",
+          "liau",
+          "lit",
+          "liu",
+          "lau",
+          "leu",
+          "long",
+          "lui",
+          "lok",
+          "luk",
+          "lo",
+          "lung",
+          "liong",
+          "la",
+          "lai",
+          "lang",
+          "lap",
+          "lam",
+          "liam",
+          "loi",
+          "lon",
+          "lan",
+          "let",
+          "lun",
+          "le",
+          "lak",
+          "lat",
+          "lim",
+          "lut",
+          "liap",
+          "liang",
+          "lot",
+          "lio",
+          "liak",
+          "liok",
+          "leng",
+          "lip",
+          "lem",
+          "lep",
+          "lek",
+          "lia",
+          "liat",
+          "lik",
+          "liuk",
+          "liung"
+        ]
+      },
       {
         "reading": "ke",
         "segment": 0,
@@ -17316,7 +20021,11 @@
           "挈",
           "喫",
           "锲",
-          "憩"
+          "憩",
+          "䛴",
+          "啓",
+          "k",
+          "K"
         ]
       },
       {
@@ -17332,6 +20041,13 @@
           "砺",
           "蛎",
           "嘞"
+        ]
+      },
+      {
+        "reading": "ke ke",
+        "segment": 1,
+        "items": [
+          "KK唱響"
         ]
       },
       {
@@ -17379,31 +20095,31 @@
             "蹒",
             "藩",
             "蟠",
-            "襻"
+            "襻",
+            "瓣"
           ]
         },
         {
-          "reading": "pau",
+          "reading": "pang",
           "items": [
-            "抛",
-            "刨",
-            "抱",
-            "泡",
-            "胞",
-            "炮",
-            "剖",
-            "袍",
-            "跑",
-            "暴",
-            "瀑",
-            "曝",
-            "咆",
-            "狍",
-            "飑",
-            "疱",
-            "匏",
-            "脬",
-            "龅"
+            "方",
+            "冯",
+            "芳",
+            "凭",
+            "庞",
+            "烹",
+            "彭",
+            "棚",
+            "鹏",
+            "亨",
+            "抨",
+            "怦",
+            "逄",
+            "堋",
+            "滂",
+            "甏",
+            "湴",
+            "肨"
           ]
         },
         {
@@ -17499,7 +20215,10 @@
             "濞",
             "癖",
             "鞴",
-            "鼙"
+            "鼙",
+            "嗅",
+            "p",
+            "P"
           ]
         },
         {
@@ -17523,7 +20242,9 @@
             "瞟",
             "螵",
             "鳔",
-            "鏖"
+            "鏖",
+            "薸",
+            "瘭"
           ]
         },
         {
@@ -17554,7 +20275,8 @@
             "胼",
             "娉",
             "鲆",
-            "颦"
+            "颦",
+            "辫"
           ]
         },
         {
@@ -17869,7 +20591,12 @@
             "羲",
             "禧",
             "醯",
-            "曦"
+            "曦",
+            "寔",
+            "c",
+            "z",
+            "C",
+            "Z"
           ]
         },
         {
@@ -17923,7 +20650,9 @@
             "蛏",
             "蜃",
             "嗪",
-            "嵊"
+            "嵊",
+            "㪛",
+            "弞"
           ]
         },
         {
@@ -18100,15 +20829,6 @@
       ],
       "assoc": [
         {
-          "reading": "pak qon",
-          "items": [
-            "拍案叫绝",
-            "拍案而起",
-            "拍案",
-            "拍案惊奇"
-          ]
-        },
-        {
           "reading": "pak teu",
           "items": [
             "白头偕老",
@@ -18124,6 +20844,17 @@
             "白头翁",
             "白头而新",
             "白豆"
+          ]
+        },
+        {
+          "reading": "pi qeu",
+          "items": [
+            "POS機",
+            "POLO衫",
+            "POS",
+            "Poppin",
+            "Popstar",
+            "PowerPoint"
           ]
         },
         {
@@ -18224,22 +20955,27 @@
           ]
         },
         {
-          "reading": "set qat",
+          "reading": "si qe",
           "items": [
-            "bp",
-            "血压",
-            "血压低",
-            "血压计",
-            "血压高"
+            "CAD",
+            "CAPCOM",
+            "Camille",
+            "Casio",
+            "Clannad",
+            "ZAKER",
+            "Zakka",
+            "call我"
           ]
         },
         {
-          "reading": "si qoi",
+          "reading": "si qeu",
           "items": [
-            "去爱",
-            "喜爱",
-            "时要",
-            "示爱"
+            "CoCo姐",
+            "Completedir",
+            "Coolpad",
+            "CorelDraw",
+            "CounterStrike",
+            "是OK"
           ]
         },
         {
@@ -18305,9 +21041,193 @@
         }
       ],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": [
+        {
+          "reading": "p",
+          "items": [
+            "pu",
+            "pi",
+            "pan",
+            "pin",
+            "pui",
+            "pang",
+            "pen",
+            "piau",
+            "pau",
+            "pok",
+            "puk",
+            "pai",
+            "pet",
+            "piang",
+            "pun",
+            "pung",
+            "pak",
+            "pong",
+            "pat",
+            "pit",
+            "po",
+            "poi",
+            "put",
+            "pa",
+            "pe",
+            "peu",
+            "piak",
+            "piong",
+            "pam",
+            "pek",
+            "pia",
+            "pik",
+            "piu",
+            "pot"
+          ]
+        },
+        {
+          "reading": "s",
+          "items": [
+            "si",
+            "sin",
+            "sun",
+            "sen",
+            "song",
+            "su",
+            "siu",
+            "suk",
+            "sit",
+            "sa",
+            "se",
+            "set",
+            "sim",
+            "sang",
+            "sau",
+            "sip",
+            "sung",
+            "sap",
+            "sok",
+            "sui",
+            "sam",
+            "san",
+            "sak",
+            "sut",
+            "sem",
+            "soi",
+            "sai",
+            "so",
+            "sot",
+            "siuk",
+            "siung",
+            "son",
+            "sat",
+            "sek",
+            "sep",
+            "seu",
+            "sia",
+            "siak",
+            "siam",
+            "siap",
+            "siat",
+            "siau",
+            "sik",
+            "sio",
+            "siok",
+            "sw"
+          ]
+        }
+      ]
     },
     "merged": [
+      {
+        "reading": "p",
+        "segment": -4,
+        "items": [
+          "pu",
+          "pi",
+          "pan",
+          "pin",
+          "pui",
+          "pang",
+          "pen",
+          "piau",
+          "pau",
+          "pok",
+          "puk",
+          "pai",
+          "pet",
+          "piang",
+          "pun",
+          "pung",
+          "pak",
+          "pong",
+          "pat",
+          "pit",
+          "po",
+          "poi",
+          "put",
+          "pa",
+          "pe",
+          "peu",
+          "piak",
+          "piong",
+          "pam",
+          "pek",
+          "pia",
+          "pik",
+          "piu",
+          "pot"
+        ]
+      },
+      {
+        "reading": "s",
+        "segment": -4,
+        "items": [
+          "si",
+          "sin",
+          "sun",
+          "sen",
+          "song",
+          "su",
+          "siu",
+          "suk",
+          "sit",
+          "sa",
+          "se",
+          "set",
+          "sim",
+          "sang",
+          "sau",
+          "sip",
+          "sung",
+          "sap",
+          "sok",
+          "sui",
+          "sam",
+          "san",
+          "sak",
+          "sut",
+          "sem",
+          "soi",
+          "sai",
+          "so",
+          "sot",
+          "siuk",
+          "siung",
+          "son",
+          "sat",
+          "sek",
+          "sep",
+          "seu",
+          "sia",
+          "siak",
+          "siam",
+          "siap",
+          "siat",
+          "siau",
+          "sik",
+          "sio",
+          "siok",
+          "sw"
+        ]
+      },
       {
         "reading": "pan",
         "segment": 0,
@@ -18340,32 +21260,32 @@
           "蹒",
           "藩",
           "蟠",
-          "襻"
+          "襻",
+          "瓣"
         ]
       },
       {
-        "reading": "pau",
+        "reading": "pang",
         "segment": 0,
         "items": [
-          "抛",
-          "刨",
-          "抱",
-          "泡",
-          "胞",
-          "炮",
-          "剖",
-          "袍",
-          "跑",
-          "暴",
-          "瀑",
-          "曝",
-          "咆",
-          "狍",
-          "飑",
-          "疱",
-          "匏",
-          "脬",
-          "龅"
+          "方",
+          "冯",
+          "芳",
+          "凭",
+          "庞",
+          "烹",
+          "彭",
+          "棚",
+          "鹏",
+          "亨",
+          "抨",
+          "怦",
+          "逄",
+          "堋",
+          "滂",
+          "甏",
+          "湴",
+          "肨"
         ]
       },
       {
@@ -18464,7 +21384,10 @@
           "濞",
           "癖",
           "鞴",
-          "鼙"
+          "鼙",
+          "嗅",
+          "p",
+          "P"
         ]
       },
       {
@@ -18489,7 +21412,9 @@
           "瞟",
           "螵",
           "鳔",
-          "鏖"
+          "鏖",
+          "薸",
+          "瘭"
         ]
       },
       {
@@ -18521,7 +21446,8 @@
           "胼",
           "娉",
           "鲆",
-          "颦"
+          "颦",
+          "辫"
         ]
       },
       {
@@ -18846,7 +21772,12 @@
           "羲",
           "禧",
           "醯",
-          "曦"
+          "曦",
+          "寔",
+          "c",
+          "z",
+          "C",
+          "Z"
         ]
       },
       {
@@ -18901,7 +21832,9 @@
           "蛏",
           "蜃",
           "嗪",
-          "嵊"
+          "嵊",
+          "㪛",
+          "弞"
         ]
       },
       {
@@ -19082,16 +22015,6 @@
         ]
       },
       {
-        "reading": "pak qon",
-        "segment": 1,
-        "items": [
-          "拍案叫绝",
-          "拍案而起",
-          "拍案",
-          "拍案惊奇"
-        ]
-      },
-      {
         "reading": "pak teu",
         "segment": 1,
         "items": [
@@ -19108,6 +22031,18 @@
           "白头翁",
           "白头而新",
           "白豆"
+        ]
+      },
+      {
+        "reading": "pi qeu",
+        "segment": 1,
+        "items": [
+          "POS機",
+          "POLO衫",
+          "POS",
+          "Poppin",
+          "Popstar",
+          "PowerPoint"
         ]
       },
       {
@@ -19213,24 +22148,29 @@
         ]
       },
       {
-        "reading": "set qat",
+        "reading": "si qe",
         "segment": 1,
         "items": [
-          "bp",
-          "血压",
-          "血压低",
-          "血压计",
-          "血压高"
+          "CAD",
+          "CAPCOM",
+          "Camille",
+          "Casio",
+          "Clannad",
+          "ZAKER",
+          "Zakka",
+          "call我"
         ]
       },
       {
-        "reading": "si qoi",
+        "reading": "si qeu",
         "segment": 1,
         "items": [
-          "去爱",
-          "喜爱",
-          "时要",
-          "示爱"
+          "CoCo姐",
+          "Completedir",
+          "Coolpad",
+          "CorelDraw",
+          "CounterStrike",
+          "是OK"
         ]
       },
       {
@@ -19483,7 +22423,10 @@
             "胢",
             "跬",
             "踝",
-            "髂"
+            "髂",
+            "下",
+            "咵",
+            "咖"
           ]
         },
         {
@@ -19556,7 +22499,9 @@
             "缬",
             "橛",
             "蹶",
-            "鳜"
+            "鳜",
+            "榤",
+            "竭"
           ]
         },
         {
@@ -19648,24 +22593,24 @@
           ]
         },
         {
-          "reading": "kiau",
+          "reading": "kin",
           "items": [
-            "巧",
-            "乔",
-            "侨",
-            "桥",
-            "轿",
-            "窍",
-            "翘",
-            "跷",
-            "撬",
-            "荞",
-            "哓",
-            "峤",
-            "硗",
-            "鞒",
-            "橇",
-            "藠"
+            "庆",
+            "氢",
+            "倾",
+            "卿",
+            "恳",
+            "馨",
+            "勤",
+            "擎",
+            "茕",
+            "肫",
+            "胗",
+            "磬",
+            "檠",
+            "罄",
+            "䐃",
+            "僸"
           ]
         },
         {
@@ -19695,7 +22640,8 @@
             "诓",
             "哐",
             "诳",
-            "蜣"
+            "蜣",
+            "惶"
           ]
         },
         {
@@ -19720,7 +22666,8 @@
             "箍",
             "龋",
             "齁",
-            "癯"
+            "癯",
+            "葫"
           ]
         },
         {
@@ -19785,7 +22732,11 @@
             "痨",
             "耢",
             "潦",
-            "醪"
+            "醪",
+            "寥",
+            "嫽",
+            "翏",
+            "僗"
           ]
         },
         {
@@ -19815,7 +22766,8 @@
             "辇",
             "裢",
             "楝",
-            "鲢"
+            "鲢",
+            "摙"
           ]
         },
         {
@@ -19971,29 +22923,34 @@
             "鲮",
             "檩",
             "酃",
-            "麟"
+            "麟",
+            "跉"
           ]
         },
         {
-          "reading": "lo",
+          "reading": "long",
           "items": [
-            "罗",
-            "萝",
-            "啰",
-            "逻",
-            "锣",
-            "愈",
-            "裸",
-            "箩",
-            "骡",
-            "螺",
-            "猡",
-            "椤",
-            "摞",
-            "氇",
-            "瘰",
-            "咯",
-            "ろ"
+            "郎",
+            "晃",
+            "狼",
+            "凉",
+            "浪",
+            "朗",
+            "琅",
+            "廊",
+            "榔",
+            "晾",
+            "莨",
+            "阆",
+            "啷",
+            "锒",
+            "稂",
+            "蒗",
+            "踉",
+            "螂",
+            "㝗",
+            "盪",
+            "俍"
           ]
         },
         {
@@ -20044,7 +23001,9 @@
             "濡",
             "鹭",
             "蕗",
-            "ル"
+            "ル",
+            "镥",
+            "硵"
           ]
         },
         {
@@ -20068,7 +23027,8 @@
             "缧",
             "儡",
             "镭",
-            "羸"
+            "羸",
+            "䉂"
           ]
         }
       ],
@@ -20392,7 +23352,8 @@
             "利是"
           ]
         }
-      ]
+      ],
+      "isolated": []
     },
     "merged": [
       {
@@ -20413,7 +23374,10 @@
           "胢",
           "跬",
           "踝",
-          "髂"
+          "髂",
+          "下",
+          "咵",
+          "咖"
         ]
       },
       {
@@ -20488,7 +23452,9 @@
           "缬",
           "橛",
           "蹶",
-          "鳜"
+          "鳜",
+          "榤",
+          "竭"
         ]
       },
       {
@@ -20581,25 +23547,25 @@
         ]
       },
       {
-        "reading": "kiau",
+        "reading": "kin",
         "segment": 0,
         "items": [
-          "巧",
-          "乔",
-          "侨",
-          "桥",
-          "轿",
-          "窍",
-          "翘",
-          "跷",
-          "撬",
-          "荞",
-          "哓",
-          "峤",
-          "硗",
-          "鞒",
-          "橇",
-          "藠"
+          "庆",
+          "氢",
+          "倾",
+          "卿",
+          "恳",
+          "馨",
+          "勤",
+          "擎",
+          "茕",
+          "肫",
+          "胗",
+          "磬",
+          "檠",
+          "罄",
+          "䐃",
+          "僸"
         ]
       },
       {
@@ -20630,7 +23596,8 @@
           "诓",
           "哐",
           "诳",
-          "蜣"
+          "蜣",
+          "惶"
         ]
       },
       {
@@ -20656,7 +23623,8 @@
           "箍",
           "龋",
           "齁",
-          "癯"
+          "癯",
+          "葫"
         ]
       },
       {
@@ -20723,7 +23691,11 @@
           "痨",
           "耢",
           "潦",
-          "醪"
+          "醪",
+          "寥",
+          "嫽",
+          "翏",
+          "僗"
         ]
       },
       {
@@ -20754,7 +23726,8 @@
           "辇",
           "裢",
           "楝",
-          "鲢"
+          "鲢",
+          "摙"
         ]
       },
       {
@@ -20913,30 +23886,35 @@
           "鲮",
           "檩",
           "酃",
-          "麟"
+          "麟",
+          "跉"
         ]
       },
       {
-        "reading": "lo",
+        "reading": "long",
         "segment": 0,
         "items": [
-          "罗",
-          "萝",
-          "啰",
-          "逻",
-          "锣",
-          "愈",
-          "裸",
-          "箩",
-          "骡",
-          "螺",
-          "猡",
-          "椤",
-          "摞",
-          "氇",
-          "瘰",
-          "咯",
-          "ろ"
+          "郎",
+          "晃",
+          "狼",
+          "凉",
+          "浪",
+          "朗",
+          "琅",
+          "廊",
+          "榔",
+          "晾",
+          "莨",
+          "阆",
+          "啷",
+          "锒",
+          "稂",
+          "蒗",
+          "踉",
+          "螂",
+          "㝗",
+          "盪",
+          "俍"
         ]
       },
       {
@@ -20988,7 +23966,9 @@
           "濡",
           "鹭",
           "蕗",
-          "ル"
+          "ル",
+          "镥",
+          "硵"
         ]
       },
       {
@@ -21013,7 +23993,8 @@
           "缧",
           "儡",
           "镭",
-          "羸"
+          "羸",
+          "䉂"
         ]
       },
       {
@@ -21364,7 +24345,8 @@
       "split": [],
       "assoc": [],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": []
     },
     "merged": []
   },
@@ -21375,7 +24357,8 @@
       "split": [],
       "assoc": [],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": []
     },
     "merged": []
   },
@@ -21386,7 +24369,8 @@
       "split": [],
       "assoc": [],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": []
     },
     "merged": []
   },
@@ -21397,7 +24381,8 @@
       "split": [],
       "assoc": [],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": []
     },
     "merged": []
   },
@@ -21675,7 +24660,8 @@
         }
       ],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": []
     },
     "merged": [
       {
@@ -21965,7 +24951,8 @@
       "split": [],
       "assoc": [],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": []
     },
     "merged": []
   },
@@ -21976,7 +24963,8 @@
       "split": [],
       "assoc": [],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": []
     },
     "merged": []
   },
@@ -21987,7 +24975,8 @@
       "split": [],
       "assoc": [],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": []
     },
     "merged": []
   },
@@ -21998,7 +24987,8 @@
       "split": [],
       "assoc": [],
       "combo": [],
-      "whole_word": []
+      "whole_word": [],
+      "isolated": []
     },
     "merged": []
   },
@@ -22281,9 +25271,231 @@
             "共产党"
           ]
         }
+      ],
+      "isolated": [
+        {
+          "reading": "k",
+          "items": [
+            "ki",
+            "kui",
+            "ket",
+            "ken",
+            "kong",
+            "ka",
+            "ko",
+            "ku",
+            "kin",
+            "kiu",
+            "kai",
+            "kiau",
+            "kun",
+            "kiun",
+            "kang",
+            "koi",
+            "ke",
+            "keu",
+            "kip",
+            "kau",
+            "kiam",
+            "kim",
+            "kok",
+            "kiuk",
+            "kuk",
+            "kam",
+            "kiong",
+            "kiung",
+            "kung",
+            "kap",
+            "kat",
+            "kiang",
+            "kak",
+            "kiak",
+            "kan",
+            "kiap",
+            "kon",
+            "kut",
+            "kia",
+            "kiok",
+            "kio",
+            "kit",
+            "kem",
+            "kioi",
+            "kep",
+            "kian",
+            "kek",
+            "kiat",
+            "kie",
+            "kik",
+            "kot"
+          ]
+        },
+        {
+          "reading": "l",
+          "items": [
+            "li",
+            "lin",
+            "lu",
+            "len",
+            "liau",
+            "lit",
+            "liu",
+            "lau",
+            "leu",
+            "long",
+            "lui",
+            "lok",
+            "luk",
+            "lo",
+            "lung",
+            "liong",
+            "la",
+            "lai",
+            "lang",
+            "lap",
+            "lam",
+            "liam",
+            "loi",
+            "lon",
+            "lan",
+            "let",
+            "lun",
+            "le",
+            "lak",
+            "lat",
+            "lim",
+            "lut",
+            "liap",
+            "liang",
+            "lot",
+            "lio",
+            "liak",
+            "liok",
+            "leng",
+            "lip",
+            "lem",
+            "lep",
+            "lek",
+            "lia",
+            "liat",
+            "lik",
+            "liuk",
+            "liung"
+          ]
+        }
       ]
     },
     "merged": [
+      {
+        "reading": "k",
+        "segment": -4,
+        "items": [
+          "ki",
+          "kui",
+          "ket",
+          "ken",
+          "kong",
+          "ka",
+          "ko",
+          "ku",
+          "kin",
+          "kiu",
+          "kai",
+          "kiau",
+          "kun",
+          "kiun",
+          "kang",
+          "koi",
+          "ke",
+          "keu",
+          "kip",
+          "kau",
+          "kiam",
+          "kim",
+          "kok",
+          "kiuk",
+          "kuk",
+          "kam",
+          "kiong",
+          "kiung",
+          "kung",
+          "kap",
+          "kat",
+          "kiang",
+          "kak",
+          "kiak",
+          "kan",
+          "kiap",
+          "kon",
+          "kut",
+          "kia",
+          "kiok",
+          "kio",
+          "kit",
+          "kem",
+          "kioi",
+          "kep",
+          "kian",
+          "kek",
+          "kiat",
+          "kie",
+          "kik",
+          "kot"
+        ]
+      },
+      {
+        "reading": "l",
+        "segment": -4,
+        "items": [
+          "li",
+          "lin",
+          "lu",
+          "len",
+          "liau",
+          "lit",
+          "liu",
+          "lau",
+          "leu",
+          "long",
+          "lui",
+          "lok",
+          "luk",
+          "lo",
+          "lung",
+          "liong",
+          "la",
+          "lai",
+          "lang",
+          "lap",
+          "lam",
+          "liam",
+          "loi",
+          "lon",
+          "lan",
+          "let",
+          "lun",
+          "le",
+          "lak",
+          "lat",
+          "lim",
+          "lut",
+          "liap",
+          "liang",
+          "lot",
+          "lio",
+          "liak",
+          "liok",
+          "leng",
+          "lip",
+          "lem",
+          "lep",
+          "lek",
+          "lia",
+          "liat",
+          "lik",
+          "liuk",
+          "liung"
+        ]
+      },
       {
         "reading": "kiun",
         "segment": 0,

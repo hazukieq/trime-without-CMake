@@ -21,6 +21,20 @@ const val SYNTHETIC_SEGMENT = -2
  */
 const val RECOMMEND_SEGMENT = -3
 
+/**
+ * 展開面板「孤單聯想」字母行的 [SyllableGroup.segment] 標記。
+ *
+ * reading = 首鍵字母（`d`/`f`），items 是該字母下可延伸的單音節名；點擊它進入該音節的字。
+ * 只在剩餘碼 >=2 鍵且整串不是完整音節時生成。
+ */
+const val ISOLATED_SEGMENT = -4
+
+/** 孤單聯想鑽取到音節後的「字」格子 [CandidateItem.segment] 標記。 */
+const val ISOLATED_CHAR_SEGMENT = -5
+
+/** 孤單聯想鑽取層的「返回」項 [CandidateItem.segment] 標記。 */
+const val ISOLATED_BACK_SEGMENT = -6
+
 data class CandidateItem(
     val text: String,
     val comment: String,

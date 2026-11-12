@@ -181,8 +181,8 @@ object TwelveKeySnapshotBuilder {
             else -> PanelBuild(emptyList(), PanelStats.EMPTY)
         }
         val panelRows = panel.rows
-        // 字典兜底只用「單字組」（segment != 1）：候選條不需要聯想/詞行。
-        val dictionaryRows = panelRows.filter { it.segment != 1 }
+        // 字典兜底只用「單字組」（segment == 0）：候選條不需要聯想/詞行/孤單聯想字母行。
+        val dictionaryRows = panelRows.filter { it.segment == 0 }
         // 候選條固定從前 BAR_CANDIDATES 條引擎窗口計算學習排序與合成詞混排。
         // 全量面板的窗口外項不能影響候選條去重或排序，bar/full 的前 12 項必須一致。
         val barOrdered = if (wantGroups && flat.size > TwelveKeyTuning.BAR_CANDIDATES) {
@@ -615,6 +615,34 @@ object TwelveKeySnapshotBuilder {
     }
 
     /**
+     * 源 6（App 側）：孤單聯想字母行（`d`/`f`）。
+     *
+     * 只在剩餘碼 >=2 鍵且整串不是完整音節時生成；reading 是首鍵字母，items 是
+     * 該字母下「繼續按鍵就能得到」的單音節名。點擊字母行由面板做二級鑽取（音節 → 字）。
+     */
+    internal fun isolatedRows(codes: String): List<PanelRow> {
+        val groups = runCatching { TwelveKeyPreedit.isolatedSyllables(codes) }.getOrElse { emptyList() }
+        if (groups.isEmpty()) return emptyList()
+        return groups.map { (letter, syllables) ->
+            PanelRow(
+                reading = letter.toString(),
+                items = syllables.map { syllable ->
+                    CandidateItem(
+                        text = syllable,
+                        comment = "",
+                        index = -1,
+                        segment = ISOLATED_SEGMENT,
+                        restCode = codes.replace("'", ""),
+                    )
+                },
+                segment = ISOLATED_SEGMENT,
+                restCode = codes.replace("'", ""),
+                sources = setOf(RowSource.ISOLATED),
+            )
+        }
+    }
+
+    /**
      * 引擎讀音組轉為 PanelRow；有段組時保留同讀音單音節組並入，
      * 另保留多音節與含非漢字的組。多音節以 reading token 數判斷。
      */
@@ -667,6 +695,7 @@ object TwelveKeySnapshotBuilder {
         val combo: Int = 0,
         val word: Int = 0,
         val engine: Int = 0,
+        val isolated: Int = 0,
         val merged: Int = 0,
         val collapsed: Int = 0,
         val capped: Int = 0,
@@ -678,7 +707,7 @@ object TwelveKeySnapshotBuilder {
          * 記錄各源、合併、收斂和截斷數量，供定位候選行。
          */
         fun line(): String = "panel sources synth=$synth split=$split assoc=$assoc combo=$combo" +
-            " word=$word engine=$engine → merged=$merged collapsed=$collapsed" +
+            " word=$word engine=$engine isolated=$isolated → merged=$merged collapsed=$collapsed" +
             " tier=[single:$tierSingles word:$tierWords blank:$tierBlank] capped=$capped"
 
         companion object {
@@ -761,10 +790,12 @@ object TwelveKeySnapshotBuilder {
         val assoc = assocRows(parts)
         val combo = if (includePanelOnlySources) initialComboRows(codes) else emptyList()
         val word = if (includePanelOnlySources) wholeWordRows(remaining) else emptyList()
+        val isolated = if (includePanelOnlySources) isolatedRows(codes) else emptyList()
 
-        // 拼接順序固定：段組 → 引擎 → 聯想 → 首字母組合 → 整串詞行。
-        // mergeRows 的「引擎項在前、App 補集在後」「單字組(0) 優先於詞行(1)」都由這個順序決定。
-        val merged = mergeRows(synth + split + engine + assoc + combo + word)
+        // 拼接順序固定：孤單聯想 → 段組 → 引擎 → 聯想 → 首字母組合 → 整串詞行。
+        // mergeRows 的「引擎項在前、App 補集在後」「單字組(0) 優先於詞行(1)」都由這個順序決定；
+        // 孤單聯想行由 tierAndSort 固定在單字組之前。
+        val merged = mergeRows(isolated + synth + split + engine + assoc + combo + word)
         val collapsed = collapsePrefixRows(merged)
         val sorted = tierAndSort(collapsed)
         val capped = capRows(sorted)
@@ -784,6 +815,7 @@ object TwelveKeySnapshotBuilder {
                     combo = combo.size,
                     word = word.size,
                     engine = engine.size,
+                    isolated = isolated.size,
                     merged = merged.size,
                     collapsed = collapsed.size,
                     capped = capped.size,

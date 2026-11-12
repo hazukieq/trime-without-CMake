@@ -122,13 +122,21 @@ class Data:
         for name in self._import_names(main):
             path = os.path.join(data_dir, name + ".dict.yaml")
             if os.path.isfile(path):
+                # 進口詞典的單字讀音也要並入（`渠 gia` 只在 zon），與 App load() 同口徑；
+                # 只並入標準音集收錄的音節（排除 bon/hop 這類方案外拼寫）。
+                self._load_dict(path, allowed=self.standard_syllables)
                 self._load_words(path)
         self._sort_assoc()
         self._build_initials_index()
+        print(
+            f"# 音節集: 詞典 {len(self.syllable_freq)}（運行時口徑，含進口詞典單字讀音）"
+            f" / 標準集 {len(self.standard_syllables)}（約束腳本與測試）",
+            file=sys.stderr,
+        )
 
     # -- 载入 ------------------------------------------------------------
 
-    def _load_dict(self, path: str) -> None:
+    def _load_dict(self, path: str, allowed: set[str] | None = None) -> None:
         for line in _iter_body(path):
             if "\t" not in line:
                 continue
@@ -136,6 +144,8 @@ class Data:
             ch = ch.strip()
             syl = rest.split("\t")[0].strip()
             if not syl or not syl.isalpha():
+                continue
+            if allowed is not None and syl not in allowed:
                 continue
             self.syllable_freq[syl] = self.syllable_freq.get(syl, 0) + 1
             # Kotlin 的 Char 是 UTF-16 單元，BMP 外字（U+24334 這類）在 App 端 `ch.length==1`
@@ -145,6 +155,7 @@ class Data:
                 if ch not in chars:
                     chars.append(ch)
                 self.char_first.setdefault(ch, syl)
+        self.code_to_syllables = defaultdict(list)
         for syl in self.syllable_freq:
             self.code_to_syllables[code_of(syl)].append(syl)
 
@@ -164,11 +175,6 @@ class Data:
                     canon.add(tok)
         self.standard_syllables = canon
         self.syllable_file = path
-        print(
-            f"# 音節集: 詞典 {len(self.syllable_freq)}（運行時口徑）"
-            f" / 標準集 {len(canon)}（約束腳本與測試）",
-            file=sys.stderr,
-        )
         return set(self.syllable_freq)
 
     def _import_names(self, main_path: str, depth: int = 0, seen: "OrderedDict[str, None]" | None = None) -> list[str]:
@@ -1017,6 +1023,32 @@ class Data:
                 seen.setdefault(row["reading"], (length, "词行"))
         return [(reading, length, kind) for reading, (length, kind) in seen.items()]
 
+    def standard_decode(self, codes: str, limit: int = 64) -> list[str]:
+        """用標準音集切分整串碼；只回完整切法（診斷 App 運行時缺失的音節，如 gia）。"""
+        clean = codes.replace("'", "")
+        by_code: dict[str, list[str]] = {}
+        for syl in self.standard_syllables:
+            code = code_of(syl)
+            if code:
+                by_code.setdefault(code, []).append(syl)
+        out: list[str] = []
+        max_len = max((len(c) for c in by_code), default=1)
+
+        def walk(pos: int, acc: list[str]) -> None:
+            if len(out) >= limit:
+                return
+            if pos == len(clean):
+                out.extend(acc)
+                return
+            for end in range(pos + 1, min(len(clean), pos + max_len) + 1):
+                for syl in by_code.get(clean[pos:end], ()):
+                    walk(end, acc + [syl])
+                    if len(out) >= limit:
+                        return
+
+        walk(0, [])
+        return out
+
     def isolated_syllables(self, codes: str) -> list[tuple[str, list[str]]]:
         """孤單聯想：整串碼不能構成完整音節時，首鍵字母各列可達單音節。
 
@@ -1025,17 +1057,17 @@ class Data:
         完整音節時（ea7→dap、eai→dai）也不生成。
         """
         clean = codes.replace("'", "")
-        if len(clean) < 2 or self.code_to_syllables.get(clean):
+        # 完整音節判定必須看標準音節集：gia 不在主詞典但標準集有，碼 iia 已算完整音節。
+        standard_codes = {code_of(syl) for syl in self.standard_syllables}
+        if len(clean) < 2 or clean in standard_codes:
             return []
         letters = self.key_initial_letters(clean[0], is_last=len(clean) == 1)
+        universe = set(self.syllable_freq) | set(self.standard_syllables)
         out: list[tuple[str, list[str]]] = []
         for letter in letters:
-            syls = [
-                syl
-                for syl in self.syllable_freq
-                if syl.startswith(letter) and (code_of(syl) or "").startswith(clean)
-            ]
-            syls.sort(key=lambda syl: (-self.syllable_freq[syl], syl))
+            # 通配口徑：只看首字母，不受剩餘碼前綴限制（55 → 所有 k/l 開頭音節）。
+            syls = [syl for syl in universe if syl.startswith(letter)]
+            syls.sort(key=lambda syl: (-self.syllable_freq.get(syl, 0), syl))
             if syls:
                 out.append((letter, syls))
         return out
@@ -1083,12 +1115,32 @@ class Data:
                     existing["chars"] = existing["items"]
         return list(merged.values())
 
+    def isolated_rows(self, codes: str) -> list[dict]:
+        """孤單聯想行（鏡像 App `isolatedRows`）：reading=首鍵字母，items=通配單音節。"""
+        rows: list[dict] = []
+        for letter, syllables in self.isolated_syllables(codes):
+            rows.append(
+                {
+                    "reading": letter,
+                    "syllables": [letter],
+                    "items": list(syllables),
+                    "segment": -4,
+                    "rest": codes.replace("'", ""),
+                    "source": "isolated",
+                    "origin": "isolated",
+                }
+            )
+        return rows
+
     def panel(self, codes: str) -> list[dict]:
-        groups = self.segment_groups(codes)
+        groups = self.isolated_rows(codes)
+        groups += self.segment_groups(codes)
         groups += self.prefix_word_rows(codes.replace("'", ""))
         groups = self.collapse(self.merge_groups(groups))
 
         def tier(g: dict) -> int:
+            if g.get("source") == "isolated":
+                return -1
             n = len([t for t in g["reading"].split(" ") if t])
             return 2 if n == 0 else (0 if n == 1 else 1)
 
@@ -1292,6 +1344,12 @@ def cmd_syllables(args, data: Data) -> None:
             f"  [{part['kind']:<6} {part['head']}|{part['rest']}] "
             f"共 {len(readings)}: {' '.join(readings)}"
         )
+    standard = [s for s in data.standard_decode(args.codes) if s not in data.syllable_freq]
+    if standard:
+        print(
+            f"  标准集（App 运行时不搜索；码 {args.codes!r} 可切出）: "
+            + " ".join(dict.fromkeys(standard))
+        )
     hidden = [r for r in union if r not in shown]
     print(f"# 單音節：去重後實際存在 {len(union)} 個；面板規則已顯示 {len(union) - len(hidden)} 個"
           + (f"；未顯示（多半被種子/配額截斷）: {' '.join(hidden)}" if hidden else "；無遗漏"))
@@ -1429,6 +1487,10 @@ def build_json_payload(data: Data, raw_codes: list[str]) -> dict:
                 for r in data.prefix_word_rows(codes)
             ],
         }
+        sources["isolated"] = [
+            {"reading": r["reading"], "items": list(r["items"])}
+            for r in data.isolated_rows(codes)
+        ]
         merged = [
             {"reading": g["reading"], "segment": g["segment"], "items": _row_items(g)}
             for g in data.panel(codes)
@@ -1692,7 +1754,7 @@ def cmd_selftest(args, data: Data) -> None:
     for code, entry in payload.items():
         sources = entry.get("sources") or {}
         expect(
-            list(sources) == ["synth", "split", "assoc", "combo", "whole_word"],
+            list(sources) == ["synth", "split", "assoc", "combo", "whole_word", "isolated"],
             f"json[{code}] sources 五个 key 均在且有序：{list(sources)}",
         )
         expect(

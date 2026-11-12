@@ -184,4 +184,18 @@ class CandidatePanelController(
         if (scrollGrid) grid?.scrollToPosition(0)
     }
 
+    /**
+     * 孤單聯想二級：右列原地換成某音節的字（items 首項是「← 返回」）。
+     * 左列保持當前字母行，不切頁、不改快照。
+     */
+    fun showDrilldown(items: List<CandidatePanelAdapter.Item>) {
+        gridAdapter.setShowComment(false)
+        gridAdapter.submit(items)
+        grid?.scrollToPosition(0)
+    }
+
+    /** 從孤單聯想二級返回原快照網格。 */
+    fun restoreGrid() {
+        render(scrollGrid = true, scrollGroups = false)
+    }
 }
