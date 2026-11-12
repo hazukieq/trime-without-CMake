@@ -199,3 +199,44 @@ internal fun capRows(rows: List<PanelRow>, maxRows: Int = TwelveKeyTuning.MAX_GR
         true
     }
 }
+
+/**
+ * 左列展示用的一行：聯想/詞行折進第一個音節組，左列只剩音節組（孤立音節行單獨保留）。
+ * `items` 已按文字去重，音節的字在前、詞在後（沿用原組順序）。
+ */
+internal data class PanelDisplayGroup(
+    val reading: String,
+    val items: List<CandidateItem>,
+    /** 折疊後第一行的組型（0=分詞段、1=詞行、-3=推薦、-4..=-6 孤立音節）。 */
+    val segment: Int,
+)
+
+/**
+ * 左列邏輯：多音節詞行（聯想 `man jiu`、組合 `jen cin kung ze`、整串詞行等）不再單獨成行，
+ * 而是並進第一個音節（`man`）的組；孤立音節行（`d`/`f`）與推薦組不受影響。
+ * 只改展示，不改快照分組、點擊語義與推薦來源。
+ */
+internal fun foldGroupsForDisplay(groups: List<SyllableGroup>): List<PanelDisplayGroup> {
+    val order = LinkedHashMap<String, MutableList<CandidateItem>>()
+    val segments = HashMap<String, Int>()
+    groups.forEach { group ->
+        val tokens = group.reading.split(' ').filter { it.isNotBlank() }
+        // 詞行可能來自引擎組（segment=-1）或聯想/組合行（segment=1），都折；
+        // 推薦組（-3，reading 空）與孤立音節（-4..-6）保持獨立。
+        val fold = tokens.size > 1 && group.segment > ISOLATED_SEGMENT
+        val key = if (fold) tokens.first() else group.reading
+        val bucket = order.getOrPut(key) { ArrayList() }
+        if (segments[key] == null) segments[key] = if (fold) group.segment else group.segment
+        bucket.addAll(group.items)
+    }
+    return order.map { (reading, items) ->
+        val seen = HashSet<String>()
+        val unique = items.filter { seen.add(it.text) }
+        // 折進來的詞在前（多音節輸入時更相關），音節本身的字在後。
+        PanelDisplayGroup(
+            reading = reading,
+            items = unique.sortedBy { if (it.segment == 0) 1 else 0 },
+            segment = segments[reading] ?: -1,
+        )
+    }
+}

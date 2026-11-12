@@ -73,6 +73,16 @@ WHOLE_WORD 仅通过轻量整串码索引查询，不把无读音的大词表塞
 - 位置：固定排在推荐组之后、单字组之前（tierAndSort 给 -1 档），行数也计入 capRows。
 - 与 `panel_probe.py` 的 `Data.isolated_syllables()` 同口径。
 
+## 左列折叠（展示层）
+
+- 多音节词行（联想 `man jiu`、组合 `jen cin kung ze`、整串词行）不再单独占左列一行，
+  而是折进**第一个音节**的组：`man jiu` 的詞进 `man` 组，左列只看到 `man`。
+- 只改展示：`snapshot.groups`、点击语义（`item.segment`）、推荐来源、golden 都不变；
+  右格点组时先显示折进来的词、再显示该音节的字；词仍按原 segment/restCode 走部分选词语义。
+- 推荐组（reading 空）与孤单联想字母行（segment -4..-6）**不折叠**，孤立音节 `d`/`f` 保持独立行。
+- 连续选字时左列保持当前折后的 reading；新输入回第 0 组。
+- 实现：`PanelRow.kt` 的 `foldGroupsForDisplay()`（纯函数，`PanelDisplayFoldTest` 覆盖）。
+
 ## 唯一合并流水线
 
 ```text
