@@ -189,12 +189,23 @@ object CandidateRanking {
         items: List<CandidateItem>,
         topSyllables: Int,
         score: (CandidateItem) -> Int,
-    ): List<CandidateItem> = items.sortedWith(
-        compareByDescending<CandidateItem> {
-            if (topSyllables <= 0) 0 else minOf(syllableCount(it.comment), topSyllables)
-        }.thenByDescending { score(it) }
-            .thenBy { it.index },
-    )
+    ): List<CandidateItem> {
+        if (items.size <= 1) return items
+        // 先算好排序鍵再排：舊寫法把 syllableCount(comment)（split）與 score()
+        // 放進 Comparator，n log n 次重算，600 條候選時每鍵白燒十幾毫秒。
+        data class Keyed(val item: CandidateItem, val depth: Int, val score: Int)
+        val keyed = ArrayList<Keyed>(items.size)
+        for (item in items) {
+            val depth = if (topSyllables <= 0) 0 else minOf(syllableCount(item.comment), topSyllables)
+            keyed.add(Keyed(item, depth, score(item)))
+        }
+        keyed.sortWith(
+            compareByDescending<Keyed> { it.depth }
+                .thenByDescending { it.score }
+                .thenBy { it.item.index },
+        )
+        return keyed.map { it.item }
+    }
 
     /**
      * 按 comment 分組（面板左列）：空白 comment 併成一組「…」並排在最後；

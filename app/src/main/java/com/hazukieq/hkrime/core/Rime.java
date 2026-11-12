@@ -942,12 +942,38 @@ public class Rime {
     return arr == null ? new String[0] : arr;
   }
 
-  /** 同上，解析爲 (text, comment) 對；comment 可能爲空串。 */
+  /**
+   * 同上，解析爲 (text, comment) 對；comment 可能爲空串。
+   *
+   * 走 packed native（一次 NewStringUTF）：每鍵 600 條候選時，舊接口要 1200 次 JNI
+   * 字串轉換 + 600 個 String[]，真機實測每鍵 30~87ms（奇偶交替）。packed 串格式：
+   * `text\u0001comment\u0002` 重複；解析出的每個 text/comment 仍是 substring（必需），
+   * 但省掉 JNI 個別轉換與陣列包裝。
+   */
   public static List<String[]> candidatesSnapshot(int maxCount) {
-    String[] flat = enumerateCandidates(maxCount);
-    List<String[]> out = new ArrayList<>(flat.length / 2);
-    for (int i = 0; i + 1 < flat.length; i += 2) {
-      out.add(new String[] {flat[i], flat[i + 1]});
+    final String packed;
+    try {
+      packed = enumerate_candidates_packed(maxCount);
+    } catch (UnsatisfiedLinkError e) {
+      // 舊 .so（未帶 packed 符號）時退回逐條接口，避免直接崩潰。
+      String[] flat = enumerateCandidates(maxCount);
+      List<String[]> out = new ArrayList<>(flat.length / 2);
+      for (int i = 0; i + 1 < flat.length; i += 2) {
+        out.add(new String[] {flat[i], flat[i + 1]});
+      }
+      return out;
+    }
+    if (packed == null || packed.isEmpty()) return new ArrayList<>(0);
+    List<String[]> out = new ArrayList<>();
+    int n = packed.length();
+    int start = 0;
+    while (start < n) {
+      int sep = packed.indexOf('\u0001', start);
+      if (sep < 0) break;
+      int end = packed.indexOf('\u0002', sep + 1);
+      if (end < 0) break;
+      out.add(new String[] {packed.substring(start, sep), packed.substring(sep + 1, end)});
+      start = end + 1;
     }
     return out;
   }
@@ -1164,6 +1190,9 @@ public class Rime {
 
   /** @see #enumerateCandidates(int) */
   public static native String[] enumerate_candidates(int maxCount);
+
+  /** packed 版：`text\u0001comment\u0002…`，见 {@link #candidatesSnapshot(int)}。 */
+  public static native String enumerate_candidates_packed(int maxCount);
 
   public static native void set_caret_pos(int caret_pos);
 

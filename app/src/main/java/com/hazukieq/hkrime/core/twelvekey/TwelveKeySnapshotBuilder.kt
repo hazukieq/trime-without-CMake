@@ -119,11 +119,17 @@ object TwelveKeySnapshotBuilder {
         // 點擊時要回傳原始下標（否則就是「貨不對版」）。
         val flat: List<CandidateItem>
         var degraded = false
+        var __enumStartNs = System.nanoTime()
+        var __enumMs = 0L
         if (candidatesOverride != null) {
             // 單測：完全繞開引擎（bar/full 兩條構建路徑要對同一份候選給出同一份「候選條 + 預覽 + 兜底」）。
             flat = candidatesOverride
         } else {
+            __enumStartNs = System.nanoTime()
             val snapshot = runCatching { Rime.candidatesSnapshot(maxCandidates) }.getOrNull()
+            __enumMs = (System.nanoTime() - __enumStartNs) / 1_000_000
+            if (__enumMs >= 8) DiagLog.d("perf", "enum=${__enumMs}ms code=$input n=${snapshot?.size ?: -1}")
+
         if (snapshot != null) {
             flat = snapshot.mapIndexed { index, row ->
                 CandidateItem(
@@ -140,6 +146,7 @@ object TwelveKeySnapshotBuilder {
             }
         }
 
+        val __tFlat = System.nanoTime()
         // App 側學習排序：選過的詞（同讀音+同詞）排前，候選條與面板都吃這個順序。
         // 但學習只能在「同一覆蓋深度」內重排 —— 否則學過的兩音節詞（共產 / kiung than）
         // 會把覆蓋全部輸入的三音節詞（共產黨 / kiung than dong）擠下去，
@@ -155,11 +162,15 @@ object TwelveKeySnapshotBuilder {
         }
         // App 側學到的「逐段拼出來的組詞」（引擎裝不出整串）：作為合成候選混進 ranked。
         // 只有 12 鍵且開啟學習排序時才做（26 鍵候選條由 librime 直接給，必須保持引擎順序）。
+        val __tRanked = System.nanoTime()
+        val __tMerge0 = __tRanked
         val ordered = if (applyLearning) {
             mergeLearnedPhrases(ranked, PhraseMemory.normalizeCode(input), System.currentTimeMillis())
         } else {
             ranked
         }
+        val __mergeMs = (System.nanoTime() - __tMerge0) / 1_000_000
+        if (__mergeMs >= 8) DiagLog.d("perf", "merge=${__mergeMs}ms code=$input n=${ordered.size}")
         // 分詞（theme 的 composing: delimiter → 送出 '）後，引擎只會給第一段候選；
         // 這裡按「段」補上字典候選：每段列出該碼對應的讀音與字，點擊後上屏該字、
         // 再把後面幾段的碼重新餵回引擎 —— 讓「分詞」真正能逐段聯想。
@@ -264,6 +275,14 @@ object TwelveKeySnapshotBuilder {
                 " all=[" + groupsWithRecommend.joinToString(",") { it.reading.ifEmpty { "推荐" } } + "]",
         )
         DiagLog.d("panel", panel.stats.line())
+        val __tEnd = System.nanoTime()
+        val __totalMs = (__tEnd - __tFlat) / 1_000_000
+        if (__totalMs >= 10) {
+            DiagLog.d(
+                "perf",
+                "build java: create=${((__tFlat - __enumStartNs) / 1_000_000) - __enumMs}ms rank=${(__tRanked - __tFlat) / 1_000_000}ms rest=${(__tEnd - __tMerge0) / 1_000_000}ms total=${__totalMs}ms n=${flat.size} code=$input",
+            )
+        }
         return TwelveKeySnapshot(
             input = input,
             consumedEnd = consumedEnd,
