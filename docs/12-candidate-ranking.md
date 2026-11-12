@@ -52,7 +52,7 @@ generalScore(ch) = max( percentile(hakka_char_freq, ch), percentile(hakka_char_r
 ### 2.1 流水线
 
 ```
-Rime.candidatesSnapshot(600)
+Rime.candidatesSnapshot(64)      // 候選條只枚舉前 64（BAR_CANDIDATES）；展開面板才 600
    → TwelveKeySnapshotBuilder 组装 CandidateItem(text, comment, index)   // index = 全局下标
    → SelectionMemory 学习排序（只抬学过的词；同分按引擎 index；不再按「覆盖音节数」分层）
    → CandidateRanking.rankBar(ranked, BAR_ITEMS = 12)

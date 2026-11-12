@@ -149,6 +149,17 @@ class TwelveKeyController(
             val (local, built, _) = result
             withContext(Dispatchers.Main.immediate) {
                 if (gen != generation) return@withContext
+                // 面板（全量 600）打開時，候選條前 12 條必須和限流快照一致，否則會「跳」。
+                if (full && built.barEntries.isNotEmpty()) {
+                    val prev = snapshot.barEntries.take(12).map { it.text }
+                    val now = built.barEntries.take(12).map { it.text }
+                    if (prev != now) {
+                        com.hazukieq.hkrime.util.DiagLog.d(
+                            "bar",
+                            "drift limited=${prev} full=${now}",
+                        )
+                    }
+                }
                 val t = System.nanoTime()
                 if (local.isEmpty) emit(TwelveKeySnapshot.EMPTY) else emit(built)
                 val emitMs = (System.nanoTime() - t) / 1e6
@@ -275,7 +286,7 @@ class TwelveKeyController(
          * 之前面板關時只枚舉 16 條，開面板換成 600 條，學習排序在更大的集合裡重排，
          * 候選條前幾名就跳了。統一成全量枚舉，兩邊永遠同一份數據。
          */
-        private const val BAR_CANDIDATES = TwelveKeySnapshotBuilder.MAX_CANDIDATES
+        private const val BAR_CANDIDATES = TwelveKeyTuning.BAR_CANDIDATES
         /**
          * librime session 非線程安全：後台枚舉與 UI 線程的 process_key / get_context 必須串行。
          * 鍵盤事件入口（TextInputManager.onEvent 等）也持同一把鎖。
