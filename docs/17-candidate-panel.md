@@ -469,6 +469,9 @@ flowchart TD
   剩余码按「码串前 N 个音节」扣（`remainingCodeAfter`），**不能**用 reading→码前缀（多读音会失配）。
   `TwelveKeyController.selectCandidate` 只做原生选中，**不再**在 commit 后兜底喂剩余码。
   只有「词覆盖整串」或最后一段选完时才 `commitText(pendingPick + 引擎 commit)`。
+  **退格 = 整段反悔**：每次 part-pick 把「词 + 选中前完整码串」压进 `heldPicks`；按退格先弹
+  这一格——`pendingPick` 扣掉该词、`clearComposition` + `onText` 还原整串码，回到选中前的候选，
+  不会出现「旧词 + 新词」一起上屏（用户 2026-11-12 报「加油家有」）。
 - PC 复刻：`rime-jni/host-test/run-host-test.sh --probe <code> --select <i>`（引擎行为）与
   `hkrime/tools/panel_probe.py preedit <code> --pick "<reading>"`（App 判定）。
 

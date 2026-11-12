@@ -524,13 +524,15 @@ class TextInputManager private constructor() :
      * 它不來自引擎，所以不能走 `select_candidate`；完整碼串放在 `restCode` 裡。
      * 上屏前先把暫存字 flush（保證「之前逐段選的字 + 這個詞」順序正確），再記一次學習。
      */
+    /** 一次「部分選中」的暫存：詞文字 + 選中前的完整碼串（退格要整段還原）。 */
+    private data class HeldPick(val text: String, val code: String)
+
     /**
      * 詞只覆蓋輸入前幾個音節（`灵机一动 | 来的`）時：**不 commit**，先把詞暫存到
-     * `pendingPick`，再把剩餘碼餵回引擎。
+     * `pendingPick`（preedit 前綴），再把剩餘碼餵回引擎；全部選完才一起上屏。
      *
-     * 這樣 preedit = 暫存前綴 + 剩餘段（`灵机一动` + `loi dit`），全部選完才一起上屏。
-     * 用戶 2026-11-12 明確要求：剩餘碼沒選完時只能停在 preedit；librime 的
-     * `select_candidate` 遇到 `end == 輸入長度` 的候選會直接 commit 整串，不能走它。
+     * 同時把「選中前的完整碼串」壓進 `heldPicks`：用戶按退格反悔時整段還原
+     * （用戶 2026-11-12：選了加油再退格改選家有，最後卻上屏「加油家有」——暫存狀態沒撤）。
      */
     private fun holdPartialPick(
         text: String,
@@ -548,6 +550,7 @@ class TextInputManager private constructor() :
         if (engineIndex >= 0) learnCandidatePick(text, reading) else if (code.isNotEmpty()) {
             PhraseMemory.learnPick(code, text, reading)
         }
+        heldPicks.addLast(HeldPick(text, code))
         pendingPick.append(text)
         updatePendingPick()
         setSegmentAnchor(text.lastOrNull())
@@ -555,11 +558,10 @@ class TextInputManager private constructor() :
         withEngineLock { Rime.onText(remaining) }
         trime.updateComposing()
         refreshTwelveKey()
-        // 組合剛重建，先再刷一次 preedit，避免悬浮窗拿到清組合前的殘留字串。
         trime.updateComposing()
         com.hazukieq.hkrime.util.DiagLog.d(
             "pick",
-            "hold text=$text reading='$reading' code=$code remaining=$remaining preedit='${Rime.getCompositionText()}'",
+            "hold text=$text reading='$reading' code=$code remaining=$remaining held=${heldPicks.size}",
         )
         return true
     }
@@ -583,6 +585,7 @@ class TextInputManager private constructor() :
         )
         if (remaining.isNotEmpty()) {
             // 剩餘碼沒選完：詞留在 preedit，不能上屏（用戶 2026-11-12）。
+            heldPicks.addLast(HeldPick(enginePrefix + text, input))
             pendingPick.append(enginePrefix).append(text)
             updatePendingPick()
             setSegmentAnchor(text.lastOrNull())
@@ -820,9 +823,13 @@ class TextInputManager private constructor() :
      * 逐段選字時字只能待在 preedit，全部選完才上屏。
      */
     private fun flushPendingPick() {
-        if (pendingPick.isEmpty()) return
+        if (pendingPick.isEmpty()) {
+            heldPicks.clear()
+            return
+        }
         val text = pendingPick.toString()
         pendingPick.setLength(0)
+        heldPicks.clear()
         updatePendingPick()
         runCatching { activeEditorInstance.commitText(text, false) }
             .onFailure { Timber.e(it, "twelvekey: flush pending failed") }
@@ -833,7 +840,10 @@ class TextInputManager private constructor() :
 
     /** 取出並清空暫存的字（引擎 commit 時用，保證「暫存 + 引擎提交」一次上屏）。 */
     private fun drainPendingPick(): String {
-        if (pendingPick.isEmpty()) return ""
+        if (pendingPick.isEmpty()) {
+            heldPicks.clear()
+            return ""
+        }
         val text = pendingPick.toString()
         pendingPick.setLength(0)
         updatePendingPick()
@@ -927,6 +937,7 @@ class TextInputManager private constructor() :
         // 組字結束（上屏/清空）→ 清掉「按段選字」的錨點，下一輪重新記。
         // 分段不再依賴用戶按 `'`：面板按碼位自動拆段（見 TwelveKeySnapshotBuilder.splitParts）。
         if (!Rime.isComposing()) {
+            heldPicks.clear()
             setSegmentAnchor(null)
             // 組字結束（上屏/清空/取消）→ 未提交前綴已無意義，避免後續一次性誤上屏。
             uncommittedPrefix = ""
@@ -1171,6 +1182,8 @@ class TextInputManager private constructor() :
     /** App 側「已選但還沒上屏」的字（兜底路徑用；見 flushPendingPick）。 */
     private val pendingPick = StringBuilder()
 
+    /** 部分選中堆棧：退格時整段還原（與 pendingPick 一一對應）。 */    private val heldPicks = ArrayDeque<HeldPick>()
+
     // ---- 逐段拼詞的累積（記進 PhraseMemory：文字 + 各段讀音 + 完整碼串）----
     private val pickedText = StringBuilder()
     private val pickedReadings = StringBuilder()
@@ -1275,7 +1288,29 @@ class TextInputManager private constructor() :
 
     override fun onKey(keyEventCode: Int, metaState: Int) {
         printModifierKeyState(metaState, "keyEventCode=" + keyEventCode)
+        // 退格 = 反悔：引擎自己會撤回選中段，App 側緩存的「未提交前綴」必須同步作廢，
+        // 否則改選別的詞後上屏會變成「舊詞 + 新詞」（用戶 2026-11-12 報「加油家有」）。
+        if (keyEventCode == KeyEvent.KEYCODE_DEL && uncommittedPrefix.isNotEmpty()) {
+            com.hazukieq.hkrime.util.DiagLog.d("pick", "backspace drop prefix='$uncommittedPrefix'")
+            uncommittedPrefix = ""
+        }
         // 逐段選字時暫存的字還沒上屏，退格先撤它（與引擎 preedit 的退格語義一致）。
+        if (keyEventCode == KeyEvent.KEYCODE_DEL && heldPicks.isNotEmpty()) {
+            // 整段反悔：撤掉這次選中的詞、恢復選中前的完整碼串（不是只刪一個字）。
+            val held = heldPicks.removeLast()
+            pendingPick.setLength(maxOf(0, pendingPick.length - held.text.length))
+            updatePendingPick()
+            uncommittedPrefix = ""
+            withEngineLock { Rime.clearComposition() }
+            withEngineLock { Rime.onText(held.code) }
+            trime.updateComposing()
+            refreshTwelveKey()
+            com.hazukieq.hkrime.util.DiagLog.d(
+                "pick",
+                "undo held text=${held.text} restore=${held.code} held=${heldPicks.size}",
+            )
+            return
+        }
         if (keyEventCode == KeyEvent.KEYCODE_DEL && pendingPick.isNotEmpty()) {
             pendingPick.setLength(pendingPick.length - 1)
             updatePendingPick()
