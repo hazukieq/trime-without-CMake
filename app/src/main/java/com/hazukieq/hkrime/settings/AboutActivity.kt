@@ -55,6 +55,28 @@ class AboutActivity : AppCompatActivity() {
     }
 
     class AboutFragment : PreferenceFragmentCompat() {
+
+        /** 編譯信息 + 當前安裝包信息；點擊複製也用這份。 */
+        private var buildInfoText: String = BuildConfig.BUILD_INFO
+
+        private fun runtimeBuildInfo(): String {
+            val ctx = requireContext()
+            val pkg = runCatching {
+                ctx.packageManager.getPackageInfo(ctx.packageName, 0)
+            }.getOrNull() ?: return BuildConfig.BUILD_INFO
+            val code = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                pkg.longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                pkg.versionCode.toLong()
+            }
+            val updated = java.text.SimpleDateFormat(
+                "yyyy-MM-dd HH:mm:ss Z",
+                java.util.Locale.getDefault(),
+            ).format(java.util.Date(pkg.lastUpdateTime))
+            return BuildConfig.BUILD_INFO + "\n\n安裝包: " + (pkg.versionName ?: "?") +
+                " (" + code + ")\n安裝時間: " + updated
+        }
         override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         view.tunePreferenceList()
@@ -64,8 +86,9 @@ class AboutActivity : AppCompatActivity() {
             setPreferencesFromResource(R.xml.about_preference, rootKey)
             findPreference<Preference>("about__changelog")
                 ?.writeLibraryVersionToSummary(BuildConfig.BUILD_VERSION)
+            buildInfoText = runtimeBuildInfo()
             findPreference<Preference>("about__buildinfo")
-                ?.writeLibraryVersionToSummary(BuildConfig.BUILD_INFO)
+                ?.writeLibraryVersionToSummary(buildInfoText)
             findPreference<Preference>("about__librime_version")
                 ?.writeLibraryVersionToSummary(Rime.get_librime_version())
             findPreference<Preference>("about__opencc_version")
@@ -104,7 +127,7 @@ class AboutActivity : AppCompatActivity() {
                 }
                 "about__buildinfo" -> {
                     val cbm = context?.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    cbm.text = BuildConfig.BUILD_INFO
+                    cbm.text = buildInfoText
                     Toast.makeText(context, R.string.copy_done, Toast.LENGTH_LONG).show()
                     true
                 }

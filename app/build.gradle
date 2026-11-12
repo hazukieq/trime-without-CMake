@@ -120,7 +120,7 @@ repositories {
 }
 
 def getBuildInfo(){
-    def info =  'Build: ' + getGitUser()+ ' \\nDate: ' + getBuildTime()+ ' UTC \\nCommit: '+getCommitInfo()+ ' \\nBranch: '+ getGitBranch()+ ' \\nRepository: '+ getGitUrl()
+    def info =  'Build: ' + getGitUser()+ ' \\nDate: ' + getLocalBuildTime()+ ' \\nCommit: '+getCommitInfo()+ ' \\nBranch: '+ getGitBranch()+ ' \\nRepository: '+ getGitUrl()
     println( info)
     return info
 }
@@ -133,12 +133,17 @@ static def getBuildTime() {
     return new Date().format("yyyy-MM-dd HH:mm", TimeZone.getTimeZone("UTC"))
 }
 
+/** 本次编译的本地时间（关于页显示用；UTC 的 getBuildTime 仍给 BUILD_VERSION 的日期用）。 */
+static def getLocalBuildTime() {
+    return new Date().format("yyyy-MM-dd HH:mm:ss Z")
+}
+
 static def getCommitInfo(){
-    def text = ' git show --pretty=format:"%ci"'.execute().text.trim()
-    text =  (text =~ /${"(\\n.*|\")"}/).replaceAll("").trim()
-    // 仓库没有 tag 时 `git describe` 会失败并输出空串（只剩 stderr），
-    // 用 --tags --always 回退到短 sha，保证 BUILD_INFO 里始终有提交号。
-    return ' git describe --tags --always'.execute().text.trim() +  ", " + text
+    def sha = 'git rev-parse --short HEAD'.execute().text.trim()
+    def date = 'git show -s --format=%ci HEAD'.execute().text.trim()
+    def dirty = 'git status --porcelain'.execute().text.trim()
+    def suffix = dirty.isEmpty() ? '' : ' (dirty)'
+    return sha + suffix + '  ' + date
 }
 
 static def getGitBranch(){
@@ -170,4 +175,13 @@ static def getGitUser() {
 
 static def getGitUrl() {
     return 'git remote get-url  origin'.execute().text.trim().replaceFirst("\\.git\$","")
+}
+
+
+// 「关于」页的编译信息必须是**本次编译**的：BuildConfig 默认会被 up-to-date 跳过，
+// 增量构建时会显示上一次的 commit/时间。这里强制每次 build 重新生成。
+tasks.configureEach { t ->
+    if (t.name.startsWith("generate") && t.name.endsWith("BuildConfig")) {
+        t.outputs.upToDateWhen { false }
+    }
 }
