@@ -25,9 +25,16 @@
         android:enableOnBackInvokedCallback="false"
         tools:targetApi="tiramisu">
         <activity
-            android:name=".setup.LauchAct"
+            android:name=".setup.LaunchActivity"
             android:theme="@style/LaunchTheme">
         </activity>
+        <!-- 輸入法內對話框宿主：透明 Activity，避免從 Service 直接彈 Dialog。 -->
+        <activity
+            android:name=".settings.PickerHostActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/PickerHostTheme"
+            android:windowSoftInputMode="stateAlwaysHidden|adjustNothing" />
 
         <service
             android:name=".TrimeImeService"
@@ -61,7 +68,7 @@
             android:exported="true"
             android:label="@string/trime_app_name"
             android:launchMode="singleTask"
-            android:targetActivity=".setup.LauchAct">
+            android:targetActivity=".setup.LaunchActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -76,10 +83,5 @@
         <activity
             android:name=".setup.SetupActivity"
             android:exported="false" />
-        <activity
-            android:name=".settings.LogActivity"
-            android:exported="false"
-            android:launchMode="singleTask"
-            android:parentActivityName=".settings.PrefMainActivity" />
     </application>
 </manifest>

@@ -1,11 +1,7 @@
 package com.hazukieq.hkrime.settings.components
 
-import android.app.Dialog
 import android.app.ProgressDialog
 import android.content.Context
-import android.os.Build
-import android.view.WindowManager
-import androidx.appcompat.app.AlertDialog
 import com.hazukieq.hkrime.R
 import com.hazukieq.hkrime.core.Rime
 import com.hazukieq.hkrime.data.Config
@@ -34,6 +30,11 @@ class SchemaPickerDialog(
     private lateinit var schemaNames: Array<String?>
 
     private var progressDialog: ProgressDialog
+
+    /** 對話框流程全部結束後的回調（輸入法宿主頁用來結束透明 Activity）。 */
+    var onDismiss: (() -> Unit)? = null
+    /** 是否已進入「部署方案」的異步流程：是的話由部署收尾，dismiss 不再觸發回調。 */
+    private var busy = false
 
     companion object {
         private class SortByName : Comparator<Map<String?, String?>> {
@@ -69,7 +70,7 @@ class SchemaPickerDialog(
                 context.getString(R.string.pref_schemas),
                 context.getString(R.string.no_schemas),
             ) {}
-            appendDialogParams(d)
+            d.setOnDismissListener { onDismiss?.invoke() }
             d.show()
             return
         }
@@ -81,8 +82,8 @@ class SchemaPickerDialog(
             checkedStatus,
         ) { flags ->
             flags.copyInto(checkedStatus)
+            busy = true
             progressDialog = createLoadingDialog(context, R.string.deploy_progress).also {
-                appendDialogParams(it)
                 it.show()
             }
             launch {
@@ -92,23 +93,13 @@ class SchemaPickerDialog(
                     Timber.e(e, "Failed to set schema")
                 } finally {
                     progressDialog.dismiss()
+                    busy = false
+                    onDismiss?.invoke()
                 }
             }
         }
-        appendDialogParams(d)
+        d.setOnDismissListener { if (!busy) onDismiss?.invoke() }
         d.show()
-    }
-
-    private fun appendDialogParams(dialog: Dialog) {
-        dialog.window?.let { window ->
-            window.attributes.token = Trime.getServiceOrNull()?.window?.window?.decorView?.windowToken
-            window.attributes.type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG
-            }
-            window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
-        }
     }
 
     private fun initSchemas() {
@@ -171,7 +162,6 @@ class SchemaPickerDialog(
     }
 
     private fun onPreExecute() {
-        appendDialogParams(progressDialog)
         progressDialog.show()
     }
 

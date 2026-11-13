@@ -20,7 +20,6 @@ package com.hazukieq.hkrime.ime.core;
 
 import static android.graphics.Color.parseColor;
 
-import android.app.Dialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -36,8 +35,10 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.os.StrictMode;
+import android.provider.Settings;
 import android.text.InputType;
 import android.text.TextUtils;
+import android.view.Display;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -56,20 +57,16 @@ import android.widget.PopupWindow;
 import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import com.blankj.utilcode.util.BarUtils;
 import com.hazukieq.hkrime.R;
 import com.hazukieq.hkrime.core.Rime;
 import com.hazukieq.hkrime.data.AppPrefs;
 import com.hazukieq.hkrime.data.Config;
-import com.hazukieq.hkrime.data.db.clipboard.ClipboardDao;
-import com.hazukieq.hkrime.data.db.draft.DraftDao;
 import com.hazukieq.hkrime.databinding.CompositionRootBinding;
 import com.hazukieq.hkrime.databinding.InputRootBinding;
 import com.hazukieq.hkrime.ime.broadcast.IntentReceiver;
 import com.hazukieq.hkrime.ime.enums.Keycode;
 import com.hazukieq.hkrime.ime.enums.PositionType;
-import com.hazukieq.hkrime.ime.enums.SymbolKeyboardType;
 import com.hazukieq.hkrime.ime.keyboard.Event;
 import com.hazukieq.hkrime.ime.keyboard.InputFeedbackManager;
 import com.hazukieq.hkrime.ime.keyboard.Key;
@@ -78,15 +75,10 @@ import com.hazukieq.hkrime.ime.keyboard.KeyboardSwitcher;
 import com.hazukieq.hkrime.ime.keyboard.KeyboardView;
 import com.hazukieq.hkrime.ime.keyboard.Sound;
 import com.hazukieq.hkrime.ime.lifecycle.LifecycleInputMethodService;
-import com.hazukieq.hkrime.ime.symbol.LiquidKeyboard;
-import com.hazukieq.hkrime.ime.symbol.TabManager;
-import com.hazukieq.hkrime.ime.symbol.TabView;
 import com.hazukieq.hkrime.ime.text.Candidate;
 import com.hazukieq.hkrime.ime.text.Composition;
-import com.hazukieq.hkrime.ime.text.ScrollView;
 import com.hazukieq.hkrime.ime.text.TextInputManager;
 import com.hazukieq.hkrime.settings.PrefMainActivity;
-import com.hazukieq.hkrime.settings.components.ColorPickerDialog;
 import com.hazukieq.hkrime.settings.components.SchemaPickerDialog;
 import com.hazukieq.hkrime.settings.components.SoundPickerDialog;
 import com.hazukieq.hkrime.settings.components.ThemePickerDialog;
@@ -103,8 +95,6 @@ import timber.log.Timber;
 /** {@link InputMethodService 輸入法}主程序 */
 public class Trime extends LifecycleInputMethodService {
   private static Trime self = null;
-  private LiquidKeyboard liquidKeyboard;
-  private boolean normalTextEditor;
 
   @NonNull
   private AppPrefs getPrefs() {
@@ -130,8 +120,6 @@ public class Trime extends LifecycleInputMethodService {
   private Composition mComposition; // 編碼
   private CompositionRootBinding compositionRootBinding = null;
   private View mCandidateRoot;
-  private ScrollView mTabRoot;
-  private TabView tabView;
   public InputRootBinding inputRootBinding = null;
   public CopyOnWriteArrayList<EventListener> eventListeners = new CopyOnWriteArrayList<>();
   public InputMethodManager imeManager = null;
@@ -139,6 +127,9 @@ public class Trime extends LifecycleInputMethodService {
   private IntentReceiver mIntentReceiver = null;
 
   private boolean isWindowShown = false; // 键盘窗口是否已显示
+
+  /** 上次见到的屏幕方向；用来识别 onConfigurationChanged 里的旋转事件。 */
+  private int lastOrientation = Configuration.ORIENTATION_UNDEFINED;
 
   private boolean isAutoCaps; // 句首自動大寫
   private final Locale[] locales = new Locale[2];
@@ -151,6 +142,17 @@ public class Trime extends LifecycleInputMethodService {
       VERSION.SDK_INT >= VERSION_CODES.P
           ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY//TYPE_APPLICATION_OVERLAY
           : WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
+
+  /**
+   * Android 12+ 鍵盤視圖與懸浮窗使用的 window context。
+   *
+   * 官方文檔（Context#createWindowContext）明確說明：創建 window context 是「expensive
+   * operation」，最佳實踐是同一個 window type + display 只建一個、到處複用；每個 window
+   * context 還持有一個附著在 DisplayArea 上的 WindowTokenClient，要等 finalize 才解綁。
+   * 過去每次 onCreateInputView() 都新建一個，鍵盤重建幾次就會遺留多個 WMS token。
+   */
+  @Nullable private Context windowContext;
+  private int windowContextDisplayId = Display.INVALID_DISPLAY;
 
   private boolean isPopupWindowEnabled = true; // 顯示懸浮窗口
   private String isPopupWindowMovable; // 悬浮窗口是否可移動
@@ -346,6 +348,15 @@ public class Trime extends LifecycleInputMethodService {
     mPopupWindow.update(popupWindowX, popupWindowY, -1, -1, true);
   }
 
+  /**
+   * 懸浮編碼窗（PopupWindow）在 P 以上用 TYPE_APPLICATION_OVERLAY 顯示，需要
+   * SYSTEM_ALERT_WINDOW；未授權時直接停用，避免每次嘗試都拋 BadTokenException。
+   * 對話框不依賴此權限（改由 PickerHostActivity 承載）。
+   */
+  private boolean canShowFloatingWindow() {
+    return VERSION.SDK_INT < VERSION_CODES.M || Settings.canDrawOverlays(this);
+  }
+
   public void loadConfig() {
     final Config imeConfig = getImeConfig();
     popupWindowPos = imeConfig.getWinPos();
@@ -357,7 +368,9 @@ public class Trime extends LifecycleInputMethodService {
     textInputManager.setShouldResetAsciiMode(imeConfig.getBoolean("reset_ascii_mode"));
     isAutoCaps = imeConfig.getBoolean("auto_caps");
     isPopupWindowEnabled =
-        getPrefs().getKeyboard().getPopupWindowEnabled() && imeConfig.hasKey("window");
+        getPrefs().getKeyboard().getPopupWindowEnabled()
+            && imeConfig.hasKey("window")
+            && canShowFloatingWindow();
     textInputManager.setShouldUpdateRimeOption(true);
   }
 
@@ -407,12 +420,6 @@ public class Trime extends LifecycleInputMethodService {
 
         keyboardSwitcher = new KeyboardSwitcher();
 
-        Timber.d("%sliquidKeyboard", methodName);
-        liquidKeyboard =
-            new LiquidKeyboard(
-                this, getImeConfig().getClipboardLimit(), getImeConfig().getDraftLimit());
-        clipBoardMonitor();
-        DraftDao.get();
       } catch (Exception e) {
         e.printStackTrace();
         super.onCreate();
@@ -443,50 +450,6 @@ public class Trime extends LifecycleInputMethodService {
       return true;
     }
     return false;
-  }
-
-  private SymbolKeyboardType symbolKeyboardType = SymbolKeyboardType.NO_KEY;
-
-  public void selectLiquidKeyboard(final int tabIndex) {
-    final LinearLayout symbolInputView =
-        inputRootBinding != null ? inputRootBinding.symbol.symbolInput : null;
-    final LinearLayout mainInputView =
-        inputRootBinding != null ? inputRootBinding.main.mainInput : null;
-    if (symbolInputView != null) {
-      if (tabIndex >= 0) {
-        final LinearLayout.LayoutParams param =
-            (LinearLayout.LayoutParams) symbolInputView.getLayoutParams();
-        param.height = mainInputView.getHeight();
-        symbolInputView.setVisibility(View.VISIBLE);
-
-        final int orientation = getResources().getConfiguration().orientation;
-        liquidKeyboard.setLand(orientation == Configuration.ORIENTATION_LANDSCAPE);
-        liquidKeyboard.calcPadding(mainInputView.getWidth());
-        symbolKeyboardType = liquidKeyboard.select(tabIndex);
-        tabView.updateTabWidth();
-        if (inputRootBinding != null) {
-          mTabRoot.setBackground(mCandidateRoot.getBackground());
-          mTabRoot.move(tabView.getHightlightLeft(), tabView.getHightlightRight());
-        }
-      } else {
-        symbolKeyboardType = SymbolKeyboardType.NO_KEY;
-        symbolInputView.setVisibility(View.GONE);
-      }
-      updateComposing();
-    }
-    if (mainInputView != null)
-      mainInputView.setVisibility(tabIndex >= 0 ? View.GONE : View.VISIBLE);
-  }
-
-  // 按键需要通过tab name来打开liquidKeyboard的指定tab
-  public void selectLiquidKeyboard(@NonNull String name) {
-    if (name.matches("\\d+")) selectLiquidKeyboard(Integer.parseInt(name));
-    else if (name.matches("[A-Z]+")) selectLiquidKeyboard(SymbolKeyboardType.valueOf(name));
-    else selectLiquidKeyboard(TabManager.getTagIndex(name));
-  }
-
-  public void selectLiquidKeyboard(SymbolKeyboardType type) {
-    selectLiquidKeyboard(TabManager.getTagIndex(type));
   }
 
   public void pasteByChar() {
@@ -575,7 +538,6 @@ public class Trime extends LifecycleInputMethodService {
       inputRootBinding.inputRoot.setBackgroundColor(Color.BLACK);
     }
 
-    tabView.reset(self);
   }
 
   public void resetKeyboard() {
@@ -593,7 +555,9 @@ public class Trime extends LifecycleInputMethodService {
       mCandidateRoot.setVisibility(!Rime.getOption("_hide_candidate") ? View.VISIBLE : View.GONE);
       mCandidate.reset(this);
       isPopupWindowEnabled =
-          getPrefs().getKeyboard().getPopupWindowEnabled() && getImeConfig().hasKey("window");
+          getPrefs().getKeyboard().getPopupWindowEnabled()
+              && getImeConfig().hasKey("window")
+              && canShowFloatingWindow();
       mComposition.setVisibility(isPopupWindowEnabled ? View.VISIBLE : View.GONE);
       mComposition.reset(this);
     }
@@ -602,10 +566,6 @@ public class Trime extends LifecycleInputMethodService {
   /** 重置鍵盤、候選條、狀態欄等 !!注意，如果其中調用Rime.setOption，切換方案會卡住 */
   private void reset() {
     if (inputRootBinding == null) return;
-    final LinearLayout symbolInputView = inputRootBinding.symbol.symbolInput;
-    final LinearLayout mainInputView = inputRootBinding.main.mainInput;
-    if (symbolInputView != null) symbolInputView.setVisibility(View.GONE);
-    if (mainInputView != null) mainInputView.setVisibility(View.VISIBLE);
     getImeConfig().reset();
     loadConfig();
     getImeConfig().initCurrentColors();
@@ -652,6 +612,14 @@ public class Trime extends LifecycleInputMethodService {
     if (inputFeedbackManager != null) inputFeedbackManager.destroy();
     inputFeedbackManager = null;
     inputRootBinding = null;
+    compositionRootBinding = null;
+    if (mPopupWindow != null) {
+      mPopupWindow.dismiss();
+      mPopupWindow = null;
+    }
+    // 釋放 window context：清掉引用後由 WindowContext.finalize() 解綁 DisplayArea 上的 token。
+    windowContext = null;
+    windowContextDisplayId = Display.INVALID_DISPLAY;
     imeManager = null;
 
     if (getPrefs().getOther().getDestroyOnQuit()) {
@@ -670,13 +638,19 @@ public class Trime extends LifecycleInputMethodService {
 
   @Override
   public void onConfigurationChanged(@NonNull Configuration newConfig) {
-    final Configuration config = getResources().getConfiguration();
-    if (config != null) {
-      if (config.orientation != newConfig.orientation) {
-        // Clear composing text and candidates for orientation change.
-        performEscape();
-        config.orientation = newConfig.orientation;
-      }
+    // 注意：不能拿 getResources().getConfiguration() 和 newConfig 比较——这时 Resources
+    // 已经同步成新配置，两者永远相等，旧代码的判断实际上从不成立（旋转后 composing 与
+    // 悬浮编码窗都残留在旧坐标）。这里改为记住上一次见到的方向。
+    final boolean orientationChanged =
+        lastOrientation != Configuration.ORIENTATION_UNDEFINED
+            && lastOrientation != newConfig.orientation;
+    lastOrientation = newConfig.orientation;
+    if (orientationChanged) {
+      // 清掉旧的 composing（候选栏、Rime 状态），并把按旋转前坐标定位的悬浮编码窗收起来；
+      // 下次编码时 showCompositionView() 会按新的窗口几何重新计算位置。
+      performEscape();
+      hideCompositionView();
+      isCursorUpdated = false;
     }
     super.onConfigurationChanged(newConfig);
   }
@@ -749,23 +723,35 @@ public class Trime extends LifecycleInputMethodService {
     outInsets.contentTopInsets = outInsets.visibleTopInsets;
   }
 
+  /**
+   * 取得（必要時創建）當前 display 的 window context。Android 12 以下直接用 Service 自己。
+   */
+  @NonNull
+  private Context obtainWindowContext() {
+    if (VERSION.SDK_INT < VERSION_CODES.S) return this;
+    final Display display = getDisplay();
+    if (display == null) return this; // 無顯示器（極端情況）時退回 Service context
+    if (windowContext == null || windowContextDisplayId != display.getDisplayId()) {
+      windowContext =
+          createWindowContext(
+              display, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null);
+      windowContextDisplayId = display.getDisplayId();
+    }
+    return windowContext;
+  }
+
   @Override
   public View onCreateInputView() {
     Timber.e("onCreateInputView()");
     // 初始化键盘布局
     super.onCreateInputView();
 
-    //适配android12以后的悬浮窗
-    Context mwcontext;
-    if (VERSION.SDK_INT >= VERSION_CODES.S) {
-      mwcontext=createWindowContext(getDisplay(), WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null);
-      //final PopupWindow overlayView = LayoutInflater.from(mwcontext).inflate(someLayoutXml, null);
-    }else{
-      mwcontext=this;
-    }
+    // 適配 android12 以後的懸浮窗：window context 只建一次並複用（見 obtainWindowContext）。
+    final Context mwcontext = obtainWindowContext();
 
     inputRootBinding = InputRootBinding.inflate(LayoutInflater.from(mwcontext));
     mainKeyboardView = inputRootBinding.main.mainKeyboardView;
+    lastOrientation = getResources().getConfiguration().orientation;
 
     // 初始化候选栏
     mCandidateRoot = inputRootBinding.main.candidateView.candidateRoot;
@@ -783,10 +769,6 @@ public class Trime extends LifecycleInputMethodService {
       mPopupWindow.setWindowLayoutType(dialogType);
     }
     hideCompositionView();
-    mTabRoot = inputRootBinding.symbol.tabView.tabRoot;
-
-    liquidKeyboard.setView(inputRootBinding.symbol.liquidKeyboardView);
-    tabView = inputRootBinding.symbol.tabView.tabs;
 
     for (EventListener listener : eventListeners) {
       assert inputRootBinding != null;
@@ -874,7 +856,6 @@ public class Trime extends LifecycleInputMethodService {
                 + (attribute.inputType & InputType.TYPE_MASK_CLASS)
                 + "; ACTION="
                 + (attribute.imeOptions & EditorInfo.IME_MASK_ACTION));
-        normalTextEditor = false;
         break;
 
       default:
@@ -900,9 +881,6 @@ public class Trime extends LifecycleInputMethodService {
           //  应用程求以隐身模式打开键盘应用程序
           Timber.i("EditorInfo: normal -> private, IME_FLAG_NO_PERSONALIZED_LEARNING");
         } else {
-          normalTextEditor = true;
-          activeEditorInstance.cacheDraft();
-          addDraft();
         }
     }
   }
@@ -911,7 +889,6 @@ public class Trime extends LifecycleInputMethodService {
   public void onFinishInputView(boolean finishingInput) {
     // 鍵盤收起時把內存裡的日誌刷到 /sdcard/hkrime/logs/，用戶回傳的文件才不會缺尾巴。
     com.hazukieq.hkrime.util.LogFileTree.flushNow();
-    if (normalTextEditor) addDraft();
     super.onFinishInputView(finishingInput);
     // Dismiss any pop-ups when the input-view is being finished and hidden.
     mainKeyboardView.closing();
@@ -1268,37 +1245,21 @@ public class Trime extends LifecycleInputMethodService {
     int startNum = 0;
     if (mCandidateRoot != null) {
       if (isPopupWindowEnabled) {
-        Timber.d("updateComposing() SymbolKeyboardType=%s", symbolKeyboardType.toString());
-        if (symbolKeyboardType != SymbolKeyboardType.NO_KEY
-            && symbolKeyboardType != SymbolKeyboardType.CANDIDATE) {
-          mComposition.getRootView().setVisibility(View.GONE);
-        } else {
-          mComposition.getRootView().setVisibility(View.VISIBLE);
-          startNum = mComposition.setWindow(minPopupSize, minPopupCheckSize, Integer.MAX_VALUE);
-          mCandidate.setText(startNum);
-          // if isCursorUpdated, showCompositionView will be called in onUpdateCursorAnchorInfo
-          // otherwise we need to call it here
-          if (!isCursorUpdated) showCompositionView();
-        }
+        mComposition.getRootView().setVisibility(View.VISIBLE);
+        startNum = mComposition.setWindow(minPopupSize, minPopupCheckSize, Integer.MAX_VALUE);
+        mCandidate.setText(startNum);
+        // if isCursorUpdated, showCompositionView will be called in onUpdateCursorAnchorInfo
+        // otherwise we need to call it here
+        if (!isCursorUpdated) showCompositionView();
       } else {
         mCandidate.setText(0);
       }
       mCandidate.setExpectWidth(mainKeyboardView.getWidth());
       if (textInputManager != null) textInputManager.onCandidatesRefreshed();
-      // 刷新候选词后，如果候选词超出屏幕宽度，滚动候选栏
-      mTabRoot.move(mCandidate.getHighlightLeft(), mCandidate.getHighlightRight());
     }
     if (mainKeyboardView != null) mainKeyboardView.invalidateComposingKeys();
     if (!onEvaluateInputViewShown())
       setCandidatesViewShown(textInputManager.isComposable()); // 實體鍵盤打字時顯示候選欄
-
-    if (symbolKeyboardType == SymbolKeyboardType.CANDIDATE) {
-      if (isComposing()) {
-        liquidKeyboard.updateCandidates();
-      } else {
-        selectLiquidKeyboard(-1);
-      }
-    }
 
     final long __perfMs = (System.nanoTime() - __perfT0) / 1_000_000L;
     if (__perfMs >= 6) {
@@ -1307,41 +1268,22 @@ public class Trime extends LifecycleInputMethodService {
     return startNum;
   }
 
-  private void showDialog(@NonNull Dialog dialog) {
-    final Window window = dialog.getWindow();
-    final WindowManager.LayoutParams lp = window.getAttributes();
-    lp.token = getWindow().getWindow().getDecorView().getWindowToken();
-    lp.type = dialogType;
-    window.setAttributes(lp);
-    window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
-    dialog.show();
+  /**
+   * 螢幕上彈出「選擇器」對話框。
+   *
+   * 不能在 InputMethodService 上直接 Dialog.show()：這種窗口沒有 Activity Token，
+   * 過去靠改寫 windowToken + TYPE_APPLICATION_OVERLAY 才能顯示，而這條路徑要求
+   * SYSTEM_ALERT_WINDOW；權限被拒時會拋 BadTokenException 直接把輸入法進程打死。
+   * 現在統一由透明的 {@link com.hazukieq.hkrime.settings.PickerHostActivity} 承載，
+   * 對話框落在普通 Activity Window 上，不需要任何懸浮窗權限。
+   */
+  private void showPickerActivity(@NonNull String kind) {
+    com.hazukieq.hkrime.settings.PickerHostActivity.start(this, kind);
   }
 
   /** 彈出現代風格（類 Apple）配色選擇對話框。 */
   public void showColorDialog() {
-    final com.hazukieq.hkrime.data.Config config =
-        com.hazukieq.hkrime.data.Config.get(this);
-    final String[] keys = config.getColorKeys().clone();
-    java.util.Arrays.sort(keys);
-    final String[] names = config.getColorNames(keys);
-    final String selected =
-        com.hazukieq.hkrime.data.AppPrefs.defaultInstance().getLooks().getSelectedColor();
-    int checked = java.util.Arrays.binarySearch(keys, selected);
-    if (checked < 0) checked = 0;
-    final com.hazukieq.hkrime.ime.dialog.ModernListDialog dialog =
-        com.hazukieq.hkrime.ime.dialog.ModernListDialog.singleChoice(
-            this,
-            getString(R.string.looks__selected_color_title),
-            java.util.Arrays.asList(names),
-            checked,
-            index -> {
-              if (index < 0 || index >= keys.length) return;
-              com.hazukieq.hkrime.data.AppPrefs.defaultInstance()
-                  .getLooks()
-                  .setSelectedColor(keys[index]);
-              initKeyboard();
-            });
-    showDialog(dialog);
+    showPickerActivity(com.hazukieq.hkrime.settings.PickerHostActivity.KIND_COLOR);
   }
 
   /**
@@ -1349,72 +1291,29 @@ public class Trime extends LifecycleInputMethodService {
    * 沒有開關時退回方案選擇對話框。
    */
   public void showSchemaSwitchDialog() {
-    final String[] labels = Rime.getSchemaSwitchDialogLabels();
-    if (labels.length == 0) {
-      showOptionsDialog();
-      return;
-    }
-    final com.hazukieq.hkrime.ime.dialog.ModernListDialog dialog =
-        com.hazukieq.hkrime.ime.dialog.ModernListDialog.actionList(
-            this,
-            "方案开关",
-            java.util.Arrays.asList(labels),
-            "✓ 已开启　○ 已关闭，点按一行即可切换",
-            index -> {
-              Rime.toggleOption(index);
-              updateComposing();
-            });
-    showDialog(dialog);
+    showPickerActivity(com.hazukieq.hkrime.settings.PickerHostActivity.KIND_SCHEMA_SWITCH);
   }
 
   /**
    * 長按 meta/Menu 顯示方案選單，支持切換當前方案及啟用/停用方案。
    */
   public void showSchemaMenuDialog() {
-    final String[] names = Rime.getSchemaNames();
-    if (names.length == 0) {
-      new SchemaPickerDialog(this).show();
-      return;
-    }
-    final int current = Rime.getSchemaIndex();
-    final java.util.List<String> items = new java.util.ArrayList<>(names.length + 1);
-    for (int i = 0; i < names.length; i++) {
-      items.add(i == current ? names[i] + "（当前）" : names[i]);
-    }
-    items.add("启用 / 停用方案…");
-    final com.hazukieq.hkrime.ime.dialog.ModernListDialog dialog =
-        com.hazukieq.hkrime.ime.dialog.ModernListDialog.actionList(
-            this,
-            "输入方案",
-            items,
-            index -> {
-              if (index == names.length) {
-                new SchemaPickerDialog(this).show();
-                return;
-              }
-              if (index == current) return;
-              // 方案切換會觸發 librime 的 schema 通知 → initSchema() + initKeyboard()，
-              // 鍵盤/候選條/面板跟著換到新方案的配置。
-              synchronized (Rime.ENGINE_LOCK) {
-                Rime.selectSchema(index);
-              }
-            });
-    showDialog(dialog);
+    showPickerActivity(com.hazukieq.hkrime.settings.PickerHostActivity.KIND_SCHEMA_MENU);
   }
 
   /** 彈出{@link SchemaPickerDialog 輸入法方案對話框} */
   public void showSchemaDialog() {
-    new SchemaPickerDialog(this).show();
+    showPickerActivity(com.hazukieq.hkrime.settings.PickerHostActivity.KIND_SCHEMA);
   }
 
   /** 彈出{@link ThemePickerDialog 主題對話框} */
   public void showThemeDialog() {
-    new ThemePickerDialog(this).show();
+    showPickerActivity(com.hazukieq.hkrime.settings.PickerHostActivity.KIND_THEME);
   }
 
   /** 彈出{@link SoundPickerDialog 音效包对话框} */
   public void showSoundDialog() {
-    new SoundPickerDialog(this).show();
+    showPickerActivity(com.hazukieq.hkrime.settings.PickerHostActivity.KIND_SOUND);
   }
 
   /** Hides the IME and launches {@link PrefMainActivity}. */
@@ -1429,25 +1328,7 @@ public class Trime extends LifecycleInputMethodService {
   }
 
   public void showOptionsDialog() {
-    // 維護被延後 / 引擎剛 destroy 時 get_current_schema() 會是 null，這裡走 getSchemaId()
-    // （已把 null 統一成 ".default"），避免 ☰ 點擊在無 session 時 NPE。
-    final String message =
-        Rime.getSchemaId().contentEquals(".default") ? getString(R.string.no_schemas) : null;
-    final com.hazukieq.hkrime.ime.dialog.ModernListDialog dialog =
-        com.hazukieq.hkrime.ime.dialog.ModernListDialog.actionList(
-            this,
-            getString(R.string.trime_app_name),
-            java.util.Arrays.asList(
-                getString(R.string.set_ime), getString(R.string.other_ime)),
-            message,
-            index -> {
-              if (index == 0) {
-                launchSettings();
-              } else if (imeManager != null) {
-                imeManager.showInputMethodPicker();
-              }
-            });
-    showDialog(dialog);
+    showPickerActivity(com.hazukieq.hkrime.settings.PickerHostActivity.KIND_OPTIONS);
   }
 
   /**
@@ -1458,7 +1339,6 @@ public class Trime extends LifecycleInputMethodService {
    */
   private boolean performEnter(int keyCode) { // 回車
     if (keyCode == KeyEvent.KEYCODE_ENTER) {
-      activeEditorInstance.cacheDraft();
       if (textInputManager.getPerformEnterAsLineBreak()) {
         commitText("\n");
       } else {
@@ -1571,55 +1451,6 @@ public class Trime extends LifecycleInputMethodService {
     default void onWindowHidden() {}
 
     default void onUpdateSelection() {}
-  }
-
-  private String ClipBoardString = "";
-
-  /**
-   * 此方法设置监听剪贴板变化，如有新的剪贴内容，就启动选定的剪贴板管理器
-   *
-   * <p>ClipBoardCompare 比较规则。每次通知剪贴板管理器，都会保存 ClipBoardCompare 处理过的 string。如果两次处理过的内容不变，则不通知。
-   * ClipBoardOut 输出规则。如果剪贴板内容与规则匹配，则不通知剪贴板管理器。
-   */
-  private void clipBoardMonitor() {
-    ClipboardDao.get();
-    final ClipboardManager clipBoard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-    final Config imeConfig = getImeConfig();
-    clipBoard.addPrimaryClipChangedListener(
-        () -> {
-          if (imeConfig.getClipboardLimit() != 0) {
-            final ClipData clipData = clipBoard.getPrimaryClip();
-            if (clipData == null) return;
-            final ClipData.Item item = clipData.getItemAt(0);
-            if (item == null) return;
-
-            final String rawText = item.coerceToText(self).toString();
-            final String filteredText =
-                StringUtils.replace(rawText, imeConfig.getClipBoardCompare());
-            if (filteredText.length() < 1 || filteredText.equals(ClipBoardString)) return;
-
-            if (StringUtils.mismatch(rawText, imeConfig.getClipBoardOutput())) {
-              ClipBoardString = filteredText;
-              liquidKeyboard.addClipboardData(rawText);
-            }
-          }
-        });
-  }
-
-  //private String draftString = "", draftCache = "";
-  private String draftString = "";
-
-  private void addDraft() {
-    String draftCache = activeEditorInstance.getDraftCache();
-    if (draftCache.isEmpty() || draftCache.trim().equals(draftString)) return;
-
-    if (getImeConfig().getDraftLimit() != 0) {
-      Timber.i("addDraft() cache=%s, string=%s", draftString, draftCache);
-      if (StringUtils.mismatch(draftCache, getImeConfig().getDraftOutput())) {
-        draftString = draftCache.trim();
-        liquidKeyboard.addDraftData(draftCache);
-      }
-    }
   }
 
   private boolean candidateExPage = false;

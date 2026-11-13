@@ -18,7 +18,6 @@ import com.blankj.utilcode.util.IntentUtils
 import com.hazukieq.hkrime.core.Rime
 import com.hazukieq.hkrime.data.AppPrefs
 import com.hazukieq.hkrime.ime.core.Trime
-import com.hazukieq.hkrime.settings.LogActivity
 import timber.log.Timber
 import java.text.FieldPosition
 import java.text.SimpleDateFormat
@@ -36,7 +35,6 @@ object ShortcutUtils {
             "date" -> return getDate(option)
             "run" -> startIntent(option)
             "share_text" -> Trime.getService().shareText()
-            "liquid_keyboard" -> Trime.getService().selectLiquidKeyboard(option)
             else -> startIntent(command, option)
         }
         return null
@@ -145,11 +143,5 @@ object ShortcutUtils {
         append(KeyEvent.KEYCODE_CALENDAR, "android.intent.category.APP_CALENDAR")
         append(KeyEvent.KEYCODE_MUSIC, "android.intent.category.APP_MUSIC")
         append(KeyEvent.KEYCODE_CALCULATOR, "android.intent.category.APP_CALCULATOR")
-    }
-
-    fun launchLogActivity(context: Context) {
-        context.startActivity(
-            Intent(context, LogActivity::class.java)
-        )
     }
 }

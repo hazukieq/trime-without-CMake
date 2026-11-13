@@ -117,20 +117,6 @@
     <string name="other__show_app_icon_on_summary">This option is only available on some ROMs</string>
     <string name="other__show_app_icon_off_summary">In some ROMs, you will still see this icon in the launcher and may go to the system\'s app information page after tapping it</string>
     <string name="pref__default">Default</string>
-    <string name="other__clipboard_manager_title">Clipboard Manager</string>
-    <string name="other__clipboard_compare_title">Clipboard Compare Rules</string>
-    <string name="other__clipboard_output_title">Clipboard Output Rules</string>
-    <string name="other__clipboard_manager_summary">Number of clipboard saved items</string>
-    <string-array name="other__clipboard_manager_entries">
-        <item name="0">Disable</item>
-        <item name="20">20</item>
-        <item name="50">50</item>
-        <item name="100">100</item>
-        <item name="200">200</item>
-        <item name="500">500</item>
-        <item name="1000">1000</item>
-        <item name="-1">All</item>
-    </string-array>
     <string name="keyboard__show_switche_arrow_title">Show arrow for switch (→)</string>
     <string name="keyboard__fullscreen_mode_title">Landscape fullscreen input</string>
     <string name="deploy_finish">Deploy finish</string>
@@ -160,14 +146,15 @@
     <string name="keyboard__hook_candidate_commit">Send Space when click candidate (coming soon)</string>
     <string name="trime_app_slogan">Trimes with Your Keystrokes</string>
     <string name="external_storage_access_required">Trime needs to access external storage to deploy or read schemas and config, tap OK to grant the permission.</string>
+    <string name="permission_go_settings">Go to settings</string>
+    <string name="permission_exit">Exit</string>
+    <string name="permission_skip">Not now</string>
     <string name="external_storage_permission_not_available">External storage permission is not available</string>
     <string name="external_storage_permission_granted">External storage permission is granted</string>
     <string name="external_storage_permission_denied">External storage permission was denied, deployment or reading schemas and config may not be available</string>
-    <string name="alert_window_access_required">Trime needs alert window permission to show up popup window or dialog, tap OK to grant the permission.</string>
+    <string name="alert_window_access_required">Trime needs the “Display over other apps” permission to show the floating composition window above the keyboard (used by the 12-key layout to show the typed code). You can enable it later in Keyboard settings; basic typing works without it.</string>
     <string name="keyboard__key_sound_package_title">Key Sound Package</string>
     <string name="sound_progress">Loading sound...</string>
-    <string name="other__draft_manager_title">Draft Manager</string>
-    <string name="other__draft_output_title">Draft Filter</string>
     <string name="setup__next">Next</string>
     <string name="setup__done">Done</string>
     <string name="setup__enable_ime_hint">Enable <b>Trime</b> in Language and input settings</string>
@@ -229,17 +216,10 @@
         <item name="50">50</item>
         <item name="100">100</item>
     </string-array>
-    <string name="exception_logcat_created">Logcat process is already created</string>
-    <string name="app_crash">Application crashed</string>
-    <string name="app_crash_message">Sorry, but we bring you some logs to investigate.</string>
-    <string name="real_time_logs">Real-time logs</string>
-    <string name="crash_logs">Crash logs</string>
-    <string name="clear">Clear</string>
-    <string name="export">Export</string>
-    <string name="system">System</string>
-    <string name="settings__system_toolkit">Toolkit</string>
     <string name="pref__title">Settings</string>
     <string name="back">Back</string>
     <string name="deploy">Deploy</string>
     <string name="about">About</string>
+    <string name="backspace">Backspace</string>
+    <string name="launch_tagline">Hakka Rime · 客語輸入</string>
 </resources>

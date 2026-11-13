@@ -67,7 +67,7 @@ class SetupActivity : FragmentActivity() {
                 }else finish()
             /*else {
                     if(!permission_isAll){
-                        startActivity(Intent(this@SetupActivity,LauchAct::class.java))
+                        startActivity(Intent(this@SetupActivity,LaunchActivity::class.java))
                         finish()
                     }else finish()
 
@@ -108,8 +108,10 @@ class SetupActivity : FragmentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
+        // FragmentStateAdapter 可能已經回收了當前頁的 Fragment 或它的 View，
+        // 這裡只要求「還是 SetupFragment 且 View 還在」，避免 ClassCastException/NPE。
         val fragment = supportFragmentManager.findFragmentByTag("f${viewPager.currentItem}")
-        (fragment as SetupFragment).sync()
+        if (fragment is SetupFragment && fragment.view != null) fragment.sync()
     }
 
     override fun onPause() {

@@ -1,11 +1,7 @@
 package com.hazukieq.hkrime.settings.components
 
-import android.app.Dialog
 import android.app.ProgressDialog
 import android.content.Context
-import android.os.Build
-import android.view.WindowManager
-import androidx.appcompat.app.AlertDialog
 import com.hazukieq.hkrime.R
 import com.hazukieq.hkrime.data.Config
 import com.hazukieq.hkrime.ime.core.Trime
@@ -28,6 +24,11 @@ class SoundPickerDialog(
 
     private val progressDialog: ProgressDialog
 
+    /** 對話框流程全部結束後的回調（輸入法宿主頁用來結束透明 Activity）。 */
+    var onDismiss: (() -> Unit)? = null
+    /** 是否已進入「套用音效包」的異步流程：是的話由 onPostExecute 收尾。 */
+    private var applying = false
+
     init {
         soundPackageFiles = Config.getSoundPackages()
         soundPackageFiles.sort()
@@ -37,19 +38,6 @@ class SoundPickerDialog(
 
         // Init progress dialog
         progressDialog = createLoadingDialog(context, R.string.sound_progress)
-    }
-
-    private fun appendDialogParams(dialog: Dialog) {
-        dialog.window?.let { window ->
-            window.attributes.token =
-                Trime.getServiceOrNull()?.window?.window?.decorView?.windowToken
-            window.attributes.type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG
-            }
-            window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
-        }
     }
 
     private fun setSound() {
@@ -68,20 +56,24 @@ class SoundPickerDialog(
             checked,
         ) { idx ->
             checkedId = idx
+            applying = true
             execute()
         }
-        appendDialogParams(d)
+        d.setOnDismissListener { if (!applying) onDismiss?.invoke() }
         d.show()
     }
 
     private fun execute() = launch {
-        onPreExecute()
-        doInBackground()
-        onPostExecute()
+        try {
+            onPreExecute()
+            doInBackground()
+            onPostExecute()
+        } catch (e: Exception) {
+            onPostExecute()
+        }
     }
 
     private fun onPreExecute() {
-        appendDialogParams(progressDialog)
         progressDialog.show()
     }
 
@@ -93,5 +85,6 @@ class SoundPickerDialog(
 
     private fun onPostExecute() {
         progressDialog.dismiss()
+        onDismiss?.invoke()
     }
 }

@@ -1,13 +1,9 @@
 package com.hazukieq.hkrime.settings.components
 
 import android.content.Context
-import android.os.Build
-import android.view.WindowManager
-import androidx.appcompat.app.AlertDialog
 import com.blankj.utilcode.util.ToastUtils
 import com.hazukieq.hkrime.R
 import com.hazukieq.hkrime.data.Config
-import com.hazukieq.hkrime.ime.core.Trime
 
 /** 顯示輸入法內置數據列表，並回廠選中的數據 */
 class ResetAssetsDialog(private val context: Context) {
@@ -43,16 +39,6 @@ class ResetAssetsDialog(private val context: Context) {
         ) { flags ->
             flags.copyInto(checkedStatus)
             selectAssets()
-        }
-        d.window?.let { window ->
-            window.attributes.token =
-                Trime.getServiceOrNull()?.window?.window?.decorView?.windowToken
-            window.attributes.type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG
-            }
-            window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
         }
         d.show()
     }

@@ -22,11 +22,9 @@ import com.hazukieq.hkrime.data.AppPrefs
 import com.hazukieq.hkrime.databinding.PrefActivityBinding
 import com.hazukieq.hkrime.ime.core.Trime
 import com.hazukieq.hkrime.settings.fragments.PrefFragment
-import com.hazukieq.hkrime.setup.LauchAct
 import com.hazukieq.hkrime.setup.SetupActivity
 import com.hazukieq.hkrime.util.RimeUtils
 import com.hazukieq.hkrime.util.createLoadingDialog
-import com.permissionx.guolindev.PermissionX
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
@@ -102,7 +100,7 @@ class PrefMainActivity :
             startActivity(Intent(this, SetupActivity::class.java))
         }*/
 
-        // 啟動頁由 LauncherAlias -> LauchAct 負責，設定頁不再自動打開它，避免閃白。
+        // 啟動頁由 LauncherAlias -> LaunchActivity 負責，設定頁不再自動打開它，避免閃白。
 
         //requestPermission()
         //requestExternalStoragePermission()
@@ -280,52 +278,5 @@ class PrefMainActivity :
         }
     }*/
 
-    /*private fun requestAlertWindowPermission() {
-        if (VERSION.SDK_INT >= VERSION_CODES.P) { // 僅Android P需要此權限在最上層顯示懸浮窗、對話框
-            if (!Settings.canDrawOverlays(this)) { // 事先说明需要权限的理由
-                AlertDialog.Builder(this)
-                    .setCancelable(true)
-                    .setMessage(R.string.alert_window_access_required)
-                    .setPositiveButton(android.R.string.ok) { _, _ ->
-                        val intent = Intent(
-                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:$packageName")
-                        )
-                        startActivity(intent)
-                    }
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .show()
-            }
-        }
-    }*/
 
-    fun requestPermission(){
-        val requestList=ArrayList<String>()
-        if(VERSION.SDK_INT >= VERSION_CODES.M&&VERSION.SDK_INT<=VERSION_CODES.Q){
-            requestList.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-            requestList.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-            requestList.add(Manifest.permission.SYSTEM_ALERT_WINDOW)
-        }else if(VERSION.SDK_INT>VERSION_CODES.Q){
-            //requestList.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-            //requestList.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-            requestList.add(Manifest.permission.MANAGE_EXTERNAL_STORAGE)
-            requestList.add(Manifest.permission.SYSTEM_ALERT_WINDOW)
-        }
-        if(!requestList.isEmpty()){
-            PermissionX.init(this)
-                .permissions(requestList)
-                .onExplainRequestReason{scope,deniedList->
-                    val msg=getString(R.string.external_storage_access_required)+"\n\n"+getString(R.string.alert_window_access_required)
-                    scope.showRequestReasonDialog(deniedList,msg,"同意","拒绝")
-                }
-                .request { allGranted, _, _ ->
-                    if (allGranted) {
-                        ToastUtils.showShort(R.string.external_storage_permission_granted)
-                    } else {
-                        ToastUtils.showShort(R.string.external_storage_permission_not_available)
-                        requestPermission()
-                    }
-                }
-        }
-    }
 }

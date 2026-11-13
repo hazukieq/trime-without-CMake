@@ -23,7 +23,7 @@
     android:layout_width="wrap_content" 
     android:layout_height="wrap_content"
     android:textSize="40sp"
-    android:minWidth="40sp"
-    android:minHeight="60sp"
+    android:minWidth="40dp"
+    android:minHeight="60dp"
     android:gravity="bottom|center_horizontal"
     />

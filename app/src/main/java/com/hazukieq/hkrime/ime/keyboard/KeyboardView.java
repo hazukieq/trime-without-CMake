@@ -20,16 +20,13 @@ package com.hazukieq.hkrime.ime.keyboard;
 
 import android.content.Context;
 import android.content.res.ColorStateList;
-import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Paint.Align;
-import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
-import android.os.Build;
 import android.os.Message;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -51,7 +48,6 @@ import com.hazukieq.hkrime.databinding.KeyboardKeyPreviewBinding;
 import com.hazukieq.hkrime.ime.enums.KeyEventType;
 import com.hazukieq.hkrime.ime.lifecycle.CoroutineScopeJava;
 import com.hazukieq.hkrime.util.LeakGuardHandlerWrapper;
-import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -215,16 +211,8 @@ public class KeyboardView extends View implements View.OnClickListener, Coroutin
   private static int MULTI_TAP_INTERVAL = 800; // milliseconds
   private final StringBuilder mPreviewLabel = new StringBuilder(1);
 
-  /** Whether the keyboard bitmap needs to be redrawn before it's blitted. * */
-  private boolean mDrawPending;
-  /** The dirty region in the keyboard bitmap */
-  private final Rect mDirtyRect = new Rect();
-  /** The keyboard bitmap for faster updates */
-  private Bitmap mBuffer;
-  /** Notes if the keyboard just changed, so that we could possibly reallocate the mBuffer. */
-  private boolean mKeyboardChanged;
-  /** The canvas for the above mutable keyboard bitmap */
-  private Canvas mCanvas;
+  /** 複用 FontMetrics：官方文檔註明 `getFontMetrics()` 每次都 Allocates a new FontMetrics。 */
+  private final Paint.FontMetrics mSymbolFontMetrics = new Paint.FontMetrics();
   // The accessibility manager for accessibility support */
   // private AccessibilityManager mAccessibilityManager;
   // The audio manager for accessibility support */
@@ -236,9 +224,6 @@ public class KeyboardView extends View implements View.OnClickListener, Coroutin
   private boolean mHeadsetRequiredToHearPasswordsAnnounced;
 
   private boolean mShowHint = true, mShowSymbol = true;
-
-  private Method findStateDrawableIndex;
-  private Method getStateDrawable;
 
   private String labelEnter = "";
   private Map<String, String> mEnterLabels;
@@ -416,18 +401,6 @@ public class KeyboardView extends View implements View.OnClickListener, Coroutin
   public KeyboardView(final Context context, final AttributeSet attrs) {
     super(context, attrs);
 
-    try {
-      findStateDrawableIndex =
-          StateListDrawable.class.getMethod(
-              Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-                  ? "findStateDrawableIndex"
-                  : "getStateDrawableIndex",
-              int[].class);
-      getStateDrawable = StateListDrawable.class.getMethod("getStateDrawable", int.class);
-    } catch (Exception ex) {
-      Timber.e(ex, "Get Drawable Exception");
-    }
-
     mPreviewText = KeyboardKeyPreviewBinding.inflate(LayoutInflater.from(context)).getRoot();
     mPaint = new Paint();
     mPaint.setAntiAlias(true);
@@ -577,8 +550,6 @@ public class KeyboardView extends View implements View.OnClickListener, Coroutin
     mKeys = keys.toArray(new Key[keys.size()]);
     setKeyboardBackground();
     requestLayout();
-    // Hint to reallocate the buffer if the size changed
-    mKeyboardChanged = true;
     invalidateAllKeys();
     computeProximityThreshold(keyboard);
     mMiniKeyboardCache.clear(); // Not really necessary to do every time, but will free up views
@@ -824,86 +795,64 @@ public class KeyboardView extends View implements View.OnClickListener, Coroutin
   @Override
   public void onSizeChanged(final int w, final int h, final int oldw, final int oldh) {
     super.onSizeChanged(w, h, oldw, oldh);
-    // if (mKeyboard != null) {
-    // mKeyboard.resize(w, h);
-    // }
-    // Release the buffer, if any and it will be reallocated on the next draw
-    mBuffer = null;
+    // 直接畫在硬件加速的 Canvas 上，沒有需要釋放的軟件位圖。
   }
 
   @Override
   public void onDraw(final Canvas canvas) {
     super.onDraw(canvas);
-    if (mDrawPending || mBuffer == null || mKeyboardChanged) {
-      onBufferDraw();
-    }
-    canvas.drawBitmap(mBuffer, 0, 0, null);
+    drawKeys(canvas);
   }
 
-  private void onBufferDraw() {
-    if (mBuffer == null || mKeyboardChanged) {
+  /**
+   * 直接在硬件加速的 Canvas 上逐鍵繪製。
+   *
+   * <p>旧实现沿用 AOSP KeyboardView 的软体双缓冲：整块键盘先画进一张全屏 ARGB_8888 位图
+   * （每像素 4 bytes），再 blit 到硬件 Canvas。硬件加速下这条路的代价是「每次脏区重绘都要 CPU
+   * 光栅 + 整张位图合成」，而且官方已废弃 {@code invalidate(rect)} 的脏矩形语义（API 21 起框架
+   * 用内部计算的区域重绘，API 28 标为 deprecated），所以脏矩形位图缓存已无意义。
+   *
+   * <p>现在 onDraw 里直接用 clip bounds 剔除区域外的键，仅绘制真正需要重绘的按键；键与键之间用
+   * {@code canvas.save()/restore()} 保护位移，避免中途异常后矩阵错位。
+   */
+  private void drawKeys(final Canvas canvas) {
+    if (mKeyboard == null || mKeys == null) return;
 
-      if (mBuffer == null
-          || mKeyboardChanged
-              && (mBuffer.getWidth() != getWidth() || mBuffer.getHeight() != getHeight())) {
-        // Make sure our bitmap is at least 1x1
-        final int width = Math.max(1, getWidth());
-        final int height = Math.max(1, getHeight());
-        mBuffer = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        mCanvas = new Canvas(mBuffer);
-      }
-      invalidateAllKeys();
-      mKeyboardChanged = false;
-    }
-
-    if (mKeyboard == null) return;
-
-    mCanvas.save();
-    final Canvas canvas = mCanvas;
-    canvas.clipRect(mDirtyRect);
+    final Rect clipRegion = mClipRegion;
+    if (!canvas.getClipBounds(clipRegion)) return;
 
     final Paint paint = mPaint;
-    Drawable keyBackground;
-    final Rect clipRegion = mClipRegion;
     final Rect padding = mPadding;
     final int kbdPaddingLeft = getPaddingLeft();
     final int kbdPaddingTop = getPaddingTop();
     final Key[] keys = mKeys;
-    final Key invalidKey = mInvalidatedKey;
 
-    boolean drawSingleKey = false;
-    if (invalidKey != null && canvas.getClipBounds(clipRegion)) {
-      // Is clipRegion completely contained within the invalidated key?
-      if (invalidKey.getX() + kbdPaddingLeft - 1 <= clipRegion.left
-          && invalidKey.getY() + kbdPaddingTop - 1 <= clipRegion.top
-          && invalidKey.getX() + invalidKey.getWidth() + kbdPaddingLeft + 1 >= clipRegion.right
-          && invalidKey.getY() + invalidKey.getHeight() + kbdPaddingTop + 1 >= clipRegion.bottom) {
-        drawSingleKey = true;
-      }
-    }
-    canvas.drawColor(0x00000000, PorterDuff.Mode.CLEAR);
-    final int keyCount = keys.length;
-    final float symbolBase = padding.top - mPaintSymbol.getFontMetrics().top;
-    final float hintBase = -padding.bottom - mPaintSymbol.getFontMetrics().bottom;
+    mPaintSymbol.getFontMetrics(mSymbolFontMetrics);
+    final float symbolBase = padding.top - mSymbolFontMetrics.top;
+    final float hintBase = -padding.bottom - mSymbolFontMetrics.bottom;
 
-    Timber.i(
-        "onBufferDraw() keyCount=%d, drawSingleKey=%s, invalidKeyIsNull=%s",
-        keyCount, drawSingleKey, invalidKey == null);
-    mKeyboard.printModifierKeyState("onBufferDraw, drawSingleKey=" + drawSingleKey);
     for (final Key key : keys) {
-      if (drawSingleKey && invalidKey != key) {
+      final int keyLeft = key.getX() + kbdPaddingLeft;
+      final int keyTop = key.getY() + kbdPaddingTop;
+      // 只画与当前脏区相交的键（框架只会重绘损坏区域）
+      if (keyLeft + key.getWidth() < clipRegion.left
+          || keyLeft > clipRegion.right
+          || keyTop + key.getHeight() < clipRegion.top
+          || keyTop > clipRegion.bottom) {
         continue;
       }
-      int[] drawableState = key.getCurrentDrawableState();
-      keyBackground = key.getBackColorForState(drawableState);
+
+      final int[] drawableState = key.getCurrentDrawableState();
+      Drawable keyBackground = key.getBackColorForState(drawableState);
       if (keyBackground == null) {
-        try {
-          final int index = (int) findStateDrawableIndex.invoke(mKeyBackColor, drawableState);
-          keyBackground = (Drawable) getStateDrawable.invoke(mKeyBackColor, index);
-        } catch (Exception ex) {
-          Timber.e(ex, "Get Drawable Exception");
-        }
+        // StateListDrawable 的公开 API：setState() 选中匹配的 child，getCurrent() 取出来。
+        // 之前用反射调 findStateDrawableIndex()/getStateDrawable()，在 R8 与 hidden API 限制下
+        // 既脆弱又在每帧的绘制循环里做反射调用。
+        mKeyBackColor.setState(drawableState);
+        keyBackground = mKeyBackColor.getCurrent();
       }
+      if (keyBackground == null) continue;
+
       if (keyBackground instanceof GradientDrawable) {
         ((GradientDrawable) keyBackground)
             .setCornerRadius(
@@ -928,7 +877,9 @@ public class KeyboardView extends View implements View.OnClickListener, Coroutin
       if (key.getWidth() != bounds.right || key.getHeight() != bounds.bottom) {
         keyBackground.setBounds(0, 0, key.getWidth(), key.getHeight());
       }
-      canvas.translate(key.getX() + kbdPaddingLeft, key.getY() + kbdPaddingTop);
+
+      final int saveCount = canvas.save();
+      canvas.translate(keyLeft, keyTop);
       keyBackground.draw(canvas);
 
       if (!TextUtils.isEmpty(label)) {
@@ -978,9 +929,10 @@ public class KeyboardView extends View implements View.OnClickListener, Coroutin
         // Turn off drop shadow
         paint.setShadowLayer(0, 0, 0, 0);
       }
-      canvas.translate(-key.getX() - kbdPaddingLeft, -key.getY() - kbdPaddingTop);
+      canvas.restoreToCount(saveCount);
     }
     mInvalidatedKey = null;
+
     // Overlay a dark rectangle to dim the keyboard
     if (mMiniKeyboardOnScreen) {
       paint.setColor((int) (mBackgroundDimAmount * 0xFF) << 24);
@@ -998,9 +950,6 @@ public class KeyboardView extends View implements View.OnClickListener, Coroutin
       paint.setColor(0xFF00FF00);
       canvas.drawCircle((mStartX + mLastX) / 2f, (mStartY + mLastY) / 2f, 2f, paint);
     }
-    mCanvas.restore();
-    mDrawPending = false;
-    mDirtyRect.setEmpty();
   }
 
   private int getKeyIndices(final int x, final int y, final int[] allKeys) {
@@ -1217,16 +1166,13 @@ public class KeyboardView extends View implements View.OnClickListener, Coroutin
   }
 
   /**
-   * Requests a redraw of the entire keyboard. Calling {@link #invalidate} is not sufficient because
-   * the keyboard renders the keys to an off-screen buffer and an invalidate() only draws the cached
-   * buffer.
+   * Requests a redraw of the entire keyboard. 现在键盘直接画在硬件加速 Canvas 上，所以
+   * {@link #invalidate()} 就是全部需要的动作（框架会重绘损坏区域）。
    *
    * @see #invalidateKey(int)
    */
   public void invalidateAllKeys() {
     Timber.d("\t<TrimeInput>\tinvalidateAllKeys()");
-    mDirtyRect.union(0, 0, getWidth(), getHeight());
-    mDrawPending = true;
     invalidate();
   }
 
@@ -1247,31 +1193,15 @@ public class KeyboardView extends View implements View.OnClickListener, Coroutin
     }
     final Key key = mKeys[keyIndex];
     mInvalidatedKey = key;
-    mDirtyRect.union(
-        key.getX() + getPaddingLeft(),
-        key.getY() + getPaddingTop(),
-        key.getX() + key.getWidth() + getPaddingLeft(),
-        key.getY() + key.getHeight() + getPaddingTop());
-    onBufferDraw();
     Timber.d("\t<TrimeInput>\tinvalidateKey()\tinvalidate");
-    invalidate(
-        key.getX() + getPaddingLeft(),
-        key.getY() + getPaddingTop(),
-        key.getX() + key.getWidth() + getPaddingLeft(),
-        key.getY() + key.getHeight() + getPaddingTop());
+    // 官方说明：API 21 起 invalidate(l,t,r,b) 的脏矩形会被内部计算区域取代，API 28 已 deprecated，
+    // 直接 invalidate() 即可；drawKeys() 里会用 canvas clip bounds 跳过区域外的键。
+    invalidate();
     Timber.d("\t<TrimeInput>\tinvalidateKey()\tfinish");
   }
 
   private void invalidateKeys(final List<Key> keys) {
     if (keys == null || keys.size() == 0) return;
-    for (Key key : keys) {
-      mDirtyRect.union(
-          key.getX() + getPaddingLeft(),
-          key.getY() + getPaddingTop(),
-          key.getX() + key.getWidth() + getPaddingLeft(),
-          key.getY() + key.getHeight() + getPaddingTop());
-    }
-    onBufferDraw();
     invalidate();
   }
 
@@ -1503,7 +1433,10 @@ public class KeyboardView extends View implements View.OnClickListener, Coroutin
     }
 
     if (action != MotionEvent.ACTION_MOVE) mOldPointerCount = pointerCount;
-    performClick();
+    // 只在抬手时上报一次点击。以前这里无条件 performClick()，ACTION_MOVE 每秒几十次都会
+    // 走一遍 OnClickListener 与 AccessibilityEvent(TYPE_VIEW_CLICKED)，既浪费也把
+    // TalkBack 等辅助功能刷屏。
+    if (action == MotionEvent.ACTION_UP) performClick();
     return result;
   }
 
@@ -1723,8 +1656,6 @@ public class KeyboardView extends View implements View.OnClickListener, Coroutin
     removeMessages();
 
     dismissPopupKeyboard();
-    mBuffer = null;
-    mCanvas = null;
     mMiniKeyboardCache.clear();
   }
 

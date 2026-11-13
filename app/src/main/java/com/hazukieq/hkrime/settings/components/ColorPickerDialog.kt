@@ -1,9 +1,6 @@
 package com.hazukieq.hkrime.settings.components
 
 import android.content.Context
-import android.os.Build
-import android.view.WindowManager
-import androidx.appcompat.app.AlertDialog
 import com.hazukieq.hkrime.R
 import com.hazukieq.hkrime.data.AppPrefs
 import com.hazukieq.hkrime.data.Config
@@ -12,6 +9,10 @@ import timber.log.Timber
 
 /** 顯示配色方案列表
  *  Show Color Scheme List
+ *
+ *  對話框只使用傳入的 Context 顯示（Activity 由 Activity 承載）。
+ *  不再改寫 Window.attributes.token / type：那條路徑要求
+ *  SYSTEM_ALERT_WINDOW，且輸入法服務不在時 token 為 null 會 BadTokenException。
  * **/
 class ColorPickerDialog(
     private val context: Context
@@ -21,6 +22,9 @@ class ColorPickerDialog(
     private var colorKeys: Array<String>
     private var checkedColorKey: Int = 0
     private lateinit var colorNames: Array<String?>
+
+    /** 對話框關閉後的回調（輸入法宿主頁用來結束透明 Activity）。 */
+    var onDismiss: (() -> Unit)? = null
 
     init {
         val colorScheme = prefs.looks.selectedColor
@@ -52,15 +56,7 @@ class ColorPickerDialog(
             checkedColorKey = idx
             selectColor()
         }
-        d.window?.let { window ->
-            window.attributes.token = Trime.getServiceOrNull()?.window?.window?.decorView?.windowToken
-            window.attributes.type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG
-            }
-            window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
-        }
+        d.setOnDismissListener { onDismiss?.invoke() }
         d.show()
     }
 }

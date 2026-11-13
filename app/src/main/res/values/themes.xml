@@ -70,6 +70,19 @@
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
     </style>
 
+    <!-- 輸入法內對話框的宿主頁：透明、無動畫、無標題。
+         由輸入法 Service 用 Activity 承載對話框，避免 Dialog 直接掛在
+         Service 上（需要 SYSTEM_ALERT_WINDOW，權限缺失會 BadTokenException）。 -->
+    <style name="PickerHostTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:windowContentTransitions">false</item>
+    </style>
+
     <!--style name="Theme.Launcher" parent="Theme.MaterialComponents.DayNight.Bridge">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowBackground">@drawable/launchbg</item>

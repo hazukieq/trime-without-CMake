@@ -6,7 +6,6 @@ import android.view.InputDevice
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
-import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputConnection
 import com.hazukieq.hkrime.core.Rime
 import com.hazukieq.hkrime.data.AppPrefs
@@ -33,7 +32,6 @@ class EditorInstance(private val ims: InputMethodService) {
         get() = (ims as Trime).textInputManager
 
     var lastCommittedText: CharSequence = ""
-    var draftCache: String = ""
 
     fun commitText(text: CharSequence, dispatchToRime: Boolean = true): Boolean {
         val ic = inputConnection ?: return false
@@ -43,7 +41,6 @@ class EditorInstance(private val ims: InputMethodService) {
         runCatching { com.hazukieq.hkrime.core.twelvekey.SegmentMemory.bump(text) }
         // Fix pressing Delete key will clear the input box issue on BlackBerry
         ic.clearMetaKeyStates(KeyEvent.getModifierMetaStateMask())
-        cacheDraft()
         return true
     }
 
@@ -84,22 +81,6 @@ class EditorInstance(private val ims: InputMethodService) {
         if (ic.getSelectedText(0).isNullOrEmpty() || !composingText.isNullOrEmpty()) {
             ic.setComposingText(composingText, 1)
         }
-    }
-
-    fun cacheDraft(): String {
-        if (prefs.other.draftLimit.equals("0") || inputConnection == null)
-            return ""
-        val et = inputConnection!!.getExtractedText(ExtractedTextRequest(), 0)
-        if (et == null) {
-            Timber.e("cacheDraft() et==null")
-            return ""
-        }
-        val cs = et.text ?: return ""
-        if (cs.isNullOrBlank())
-            return ""
-        draftCache = cs as String
-        Timber.d("cacheDraft() $draftCache")
-        return draftCache
     }
 
     /**

@@ -118,20 +118,6 @@
     <string name="other__show_app_icon_title">在啟動器中顯示圖示</string>
     <string name="other__show_app_icon_off_summary">在某些 ROM 中，您仍會看到圖示顯示，並可能在>點選它後轉到系統的應用資訊頁</string>
     <string name="pref__default">預設</string>
-    <string name="other__clipboard_manager_title">剪貼板管理器</string>
-    <string name="other__clipboard_compare_title">剪貼板去重規則(每行爲一條正則規則)</string>
-    <string name="other__clipboard_output_title">剪貼板過濾規則(每行爲一條正則規則)</string>
-    <string name="other__clipboard_manager_summary">保存剪貼板內容的數量</string>
-    <string-array name="other__clipboard_manager_entries" >
-        <item name="0">停用</item>
-        <item name="20">20</item>
-        <item name="50">50</item>
-        <item name="100">100</item>
-        <item name="200">200</item>
-        <item name="500">500</item>
-        <item name="1000">1000</item>
-        <item name="-1">全部</item>
-    </string-array>
     <string name="keyboard__show_switche_arrow_title">爲開關顯示箭頭符號(→)</string>
     <string name="keyboard__fullscreen_mode_title">橫屏時全屏編輯</string>
     <string name="deploy_finish">部署完成</string>
@@ -161,14 +147,15 @@
     <string name="keyboard__hook_candidate_commit">點擊候選詞後，模擬空格鍵完成上屏(暫未實現)</string>
     <string name="trime_app_slogan">擊響中文之韻</string>
     <string name="external_storage_access_required">同文輸入法需要儲存許可權以部署或讀取方案和配置，點選“確定”前往授權。</string>
+    <string name="permission_go_settings">前往設定</string>
+    <string name="permission_exit">結束</string>
+    <string name="permission_skip">暫不開啟</string>
     <string name="external_storage_permission_not_available">儲存許可權不可用</string>
     <string name="external_storage_permission_granted">已授予儲存許可權</string>
     <string name="external_storage_permission_denied">已拒絕授權儲存許可權，部署或讀取方案和配置功能或不可用</string>
-    <string name="alert_window_access_required">同文輸入法需要允許顯示在其他應用上方以能顯示應用外懸浮窗或對話方塊，點選“確定”以授權。</string>
+    <string name="alert_window_access_required">同文輸入法需要「顯示在其他應用上方」許可權，才能在鍵盤上方顯示懸浮編碼窗（12 鍵版面用來顯示正在輸入的編碼）。此許可權可稍後在「鍵盤設定 → 顯示懸浮窗」開啟；不開啟也不影響基本輸入。</string>
     <string name="keyboard__key_sound_package_title">按鍵音效包</string>
     <string name="sound_progress">正在應用音效...</string>
-    <string name="other__draft_manager_title">草稿箱管理器</string>
-    <string name="other__draft_output_title">草稿箱過濾規則\n每行爲一條正則表達式，與規則匹配的內容不會被緩存</string>
     <string name="setup__next">下一步</string>
     <string name="setup__done">完成</string>
     <string name="setup__enable_ime_hint">在語言和輸入設定中啟用<b>同文輸入法</b></string>
@@ -228,17 +215,10 @@
         <item name="50">50</item>
         <item name="100">100</item>
     </string-array>
-    <string name="export">匯出</string>
-    <string name="app_crash_message">抱歉，但我們為您帶來了一些紀錄檔以供調查。</string>
-    <string name="app_crash">應用程式當機</string>
-    <string name="crash_logs">當機紀錄檔</string>
-    <string name="real_time_logs">即時紀錄檔</string>
-    <string name="clear">清除</string>
-    <string name="system">系統</string>
-    <string name="settings__system_toolkit">工具箱</string>
-    <string name="exception_logcat_created">Logcat 行程已建立</string>
     <string name="pref__title">設定</string>
     <string name="back">返回</string>
     <string name="deploy">部署</string>
     <string name="about">關於</string>
+    <string name="backspace">退格</string>
+    <string name="launch_tagline">Hakka Rime · 客語輸入</string>
 </resources>

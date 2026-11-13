@@ -342,11 +342,6 @@ class AppPrefs(
             const val SHOW_APP_ICON = "other__show_app_icon"
             const val SHOW_STATUS_BAR_ICON = "other__show_status_bar_icon"
             const val DESTROY_ON_QUIT = "other__destroy_on_quit"
-            const val CLIPBOARD_COMPARE_RULES = "other__clipboard_compare"
-            const val CLIPBOARD_OUTPUT_RULES = "other__clipboard_output"
-            const val DRAFT_OUTPUT_RULES = "other__draft_output"
-            const val DRAFT_LIMIT = "other__draft_limit"
-            const val CLIPBOARD_LIMIT = "other__clipboard_limit"
         }
         var uiMode: String
             get() = prefs.getPref(UI_MODE, "auto")
@@ -360,20 +355,5 @@ class AppPrefs(
         var destroyOnQuit: Boolean = false
             get() = prefs.getPref(DESTROY_ON_QUIT, false)
             private set
-        var clipboardCompareRules: String
-            get() = prefs.getPref(CLIPBOARD_COMPARE_RULES, "")
-            set(v) = prefs.setPref(CLIPBOARD_COMPARE_RULES, v)
-        var clipboardOutputRules: String
-            get() = prefs.getPref(CLIPBOARD_OUTPUT_RULES, "")
-            set(v) = prefs.setPref(CLIPBOARD_OUTPUT_RULES, v)
-        var draftOutputRules: String
-            get() = prefs.getPref(DRAFT_OUTPUT_RULES, "")
-            set(v) = prefs.setPref(DRAFT_OUTPUT_RULES, v)
-        var clipboardLimit: String
-            get() = prefs.getPref(CLIPBOARD_LIMIT, "50")
-            set(v) = prefs.setPref(CLIPBOARD_LIMIT, v)
-        var draftLimit: String
-            get() = prefs.getPref(DRAFT_LIMIT, "20")
-            set(v) = prefs.setPref(DRAFT_LIMIT, v)
     }
 }

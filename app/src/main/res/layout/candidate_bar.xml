@@ -20,20 +20,17 @@
 -->
 
 <!-- 固定候選欄：不滾動、不顯示滾動條、不響應左右滑（用戶 2026-11-09 指示）。
-     之前用自製 HorizontalScrollView，左滑會被當成「展開面板」手勢，誤觸率太高。 -->
+     之前用自製 HorizontalScrollView，左滑會被當成「展開面板」手勢，誤觸率太高。
+     Candidate 直接作為 FrameLayout 的唯一子View（舊版多包了一層 LinearLayout）。 -->
 <FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
-  android:id="@+id/candidate_root"
-  android:layout_width="match_parent"
-  android:layout_height="wrap_content">
-  <LinearLayout
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:orientation="horizontal">
+    android:id="@+id/candidate_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <!-- 寬高由 Candidate.onMeasure() 依內容自行測算，XML 只用 wrap_content 佔位。 -->
     <com.hazukieq.hkrime.ime.text.Candidate
         android:id="@+id/candidates"
-        android:layout_width="1000dp"
-        android:layout_height="120dp"
-        />
-  </LinearLayout>
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
 </FrameLayout>

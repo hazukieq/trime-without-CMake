@@ -2,11 +2,8 @@ package com.hazukieq.hkrime
 
 import android.app.Application
 import android.content.Context
-import android.os.Process
 import android.util.Log
-import cat.ereza.customactivityoncrash.config.CaocConfig
 import com.hazukieq.hkrime.data.AppPrefs
-import com.hazukieq.hkrime.settings.LogActivity
 import timber.log.Timber
 
 /**
@@ -18,21 +15,13 @@ import timber.log.Timber
 class TrimeApplication : Application() {
     companion object {
         private var instance: TrimeApplication? = null
-        private var lastPid: Int? = null
-
         fun getInstance() =
             instance ?: throw IllegalStateException("Trime application is not created!")
 
-        fun getLastPid() = lastPid
     }
 
     override fun onCreate() {
         super.onCreate()
-        CaocConfig.Builder
-            .create()
-            .errorActivity(LogActivity::class.java)
-            .enabled(!BuildConfig.DEBUG)
-            .apply()
         instance = this
         try {
             if (BuildConfig.DEBUG) {
@@ -45,8 +34,6 @@ class TrimeApplication : Application() {
                     override fun isLoggable(tag: String?, priority: Int): Boolean =
                         priority > Log.DEBUG && super.isLoggable(tag, priority)
                 })
-            }else{
-                Timber.plant(CrashReportingTree())
             }
             val prefs = AppPrefs.initDefault(this@TrimeApplication)
             prefs.initDefaultPreferences()
@@ -64,24 +51,6 @@ class TrimeApplication : Application() {
         } catch (e: Exception) {
             e.fillInStackTrace()
             return
-        }
-    }
-
-    inner class CrashReportingTree: Timber.Tree() {
-        override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
-            if(priority==Log.VERBOSE||priority==Log.DEBUG||priority==Log.INFO)return
-            if(t!=null){
-                if(priority==Log.ERROR){
-                    // record last pid for crash logs
-                    val appPrefs = AppPrefs.defaultInstance()
-                    val currentPid = Process.myPid()
-                    appPrefs.general.pid.apply {
-                        lastPid = this
-                        Timber.d("Last pid is $lastPid. Set it to current pid: $currentPid")
-                    }
-                    appPrefs.general.pid = currentPid
-                }
-            }
         }
     }
 }

@@ -4,10 +4,7 @@ import android.app.Dialog
 import android.content.Context
 import android.content.res.ColorStateList
 import android.content.res.Configuration
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
@@ -51,7 +48,6 @@ class ModernListDialog private constructor(
 
     private var currentIndex = checkedIndex
     private val checks = ArrayList<View>()
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     private val night: Boolean =
         context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
@@ -108,16 +104,13 @@ class ModernListDialog private constructor(
                 ).apply { leftMargin = dp(20); rightMargin = dp(20); bottomMargin = dp(16) },
             )
         }
-        items.forEachIndexed { index, _ ->
+        if (items.isNotEmpty()) {
             card.addView(
-                buildRow(index),
+                buildItemList(),
                 LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply {
-                    leftMargin = dp(16); rightMargin = dp(16)
-                    topMargin = dp(3); bottomMargin = dp(3)
-                },
+                ),
             )
         }
         card.addView(buildButtons())
@@ -218,11 +211,15 @@ class ModernListDialog private constructor(
         checks.add(check)
 
         // 不用分割線：每行是獨立圓角淺底「選項片」，靠底色與間距區分。
+        // 注意：Ripple 必須是最外層 Drawable 且把 GradientDrawable 當 content，
+        // 舊代碼先 background = ripple(...) 再 background = GradientDrawable(...)，
+        // 直接把水波紋覆蓋掉了（暗色/亮色都沒反饋）。
         row.minimumHeight = dp(48)
-        row.background = android.graphics.drawable.GradientDrawable().apply {
+        val shape = android.graphics.drawable.GradientDrawable().apply {
             cornerRadius = dp(12).toFloat()
             setColor(if (night) 0xFF2C2C2E.toInt() else 0xFFF2F2F7.toInt())
         }
+        row.background = RippleDrawable(ColorStateList.valueOf(rippleColor(0.06f)), shape, null)
         return row
     }
 
@@ -276,43 +273,70 @@ class ModernListDialog private constructor(
             setOnClickListener { onClick() }
         }
 
+    /**
+     * 列表項統一放進「限高可滾動」容器：方案/主題/音效包動輒十幾項，
+     * 直接線性塞進卡片會把底部按鈕頂出屏幕（無法滾動、也無法確定/取消）。
+     */
+    private fun buildItemList(): View {
+        val column = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        items.forEachIndexed { index, _ ->
+            column.addView(
+                buildRow(index),
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    leftMargin = dp(16); rightMargin = dp(16)
+                    topMargin = dp(3); bottomMargin = dp(3)
+                },
+            )
+        }
+        return MaxHeightScrollView(context, maxListHeightPx()).apply {
+            isFillViewport = false
+            isVerticalScrollBarEnabled = true
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            addView(column, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+    }
+
+    /** 列表最大高度：給標題/按鈕/卡片上下留白讓位，同時不超過屏幕 55%。 */
+    private fun maxListHeightPx(): Int {
+        val screen = context.resources.displayMetrics.heightPixels
+        val chrome = dp(24 + 22 + 18 + 48 + 24) // 卡片上下 margin + 標題 + 按鈕
+        val capped = minOf((screen * 0.55f).toInt(), screen - chrome)
+        return capped.coerceAtLeast(dp(140))
+    }
+
+    /** 只限制最大高度的 ScrollView：內容少時保持 WRAP_CONTENT，內容多時可滾動。 */
+    private class MaxHeightScrollView(context: Context, private val maxHeight: Int) :
+        android.widget.ScrollView(context) {
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val limited = MeasureSpec.makeMeasureSpec(maxHeight, MeasureSpec.AT_MOST)
+            super.onMeasure(widthMeasureSpec, limited)
+        }
+    }
+
     private fun refreshChecks() {
         checks.forEachIndexed { index, view ->
             view.visibility = if (isChecked(index)) View.VISIBLE else View.INVISIBLE
         }
     }
 
-    private fun ripple(alpha: Float) = RippleDrawable(
-        ColorStateList.valueOf(
-            Color.argb((alpha * 255).toInt(), 0, 0, 0),
-        ),
-        null,
-        null,
-    )
+    /**
+     * 回饋色：亮色用黑色低透明度，暗色卡片（#1C1C1E）必須改用白色，
+     * 否則黑色波纹在黑底上物理不可見。暗色下人眼對高光更敏感，alpha 放大約 2.4 倍。
+     */
+    private fun rippleColor(alpha: Float): Int {
+        val a = if (night) (alpha * 2.4f).coerceAtMost(0.2f) else alpha
+        val rgb = if (night) 0xFFFFFF else 0x000000
+        return Color.argb((a * 255).toInt(), Color.red(rgb), Color.green(rgb), Color.blue(rgb))
+    }
+
+    private fun ripple(alpha: Float) =
+        RippleDrawable(ColorStateList.valueOf(rippleColor(alpha)), null, null)
 
     private fun dp(v: Number): Int =
         (v.toFloat() * context.resources.displayMetrics.density + 0.5f).toInt()
-
-    private class CheckMark(context: Context, color: Int) : View(context) {
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = 2f * resources.displayMetrics.density
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
-            this.color = color
-        }
-
-        override fun onDraw(canvas: Canvas) {
-            val w = width.toFloat()
-            val h = height.toFloat()
-            val path = Path().apply {
-                moveTo(w * 0.18f, h * 0.52f)
-                lineTo(w * 0.42f, h * 0.76f)
-                lineTo(w * 0.84f, h * 0.26f)
-            }
-            canvas.drawPath(path, paint)
-        }
-    }
 
     /** Java 端可用的 lambda 回調（避免 Function1 在 Java 不好寫）。 */
     fun interface OnIndex {

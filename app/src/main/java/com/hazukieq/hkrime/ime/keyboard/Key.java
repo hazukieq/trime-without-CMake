@@ -428,8 +428,6 @@ public class Key {
   public int[] getCurrentDrawableState() {
     int[] states = KEY_STATE_NORMAL;
     boolean isShifted = isTrimeModifierKey() && mKeyboard.hasModifier(getModifierKeyOnMask());
-    // only for modiferKey debug
-    if (isTrimeModifierKey()) mKeyboard.printModifierKeyState("getCurrentDrawableState");
 
     if (isShifted || on) {
       if (pressed) {

@@ -32,7 +32,6 @@ import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.ViewConfiguration;
 import android.view.View;
-import android.view.ViewGroup.LayoutParams;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.hazukieq.hkrime.core.Rime;
@@ -154,6 +153,8 @@ public class Candidate extends View {
 
     isCommentOnTop = config.getBoolean("comment_on_top");
     candidateUseCursor = config.getBoolean("candidate_use_cursor");
+    // 主題可能改了 candidate_view_height / comment_height：讓 onMeasure 重新算高度。
+    requestLayout();
     invalidate();
   }
 
@@ -234,7 +235,36 @@ public class Candidate extends View {
   }
 
   public void setExpectWidth(int expectWidth) {
+    if (this.expectWidth == expectWidth) return;
     this.expectWidth = expectWidth;
+    requestLayout();
+  }
+
+  /** 候選條高度：只有「真的有註釋且註釋在上方」時才多留一行。 */
+  private int desiredBarHeight() {
+    return (showCommentRow && isCommentOnTop)
+        ? candidateViewHeight + commentHeight
+        : candidateViewHeight;
+  }
+
+  /**
+   * 官方對自定義 View 的契約：寬高必須在 onMeasure() 內自行算出並呼叫 setMeasuredDimension()，
+   * 而不是由外部反覆改寫 LayoutParams —— 後者每次都會觸發父容器 requestLayout，連帶整棵
+   * 視圖樹重新測量。這裡寬度尊重父容器給的 MeasureSpec，高度由內容（是否顯示註釋行）決定。
+   */
+  @Override
+  protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+    final int specSize = MeasureSpec.getSize(widthMeasureSpec);
+    final int available =
+        MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.UNSPECIFIED
+            ? (expectWidth > 0 ? expectWidth : getResources().getDisplayMetrics().widthPixels)
+            : specSize;
+    final int desiredWidth = expectWidth > 0 ? Math.min(expectWidth, available) : available;
+    final int width = resolveSize(desiredWidth, widthMeasureSpec);
+    final int height =
+        resolveSize(
+            Math.max(desiredBarHeight(), getSuggestedMinimumHeight()), heightMeasureSpec);
+    setMeasuredDimension(width, height);
   }
 
   /**
@@ -483,7 +513,7 @@ public class Candidate extends View {
       addThemeSymbol(themeLeft);
       computedCandidates.add(
           new ComputedCandidate.Symbol(HIDE_KEYBOARD_BUTTON, symbolRect(rightMost, symbolBoxSize)));
-      applyLayoutParams(avail);
+      ensureBarHeight();
       Trime.getService().setCandidateExPage(false);
       return;
     }
@@ -523,21 +553,14 @@ public class Candidate extends View {
     computedCandidates.add(
         new ComputedCandidate.Symbol(PAGE_EX_BUTTON, symbolRect(arrowLeft, symbolBoxSize)));
 
-    applyLayoutParams(avail);
+    ensureBarHeight();
     Trime.getService().setCandidateExPage(true);
   }
 
-  private void applyLayoutParams(int width) {
-    LayoutParams params = getLayoutParams();
-    int height =
-        (showCommentRow && isCommentOnTop)
-            ? candidateViewHeight + commentHeight
-            : candidateViewHeight;
-    // 每鍵都 setLayoutParams 會讓整條候選欄重新 measure/layout；寬高沒變就別碰。
-    if (params.width == width && params.height == height) return;
-    params.width = width;
-    params.height = height;
-    setLayoutParams(params);
+  /** 內容高度（是否預留註釋行）變了才請求重新測量；高度由 onMeasure 決定。 */
+  private void ensureBarHeight() {
+    if (getMeasuredHeight() == desiredBarHeight()) return;
+    requestLayout();
   }
 
   @Override

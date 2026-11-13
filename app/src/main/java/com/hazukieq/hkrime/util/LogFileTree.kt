@@ -21,7 +21,7 @@ import java.util.Locale
  * - 進程啟動時 [dumpCurrentLogcat] 會把本進程啟動前後的 logcat 抓一段寫進文件，
  *   這樣反饋回來的文件從啟動就有上下文（release 包也能用，見 TrimeApplication）。
  *
- * 這裡刻意不依賴 Timber 的 DebugTree：release 包只 plant 了 CrashReportingTree（只留 WARN 以上），
+ * 這裡刻意不依賴 Timber 的 DebugTree：release 包只 plant 本 Tree（INFO 以上也會落盤），
  * 而排障最需要的是 INFO。
  */
 class LogFileTree(private val context: Context) : Timber.Tree() {

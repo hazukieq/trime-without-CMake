@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 暗色模式：亮色波纹。亮色版本用的 #14000000 在 #1C1C1E 卡片上不可见。 -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#33FFFFFF">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/modern_surface" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+</ripple>

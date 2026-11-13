@@ -37,10 +37,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.hazukieq.hkrime.core.Rime;
 import com.hazukieq.hkrime.ime.enums.PositionType;
-import com.hazukieq.hkrime.ime.enums.SymbolKeyboardType;
 import com.hazukieq.hkrime.ime.keyboard.Key;
 import com.hazukieq.hkrime.ime.keyboard.Sound;
-import com.hazukieq.hkrime.ime.symbol.TabManager;
 import com.hazukieq.hkrime.util.AppVersionUtils;
 import com.hazukieq.hkrime.util.ConfigGetter;
 import java.io.File;
@@ -56,7 +54,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.regex.Pattern;
 import timber.log.Timber;
 
 /** 解析 YAML 配置文件 */
@@ -86,11 +83,8 @@ public class Config {
   private Map<?, ?> fallbackColors;
   private Map<String, Map<String, String>> presetColorSchemes;
   private Map<String, Map<String, ?>> presetKeyboards;
-  private Map<String, ?> liquidKeyboard;
 
-  private static final Pattern pattern = Pattern.compile("\\s*\n\\s*");
 
-  private String[] clipBoardCompare, clipBoardOutput, draftOutput;
 
   public Config(@NonNull Context context) {
     this(context, false);
@@ -118,53 +112,7 @@ public class Config {
     Timber.d("%ssetSoundFromColor", methodName);
     setSoundFromColor();
 
-    Timber.d("%ssetClipboard&draft", methodName);
-    clipBoardCompare = appPrefs.getOther().getClipboardCompareRules().trim().split("\n");
-    clipBoardOutput = appPrefs.getOther().getClipboardOutputRules().trim().split("\n");
-    draftOutput = appPrefs.getOther().getDraftOutputRules().trim().split("\n");
-
     Timber.d("%sfinish", methodName);
-  }
-
-  public String[] getClipBoardCompare() {
-    return clipBoardCompare;
-  }
-
-  public String[] getClipBoardOutput() {
-    return clipBoardOutput;
-  }
-
-  public String[] getDraftOutput() {
-    return draftOutput;
-  }
-
-  public int getClipboardLimit() {
-    return Integer.parseInt(appPrefs.getOther().getClipboardLimit());
-  }
-
-  public int getDraftLimit() {
-    return Integer.parseInt(appPrefs.getOther().getDraftLimit());
-  }
-
-  public void setClipBoardCompare(String str) {
-    String s = pattern.matcher(str).replaceAll("\n").trim();
-    clipBoardCompare = s.split("\n");
-
-    appPrefs.getOther().setClipboardCompareRules(s);
-  }
-
-  public void setClipBoardOutput(String str) {
-    String s = pattern.matcher(str).replaceAll("\n").trim();
-    clipBoardOutput = s.split("\n");
-
-    appPrefs.getOther().setClipboardOutputRules(s);
-  }
-
-  public void setDraftOutput(String str) {
-    String s = pattern.matcher(str).replaceAll("\n").trim();
-    draftOutput = s.split("\n");
-
-    appPrefs.getOther().setDraftOutputRules(s);
   }
 
   public String getTheme() {
@@ -439,9 +387,6 @@ public class Config {
       presetColorSchemes =
           (Map<String, Map<String, String>>) globalThemeConfig.get("preset_color_schemes");
       presetKeyboards = (Map<String, Map<String, ?>>) globalThemeConfig.get("preset_keyboards");
-      liquidKeyboard = globalThemeConfig.get("liquid_keyboard");
-      initLiquidKeyboard();
-      Timber.d("init() initLiquidKeyboard done");
       Rime.setShowSwitches(false);
       reset();
       Timber.d("init() reset done");
@@ -556,39 +501,9 @@ public class Config {
     return keyboards;
   }
 
-  public void initLiquidKeyboard() {
-    TabManager.clear();
-    if (liquidKeyboard == null) return;
-    Timber.d("initLiquidKeyboard()");
-    final List<?> names = (List<?>) liquidKeyboard.get("keyboards");
-    if (names == null) return;
-    for (Object s : names) {
-      String name = (String) s;
-      if (liquidKeyboard.containsKey(name)) {
-        Map<?, ?> keyboard = (Map<?, ?>) liquidKeyboard.get(name);
-        if (keyboard != null) {
-          if (keyboard.containsKey("name")) {
-            name = (String) keyboard.get("name");
-          }
-          if (keyboard.containsKey("type")) {
-            TabManager.get()
-                .addTab(
-                    name,
-                    SymbolKeyboardType.Companion.fromObject(keyboard.get("type")),
-                    keyboard.get("keys"));
-          }
-        }
-      }
-    }
-  }
-
   public Map<String, ?> getKeyboard(String name) {
     if (!presetKeyboards.containsKey(name)) name = "default";
     return (Map<String, ?>) presetKeyboards.get(name);
-  }
-
-  public Map<String, ?> getLiquidKeyboard() {
-    return liquidKeyboard;
   }
 
   public void destroy() {
@@ -748,15 +663,6 @@ public class Config {
     final Object o = getValue(key);
     if (o == null) return 0f;
     return Float.parseFloat(o.toString());
-  }
-
-  public float getLiquidFloat(String key) {
-    if (liquidKeyboard != null) {
-      if (liquidKeyboard.containsKey(key)) {
-        return ConfigGetter.getFloat(liquidKeyboard, key, 0);
-      }
-    }
-    return getFloat(key);
   }
 
   public float getFloat(String key, float defaultValue) {
@@ -1009,25 +915,6 @@ public class Config {
 
   public static boolean getShouldLongClickDeleteCandidate() {
     return appPrefs.getKeyboard().getShouldLongClickDeleteCandidate();
-  }
-
-  public int getLiquidPixel(String key) {
-    if (liquidKeyboard != null) {
-      if (liquidKeyboard.containsKey(key)) {
-        return ConfigGetter.getPixel(liquidKeyboard, key, 0);
-      }
-    }
-    return getPixel(key);
-  }
-
-  public Integer getLiquidColor(String key) {
-    if (liquidKeyboard != null) {
-      if (liquidKeyboard.containsKey(key)) {
-        Integer value = parseColor(liquidKeyboard.get(key));
-        if (value != null) return value;
-      }
-    }
-    return getColor(key);
   }
 
   // 获取当前色彩 Config 2.0

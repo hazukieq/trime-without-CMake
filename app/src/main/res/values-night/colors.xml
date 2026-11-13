@@ -10,6 +10,9 @@
     <color name="modern_hairline">#38383A</color>
     <color name="modern_accent">#0A84FF</color>
     <color name="modern_icon_bg">#1E2A44</color>
+    <color name="panel_surface_fallback">#1C1C1E</color>
+    <color name="panel_group_bg_fallback">#2C2C2E</color>
+    <color name="panel_backspace_ink_fallback">#F2F2F7</color>
     <color name="launch_bg_start">#0B0B0D</color>
     <color name="launch_bg_end">#17171A</color>
 </resources>

@@ -15,7 +15,6 @@ import androidx.preference.PreferenceFragmentCompat
 import android.view.View
 import com.hazukieq.hkrime.R
 import com.hazukieq.hkrime.data.AppPrefs
-import com.hazukieq.hkrime.data.Config
 import com.hazukieq.hkrime.ime.core.Trime
 
 class OtherFragment :
@@ -56,24 +55,6 @@ class OtherFragment :
                 if (sharedPreferences?.getBoolean(key, false) == true) {
                     trime?.showStatusIcon(R.drawable.ic_trime_status)
                 } else { trime?.hideStatusIcon() }
-            }
-
-            "other__clipboard_compare" -> {
-                Config.get(context).setClipBoardCompare(
-                    sharedPreferences?.getString(key, "")
-
-                )
-            }
-
-            "other__clipboard_output" -> {
-                Config.get(context).setClipBoardOutput(
-                    sharedPreferences?.getString(key, "")
-                )
-            }
-            "other__draft_output" -> {
-                Config.get(context).setDraftOutput(
-                    sharedPreferences?.getString(key, "")
-                )
             }
         }
     }

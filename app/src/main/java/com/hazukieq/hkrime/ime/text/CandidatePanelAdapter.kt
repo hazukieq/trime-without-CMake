@@ -12,6 +12,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.google.android.flexbox.FlexboxLayoutManager
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -19,7 +20,7 @@ import com.hazukieq.hkrime.core.Rime
 import com.hazukieq.hkrime.data.Config
 
 /**
- * 候選展開面板右側的流式候選（配合 [FlowLayoutManager]）：只讀快照，整表 submitList 替換。
+ * 候選展開面板右側的流式候選（配合 FlexboxLayoutManager）：只讀快照，整表 submitList 替換。
  *
  * 設計：
  * - 格子寬度由「候選詞」決定（1 字窄、多字寬），拼音只做註腳、放不下就自動縮字；
@@ -63,6 +64,9 @@ class CandidatePanelAdapter(
     private val radius = dp(14f)
     private val minTileWidth = dp(56f)
 
+    /** 格子間距（FlexboxLayoutManager 沒有 gap 參數，用 item 的 margin 實現）。 */
+    private val gap = dp(8f)
+
     private val hideComment = Rime.getOption("_hide_comment")
 
     /** 只有組數 >= 2（多個讀音）時才標註拼音；單讀音時留白反而清爽。 */
@@ -90,10 +94,6 @@ class CandidatePanelAdapter(
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setPadding(padH, padV, padH, padV)
-            layoutParams = ViewGroup.MarginLayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            )
             background = RippleDrawable(
                 ColorStateList.valueOf(rippleColor),
                 shape,
@@ -134,10 +134,21 @@ class CandidatePanelAdapter(
             maxOf(wordWidth, commentWidth).toInt() + padH * 2,
             minTileWidth,
         )
-        holder.box.layoutParams = ViewGroup.MarginLayoutParams(
-            tileWidth,
-            ViewGroup.LayoutParams.WRAP_CONTENT,
-        )
+        val lp = holder.box.layoutParams
+        if (lp is FlexboxLayoutManager.LayoutParams) {
+            lp.width = tileWidth
+            lp.height = ViewGroup.LayoutParams.WRAP_CONTENT
+            lp.marginEnd = gap
+            lp.bottomMargin = gap
+        } else {
+            holder.box.layoutParams = FlexboxLayoutManager.LayoutParams(
+                tileWidth,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                marginEnd = gap
+                bottomMargin = gap
+            }
+        }
         if (hideComment || !showComment || item.comment.isEmpty()) {
             holder.comment.visibility = View.GONE
         } else {

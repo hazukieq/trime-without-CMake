@@ -26,38 +26,4 @@
         android:title="@string/other__destroy_on_quit_title" />
 
 
-    <com.hazukieq.hkrime.settings.components.ModernListPreference
-        android:defaultValue="100"
-        app:iconSpaceReserved="false"
-        app:entries="@array/other__clipboard_manager_entries"
-        app:entryValues="@array/other__clipboard_manager_values"
-        app:key="other__clipboard_limit"
-        app:title="@string/other__clipboard_manager_title"
-        app:useSimpleSummaryProvider="true" />
-
-    <com.hazukieq.hkrime.settings.components.ModernEditTextPreference android:key="other__clipboard_compare"
-        app:iconSpaceReserved="false"
-        android:title="@string/other__clipboard_compare_title"
-        android:defaultValue=""
-        app:useSimpleSummaryProvider="true"/>
-    <com.hazukieq.hkrime.settings.components.ModernEditTextPreference android:key="other__clipboard_output"
-        app:iconSpaceReserved="false"
-        android:title="@string/other__clipboard_output_title"
-        android:defaultValue=""
-        app:useSimpleSummaryProvider="true"/>
-
-
-    <com.hazukieq.hkrime.settings.components.ModernListPreference
-        app:iconSpaceReserved="false"
-        app:entries="@array/other__clipboard_manager_entries"
-        app:entryValues="@array/other__clipboard_manager_values"
-        app:key="other__draft_limit"
-        app:title="@string/other__draft_manager_title"
-        app:useSimpleSummaryProvider="true" />
-
-    <com.hazukieq.hkrime.settings.components.ModernEditTextPreference android:key="other__draft_output"
-        app:iconSpaceReserved="false"
-        android:title="@string/other__draft_output_title"
-        android:defaultValue=""
-        app:useSimpleSummaryProvider="true"/>
 </PreferenceScreen>

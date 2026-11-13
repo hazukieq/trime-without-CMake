@@ -28,7 +28,6 @@ import com.hazukieq.hkrime.ime.core.EditorInstance
 import com.hazukieq.hkrime.ime.core.Speech
 import com.hazukieq.hkrime.ime.core.Trime
 import com.hazukieq.hkrime.ime.enums.Keycode
-import com.hazukieq.hkrime.ime.enums.SymbolKeyboardType
 import com.hazukieq.hkrime.ime.keyboard.Event
 import com.hazukieq.hkrime.ime.keyboard.Keyboard.printModifierKeyState
 import com.hazukieq.hkrime.ime.keyboard.KeyboardSwitcher
@@ -185,9 +184,25 @@ class TextInputManager private constructor() :
         inputArea = uiBinding.main.inputArea
         candidatePanelRoot = uiBinding.main.candidatePanelRoot
         runCatching {
-            candidatePanelRoot?.setBackgroundColor(
-                com.hazukieq.hkrime.data.Config.get(trime).getColor("keyboard_back_color") ?: 0xFFFFFFFF.toInt()
+            // 展開面板的三處顏色都跟鍵盤主題色走（XML 裡只留 values/values-night 的兜底 token）：
+            // 根底 = keyboard_back_color、左側音節列 = off_key_back_color、退格字 = key_text_color。
+            val config = Config.get(trime)
+            val fallbackSurface = androidx.core.content.ContextCompat.getColor(
+                trime, com.hazukieq.hkrime.R.color.panel_surface_fallback
             )
+            val fallbackGroup = androidx.core.content.ContextCompat.getColor(
+                trime, com.hazukieq.hkrime.R.color.panel_group_bg_fallback
+            )
+            val fallbackInk = androidx.core.content.ContextCompat.getColor(
+                trime, com.hazukieq.hkrime.R.color.panel_backspace_ink_fallback
+            )
+            candidatePanelRoot?.setBackgroundColor(config.getColor("keyboard_back_color") ?: fallbackSurface)
+            uiBinding.main.candidateGroupList.setBackgroundColor(
+                config.getColor("off_key_back_color")
+                    ?: config.getColor("key_back_color")
+                    ?: fallbackGroup
+            )
+            uiBinding.main.panelBackspace.setTextColor(config.getColor("key_text_color") ?: fallbackInk)
         }
         candidatePanelController = CandidatePanelController(
             context = trime,
@@ -1061,7 +1076,6 @@ class TextInputManager private constructor() :
         super.onStartInputView(instance, restarting)
         // 新輸入框/新會話：面板狀態一律復位，否則會留下「鍵盤被 GONE、面板空的」灰塊
         hideCandidatePanel()
-        Trime.getService().selectLiquidKeyboard(-1)
         twelveKeyController?.reset()
         candidatePanelRoot?.visibility = android.view.View.GONE
         isComposable = false
@@ -1142,7 +1156,6 @@ class TextInputManager private constructor() :
                 candidateRoot?.visibility = if (!value) View.VISIBLE else View.GONE
                 trime.setCandidatesViewShown(isComposable && !value)
             }
-            "_liquid_keyboard" -> trime.selectLiquidKeyboard(0)
             "_hide_key_hint" -> if (mainKeyboardView != null) mainKeyboardView!!.setShowHint(!value)
             "_hide_key_symbol" -> if (mainKeyboardView != null) mainKeyboardView!!.setShowSymbol(!value)
             else -> if (option.startsWith("_keyboard_") &&
@@ -1293,9 +1306,7 @@ class TextInputManager private constructor() :
                     activeEditorInstance.getTextBeforeCursor(1),
                     activeEditorInstance.getTextBeforeCursor(1024)
                 )
-                if (event.command == "liquid_keyboard") {
-                    trime.selectLiquidKeyboard(arg)
-                } else if (event.command == "paste_by_char") {
+                if (event.command == "paste_by_char") {
                     trime.pasteByChar()
                 } else if (event.command == "candidate_panel") {
                     // 12 鍵 /、：在組字中切換候選面板，主題對應 Panel_toggle 事件。

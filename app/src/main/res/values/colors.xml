@@ -25,6 +25,10 @@
     <color name="modern_hairline">#E5E5EA</color>
     <color name="modern_accent">#007AFF</color>
     <color name="modern_icon_bg">#EEF3FF</color>
+    <!-- 候選展開面板的兜底色（執行時會被鍵盤主題色覆蓋，見 TextInputManager） -->
+    <color name="panel_surface_fallback">#FFFFFF</color>
+    <color name="panel_group_bg_fallback">#EDF0F2</color>
+    <color name="panel_backspace_ink_fallback">#3C4043</color>
     <color name="launch_bg_start">#F6F7FA</color>
     <color name="launch_bg_end">#FFFFFF</color>
 </resources>

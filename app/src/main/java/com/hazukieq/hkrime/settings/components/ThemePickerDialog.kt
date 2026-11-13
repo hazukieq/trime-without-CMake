@@ -1,11 +1,7 @@
 package com.hazukieq.hkrime.settings.components
 
-import android.app.Dialog
 import android.app.ProgressDialog
 import android.content.Context
-import android.os.Build
-import android.view.WindowManager
-import androidx.appcompat.app.AlertDialog
 import com.hazukieq.hkrime.R
 import com.hazukieq.hkrime.data.Config
 import com.hazukieq.hkrime.ime.core.Trime
@@ -27,6 +23,11 @@ class ThemePickerDialog(
     private var checkedId: Int = 0
     @Suppress("DEPRECATION")
     private val progressDialog: ProgressDialog
+
+    /** 對話框流程全部結束後的回調（輸入法宿主頁用來結束透明 Activity）。 */
+    var onDismiss: (() -> Unit)? = null
+    /** 是否已進入「套用主題」的異步流程：是的話由 onPostExecute 收尾，dismiss 不再觸發回調。 */
+    private var applying = false
 
     init {
         val themeFile = config.theme + ".yaml"
@@ -53,18 +54,6 @@ class ThemePickerDialog(
         progressDialog = createLoadingDialog(context, R.string.themes_progress)
     }
 
-    private fun appendDialogParams(dialog: Dialog) {
-        dialog.window?.let { window ->
-            window.attributes.token = Trime.getServiceOrNull()?.window?.window?.decorView?.windowToken
-            window.attributes.type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG
-            }
-            window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
-        }
-    }
-
     private fun setTheme() { config.theme = themeKeys[checkedId]?.replace(".yaml", "") }
 
     /** 调用该方法显示对话框（現代類 Apple 單選） **/
@@ -78,20 +67,24 @@ class ThemePickerDialog(
             checked,
         ) { idx ->
             checkedId = idx
+            applying = true
             execute()
         }
-        appendDialogParams(d)
+        d.setOnDismissListener { if (!applying) onDismiss?.invoke() }
         d.show()
     }
 
     private fun execute() = launch {
-        onPreExecute()
-        doInBackground()
-        onPostExecute()
+        try {
+            onPreExecute()
+            doInBackground()
+            onPostExecute()
+        } catch (e: Exception) {
+            onPostExecute()
+        }
     }
 
     private fun onPreExecute() {
-        appendDialogParams(progressDialog)
         progressDialog.show()
     }
 
@@ -104,5 +97,6 @@ class ThemePickerDialog(
     private fun onPostExecute() {
         progressDialog.dismiss()
         Trime.getServiceOrNull()?.initKeyboard() // 實時生效
+        onDismiss?.invoke()
     }
 }

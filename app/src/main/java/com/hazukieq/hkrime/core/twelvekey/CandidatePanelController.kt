@@ -5,9 +5,13 @@ import android.view.View
 import android.widget.FrameLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.flexbox.AlignItems
+import com.google.android.flexbox.FlexDirection
+import com.google.android.flexbox.FlexWrap
+import com.google.android.flexbox.FlexboxLayoutManager
+import com.google.android.flexbox.JustifyContent
 import com.hazukieq.hkrime.ime.keyboard.KeyboardView
 import com.hazukieq.hkrime.ime.text.CandidateGroupAdapter
-import com.hazukieq.hkrime.ime.text.FlowLayoutManager
 import com.hazukieq.hkrime.ime.text.CandidatePanelAdapter
 
 /**
@@ -55,9 +59,15 @@ class CandidatePanelController(
             itemAnimator = null
         }
         grid?.apply {
-            layoutManager = FlowLayoutManager(
-                (8 * context.resources.displayMetrics.density).toInt(),
-            )
+            // 官方 FlexboxLayoutManager：Row + Wrap 的流式候選，滾出屏幕的格子由 RecyclerView
+            // 回收複用（Google 的 flexbox README 明確說明它會 recycle 離屏 view），不再自繪
+            // 一個「實例化全部項目」的 LayoutManager。
+            layoutManager = FlexboxLayoutManager(context).apply {
+                flexDirection = FlexDirection.ROW
+                flexWrap = FlexWrap.WRAP
+                justifyContent = JustifyContent.FLEX_START
+                alignItems = AlignItems.FLEX_START
+            }
             adapter = gridAdapter
             itemAnimator = null
         }

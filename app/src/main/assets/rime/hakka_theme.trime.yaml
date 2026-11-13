@@ -205,7 +205,6 @@ fallback_colors:
   shadow_color: border_color
   root_background: back_color # 整个键盘区+候选栏的背景图/色
   candidate_background: back_color #候选栏的整体背景图/色
-  liquid_keyboard_background: keyboard_back_color # liquidKeyboard的背景图/色
   long_text_back_color: key_back_color #长文本按键的背景(剪贴板）
 
 #颜色
@@ -307,125 +306,6 @@ preset_color_schemes:
     text_color: 0xff5a676e #編碼
     text_back_color: 0xcce4e7e9 #編碼區背景
 #--------配色结束----------------#
-
-liquid_keyboard:
-  # 目前只能直接写参数，不支持变量或者fallback机制。
-  # 缺少参数时，自动从style中加载参数。
-  # 除非需要指定liquid_keyboard使用与主键盘不同的背景色、背景图，否则不应设置被注释掉的参数。
-  author: 'tumuyan'
-  row: 6              #每屏最多显示多少行按键
-  row_land: 5         #横屏每屏最多显示多少行按键
-  key_height: 40      #按键高度
-  key_height_land: 40 #横屏模式按键高度
-  single_width: 60    #single类型的按键宽度
-  vertical_gap: 8     #纵向按键间隙
-  margin_x: 2       #左右按键间隙的1/2
-  keyboards: [emoji, math, ascii, cn, history, clipboard, draft, list, tabs, exit, ids , jp, table, symbol, pinyin, grease, rusa, korea, lation, yinbiao, unit,  exit]  #tab列表
-  exit:
-    name: 返回
-    type: NO_KEY
-    keys: EXIT
-  tabs:
-    name: 更多
-    type: TABS
-  history:
-    name: 常用
-    type: HISTORY
-  emoji:
-    type: SINGLE
-    keys: "🙂😂🤣😆🙃😅🥺🙈🙉🙊☹😑😄🤐😨😱🌚🌝🤔❤💔🌹💣👌👍😣😥😮🙄😏😕😯😪😫😴😌🤑😉😋😎😍😘😚😛😜😝😒😓😔😲😷🤒😇🤓🤗🤕🙁😖😞😟😤😢😭😦😧😨😩😬😰😳😵😡😠☝✌🖕👎🙏🤘👏💪💋☘🍀🌸☕🍵🍺🍻🍦🍬🍚🍜🍲🍖🎂💤"
-  clipboard:
-    type: CLIPBOARD
-    name: 剪贴
-  draft:
-    type: DRAFT
-    name: 草稿
-  math:   #tab名称
-    type: SINGLE
-    name: 数学
-    keys: "≈＝≠≌<>≤≥≡()[]{}-+±×*/÷&∥%‰‱°′″∫∮∯∬∭∰∞∑∧∏∈∵∴⊥∝∨∪•√〒∝∽∈∩∧⊙⌒∥∟∣∂∆∞≌∉∪∨⊕⊿⊥∠∫∬∭"  #tab中的按键列表
-  cn:
-    type: SINGLE
-    name: 中文
-    keys:  #keys列表可以使用多种格式混合书写。
-      - ，
-      - 。
-      - ？
-      - ！
-      - ：
-      - 、
-      - “
-      - ”
-      - ‘
-      - ···
-      - ……
-      - { click: "——" }
-      - { click: "——", label: "破折" }
-      - （
-      - ）
-      - 【
-      - 】
-      - 《
-      - 》
-      - ［
-      - ］
-      - ｛
-      - ｝
-      - 「
-      - 」
-      - 『
-      - 』
-      - ～
-  symbol:
-    name: 特殊
-    type: SINGLE
-    keys: "△▽○◇□☆▲▼●◆■★▷◁▶◀♻♲†⚝✡⚹✦✸✹￼�×⌫☑☒✅❎✔✘✓✗☼☽♀☻◐㏂☀☾♂☹◑㏘☜☝☞☚☟☛▪•‥…∷※♩♪♫♬§°♭♯♮‖¶№◎¤۞℗®©卍卐℡™㏇Φ↖↑↗◤㊤◥←↔→㊧㊥㊨↙↓↘◣㊦◢⇄⇅⇆⇤↩⇥❏❐◲〼▢▣⇦⇧⇨⇩⇪↶▸◂▴▾✁↷✍⏍ϟ📝✎✆☱☰☴⚿⛮⚙☲☯☵⛶☩☐☳☷☶💬🗨⟲ღ✈☂🎤🌐🔍"
-  unit:
-    name: 单位
-    type: SINGLE
-    keys: "℃¥$€฿￡㎡m³℉￥£￠₠¹²³⁴⁵ⁿ⁶⁷⁸⁹⁰ˣ⁺⁻⁼⁽⁾½⅓¼⅔¾₁₂₃₄₅ₙ₆₇₈₉₀ₓ₊₋₌₍₎℅"
-  list:
-    name: 列表
-    type: SINGLE
-    keys: "①②③④⑤⑥⑦⑧⑨⑩⒈⒉⒊⒋⒌⒍⒎⒏⒐⒑⒒⒓⒔⒕⒖⒗⒘⒙⒚⒛⑴⑵⑶⑷⑸⑹⑺⑻⑼⑽⑾⑿⒀⒁⒂⒃⒄⒅⒆⒇㈠㈡㈢㈣㈤㈥㈦㈧㈨㈩➊➋➌➍➎➏➐➑➒➓㊀㊁㊂㊃㊄㊅㊆㊇㊈㊉ⅰⅱⅲⅳⅴⅵⅶⅷⅸⅹⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ"
-  pinyin:
-    name: 拼音
-    type: SINGLE
-    keys: "āáǎàōóēéěèǒòīíǐìūúǖǘǚǜǔùêüńňㄚㄛㄜㄧㄨㄩㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙ"
-  grease:
-    type: SINGLE
-    name: 希腊
-    keys: "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρστυφχψω"
-  rusa:
-    name: 俄语
-    type: SINGLE
-    keys: "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя"
-  lation:
-    name: 拉丁
-    type: SINGLE
-    keys: "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞŠŸŒàáâãäåæçèéêëìíîïðñòóõôöøùúûüýþšÿœ"
-  korea:
-    type: SINGLE
-    name: "韩文"
-    keys: "dㅏㅑㅓㅕㅗㅛㅜㅠㅡㅣㅐㅒㅔㅖㅘㅙㅚㅝㅞㅟㅢㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎㄲㄸㅚㅆㅉ㉠㉡㉢㉣㉤㉥㉦㉧㉨㉩㉪㉫㉬㉭㉮㉯㉰㉱㉲㉳㉴㉵㉶㉷㉸㉹㉺㉻㈀㈁㈂㈃㈄㈅㈆㈇㈈㈉㈊㈋㈌㈍㈎㈏㈐㈑㈒㈓㈔㈕㈖㈗㈘㈙㈚㈛"
-  yinbiao:
-    type: SINGLE
-    name: "音标"
-    keys: ["a:", "ɔ:", "ɜː", "i:", "u:", "ʌ", "ɒ", "ə", "ɪ", "ʊ", "e", "æ", "eɪ", "aɪ", "ɔɪ", "ɪə", "eə", "ʊə", "əʊ", "aʊ", "p", "t", "k", "f", "θ", "s", "b", "d", "g", "v", "ð", "z", "ʃ", "h", "ts", "tʃ", "j", "tr", "ʒ", "r", "dz", "dʒ", "dr", "w", "m", "n", "ŋ", "l"]
-  ascii:
-    type: SINGLE
-    name: 英文
-    keys: ",.?!:;/\\|*-+=^$`'\"^~@#%&()[]{}_"
-  ids:
-    type: SINGLE
-    name: IDS
-    keys: "⿰⿱⿲⿳⿴⿵⿶⿷⿸⿹⿺⿻↷↔"
-  jp:
-    type: SINGLE
-    name: 假名
-    keys: "あいうえおかがきぎくぐけげこごさざしじすずせぜそぞただちぢつづてでとどなにぬねのはばぱひびぴふぶぷへべぺほぼぽまみむめもゃやゅゆょよらりるれろわをんアィイウェエオカガキギクグケゲコゴサザシジスズセゼソゾタダチヂツヅテデトドナニヌネノハバパヒビピフブプヘベペホボポマミムメモャヤュユョヨラリルレロワヲン"
-
-
 
 #键盘布局
 preset_keyboards:
