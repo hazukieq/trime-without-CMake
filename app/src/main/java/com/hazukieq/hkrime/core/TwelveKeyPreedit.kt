@@ -1200,7 +1200,10 @@ object TwelveKeyPreedit {
      */
     internal fun hasFullSyllable(code: String): Boolean {
         val clean = code.replace("'", "")
-        return isSingleSyllable(clean) || clean in standardSyllableCodes
+        if (isSingleSyllable(clean) || clean in standardSyllableCodes) return true
+        // 多音節但整串能完整切成音節（4a834 → ma jun）也算「夠完整」：
+        // 剩餘碼已有正常拼音切分，不應再列孤立字母鍵。
+        return decodeSpans(clean) != null
     }
 
     /**

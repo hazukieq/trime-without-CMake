@@ -1085,6 +1085,9 @@ class Data:
         standard_codes = {code_of(syl) for syl in self.standard_syllables}
         if len(clean) < 2 or clean in standard_codes:
             return []
+        # 多音節但整串可完整切分（4a834 → ma jun）同樣不出孤立鍵。
+        if self.decode(clean) is not None:
+            return []
         letters = self.key_initial_letters(clean[0], is_last=len(clean) == 1)
         universe = set(self.syllable_freq) | set(self.standard_syllables)
         out: list[tuple[str, list[str]]] = []

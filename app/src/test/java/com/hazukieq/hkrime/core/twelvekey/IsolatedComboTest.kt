@@ -20,6 +20,10 @@ class IsolatedComboTest {
         // gia 不在主詞典但標準集有，碼 iia 已是完整音節 -> 不出孤單聯想
         assertTrue(TwelveKeyPreedit.hasFullSyllable("iia"))
         assertTrue(TwelveKeyPreedit.isolatedSyllables("iia").isEmpty())
+        // 多音節但整串可完整切分（ma jun / ma jok）也不出孤立鍵
+        assertTrue(TwelveKeyPreedit.hasFullSyllable("4a834"))
+        assertTrue(TwelveKeyPreedit.isolatedSyllables("4a834").isEmpty())
+        assertTrue(TwelveKeyPreedit.isolatedSyllables("4a845").isEmpty())
         // 單鍵不生成（音節組已經在）
         assertTrue(TwelveKeyPreedit.isolatedSyllables("e").isEmpty())
     }
