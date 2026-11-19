@@ -41,9 +41,8 @@ KeyboardView / Event → Trime / TextInputManager → Rime.onKey → librime
 - 只缓存有候选的快照。无候选最多延迟重试 3 次，每次 90ms。
 - 全量分组与枚举应留在后台，UI 线程不得承担重构建。
 
-当前 `toggleCandidatePanel` / `showCandidatePanel` 在组字中完全没有快照时仍调用
-`refreshSync()` 同步构建；这是实际存在的性能检查点，不能据此声称所有路径均已异步。
-涉及该入口的改动应验证首次开面板的 UI 延迟。
+开面板只请求 full 快照并等发布后展示，不再在主线程同步构建；
+首次开面板与连续选字的面板延迟仍需性能门禁验证。
 
 ## 初始化、维护与部署
 

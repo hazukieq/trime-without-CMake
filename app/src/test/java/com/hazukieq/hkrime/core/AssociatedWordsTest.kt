@@ -5,6 +5,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.BeforeClass
+import com.hazukieq.hkrime.core.twelvekey.PreeditPresentation
+import com.hazukieq.hkrime.core.twelvekey.CandidateItem
+import com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshot
 import org.junit.Test
 import java.io.File
 
@@ -399,35 +402,33 @@ class AssociatedWordsTest {
     /** render()：preedit 的唯一入口（讀音來源 / 前綴 / 暫存 三件事的組合）。 */
     @Test
     fun `render prefers bar hint over engine hint`() {
-        TwelveKeyPreedit.preferredText = "共產"
-        TwelveKeyPreedit.preferredComment = "kiung than"
-        assertEquals("kiung than", TwelveKeyPreedit.render("5i34i w\u2038", "其它", "ki biet"))
-        TwelveKeyPreedit.preferredText = null
-        TwelveKeyPreedit.preferredComment = null
+        val raw = "5i34i w\u2038"
+        PreeditPresentation.publish(TwelveKeySnapshot("5i34iw", 0, "5i34iw", emptyList(), null,
+            barEntries = listOf(CandidateItem("共產", "kiung than", 0)), rawPreedit = raw), "")
+        assertEquals("kiung than", PreeditPresentation.render(raw, "5i34iw", "其它", "ki biet"))
+        PreeditPresentation.invalidate("")
     }
 
     @Test
     fun `render falls back to engine hint when bar snapshot is absent`() {
-        TwelveKeyPreedit.preferredText = null
-        TwelveKeyPreedit.preferredComment = null
-        assertEquals("kiung than", TwelveKeyPreedit.render("5i34i w\u2038", "共產", "kiung than"))
+        PreeditPresentation.invalidate("")
+        assertEquals("kiung than", PreeditPresentation.render("5i34i w\u2038", "5i34iw", "共產", "kiung than"))
     }
 
     @Test
     fun `render keeps selected prefix and appends pending first`() {
-        TwelveKeyPreedit.preferredText = null
-        TwelveKeyPreedit.preferredComment = null
-        TwelveKeyPreedit.pendingPrefix = "以"
+        PreeditPresentation.invalidate("")
+        PreeditPresentation.invalidate("以")
         // 已選前綴「以」保留；尾部碼 8 轉成本地解碼；暫存字在最前
-        val rendered = TwelveKeyPreedit.render("以8\u2038", "以", "ji")
+        val rendered = PreeditPresentation.render("以8\u2038", "8", "以", "ji")
         assertTrue(rendered!!.startsWith("以"))
-        assertEquals("以", TwelveKeyPreedit.pendingPrefix.take(1))
-        TwelveKeyPreedit.pendingPrefix = ""
+        assertTrue(rendered.startsWith("以以"))
+        PreeditPresentation.invalidate("")
     }
 
     @Test
     fun `render returns null when there is nothing to rewrite`() {
-        assertNull(TwelveKeyPreedit.render(null))
-        assertNull(TwelveKeyPreedit.render(""))
+        assertNull(PreeditPresentation.render(null, ""))
+        assertNull(PreeditPresentation.render("", ""))
     }
 }

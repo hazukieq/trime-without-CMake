@@ -39,7 +39,9 @@ object TwelveKeySnapshotBuilder {
         val consumedEnd: Int,
         val remaining: String,
         val segmentsKey: String,
+        val rawPreedit: String = "",
     ) {
+        val contextKey: String get() = input + "\u0000" + consumedEnd + "\u0000" + segmentsKey + "\u0000" + rawPreedit
         val isEmpty: Boolean get() = input.isEmpty()
     }
 
@@ -68,6 +70,7 @@ object TwelveKeySnapshotBuilder {
             consumedEnd = consumedEnd,
             remaining = remainingOf(input, consumedEnd),
             segmentsKey = segs.joinToString(","),
+            rawPreedit = Rime.getRawPreedit().orEmpty(),
         )
     }
 
@@ -78,7 +81,7 @@ object TwelveKeySnapshotBuilder {
         segmentAnchor: Char? = null,
         segmented: Boolean = false,
     ): String =
-        local.input + "|" + local.segmentsKey +
+        local.contextKey +
             (if (full) "|full" else "|bar") + "|m" + SelectionMemory.version +
             "|p" + PhraseMemory.version +
             (if (segmentAnchor == null) "" else "|a" + segmentAnchor.code) +
@@ -230,8 +233,7 @@ object TwelveKeySnapshotBuilder {
         val previewText = barEntries.firstOrNull { it.text.isNotEmpty() }?.text ?: ""
         // 已選前綴（librime context 裡尚未 commit 的字）+ 第一條候選 = 嵌入式預覽全文
         // App 側暫存的字（兜底逐段選字）也要算進嵌入式預覽，否則選中的字在輸入框裡看不到。
-        val inlineText = TwelveKeyPreedit.pendingPrefix +
-            runCatching { Rime.getCompositionPrefix() }.getOrDefault("") + previewText
+        val inlineText = runCatching { Rime.getCompositionPrefix() }.getOrDefault("") + previewText
         // 兜底按引擎和字典候選是否可用判斷，不能把面板關閉的空 groups 當成無候選。
         val fallback = if (shouldShowFallback(barEntries.size, remaining)) {
             val raw = remaining.takeLast(MAX_FALLBACK_CODE)
@@ -271,6 +273,8 @@ object TwelveKeySnapshotBuilder {
             recommend = recommend,
             previewText = previewText,
             inlineText = inlineText,
+            contextKey = local.contextKey,
+            rawPreedit = local.rawPreedit,
         )
     }
 
@@ -744,6 +748,7 @@ object TwelveKeySnapshotBuilder {
     internal fun debugPanelSources(codes: String): PanelSources =
         computePanel(codes, null, emptyList(), includePanelOnlySources = true).let { c ->
             PanelSources(
+                isolated = isolatedRows(codes),
                 synth = c.synth,
                 split = c.split,
                 assoc = c.assoc,
@@ -753,8 +758,9 @@ object TwelveKeySnapshotBuilder {
             )
         }
 
-    /** 五源 + 合併後的最終行（[debugPanelSources] 的回傳型別）。 */
+    /** 六個 App 來源與合併後的最終行（測試診斷用）。 */
     internal data class PanelSources(
+        val isolated: List<PanelRow>,
         val synth: List<PanelRow>,
         val split: List<PanelRow>,
         val assoc: List<PanelRow>,
@@ -907,6 +913,8 @@ object TwelveKeySnapshotBuilder {
      * （`xform/^/［/` + `xform/$/］/`），面板左列的分組鍵與候選下面那行註釋都不該帶全角括號，
      * 這裡統一把包裝剝掉；其他形式的 comment 原樣保留。
      */
+    internal fun cleanCommentForSelection(comment: String?): String = cleanComment(comment)
+
     private fun cleanComment(raw: String?): String {
         val text = raw?.trim().orEmpty()
         if (text.length >= 2 && text.startsWith("\uFF3B") && text.endsWith("\uFF3D")) {

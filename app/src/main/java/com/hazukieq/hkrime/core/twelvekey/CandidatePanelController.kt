@@ -117,11 +117,11 @@ class CandidatePanelController(
     }
 
     /** 每次按鍵/上屏後由上層調用：整個面板只讀這一份快照。 */
-    fun submit(next: TwelveKeySnapshot) {
+    fun submit(next: TwelveKeySnapshot, preserveReading: Boolean = false) {
         val inputChanged = next.input != lastInput
         if (inputChanged) lastInput = next.input
 
-        if (inputChanged) {
+        if (inputChanged && !preserveReading) {
             // 新輸入回第 0 組，不隨候選條首選自動滾動定位。
             activeDisplay = 0
         } else {
@@ -163,7 +163,7 @@ class CandidatePanelController(
                 listOf(CandidateGroupAdapter.GroupItem(0, "〔${fallback.rawCode}〕…", true)),
             )
             gridAdapter.submit(
-                listOf(CandidatePanelAdapter.Item(fallback.letters, "本地原文", -1)),
+                listOf(CandidatePanelAdapter.Item(fallback.letters, "本地原文", -1, contextKey = snapshot.contextKey)),
             )
             groupList?.scrollToPosition(0)
             grid?.scrollToPosition(0)
@@ -191,6 +191,7 @@ class CandidatePanelController(
                     index = it.index,
                     segment = it.segment,
                     restCode = it.restCode,
+                    contextKey = snapshot.contextKey,
                 )
             },
         )
@@ -204,7 +205,7 @@ class CandidatePanelController(
      */
     fun showDrilldown(items: List<CandidatePanelAdapter.Item>) {
         gridAdapter.setShowComment(false)
-        gridAdapter.submit(items)
+        gridAdapter.submit(items.map { it.copy(contextKey = snapshot.contextKey) })
         grid?.scrollToPosition(0)
     }
 

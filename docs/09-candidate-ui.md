@@ -23,11 +23,11 @@ CandidatePanelController 控制开合与快照提交；左列 CandidateGroupAdap
 
 | 候选 | 行为 |
 |---|---|
-| 引擎候选，index ≥ 0 | 先判断剩余码；必要时暂存部分选择，否则交引擎 select_candidate |
-| App 段组/联想词 | 在 TextInputManager 中处理部分选词、重喂剩余码或完成提交 |
-| 合成学习词，segment = -2 | commitPhrase，按覆盖范围暂存或整串提交并学习 |
+| 引擎候选，index ≥ 0 | 同一 chooseTwelveKey：证实在当前码串的消费边界；未选完暂存并重喂剩余码 |
+| App 段组/联想词 | 由 CompositionSession 记日志，部分选择只留 preedit，全选完才提交 |
+| 合成学习词，segment = -2 | 同一入口按覆盖范围暂存或整串提交，提交成功后记学习 |
 | 无候选原文兜底 | 清组合并提交本地字母，不记入学习词库 |
 
-未选完时字停留在 preedit；部分选择的退格按 heldPicks 整段撤回。
+未选完时字停留在 preedit；部分选择的退格按选择日志整段撤回并恢复原码。
 非 12 键方案复用面板视图，候选仍来自该方案的引擎顺序。
 规则与配额见 [17](17-candidate-panel.md)，输入状态见 [10](10-twelve-key-input-design.md)。

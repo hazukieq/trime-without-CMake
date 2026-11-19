@@ -8,6 +8,8 @@ assert pending ""
 assert input 5i4ii8i9934i54iei9
 assert composing 1
 pick 灵机一动
-pick 来
-pick 的
+left loi
+right 来
+left dit
+right 的
 assert committed 灵机一动来的

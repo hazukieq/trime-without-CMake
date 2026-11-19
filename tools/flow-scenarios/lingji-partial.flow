@@ -3,10 +3,13 @@ type 5i4ii8i9934i54iei9
 pick 灵机一动
 assert pending 灵机一动
 assert composing 1
-pick 来
-# 來是單音節，走引擎原生部分選中：選中段在 preedit 裡，但不進 pendingPick。
-assert pending 灵机一动
+left loi
+right 来
+# 单音节部分选择同样进入 pendingPick，保留最后一个音节继续选。
+assert pending 灵机一动来
+assert input ei9
 assert composing 1
-pick 的
+left dit
+right 的
 assert committed 灵机一动来的
 assert composing 0

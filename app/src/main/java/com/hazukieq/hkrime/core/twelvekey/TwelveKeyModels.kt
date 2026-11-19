@@ -94,6 +94,8 @@ data class TwelveKeySnapshot(
      * 會讓「已選的字」在輸入框裡消失；這裡把 librime preedit 的前綴一起帶上。
      */
     val inlineText: String = "",
+    val contextKey: String = "",
+    val rawPreedit: String = "",
 ) {
     val isEmpty: Boolean get() = input.isEmpty()
     /**

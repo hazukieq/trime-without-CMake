@@ -91,41 +91,47 @@ class RealCorpusTest {
                 userDbCorpusFile.isFile,
             )
 
-            // 與 RimeDictSource 同樣的展開規則：主詞典 + import_tables（block / inline）。
-            val main = File(realDataDir, "hakka.dict.yaml")
-            val names = LinkedHashSet<String>()
-            names.add("hakka")
-            if (main.isFile) {
-                var inImports = false
-                main.readLines().take(200).forEach { line ->
-                    if (line.startsWith("...")) return@forEach
-                    if (line.startsWith("import_tables")) {
-                        inImports = true
-                        Regex("\\[([^]]+)]").find(line)?.groupValues?.get(1)
-                            ?.split(',')?.forEach { names.add(it.trim().trim('"', '\'')) }
-                        return@forEach
-                    }
-                    if (!inImports) return@forEach
-                    val dash = line.indexOf('-')
-                    if (dash < 0) {
-                        if (line.isNotEmpty() && !line[0].isWhitespace()) inImports = false
-                        return@forEach
-                    }
-                    val name = line.substring(dash + 1).substringBefore('#').trim()
-                    if (name.isNotEmpty()) names.add(name)
-                }
-            }
-            val dictFile = if (main.isFile) main else File("src/main/assets/rime/hakka.dict.yaml")
-            TwelveKeyPreedit.finishLoading(
-                TwelveKeyPreedit.loadDictLines(dictFile.readLines().asSequence())
-            )
-            names.drop(1).forEach { name ->
-                val f = File(realDataDir, "$name.dict.yaml")
-                val src = if (f.isFile) f else File("src/main/assets/rime/$name.dict.yaml")
-                if (src.isFile) TwelveKeyPreedit.loadWordLines(src.readLines().asSequence())
-            }
-            TwelveKeyPreedit.finishWordIndex()
+            com.hazukieq.hkrime.core.twelvekey.OfflineDictionary.load(realDataDir)
         }
+    }
+
+    /** 真實候選可精確對應的前綴逐一走生產狀態機：部分不得提交，撤回必須還原原碼。 */
+    @Test
+    fun realCandidateSelectionBoundariesAreReversibleAndNeverCommitTails() {
+        var checked = 0
+        var partial = 0
+        var invalidSuffix = 0
+        val origins = com.hazukieq.hkrime.core.twelvekey.CompositionSession.Origin.values()
+        for (record in records) {
+            val code = cleanCode(record.code)
+            for (candidate in record.cands) {
+                val tokens = preedit.parseComment(candidate.comment) ?: continue
+                if (tokens.any { token -> token.any { it !in 'a'..'z' } } || "r" in tokens.dropLast(1)) continue
+                val full = preedit.codeOfReading(candidate.comment)
+                if (full.isEmpty() || !code.startsWith(full)) continue
+                if (tokens.lastOrNull() == "r" && full.length < code.length) {
+                    invalidSuffix++
+                    org.junit.Assert.assertNull(preedit.selectedInputEnd(candidate.comment, code))
+                    continue
+                }
+                val end = preedit.selectedInputEnd(candidate.comment, code)
+                org.junit.Assert.assertEquals("真實候選完整前綴消費範圍", full.length, end)
+                val state = com.hazukieq.hkrime.core.twelvekey.CompositionSession()
+                state.input(code)
+                assertTrue(state.pick(candidate.text, candidate.comment, end!!, origins[checked % origins.size]))
+                if (full.length < code.length) {
+                    partial++
+                    org.junit.Assert.assertNull("未選尾碼必須阻止提交", state.completed())
+                    org.junit.Assert.assertFalse(state.allowsCommit(candidate.text))
+                }
+                org.junit.Assert.assertEquals("撤回必須還原逐鍵原碼", code, state.undo())
+                org.junit.Assert.assertEquals("撤回不能殘留選中文字", "", state.selectedText)
+                checked++
+            }
+        }
+        println("REAL_SELECTION_BOUNDARIES=$checked PARTIAL_GUARDS=$partial INVALID_SUFFIX_REJECTED=$invalidSuffix")
+        assertTrue("必須實際覆蓋真實候選，不能空跑", checked > 1000)
+        assertTrue("必須實際覆蓋部分選擇", partial > 100)
     }
 
     /** comment 的音節碼長之和（`ki`→`5i` 兩位、`mak`→`4a5` 三位）。 */

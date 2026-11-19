@@ -1,30 +1,11 @@
 #!/usr/bin/env python3
-"""PC 端「上屏全流程」模擬器（復刻 App 的部分選中 / 退格重選語義）。
+"""PC librime + App 部分选词、撤销、学习排序的行为模拟。
 
-引擎側走 rime-jni/host-test 的 `--script -` 互動模式（真實 librime + 真機詞庫），
-App 側在 Python 裡復刻 TextInputManager 的 pendingPick / heldPicks / unconsumed 規則，
-可以逐步命令：候選條選詞、展開面板左列選行 + 右列選字、退格反悔重選。
-
-用法：
-  python3 tools/preedit_flow.py --exec "type 5a4i5i; left lang; right 冷; right 起; state"
-  python3 tools/preedit_flow.py --scenario tools/flow-scenarios/lang-ki.flow
-  python3 tools/preedit_flow.py            # 內建 demo
-
-命令：
-  type <code>        逐鍵輸入（等同 App 的按鍵）
-  bar <n>            候選條第 n 條（引擎順序；無學習/adjust 重排）
-  pick <text>        依文字在候選條裡找（第一條匹配）
-  left <reading>     展開面板左列選一段音節（印出該段可選項）
-  right <text>       在目前左列/全部候選裡找文字並選（含部分選中 hold 判定）
-  back / del         退格（有 hold 時整段反悔並還原原碼）
-  commit             目前組字全部上屏
-  clear              清空組字與暫存（對應 App onFinishInput）
-  state              印目前狀態
-  # ...              註解
-
-注意：這是「行為模擬」不是 UI 模擬；候選條順序取引擎順序（App 的學習詞/SelectionMemory
-調整不在模擬範圍）；候選條只枚舉前 64 條與面板全量 600 的差異、panel 左列排序等
-需要時再逐步補進來。
+--data 同时指定引擎与面板索引的数据目录；不指定时使用现有设备快照，否则随包数据。
+bar/pick 使用 64 条引擎窗口、最多展示 12 项；left/right 查询最多 600 条引擎候选。
+panel 诊断 App 字典来源，不渲染 UI。assert 支持 remaining、panel_has、no_isolated，
+以及 committed/pending/input/composing/bar_first。找不到候选、未知命令或断言失败均退出非零。
+示例见 docs/14-preedit.md。
 """
 
 from __future__ import annotations
@@ -36,7 +17,7 @@ import subprocess
 import sys
 import time
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
@@ -44,17 +25,20 @@ WORKSPACE = os.path.dirname(REPO)
 HOST_RUNNER = os.path.join(WORKSPACE, "rime-jni", "host-test", "run-host-test.sh")
 
 _DATA = None
+_DATA_DIR = os.environ.get("HKRIME_REAL_DATA", "/tmp/hkrime-real-data")
+if not os.path.isdir(_DATA_DIR):
+    _DATA_DIR = os.path.join(REPO, "app", "src", "main", "assets", "rime")
 DEFAULT_PREFS = os.path.join(HERE, "flow-data")
 
 
 def data():
-    """面板/音節索引（與 App 同口徑），用來數「剩餘碼還有幾個音節」。"""
+    """與引擎共用資料來源的音節、選詞跨度與面板字典索引。"""
     global _DATA
     if _DATA is None:
         sys.path.insert(0, HERE)
         import panel_probe  # noqa: E402
 
-        _DATA = panel_probe.Data(os.path.join(REPO, "app", "src", "main", "assets", "rime"))
+        _DATA = panel_probe.Data(_DATA_DIR)
     return _DATA
 
 
@@ -248,7 +232,10 @@ class SelectionMemory:
 class BarItem:
     text: str
     comment: str
-    index: int  # 引擎候選下標；-1 表示 App 學習詞（合成候選）
+    index: int
+    segment: int = -1
+    rest: str = ""
+    context: tuple[str, str] = ("", "")
 
 
 @dataclass
@@ -282,6 +269,7 @@ class Engine:
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
+            env={**os.environ, "HKRIME_REAL_DATA": os.path.abspath(_DATA_DIR)},
         )
         # 先送一個 dump 當同步點：run-host-test.sh 的部署輸出會被解析器忽略，
         # 直到收到第一個 END 才代表引擎就緒。
@@ -316,7 +304,7 @@ class Engine:
                 parts = line.split("\t")
                 if len(parts) >= 4:
                     st.cands.append((parts[2], parts[3]))
-        return st
+        raise RuntimeError(f"引擎在 END 前退出，returncode={self.proc.poll()}")
 
     def send(self, cmd: str) -> EngineState:
         assert self.proc.stdin is not None
@@ -350,15 +338,18 @@ class Sim:
         self.sel = SelectionMemory(prefs_dir) if apply_learning else SelectionMemory(None)
         self.state = EngineState()
         self.pending = ""            # pendingPick：已選但未上屏的詞（preedit 前綴）
-        self.held: list[tuple[str, str]] = []  # (text, 選中前完整碼)
         self.committed = ""          # 目前已上屏文字
         self.left_reading = ""       # 面板左列目前選中的段音節
         self.failures = 0            # assert 失敗數（scenario 當回歸測試用）
-        # 逐段拼出的整串（App maybeRecordPhrase 的口徑）
-        self.picked_code = ""
-        self.picked_pieces = 0
-        self.picked_text = ""
-        self.picked_readings: list[str] = []
+        self.expected_code = ""
+        self.ready = False
+        self.editor_available = True
+        self.commit_count = 0
+        self.blocked_commits = 0
+        self.drill = ""
+        self.saved_item = None
+        # (text, reading, before code, consumed code)，與生產日誌同樣逐次撤銷。
+        self.held: list[tuple[str, str, str, str]] = []
         self._reset_from(self.state)
 
     # ---------- 引擎狀態同步 ----------
@@ -387,50 +378,34 @@ class Sim:
     def remaining_segs(self) -> list[Seg]:
         return [s for s in self.state.segs if s.status < 2]
 
-    # ---------- 上屏 ----------
-    def _note_picked(self, text: str, reading: str, code: str) -> None:
-        if not text:
-            return
-        if not self.picked_code:
-            self.picked_code = code
-        self.picked_pieces += 1
-        self.picked_text += text
-        self.picked_readings.append(reading)
-        if not reading:
-            self.picked_readings = [""]  # 缺讀音就不記整串
-
-    def _maybe_record_phrase(self) -> None:
-        if not self.apply_learning:
-            self._reset_picked()
-            return
-        readings = " ".join(r for r in self.picked_readings if r)
-        complete = bool(self.picked_readings) and all(self.picked_readings)
-        if (len(self.picked_text) >= 2 and self.picked_pieces >= 2
-                and self.picked_code and complete):
-            self.phrase.record(self.picked_code, self.picked_text, readings)
-        self._reset_picked()
-
-    def _reset_picked(self) -> None:
-        self.picked_code = ""
-        self.picked_pieces = 0
-        self.picked_text = ""
-        self.picked_readings = []
-
+    # ---------- 受控提交 ----------
     def _absorb_commit(self, st: EngineState) -> None:
         if st.commit:
-            self.committed += self.pending + st.commit
-            self.pending = ""
-            self.held.clear()
-            self._maybe_record_phrase()
-        elif not st.composing and self.picked_pieces:
-            self._maybe_record_phrase()
+            self.blocked_commits += 1
+            print("  blocked unsolicited engine commit")
+            self._restore(self.expected_code)
 
-    # ---------- 選中 ----------
-    def _decode(self, code: str) -> list[str]:
-        try:
-            return data().decode(code) or []
-        except Exception:
-            return [code] if code else []
+    def _restore(self, code: str) -> None:
+        self._reset_from(self.engine.send("clear"))
+        if code:
+            self._reset_from(self.engine.send("type " + code))
+
+    def _commit_completed(self) -> None:
+        if self.expected_code or not self.ready or not self.pending or not self.editor_available:
+            return
+        self.committed += self.pending
+        self.commit_count += 1
+        if self.apply_learning:
+            for text, reading, before, _ in self.held:
+                self.sel.bump(text, reading)
+                if len(text) >= 2 and reading:
+                    self.phrase.learn_pick(before, text, reading)
+            if len(self.held) >= 2 and all(p[1] for p in self.held):
+                self.phrase.record("".join(p[3] for p in self.held), self.pending,
+                                   " ".join(p[1] for p in self.held))
+        self.pending = ""
+        self.held.clear()
+        self.ready = False
 
     # ---------- 候選條（引擎 + SelectionMemory + PhraseMemory） ----------
     def _engine_items(self) -> list[BarItem]:
@@ -479,17 +454,27 @@ class Sim:
     def bar_items(self) -> list[BarItem]:
         """App 候選條：永遠只取前 64 條引擎候選做學習排序+學習詞混排，展示 12 項。"""
         flat = self._engine_items()[: self.BAR_WINDOW]
-        return self._ordered(flat)[: self.BAR_ITEMS]
+        items = self._ordered(flat)[: self.BAR_ITEMS]
+        return [replace(it, context=(self.state.input, self.state.preedit)) for it in items]
 
     def panel_items(self) -> list[BarItem]:
-        """展開面板：全量引擎候選（host-test 最多印 600）再排序，供左列/右列查找。"""
-        return self._ordered(self._engine_items())
+        if self.drill:
+            items = [BarItem(ch, self.drill, -1, -5) for ch in data().syllable_chars.get(self.drill, ())]
+        else:
+            items = []
+            for row in data().panel(self.unconsumed()):
+                segment = row.get("segment", 1)
+                for text in row.get("chars" if segment == 0 else "items", ()):
+                    items.append(BarItem(text, row["reading"], -1, segment, row.get("rest", "")))
+            items += self._ordered(self._engine_items())
+        return [replace(it, context=(self.state.input, self.state.preedit)) for it in items]
 
     def bar(self, n: int) -> None:
         items = self.bar_items()
         if 0 <= n < len(items):
             self._pick_item(items[n])
         else:
+            self.failures += 1
             print(f"  ! 候選條沒有第 {n} 項（共 {len(items)}）")
 
     def _print_bar(self) -> None:
@@ -502,65 +487,45 @@ class Sim:
             if it.text == text:
                 self._pick_item(it)
                 return True
+        self.failures += 1
         print(f"  ! 候選條找不到「{text}」")
         return False
 
     def _pick_item(self, it: BarItem) -> None:
-        if it.index < 0:
-            # App 合成詞（學習詞）：直接併入 pending 並上屏，不經引擎 select。
-            self.pending += it.text
-            self.committed += self.pending
-            self.pending = ""
-            self.held.clear()
-            if self.apply_learning:
-                # App commitPhrase：合成詞已存在時只 bumpPicked。
-                if any(e.text == it.text for e in
-                       self.phrase.by_code.get(PhraseMemory.normalize(self.state.input), [])):
-                    self.phrase.bump_picked(self.state.input, it.text)
-                else:
-                    self.phrase.learn_pick(self.state.input, it.text, it.comment)
-                self.sel.bump(it.text, it.comment)
-            st = self.engine.send("clear")
-            self._reset_from(st)
-            return
+        from panel_probe import selected_input_end
 
-        tokens = reading_syllables(it.comment)
-        remaining_code = self.unconsumed()
-        pieces = self._decode(remaining_code)
-        # App：只在「多音節整詞」被部分覆蓋時 hold；單音節/單字走引擎原生部分選中。
-        if len(tokens) >= 2 and pieces and len(pieces) > len(tokens):
-            covered = "".join(pieces[: len(tokens)])
-            rest = remaining_code[len(covered):]
-            prefix = self.selected_prefix()
-            picked = prefix + it.text
-            self.pending += picked
-            self.held.append((picked, self.state.input))
-            if self.apply_learning:
-                # App holdPartialPick：engineIndex>=0 與 App 詞都記 learnPick（單字不記）。
-                if len(it.text) >= 2:
-                    self.phrase.learn_pick(self.state.input, it.text, it.comment)
-                    self.sel.bump(it.text, it.comment)
-            self._note_picked(it.text, it.comment, self.state.input)
-            st = self.engine.send("clear")
-            self._reset_from(st)
-            if rest:
-                st = self.engine.send("type " + rest)
-                self._reset_from(st)
-            else:
-                self.committed += self.pending
-                self.pending = ""
-                self.held.clear()
-            self._absorb_commit(st)
+        if it.context != (self.state.input, self.state.preedit) or not self.state.input:
+            print("  ignored stale candidate")
+            return
+        if it.segment == -4:
+            self.drill = it.text
+            return
+        code = self.unconsumed()
+        if it.segment == -5:
+            consumed = next((i + 1 for i, ch in enumerate(code) if ch != "'" and not ch.isspace()), None)
+        elif it.segment == 0 and it.index < 0:
+            consumed = len(code) - len(it.rest) if code.endswith(it.rest) else None
         else:
-            if self.apply_learning:
-                # App：selectCandidate 前先 bump 排序記憶；多字詞同時記 PhraseMemory.learnPick。
-                self.sel.bump(it.text, it.comment)
-                if len(it.text) >= 2:
-                    self.phrase.learn_pick(self.state.input, it.text, it.comment)
-            self._note_picked(it.text, it.comment, self.state.input)
-            st = self.engine.send(f"select {it.index}")
-            self._reset_from(st)
-            self._absorb_commit(st)
+            consumed = selected_input_end(data(), it.comment, code)
+        if consumed is None or not 1 <= consumed <= len(code):
+            self.failures += 1
+            print("  ! unresolved candidate coverage; original code retained")
+            return
+        while consumed < len(code) and (code[consumed] == "'" or code[consumed].isspace()):
+            consumed += 1
+        self.held.append((it.text, it.comment, code, code[:consumed]))
+        self.pending += it.text
+        self.expected_code = code[consumed:]
+        self.ready = not self.expected_code
+        self.drill = ""
+        if self.expected_code:
+            self._restore(self.expected_code)
+        else:
+            if it.index >= 0:
+                # 僅最後一次選擇走原生學習；buffer 由本交易消耗，不另行上屏。
+                self._reset_from(self.engine.send(f"select {it.index}"))
+            self._reset_from(self.engine.send("clear"))
+            self._commit_completed()
 
     # ---------- 面板 ----------
     def left(self, reading: str) -> None:
@@ -573,7 +538,7 @@ class Sim:
             print(f"    {it.text}  ({it.comment}) {mark}")
 
     def right(self, text: str) -> bool:
-        wanted = self.left_reading
+        wanted = self.drill or self.left_reading
         for it in self.panel_items():
             if it.text == text and (not wanted or reading_syllables(it.comment)[:1] == [wanted]):
                 self._pick_item(it)
@@ -583,34 +548,34 @@ class Sim:
     # ---------- 退格 / 上屏 ----------
     def back(self) -> None:
         if self.held:
-            picked, code = self.held.pop()
-            if self.pending.endswith(picked):
-                self.pending = self.pending[: -len(picked)]
-            else:
-                self.pending = ""
-            st = self.engine.send("clear")
-            self._reset_from(st)
-            if code:
-                st = self.engine.send("type " + code)
-                self._reset_from(st)
-            self._absorb_commit(st)
+            _, _, before, _ = self.held.pop()
+            self.pending = "".join(p[0] for p in self.held)
+            self.expected_code = before
+            self.ready = False
+            self.drill = ""
+            self._restore(before)
         else:
-            st = self.engine.send("key 65288")  # XK_BackSpace
+            self.expected_code = self.state.input[:-1]
+            st = self.engine.send("key 65288")
             self._reset_from(st)
             self._absorb_commit(st)
 
     def commit(self) -> None:
-        st = self.engine.send("commit")
-        self._reset_from(st)
-        self._absorb_commit(st)
+        if not self.expected_code and self.ready:
+            self._commit_completed()
+            return
+        first = next(iter(self.bar_items()), None)
+        if first is not None:
+            self._pick_item(first)
 
     def clear(self) -> None:
-        st = self.engine.send("clear")
-        self._reset_from(st)
+        self._reset_from(self.engine.send("clear"))
         self.pending = ""
         self.held.clear()
         self.left_reading = ""
-        self._reset_picked()
+        self.drill = ""
+        self.expected_code = ""
+        self.ready = False
 
     # ---------- 記憶持久化 ----------
     def save_prefs(self, prefs_dir: str) -> list[str]:
@@ -672,6 +637,19 @@ class Sim:
             got = self.pending
         elif key == "input":
             got = self.state.input
+        elif key == "commit_count":
+            got = str(self.commit_count)
+        elif key == "blocked_commits":
+            got = str(self.blocked_commits)
+        elif key == "held":
+            got = str(len(self.held))
+        elif key == "remaining":
+            got = self.unconsumed()
+        elif key == "panel_has":
+            rows = data().panel(self.unconsumed())
+            got = want if any(row["reading"] == want for row in rows) else "(missing)"
+        elif key == "no_isolated":
+            got = "1" if not data().isolated_syllables(self.unconsumed()) else "0"
         elif key == "composing":
             got = "1" if self.state.composing else "0"
         elif key in ("bar0", "bar_first"):
@@ -694,6 +672,8 @@ class Sim:
         arg = arg.strip()
         print(f"> {line}")
         if cmd == "type":
+            self.expected_code = self.state.input + arg
+            self.ready = False
             st = self.engine.send("type " + arg)
             self._reset_from(st)
             self._absorb_commit(st)
@@ -704,14 +684,31 @@ class Sim:
                 self._print_bar()
         elif cmd in ("pick", "sel"):
             self.pick(arg)
+        elif cmd == "panel":
+            print("  面板字典行: " + ", ".join(row["reading"] for row in data().panel(self.unconsumed())))
         elif cmd == "left":
             self.left(arg)
         elif cmd == "right":
             self.right(arg)
         elif cmd in ("back", "del"):
             self.back()
-        elif cmd == "commit":
+        elif cmd in ("commit", "space", "enter", "retry"):
             self.commit()
+        elif cmd == "editor_available":
+            self.editor_available = arg != "0"
+        elif cmd == "engine_commit":
+            st = self.engine.send("commit")
+            self._reset_from(st)
+            self._absorb_commit(st)
+        elif cmd == "remember":
+            self.saved_item = next((it for it in self.bar_items() if it.text == arg), None)
+            if self.saved_item is None:
+                self.failures += 1
+        elif cmd == "pick_saved":
+            if self.saved_item is not None:
+                self._pick_item(self.saved_item)
+            else:
+                self.failures += 1
         elif cmd == "clear":
             self.clear()
         elif cmd == "state":
@@ -719,6 +716,7 @@ class Sim:
         elif cmd == "assert":
             self._assert(arg)
         else:
+            self.failures += 1
             print(f"  ! 未知命令: {cmd}")
         self.dump()
 
@@ -736,10 +734,12 @@ state
 
 
 def main() -> int:
+    global _DATA_DIR
     ap = argparse.ArgumentParser(description="PC preedit/上屏 全流程模擬")
     ap.add_argument("--exec", dest="inline", help="以分號分隔的命令字串")
     ap.add_argument("--scenario", help="命令檔路徑，一行一命令")
     ap.add_argument("--host-runner", default=HOST_RUNNER)
+    ap.add_argument("--data", default=_DATA_DIR, help="引擎与 App 字典索引共用的数据目录")
     ap.add_argument("--prefs-dir", default=os.environ.get(
         "HKRIME_FLOW_PREFS", DEFAULT_PREFS))
     ap.add_argument("--no-learning", action="store_true",
@@ -749,6 +749,10 @@ def main() -> int:
     ap.add_argument("--no-save", action="store_true",
                     help="跑完不落盤（默認寫回 --prefs-dir，供下一次模擬續用）")
     args = ap.parse_args()
+    _DATA_DIR = os.path.abspath(args.data)
+    if not os.path.isfile(os.path.join(_DATA_DIR, "hakka.dict.yaml")):
+        ap.error(f"找不到 {_DATA_DIR}/hakka.dict.yaml")
+    data()
 
     if args.pull_prefs:
         os.makedirs(args.prefs_dir, exist_ok=True)
@@ -780,7 +784,7 @@ def main() -> int:
     engine = Engine(args.host_runner)
     sim = Sim(engine, args.prefs_dir, not args.no_learning)
     learn = "off" if args.no_learning else "on"
-    print(f"== 資料源與引擎就緒（host-test --script）；學習記憶 {learn}")
+    print(f"== 資料源 {_DATA_DIR}；引擎就緒（host-test --script）；學習記憶 {learn}")
     if not args.no_learning:
         print(f"   PhraseMemory code 數={len(sim.phrase.by_code)}，"
               f"SelectionMemory 條目={len(sim.sel.scores)}（{args.prefs_dir}）")

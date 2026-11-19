@@ -15,14 +15,6 @@ import java.util.HashMap
  * 切成最可能的音節串；切不出來就回傳 null，維持原本的 preedit。
  */
 object TwelveKeyPreedit {
-    /**
-     * App 已選未提交前綴，由 TextInputManager 更新；組合未完成時僅留在 preedit。
-     */
-    @Volatile
-    @JvmField
-    var pendingPrefix: String = ""
-
-
     private class Entry(val syllable: String, val freq: Int)
 
     private val table = HashMap<String, Entry>()
@@ -86,6 +78,7 @@ object TwelveKeyPreedit {
 
     /** 標準音節集的碼 → 完整音節（`gia` 不在主詞典但標準集有，`iia` 必須視為完整音節）。 */
     private val standardSyllableCodes = HashSet<String>()
+    private val standardNonSuffixCodes = HashSet<String>()
 
     /**
      * 發布不可變整串碼索引，完成構建後整體替換；查詢不遍歷可變載入列表。
@@ -223,7 +216,7 @@ object TwelveKeyPreedit {
         }.onFailure { Timber.w(it, "TwelveKeyPreedit: load char rank failed") }
 
         // 標準音節集（可選資源）：只參與「孤單聯想」的完整音節判定與通配列表，
-        // 不擴大運行時搜索集合（主詞典 694 仍是段組/聯想的口徑）。
+        // 運行時搜索集合由主詞典及進口詞典的合法單字讀音建立。
         runCatching {
             RimeDictSource.textLines(context, "hakka_syllables.txt")?.let { lines ->
                 loadStandardSyllableLines(lines.asSequence())
@@ -442,23 +435,46 @@ object TwelveKeyPreedit {
         return sb.toString()
     }
 
-    /**
-     * 按實際輸入解碼的前 N 個音節扣除已選讀音的音節數，返回剩餘碼。
-     * 不將候選讀音重新編碼作字串前綴扣除；無可靠解碼時不猜剩餘。
-     */
-    internal fun remainingCodeAfter(wordReading: String, input: String): String {
-        if (wordReading.isEmpty() || input.isEmpty()) return ""
-        val tokens = wordReading.split(' ', '\u3000').filter { it.isNotEmpty() }
-        if (tokens.isEmpty()) return ""
-        // 用「碼串前 N 個音節」算消耗量，**不要**用 reading→碼 的前綴比對：
-        // 同一個字可能有多個讀音（动 dung/tung），學習詞記下的 readings 未必等於
-        // 這次輸入實際用的讀音（實測：`灵机一动` 記的是 dung，但用戶打的是 tung 934i），
-        // 前綴比對會失配 → 剩餘碼算不出來 → 後半截照樣丟。
-        val spans = decodeSpans(input) ?: return ""
-        if (spans.size < tokens.size) return ""
-        var consumed = 0
-        for (i in 0 until tokens.size) consumed += spans[i].first.length
-        return if (input.length > consumed) input.substring(consumed) else ""
+    /** 返回已證實選擇後的尾碼；真正選擇應使用可區分 null 的 selectedInputEnd。 */
+    internal fun remainingCodeAfter(wordReading: String, input: String): String =
+        selectedInputEnd(wordReading, input)?.let { input.substring(it).trimStart('\'', ' ') }.orEmpty()
+
+    /** 真正選擇用的碼位證明；與顯示的寬鬆讀音補齊分離，null 表示不能安全選擇。 */
+    internal fun selectedInputEnd(reading: String, input: String): Int? {
+        val tokens = parseComment(reading)?.takeIf { it.isNotEmpty() } ?: return null
+        if (input.isEmpty()) return null
+        val offsets = input.indices.filter { input[it] != '\'' && !input[it].isWhitespace() }
+        val codes = offsets.map { input[it] }.joinToString("")
+        if (codes.isEmpty()) return null
+        if (tokens.any { token -> token.any { it !in 'a'..'z' } }) return null
+        if (tokens.dropLast(1).any { isSuffixOnlySyllable(it) }) return null
+        var pos = 0
+        var matched = true
+        for (token in tokens) {
+            if (pos == codes.length) break // 引擎補全的詞尾沒有額外按鍵需要消費。
+            if (isSuffixOnlySyllable(token) && pos + 1 != codes.length) return null
+            val full = codeOf(token)
+            val aliasLength = (minOf(6, codes.length - pos) downTo 1).firstOrNull { length ->
+                codeToSyllables[codes.substring(pos, pos + length)].orEmpty().any {
+                    isSpellingAlias(token, it.syllable)
+                }
+            }
+            when {
+                codes.startsWith(full, pos) -> pos += full.length
+                aliasLength != null -> pos += aliasLength
+                token.first() in keyLetters(codes[pos]) && token.first() !in "aeiou" -> pos++
+                full.startsWith(codes.substring(pos)) -> pos = codes.length
+                else -> { matched = false; break }
+            }
+        }
+        if (!matched) {
+            // 學習詞的異讀可能不同於實際輸入（dung/tung），只用完整輸入跨度回退。
+            if (tokens.any { it !in syllableSet }) return null
+            val spans = decodeSpans(codes) ?: return null
+            if (spans.size < tokens.size) return null
+            pos = spans.take(tokens.size).sumOf { it.first.length }
+        }
+        return offsets.getOrNull(pos - 1)?.plus(1)
     }
 
     /** PhraseMemory 變化時重建「學習詞 → 讀音」索引（面板與候選條同源）。 */
@@ -1181,29 +1197,39 @@ object TwelveKeyPreedit {
     internal fun loadStandardSyllableLines(lines: Sequence<String>) {
         standardSyllables.clear()
         standardSyllableCodes.clear()
+        standardNonSuffixCodes.clear()
         lines.forEach { raw ->
             val syllable = raw.trim()
             if (syllable.isEmpty() || syllable.startsWith("#")) return@forEach
             standardSyllables.add(syllable)
             standardSyllableCodes.add(codeOf(syllable))
+            if (!isSuffixOnlySyllable(syllable)) standardNonSuffixCodes.add(codeOf(syllable))
         }
     }
 
     /** 標準音節集快照（只讀；測試與診斷用）。 */
     internal fun standardSyllablesSnapshot(): Set<String> = standardSyllables
 
-    /**
-     * 整串碼恰好是一個完整音節（孤單聯想互斥）。
-     *
-     * 判定必須看**標準音節集**：`gia` 不在主詞典（運行時 694）但標準集有，
-     * 它的碼 `iia` 已是完整音節，不能再列孤單聯想。
-     */
+    /** 運行時與標準音節的聯集能否完整覆蓋碼串；r 僅允許末段。 */
     internal fun hasFullSyllable(code: String): Boolean {
         val clean = code.replace("'", "")
-        if (isSingleSyllable(clean) || clean in standardSyllableCodes) return true
-        // 多音節但整串能完整切成音節（4a834 → ma jun）也算「夠完整」：
-        // 剩餘碼已有正常拼音切分，不應再列孤立字母鍵。
-        return decodeSpans(clean) != null
+        if (clean.isEmpty()) return false
+        val reachable = BooleanArray(clean.length + 1)
+        reachable[0] = true
+        for (start in clean.indices) {
+            if (!reachable[start]) continue
+            for (length in 1..minOf(6, clean.length - start)) {
+                val end = start + length
+                val part = clean.substring(start, end)
+                val runtime = codeToSyllables[part].orEmpty().any {
+                    end == clean.length || !isSuffixOnlySyllable(it.syllable)
+                }
+                val standard = part in standardSyllableCodes &&
+                    (end == clean.length || part in standardNonSuffixCodes)
+                if (runtime || standard) reachable[end] = true
+            }
+        }
+        return reachable[clean.length]
     }
 
     /**
@@ -1350,69 +1376,6 @@ object TwelveKeyPreedit {
         return aligned.joinToString(" ")
     }
 
-    // preedit 首選讀音由發布快照的候選條第一項提供，不能另取引擎第 0 項。
-    // 空快照設為 null，回退本地解碼。
-
-    /** 候選條第一條候選的文本；preedit 用它對齊讀音（歧義時對齊第一個字）。 */
-    @Volatile
-    @JvmField
-    var preferredText: String? = null
-
-    /** 候選條第一條候選的 comment = 引擎給的精確拼音（spelling_hints）。 */
-    @Volatile
-    @JvmField
-    var preferredComment: String? = null
-
-    /**
-     * 保留引擎已選前綴，只改寫尾部未選碼。首選 comment 的精確讀音優先，
-     * 沒有可用首選時回退本地解碼；同碼多音節不存在唯一解碼。
-     * @param hint 首條候選文字
-     * @param preferred 首條候選讀音
-     */
-    /**
-     * preedit 統一入口：App 快照首選優先，引擎首選兜底，
-     * 合併 App 暫存前綴與引擎已選前綴，並補齊未覆蓋原碼。
-     */
-    // 相同參數的 preedit 渲染復用最近結果，減少重複解碼、查表和字串分配。
-    private var renderCacheKey: String? = null
-    private var renderCacheValue: String? = null
-    private var renderCacheUsedRawCode: Boolean = false
-
-    fun render(
-        rawPreedit: String?,
-        engineText: String? = null,
-        engineComment: String? = null,
-    ): String? {
-        if (rawPreedit.isNullOrEmpty() || table.isEmpty()) return null
-        val cacheKey = rawPreedit + "\u0001" + engineText + "\u0001" + engineComment + "\u0001" +
-            preferredText + "\u0001" + preferredComment + "\u0001" + pendingPrefix
-        if (cacheKey == renderCacheKey) {
-            lastRenderUsedRawCode = renderCacheUsedRawCode
-            return renderCacheValue
-        }
-        // 1) 讀音來源：App 快照發布的「候選條第一條」優先（所見即所讀），否則退回引擎 menu 第一條。
-        val hasBarHint = !preferredText.isNullOrEmpty()
-        val hint = if (hasBarHint) preferredText else engineText
-        val preferred = if (hasBarHint) preferredComment else engineComment
-        // 2) 改寫（已選前綴保留、尾部碼段轉拼音、comment 不夠覆蓋時補原始碼）。
-        val rewritten = rewrite(rawPreedit, hint, preferred)
-        lastRenderUsedRawCode = rewritten == null
-        val decoded = rewritten ?: rawPreedit
-        // 3) App 側暫存（兜底逐段選字，引擎候選裡沒有那些字）顯示在最前面。
-        val pending = pendingPrefix
-        val rendered = (if (pending.isNullOrEmpty()) "" else pending) + decoded
-        if (com.hazukieq.hkrime.BuildConfig.DEBUG && com.hazukieq.hkrime.util.DiagLog.verbose) {
-            Timber.d(
-                "dbgpre: raw=[%s] hint=[%s] preferred=[%s] pending=[%s] decoded=[%s]",
-                rawPreedit, hint, preferred, pending, rendered,
-            )
-        }
-        renderCacheKey = cacheKey
-        renderCacheValue = rendered
-        renderCacheUsedRawCode = lastRenderUsedRawCode
-        return rendered
-    }
-
     fun rewrite(preedit: String?, hint: String? = null, preferred: String? = null): String? {
         if (preedit.isNullOrEmpty() || table.isEmpty()) return null
         // `‸`(U+2038) 是 librime 的光標標記，不屬於前綴也不屬於碼段，先整串剝掉再切。
@@ -1460,11 +1423,6 @@ object TwelveKeyPreedit {
         } ?: return null
         return prefix + shown.joinToString(" ")
     }
-
-    /** 上一次 [render] 是否連本地解碼都拿不出讀音、直接回了原始碼（需要在快照到達後補畫）。 */
-    @Volatile
-    var lastRenderUsedRawCode: Boolean = false
-        private set
 
     /**
      * 依次計算 comment 音節覆蓋的輸入碼位與顯示讀音。
@@ -1591,7 +1549,7 @@ object TwelveKeyPreedit {
     internal fun parseComment(comment: String?): List<String>? {
         val text = comment?.replace("\uFF3B", "")?.replace("\uFF3D", "")?.trim()
         if (text.isNullOrEmpty()) return null
-        return text.split(' ').filter { it.isNotEmpty() }.ifEmpty { null }
+        return text.split(Regex("[\\s\u3000]+" )).filter { it.isNotEmpty() }.ifEmpty { null }
     }
 
     private val MULTI_DELIMITER = Regex("[\u0027\\s]+")

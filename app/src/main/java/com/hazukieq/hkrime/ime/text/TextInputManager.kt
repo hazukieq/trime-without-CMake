@@ -7,6 +7,11 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import com.hazukieq.hkrime.core.Rime
 import com.hazukieq.hkrime.core.TwelveKeyPreedit
+import com.hazukieq.hkrime.core.twelvekey.CandidateSelection
+import com.hazukieq.hkrime.core.twelvekey.CompositionInput
+import com.hazukieq.hkrime.core.twelvekey.CompositionSession
+import com.hazukieq.hkrime.core.twelvekey.PreeditPresentation
+import com.hazukieq.hkrime.core.twelvekey.SelectionMemory
 import com.hazukieq.hkrime.core.twelvekey.CandidateBarBinder
 import com.hazukieq.hkrime.core.twelvekey.CandidateItem
 import com.hazukieq.hkrime.core.twelvekey.Fallback
@@ -222,34 +227,6 @@ class TextInputManager private constructor() :
         twelveKeyController = TwelveKeyController(
             scope = this,
             onSnapshot = { snapshot -> onTwelveKeySnapshot(snapshot) },
-            // 12 鍵的 preedit 由 TwelveKeyPreedit 改寫，長度與 librime 的 sel_start/sel_end 不一致，
-            // Composition.setWindow() 會在 updateComposing() 內拋 StringIndexOutOfBoundsException。
-            // 這裡保證：commit buffer 先落地；updateComposing 失敗只記日誌，進程不死，快照照常重建。
-            onEngineChanged = {
-                // 引擎寫過（選字/上屏/重建）→ 之前緩存的候選快照可能已過期
-                twelveKeyController?.invalidateForEngine()
-                val committed = runCatching { Rime.getCommit() }.getOrDefault(false)
-                if (committed) {
-                    val text = drainPendingPick() + foldUncommittedPrefix(Rime.getCommitText())
-                    Timber.i("twelvekey: commit buffer=[%s]", text)
-                    runCatching { activeEditorInstance.commitText(text, false) }
-                        .onFailure { Timber.e(it, "twelvekey: commitText failed") }
-                    maybeRecordPhrase()
-                } else {
-                    // 多字詞被選中：buffer 空、但 preedit 前綴已有字，先記住，下一次提交一起上屏。
-                    uncommittedPrefix = compositionPrefix()
-                    Timber.i("twelvekey: no commit buffer after select, prefix=[%s]", uncommittedPrefix)
-                }
-                runCatching { trime.updateComposing() }
-                    .onFailure { Timber.e(it, "twelvekey: updateComposing failed") }
-                refreshTwelveKey()
-            },
-            onCommitText = { text ->
-                runCatching {
-                    activeEditorInstance.commitText(text)
-                    trime.updateComposing()
-                }.onFailure { Timber.e(it, "twelvekey: fallback commit failed") }
-            },
         )
     }
 
@@ -270,28 +247,24 @@ class TextInputManager private constructor() :
     }.getOrDefault(false)
 
     /**
-     * 12 鍵下按空格：上屏「候選條第一條」而不是引擎高亮條（引擎高亮仍是引擎順序第 0 個，
-     * 學習重排後它已經不是用戶看到的第一個）。
-     */
-    fun commitTopCandidateIfTwelveKey(keyCode: Int): Boolean {
-        if (keyCode != android.view.KeyEvent.KEYCODE_SPACE) return false
-        if (!isTwelveKeyMode() || !Rime.isComposing()) return false
-        val item = currentSnapshot.barItems.firstOrNull()
-            ?: return false
-        if (holdPartialPick(item.text, item.comment, engineIndex = item.index)) return true
-        withEngineLock { twelveKeyController?.selectCandidate(item.index, item.comment) }
-        return true
-    }
-
-    /**
      * 12 鍵預編輯預覽文字：取「固定候選欄第一條」，讓嵌入式預覽與候選欄顯示同一個字。
      *
      * 引擎的 commit_text_preview 是引擎順序第一條；12 鍵候選條會被 SelectionMemory
      * 重排（用戶常用字優先），兩者不一致時會出現「候選欄是怕、預覽是啥」的錯位。
      */
     fun currentPreviewText(): String? {
-        if (!isTwelveKeyMode() || !Rime.isComposing()) return null
-        return currentSnapshot.inlineText.takeIf { it.isNotEmpty() }
+        if (!isTwelveKeyMode()) return null
+        return withEngineLock {
+            PreeditPresentation.preview(Rime.getRawPreedit().orEmpty(), Rime.RimeGetInput().orEmpty())
+        }
+    }
+
+    fun currentCompositionText(): String? = if (!isTwelveKeyMode()) null else withEngineLock {
+        PreeditPresentation.render(Rime.getRawPreedit(), Rime.RimeGetInput().orEmpty())
+    }
+
+    fun currentInputText(): String? = if (!isTwelveKeyMode()) null else withEngineLock {
+        composition.selectedText + Rime.RimeGetInput().orEmpty()
     }
 
     /**
@@ -311,12 +284,6 @@ class TextInputManager private constructor() :
      * 統一刷新：面板已顯示或要求顯示時傳 full=true，確保連續選字後仍有完整分組。
      */
     private fun refreshTwelveKey() {
-        // 暫存的字不能漏：引擎這邊已經沒有組合了（例如用戶按了回車/焦點切走），
-        // 就立刻把它上屏，否則它會殘留在 preedit 裡串到下一次輸入。
-        if (pendingPick.isNotEmpty() && runCatching { !Rime.isComposing() }.getOrDefault(false)) {
-            flushPendingPick()
-            return
-        }
         twelveKeyController?.refresh(
             immediate = true,
             full = panelWanted || isCandidatePanelShown(),
@@ -326,13 +293,7 @@ class TextInputManager private constructor() :
     /** 切換展開面板；空候選時 ▼ 的語義是「收起鍵盤」。 */
     fun toggleCandidatePanel() {
         if (isTwelveKeyMode()) {
-            // 快照通常在按鍵後 120ms 內就位；只有完全沒快照時才同步算一次（首開面板）
-            if (twelveKeyController?.snapshot?.isEmpty != false && Rime.isComposing()) {
-                twelveKeyController?.refreshSync()
-            }
-            candidatePanelController?.toggle()
-            twelveKeyController?.refresh(immediate = true, full = true)
-            candidateView?.setPanelOpen(candidatePanelController?.isShown == true)
+            if (panelWanted || isCandidatePanelShown()) hideCandidatePanel() else showCandidatePanel()
             return
         }
         if (isCandidatePanelShown()) {
@@ -350,11 +311,7 @@ class TextInputManager private constructor() :
         if (!Rime.isComposing()) return
         panelWanted = true
         if (isTwelveKeyMode()) {
-            if (twelveKeyController?.snapshot?.isEmpty != false) twelveKeyController?.refreshSync()
-            val snapshot = twelveKeyController?.snapshot
-            if (snapshot == null || (!snapshot.hasCandidates && snapshot.fallback == null)) return
-            candidatePanelController?.show()
-            // 面板要完整分組：開面板時全量枚舉一次
+            // 保持鍵盤可見，完整快照到達才展示面板，不在主線程同步枚舉。
             twelveKeyController?.refresh(immediate = true, full = true)
         } else {
             // 非 12 鍵方案在開面板時構建相同模型的引擎快照，不產生 12 鍵本地段組。
@@ -391,39 +348,27 @@ class TextInputManager private constructor() :
             lastKeyAtNs = 0L
         }
         if (snapshot.isEmpty) {
-            // 新一輪輸入：上一輪的逐段累積作廢（上屏時已經記過了）
-            pickedText.setLength(0)
-            pickedReadings.setLength(0)
-            pickedCode = ""
-            pickedMissingReading = false
-            pickedPieces = 0
-            // 本輪結束：露過面但沒被選的合成候選，各記一次曝光（弱負信號）
+            if (!composition.active) panelWanted = false
             flushPhraseExposure()
         } else {
             collectPhraseExposure(snapshot)
         }
         currentSnapshot = snapshot
-        // preedit 讀音對齊（docs/14）：把「用戶看到的第一條候選」發布給 TwelveKeyPreedit，
-        // 因為 getComposition() 裡無法知道候選條順序（那是 App 排的，不是引擎 menu 順序）。
-        // 讀音只取「候選條第一條」的 comment（所見即所得）；首條覆蓋不到全部碼位時，
-        // 由 TwelveKeyPreedit.rewrite() 用本地解碼把尾巴補上，保證按下的鍵全部顯示。
-        val first = snapshot.barItems.firstOrNull()
-        val preferredChanged = TwelveKeyPreedit.preferredText != first?.text ||
-            TwelveKeyPreedit.preferredComment != first?.comment
-        TwelveKeyPreedit.preferredText = first?.text
-        TwelveKeyPreedit.preferredComment = first?.comment
+        val preferredChanged = PreeditPresentation.publish(snapshot, composition.selectedText)
         candidateBarBinder?.bind(snapshot)
-        candidatePanelController?.submit(snapshot)
-        applyInlinePreview(snapshot)
+        candidatePanelController?.submit(snapshot, preserveReading = preservePanelReading)
+        preservePanelReading = false
+        if (panelWanted && snapshot.groups.isNotEmpty() && candidatePanelController?.isShown != true) {
+            candidatePanelController?.show()
+        }
+        applyInlinePreview()
         if (snapshot.isEmpty || (!snapshot.hasCandidates && snapshot.fallback == null)) {
             if (candidatePanelController?.isShown == true) candidatePanelController?.hide()
         }
         // 面板可能被 submit() 自動收起（上屏後無剩餘碼），箭頭方向要跟著回到 ▼
         candidateView?.setPanelOpen(candidatePanelController?.isShown == true)
         // 首選變化或上一幀未完成讀音渲染時補畫 preedit，使用已發布快照。
-        val needRedraw = preferredChanged ||
-            (TwelveKeyPreedit.lastRenderUsedRawCode && first?.comment.isNullOrEmpty().not())
-        if (needRedraw && Rime.isComposing()) refreshPreeditAfterSnapshot()
+        if (preferredChanged && (Rime.isComposing() || composition.active)) refreshPreeditAfterSnapshot()
     }
 
     /**
@@ -445,45 +390,205 @@ class TextInputManager private constructor() :
      * 12 鍵 preedit 預覽與候選條同幀落地：快照一到就把第一條寫進 preedit。
      * 只在「嵌入式編輯模式 = 首選」時接管；其他模式仍由 EditorInstance 按各自來源更新。
      */
-    private fun applyInlinePreview(snapshot: TwelveKeySnapshot) {
+    private fun applyInlinePreview() {
         if (!isTwelveKeyMode()) return
         if (prefs.keyboard.inlinePreedit != InlineModeType.INLINE_PREVIEW) return
         val ic = activeEditorInstance.inputConnection ?: return
-        val text = if (snapshot.isEmpty || !Rime.isComposing()) "" else snapshot.inlineText
+        val text = currentPreviewText().orEmpty()
         runCatching { ic.setComposingText(text, 1) }
             .onFailure { Timber.e(it, "twelvekey: inline preview failed") }
     }
 
 
-    /**
-     * App 聯想詞使用具體讀音和剩餘碼判定：部分覆蓋先暫存，完整覆蓋才提交。
-     * 不是引擎候選的詞不能直接用 select_candidate。
-     */
-    private fun pickAssociationWord(text: String, reading: String = "") {
-        if (text.isEmpty()) return
-        // 先記下當前完整碼串：清組合後 input 就沒了，學習的 key 必須是「這次打的碼」。
-        val code = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
-        // 詞只覆蓋輸入前幾個音節時由 holdPartialPick 攔掉（留在 preedit）；
-        // 這裡只處理「整串被這個詞覆蓋」的上屏。
-        if (holdPartialPick(text, reading, code)) return
-        runCatching {
-            withEngineLock { Rime.clearComposition() }
-            activeEditorInstance.commitText(text, false)
-            setSegmentAnchor(text.lastOrNull())
+    private val composition = CompositionSession()
+    private var preservePanelReading = false
+    private var rawEngineCommitAllowed = false
+
+    /** 所有 12 鍵來源先證實消費範圍，再寫同一份選擇日誌。 */
+    private fun chooseTwelveKey(item: CandidateItem, contextKey: String, origin: CompositionSession.Origin) {
+        withEngineLock {
+            if (!composition.bindEditor(currentEditorIdentity())) {
+                cancelTwelveKeyComposition()
+                refreshTwelveKey()
+                return@withEngineLock
+            }
+            val local = TwelveKeySnapshotBuilder.local()
+            val actualKey = twelveKeyController?.contextKey(local).orEmpty()
+            if (!CandidateSelection.isCurrent(contextKey, actualKey) || local.remaining.isEmpty()) {
+                refreshTwelveKey()
+                return@withEngineLock
+            }
+            val consumed = CandidateSelection.consumedEnd(item, local.remaining, origin) ?: run {
+                Timber.w("twelvekey: unresolved selection text=%s reading=%s", item.text, item.comment)
+                refreshTwelveKey()
+                return@withEngineLock
+            }
+            // 原生部分選中不應與 App 日誌並存；保留原碼，退格仍可交引擎撤回。
+            if (local.consumedEnd != 0) { refreshTwelveKey(); return@withEngineLock }
+            composition.input(local.remaining)
+            if (!composition.pick(item.text, item.comment, consumed, origin)) return@withEngineLock
+            preservePanelReading = true
+            twelveKeyController?.invalidateForEngine()
+            PreeditPresentation.invalidate(composition.selectedText)
+            if (composition.remaining.isNotEmpty()) {
+                restoreTwelveKeyCode(composition.remaining)
+            } else {
+                // 最後一次選擇才允許原生學習；其 buffer 在這裡消耗，不直接寫編輯器。
+                if (item.index >= 0) {
+                    val current = runCatching { Rime.candidatesSnapshot(item.index + 1) }.getOrNull()
+                        ?.getOrNull(item.index)
+                    if (current?.getOrNull(0) == item.text &&
+                        TwelveKeySnapshotBuilder.cleanCommentForSelection(current.getOrNull(1)) == item.comment) {
+                        runCatching { Rime.select_candidate(item.index); Rime.getContexts(); Rime.getCommit() }
+                    }
+                }
+                Rime.clearComposition()
+                commitCompletedSelection()
+            }
+            setSegmentAnchor(composition.selectedText.lastOrNull())
             trime.updateComposing()
             refreshTwelveKey()
-            // 面板聯想詞提交記入 App 學習，維持候選條與推薦排序的學習來源。
-            if (code.isNotEmpty()) PhraseMemory.learnPick(code, text, reading)
-        }.onFailure { Timber.e(it, "twelvekey: association pick failed") }
+        }
     }
 
-    /**
-     * 引擎詞點選同時記 App 學習；單字不作 PhraseMemory 詞條。
-     */
-    private fun learnCandidatePick(text: String, reading: String) {
-        if (text.length < 2) return
-        val code = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
-        if (code.isNotEmpty()) PhraseMemory.learnPick(code, text, reading)
+    private fun commitCompletedSelection() {
+        val completed = composition.completed() ?: return
+        // false/例外保留完整 journal 與許可，使用者仍可退格重選或確認重試。
+        runCatching { activeEditorInstance.commitText(completed.text, false) }
+            .onFailure { Timber.e(it, "twelvekey: editor commit failed") }
+    }
+
+    /** 編輯器寫入前的最後守衛：生產與離線測試共用 commitThrough 交易。 */
+    private fun currentEditorIdentity() = CompositionSession.EditorIdentity(
+        activeEditorInstance.editorInfo, activeEditorInstance.inputConnection,
+    )
+
+    fun onEditorSessionChanged() {
+        withEngineLock {
+            val editor = currentEditorIdentity()
+            if (!composition.bindEditor(editor)) {
+                cancelTwelveKeyComposition()
+                composition.bindEditor(editor)
+            }
+        }
+    }
+
+    fun commitEditorText(text: String, editor: CompositionSession.EditorIdentity, write: () -> Boolean): Boolean = withEngineLock {
+        if (!editor.same(currentEditorIdentity())) return@withEngineLock false
+        if (!composition.belongsTo(editor)) {
+            cancelTwelveKeyComposition()
+            return@withEngineLock false
+        }
+        if (!composition.active) {
+            return@withEngineLock if (isTwelveKeyMode() && Rime.isComposing()) false else write()
+        }
+        val completed = composition.commitThrough(text, editor, write) ?: return@withEngineLock false
+        PreeditPresentation.invalidate("")
+        learnCompletedSelection(completed)
+        true
+    }
+
+    private fun learnCompletedSelection(completed: CompositionSession.Completion) {
+        val text = completed.text
+        runCatching { completed.picks.forEach { pick ->
+            SelectionMemory.bump(pick.text, pick.reading)
+            pickedSynthetic.add(pick.text)
+            if (pick.text.length >= 2 && pick.reading.isNotBlank()) {
+                PhraseMemory.learnPick(pick.beforeCode, pick.text, pick.reading)
+            }
+        }
+        if (completed.picks.size >= 2 && text.length >= 2 && completed.picks.all { it.reading.isNotBlank() }) {
+            PhraseMemory.record(completed.code, text, completed.picks.joinToString(" ") { it.reading })
+        }
+        }.onFailure { Timber.e(it, "twelvekey: post-commit learning failed") }
+    }
+
+    private fun restoreTwelveKeyCode(code: String) {
+        Rime.clearComposition()
+        if (code.isNotEmpty()) Rime.onText(code)
+        Rime.getContexts()
+    }
+
+    /** 原生 buffer 不等同於使用者完成選擇。拒絕意外提交並還原待選碼。 */
+    fun consumeTwelveKeyEngineCommit(): Boolean = withEngineLock {
+        val committed = Rime.getCommit()
+        val allowRaw = rawEngineCommitAllowed
+        rawEngineCommitAllowed = false
+        if (committed && allowRaw && !composition.active) {
+            activeEditorInstance.commitText(Rime.getCommitText(), false)
+        } else if (committed) {
+            Timber.w("twelvekey: blocked unsolicited engine commit; remaining=%s", composition.remaining)
+            restoreTwelveKeyCode(composition.remaining)
+        } else {
+            val actual = Rime.RimeGetInput().orEmpty()
+            if (actual.isEmpty() && composition.remaining.isNotEmpty()) restoreTwelveKeyCode(composition.remaining)
+            else composition.input(actual)
+        }
+        PreeditPresentation.invalidate(composition.selectedText)
+        trime.updateComposing()
+        committed
+    }
+
+    fun hasTwelveKeySession(): Boolean = composition.active
+
+    /** 在引擎處理按鍵前保存預期碼，防止 auto_commit 清空後無法恢復剛按的鍵。 */
+    fun beforeTwelveKeyEngineKey(event: IntArray) {
+        if (!isTwelveKeyMode() || Rime.isAsciiMode() || event.isEmpty()) return
+        if (event.size > 1 && event[1] and Rime.META_RELEASE_ON != 0) return
+        onEditorSessionChanged()
+        if (Rime.RimeGetInput().isNullOrEmpty() && composition.remaining.isNotEmpty()) {
+            restoreTwelveKeyCode(composition.remaining)
+        }
+        val code = Rime.RimeGetInput().orEmpty()
+        val caret = runCatching { Rime.RimeGetCaretPos() }.getOrDefault(code.length)
+        val intent = CompositionInput.beforeKey(code, caret, event[0], composition.canUndo)
+        rawEngineCommitAllowed = intent.allowRawCommit
+        composition.input(intent.code)
+        PreeditPresentation.invalidate(composition.selectedText)
+        twelveKeyController?.invalidateForEngine()
+    }
+
+    /** 軟鍵盤與實體鍵盤共用；回車/空格只選一次，不強制提交尾碼。 */
+    fun handleTwelveKeyKey(keyCode: Int): Boolean {
+        if (!isTwelveKeyMode() || (!composition.active && !Rime.isComposing())) return false
+        if (keyCode == KeyEvent.KEYCODE_ESCAPE || keyCode == KeyEvent.KEYCODE_BACK) {
+            cancelTwelveKeyComposition()
+            trime.updateComposing()
+            return true
+        }
+        if (keyCode == KeyEvent.KEYCODE_DEL && composition.canUndo) {
+            withEngineLock {
+                composition.undo()?.let { restoreTwelveKeyCode(it) }
+                PreeditPresentation.invalidate(composition.selectedText)
+                twelveKeyController?.invalidateForEngine()
+                preservePanelReading = true
+            }
+            trime.updateComposing()
+            refreshTwelveKey()
+            return true
+        }
+        if (keyCode != KeyEvent.KEYCODE_SPACE && keyCode != KeyEvent.KEYCODE_ENTER) return false
+        if (composition.remaining.isEmpty() && composition.confirmSelected()) {
+            commitCompletedSelection()
+            trime.updateComposing()
+            refreshTwelveKey()
+            return true
+        }
+        val origin = if (keyCode == KeyEvent.KEYCODE_SPACE) CompositionSession.Origin.SPACE else CompositionSession.Origin.RETURN
+        val item = currentSnapshot.barItems.firstOrNull()
+        if (item != null) chooseTwelveKey(item, currentSnapshot.contextKey, origin) else refreshTwelveKey()
+        return true
+    }
+
+    fun cancelTwelveKeyComposition() {
+        withEngineLock {
+            val hadSession = composition.active || isTwelveKeyMode()
+            composition.cancel()
+            rawEngineCommitAllowed = false
+            PreeditPresentation.invalidate("")
+            if (hadSession) Rime.clearComposition()
+            twelveKeyController?.invalidateForEngine()
+        }
     }
 
     /** 記下本輪真展示過的合成候選（候選條必算；展開面板打開時也算）。 */
@@ -520,149 +625,6 @@ class TextInputManager private constructor() :
     }
 
     /**
-     * 選合成學習詞不走 select_candidate。完整碼在 restCode；
-     * 若只覆蓋前段先暫存，全部選完才提交並記學習。
-     */
-    /** 一次「部分選中」的暫存：詞文字 + 選中前的完整碼串（退格要整段還原）。 */
-    private data class HeldPick(val text: String, val code: String)
-
-    /**
-     * 部分選詞先存 pendingPick，再重餵剩餘碼，全部選完才上屏。
-     * heldPicks 同時保存文字和完整原碼，DEL 整段撤回並恢復原碼。
-     */
-    /**
-     * 引擎目前**還沒被消費**的輸入尾巴（已選中的段不算）。
-     *
-     * librime 的 `RimeGetInput()` 在部分選中後仍回整串原始碼；用整串去算「還剩幾個音節」
-     * 會把已選的前綴重複算一次。快照的 `remaining` 已扣掉 `consumedEnd`，優先用它。
-     */
-    private fun unconsumedCode(): String {
-        val rem = twelveKeyController?.snapshot?.remaining.orEmpty()
-        if (rem.isNotEmpty()) return rem
-        return withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
-    }
-
-    private fun holdPartialPick(
-        text: String,
-        reading: String,
-        input: String = "",
-        engineIndex: Int = -1,
-    ): Boolean {
-        if (text.isEmpty()) return false
-        val code = input.ifEmpty {
-            withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
-        }
-        // 引擎已有 consumedEnd 時僅從未消耗尾碼判斷本次選詞的剩餘部分。
-        val base = unconsumedCode().ifEmpty { code }
-        val remaining = TwelveKeyPreedit.remainingCodeAfter(reading, base)
-        if (remaining.isEmpty()) return false
-        // 學習要在清組合前記（key 是這次完整碼串）。
-        if (engineIndex >= 0) learnCandidatePick(text, reading) else if (code.isNotEmpty()) {
-            PhraseMemory.learnPick(code, text, reading)
-        }
-        // 引擎 preedit 裡「已選未提交」的前綴（如「冷」）不是 pendingPick 管的，clearComposition 前
-        // 要併進來，否則被丟掉；heldPicks 記完整碼串，退格時還原整串（含前綴未選中的狀態）。
-        val enginePrefix = uncommittedPrefix.ifEmpty {
-            withEngineLock { runCatching { Rime.getCompositionPrefix() }.getOrNull() }.orEmpty()
-        }
-        uncommittedPrefix = ""
-        heldPicks.addLast(HeldPick(enginePrefix + text, code))
-        pendingPick.append(enginePrefix).append(text)
-        updatePendingPick()
-        setSegmentAnchor(text.lastOrNull())
-        withEngineLock { Rime.clearComposition() }
-        withEngineLock { Rime.onText(remaining) }
-        trime.updateComposing()
-        refreshTwelveKey()
-        trime.updateComposing()
-        com.hazukieq.hkrime.util.DiagLog.d(
-            "pick",
-            "hold text=$text reading='$reading' code=$code remaining=$remaining held=${heldPicks.size}",
-        )
-        return true
-    }
-
-    private fun commitPhrase(item: CandidateItem) {
-        val code = item.restCode
-        val text = item.text
-        if (text.isEmpty()) return
-        pickedSynthetic.add(text)
-        // 引擎裡可能已有「選中未提交」的前綴（先逐段選了幾個字），它不在 pendingPick 裡：
-        // 先取出來併進上屏文字，否則 clearComposition 會把它丟掉。
-        val enginePrefix = uncommittedPrefix.ifEmpty { withEngineLock { compositionPrefix() } }
-        uncommittedPrefix = ""
-        // 部分選詞統一暫存 preedit，並按完整原碼推算剩餘碼。
-        val input = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
-        val base = unconsumedCode().ifEmpty { input }
-        val remaining = TwelveKeyPreedit.remainingCodeAfter(item.comment, base)
-        com.hazukieq.hkrime.util.DiagLog.d(
-            "phrase",
-            "input=$input comment=${item.comment} remaining=$remaining rest=${item.restCode}",
-        )
-        if (remaining.isNotEmpty()) {
-            // 剩餘碼未完成時詞僅留在 preedit。
-            heldPicks.addLast(HeldPick(enginePrefix + text, input))
-            pendingPick.append(enginePrefix).append(text)
-            updatePendingPick()
-            setSegmentAnchor(text.lastOrNull())
-            withEngineLock { Rime.clearComposition() }
-            withEngineLock { Rime.onText(remaining) }
-            if (code.isNotEmpty()) PhraseMemory.bumpPicked(code, text)
-            trime.updateComposing()
-            refreshTwelveKey()
-            return
-        }
-        flushPendingPick()
-        runCatching { activeEditorInstance.commitText(enginePrefix + text, false) }
-            .onFailure { Timber.e(it, "twelvekey: phrase commit failed") }
-        if (code.isNotEmpty()) PhraseMemory.bumpPicked(code, text)
-        withEngineLock { Rime.clearComposition() }
-        if (remaining.isNotEmpty()) {
-            withEngineLock { runCatching { Rime.onText(remaining) } }
-        }
-        setSegmentAnchor(text.lastOrNull())
-        trime.updateComposing()
-        refreshTwelveKey()
-    }
-
-    /** 記下「這一段選了哪個字、什麼讀音」；整串上屏時一併寫進 PhraseMemory。 */
-    private fun notePickedSegment(text: String, reading: String) {
-        if (text.isEmpty()) return
-        val input = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
-        // 只認**第一次**選段時的完整碼串：選完一段後 librime 的 input 只剩剩下的碼，
-        // 用它當 key 會把「以液難」記到只剩尾巴的碼串上（下次打同樣的碼就查不到）。
-        val code = PhraseMemory.normalizeCode(input)
-        if (pickedCode.isEmpty() && code.isNotEmpty()) pickedCode = code
-        pickedPieces += 1
-        pickedText.append(text)
-        val r = reading.trim()
-        pickedReadings.append(r).append(' ')
-        if (r.isEmpty()) pickedMissingReading = true
-    }
-
-    /**
-     * 逐段拼出的整串上屏後記一條「碼串 → 詞」。
-     *
-     * 只記「用戶自己一段段選出來的」多字串：引擎能一次裝出來的詞它自己會進 userdb，這裡再記是重複。
-     */
-    private fun maybeRecordPhrase() {
-        val text = pickedText.toString()
-        val readings = pickedReadings.toString().trim()
-        val code = pickedCode
-        val missing = pickedMissingReading
-        val pieces = pickedPieces
-        pickedText.setLength(0)
-        pickedReadings.setLength(0)
-        pickedCode = ""
-        pickedMissingReading = false
-        pickedPieces = 0
-        // 只記「逐段拼出來」的（≥2 次選）：一次選中的詞是引擎自己會學的，App 再記一份是重複。
-        if (text.length < 2 || code.isEmpty() || missing || pieces < 2) return
-        PhraseMemory.record(code, text, readings)
-        Timber.i("twelvekey: phrase record code=[%s] text=[%s] readings=[%s]", code, text, readings)
-    }
-
-    /**
      * 孤單聯想：點字母行（d/f）後，右列列出該字母下所有可延伸單音節。
      * 只做展示替換，不改輸入。
      */
@@ -682,7 +644,7 @@ class TextInputManager private constructor() :
             items.add(
                 CandidatePanelAdapter.Item(
                     text = ch,
-                    comment = "",
+                    comment = syllable,
                     index = -1,
                     segment = ISOLATED_CHAR_SEGMENT,
                 ),
@@ -691,245 +653,22 @@ class TextInputManager private constructor() :
         candidatePanelController?.showDrilldown(items)
     }
 
-    /**
-     * 孤單聯想：選字與左列單字組的行為一致——先留在 preedit（pendingPick），
-     * 只消耗首鍵，剩下的碼重新餵回引擎繼續組下一個音節；退格可整段反悔還原原碼。
-     */
-    private fun onPickIsolatedChar(text: String) {
-        if (text.isEmpty()) return
-        val input = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
-        val rest = if (input.length > 1) input.substring(1) else ""
-        runCatching {
-            heldPicks.addLast(HeldPick(text, input))
-            pendingPick.append(text)
-            updatePendingPick()
-            withEngineLock { Rime.clearComposition() }
-            if (rest.isNotEmpty()) {
-                withEngineLock { Rime.onText(rest) }
-            }
-            trime.updateComposing()
-            refreshTwelveKey()
-            trime.updateComposing()
-        }.onFailure { Timber.e(it, "twelvekey: isolated pick failed") }
-    }
-
     private fun onPickPanelCandidate(item: CandidatePanelAdapter.Item) {
-        if (!isTwelveKeyMode()) {
-            pickLegacyPanelCandidate(item)
+        if (!isTwelveKeyMode()) { pickLegacyPanelCandidate(item); return }
+        if (item.contextKey != currentSnapshot.contextKey) { refreshTwelveKey(); return }
+        if (item.segment == ISOLATED_SEGMENT) { onPickIsolatedSyllable(item.text); return }
+        if (item.segment == ISOLATED_BACK_SEGMENT) { candidatePanelController?.restoreGrid(); return }
+        val fallback = currentSnapshot.fallback
+        if (fallback != null && item.index < 0 && item.segment == -1 && item.text == fallback.letters) {
+            chooseTwelveKey(CandidateItem(item.text, "", -1, restCode = currentSnapshot.remaining),
+                item.contextKey, CompositionSession.Origin.FALLBACK)
             return
         }
-        if (item.segment == ISOLATED_SEGMENT) {
-            onPickIsolatedSyllable(item.text)
-            return
-        }
-        if (item.segment == ISOLATED_CHAR_SEGMENT) {
-            onPickIsolatedChar(item.text)
-            return
-        }
-        if (item.segment == ISOLATED_BACK_SEGMENT) {
-            candidatePanelController?.restoreGrid()
-            return
-        }
-        if (item.segment == 1) {
-            // 引擎詞組（`灵机一动` 這種多音節詞在面板裡也有下標）：必須走 librime
-            // 原生 select_candidate，選中不提交、剩餘輸入（`来的`）才會保留。
-            // 只有 App 側合成的聯想詞/學習詞（index < 0）才整詞上屏。
-            if (item.index >= 0) {
-                // 只覆蓋前幾音節的詞：留在 preedit（不走 select_candidate，否則 auto_commit 會整串上屏）。
-                if (holdPartialPick(item.text, item.comment, engineIndex = item.index)) return
-                // 不要 notePickedSegment：這裡是引擎原生選中，引擎會自己管 commit buffer；
-                // 再往 pendingPick 塞一份會在最終上屏時重複。
-                learnCandidatePick(item.text, item.comment)
-                twelveKeyController?.selectCandidate(item.index, item.comment)
-                return
-            }
-            pickAssociationWord(item.text, item.comment)
-            return
-        }
-        if (item.segment == SYNTHETIC_SEGMENT) {
-            commitPhrase(
-                CandidateItem(
-                    text = item.text,
-                    comment = item.comment,
-                    index = -1,
-                    segment = SYNTHETIC_SEGMENT,
-                    restCode = item.restCode,
-                ),
-            )
-            return
-        }
-        if (item.segment >= 0) {
-            notePickedSegment(item.text, item.comment)
-            // 此路徑交引擎維持已選前綴，全部完成才提交，退格可撤回。
-            val engineIndex = resolveEngineIndexForSegment(item.text, item.comment)
-            if (engineIndex >= 0) {
-                learnCandidatePick(item.text, item.comment)
-                twelveKeyController?.selectCandidate(engineIndex, item.comment)
-                return
-            }
-            // 匹配到可用引擎段候選時交引擎維護選中狀態，不重複寫 pendingPick。
-            if (resegmentAndSelect(item)) return
-            // 引擎重分段後仍然沒有這個字（詞庫確實沒收）：退回 App 側兜底（會逐段上屏）。
-            pickSegmentedCandidate(item.text, item.restCode)
-            return
-        }
-        if (item.index < 0) {
-            // fallback：本地原文上屏
-            twelveKeyController?.snapshot?.fallback?.let { twelveKeyController?.commitFallback(it) }
-            return
-        }
-        notePickedSegment(item.text, item.comment)
-        twelveKeyController?.selectCandidate(item.index, item.comment)
-    }
-
-    /**
-     * 把「段組裡的一個字」解析成 librime 的**全局候選下標**。
-     *
-     * 命中就交給引擎原生 `select_candidate`：選中不提交、preedit 保留已選段、全部選完才上屏，
-     * 退格由引擎自己反悔，學習也走 librime —— 不需要 App 在旁邊維護一份「待上屏的字」。
-     * 只有引擎候選裡確實沒有這個字（字典有、詞庫沒收）時返回 -1，調用方再退回 App 側兜底。
-     */
-    private fun resolveEngineIndexForSegment(text: String, syllable: String): Int {
-        if (text.isEmpty()) return -1
-        val rows = withEngineLock {
-            runCatching { Rime.candidatesSnapshot(TwelveKeySnapshotBuilder.MAX_CANDIDATES) }.getOrNull()
-        } ?: return -1
-        var looseMatch = -1
-        for (i in rows.indices) {
-            val row = rows[i] ?: continue
-            if ((row.getOrNull(0) ?: "") != text) continue
-            if (looseMatch < 0) looseMatch = i
-            val comment = row.getOrNull(1)?.trim().orEmpty()
-            if (syllable.isNotEmpty() && (comment == syllable || comment.startsWith(syllable))) {
-                return i
-            }
-        }
-        return looseMatch
-    }
-
-    /**
-     * 把「還沒分段的輸入」按段插 `'` 重新餵給引擎，再把這個字交給引擎選中。
-     *
-     * 為什麼需要：librime 對 `88` 這種未分段輸入只給「組詞」候選，單字（以/夜/就…）不在候選裡，
-     * 於是面板段組點擊會落到 App 兜底——兜底是「上屏這個字 + 其餘碼重餵」，用戶會看到字先上屏了。
-     * 插 `'` 後引擎按段給單字候選，命中就能走原生 `select_candidate`：選中不提交、全部選完才上屏、
-     * 退格由引擎反悔、學習也走 librime。
-     *
-     * 返回 true = 已經由引擎選中（調用方直接 return）；false = 沒命中，調用方退回兜底。
-     */
-    private fun resegmentAndSelect(item: CandidatePanelAdapter.Item): Boolean {
-        val input = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
-        if (input.isEmpty() || input.contains('\'')) return false
-        val rest = item.restCode
-        if (rest.isEmpty() || input.length <= rest.length || !input.endsWith(rest)) return false
-        val head = input.dropLast(rest.length)
-        if (head.isEmpty()) return false
-        val segmented = head + "'" + rest
-        return runCatching {
-            withEngineLock { Rime.clearComposition() }
-            withEngineLock { Rime.onText(segmented) }
-            val engineIndex = resolveEngineIndexForSegment(item.text, item.comment)
-            if (engineIndex < 0) {
-                // 沒命中：把輸入還原成沒分段的形式，讓後續兜底走原路徑。
-                withEngineLock { Rime.clearComposition() }
-                withEngineLock { Rime.onText(input) }
-                false
-            } else {
-                twelveKeyController?.selectCandidate(engineIndex, item.comment)
-                true
-            }
-        }.getOrElse {
-            Timber.e(it, "twelvekey: resegment failed")
-            false
-        }
-    }
-
-    /**
-     * 分詞（`'`）後的逐段選字：上屏這一段的字，然後把剩下的段重新餵回引擎，
-     * 讓下一段繼續出候選。只處理第一個待選段（分詞是逐段進行的）。
-     */
-    private fun pickSegmentedCandidate(text: String, restCode: String = "") {
-        val input = withEngineLock { runCatching { Rime.RimeGetInput() }.getOrNull() }.orEmpty()
-        // restCode 由快照算好（多音節但沒按分詞鍵的情況，碼串裡沒有 `'` 可以切）。
-        val rest: List<String> = if (restCode.isNotEmpty()) {
-            listOf(restCode)
-        } else {
-            val segments = input.split('\'').filter { it.isNotEmpty() }
-            if (segments.isEmpty()) return
-            segments.drop(1)
-        }
-        runCatching {
-            // 清組合前保留已選前綴，優先使用引擎確認的前綴；使用後清空緩存，避免重複合併。
-            val remembered = uncommittedPrefix
-            uncommittedPrefix = ""
-            val prefix = remembered.ifEmpty { withEngineLock { compositionPrefix() } }
-            // App 兜底逐段選字先暫存文字及剩餘碼，最後一段完成再提交。
-            pendingPick.append(prefix).append(text)
-            updatePendingPick()
-            withEngineLock { Rime.clearComposition() }
-            // 記住剛上屏的字：下一段的候選條按「與它的關聯度」排序（區 → 域）。
-            setSegmentAnchor(text.firstOrNull())
-            if (rest.isNotEmpty()) {
-                withEngineLock { Rime.onText(rest.joinToString("'")) }
-                trime.updateComposing()
-                refreshTwelveKey()
-            } else {
-                // 最後一段也選完了 → 現在才上屏（含前面暫存的字）。
-                flushPendingPick()
-            }
-        }.onFailure { Timber.e(it, "twelvekey: segmented pick failed") }
-    }
-
-    /** 把 App 側暫存前綴同步給 preedit 顯示（Rime.getComposition() 會拼在最前面）。 */
-    private fun updatePendingPick() {
-        TwelveKeyPreedit.pendingPrefix = pendingPick.toString()
-    }
-
-    /**
-     * 最後一段完成或引擎提交時取出並清理暫存前綴與撤回堆棧。
-     */
-    private fun flushPendingPick() {
-        if (pendingPick.isEmpty()) {
-            heldPicks.clear()
-            return
-        }
-        val text = pendingPick.toString()
-        pendingPick.setLength(0)
-        heldPicks.clear()
-        updatePendingPick()
-        runCatching { activeEditorInstance.commitText(text, false) }
-            .onFailure { Timber.e(it, "twelvekey: flush pending failed") }
-        maybeRecordPhrase()
-        trime.updateComposing()
-        refreshTwelveKey()
-    }
-
-    /** 取出並清空暫存的字（引擎 commit 時用，保證「暫存 + 引擎提交」一次上屏）。 */
-    private fun drainPendingPick(): String {
-        if (pendingPick.isEmpty()) {
-            heldPicks.clear()
-            return ""
-        }
-        val text = pendingPick.toString()
-        pendingPick.setLength(0)
-        updatePendingPick()
-        return text
-    }
-
-    /** librime preedit 裡已選前綴（不含碼串）。調用方需持有引擎鎖。 */
-    private fun compositionPrefix(): String =
-        runCatching { Rime.getCompositionPrefix() }.getOrDefault("").orEmpty()
-
-    /**
-     * 把「已選未提交前綴」並進上屏文字。
-     *
-     * librime 有時 commit buffer 已包含前綴（整串一次提交），此時不能重複拼接，用 startsWith 判斷。
-     */
-    private fun foldUncommittedPrefix(commitText: String): String {
-        val prefix = uncommittedPrefix
-        uncommittedPrefix = ""
-        if (prefix.isEmpty() || commitText.startsWith(prefix)) return commitText
-        return prefix + commitText
+        chooseTwelveKey(
+            CandidateItem(item.text, item.comment, item.index, item.segment, item.restCode),
+            item.contextKey,
+            if (item.segment == ISOLATED_CHAR_SEGMENT) CompositionSession.Origin.ISOLATED else CompositionSession.Origin.PANEL,
+        )
     }
 
     /** 更新「按段選字」的關聯度錨點（前一個上屏的字）；變化時讓快照緩存失效。 */
@@ -1000,14 +739,7 @@ class TextInputManager private constructor() :
     }
 
     private fun doOnCandidatesRefreshed() {
-        // 組字結束（上屏/清空）→ 清掉「按段選字」的錨點，下一輪重新記。
-        // 分段不再依賴用戶按 `'`：面板按碼位自動拆段（見 TwelveKeySnapshotBuilder.splitParts）。
-        if (!Rime.isComposing()) {
-            heldPicks.clear()
-            setSegmentAnchor(null)
-            // 組字結束（上屏/清空/取消）→ 未提交前綴已無意義，避免後續一次性誤上屏。
-            uncommittedPrefix = ""
-        }
+        if (!Rime.isComposing() && !composition.active) setSegmentAnchor(null)
         if (isTwelveKeyMode()) {
             // 按鍵後立即重建快照（不 debounce）；面板關閉時只枚舉候選條需要的 16 條，
             // 面板打開才全量枚舉（按鍵卡頓的另一半原因：每鍵 600 條枚舉）。
@@ -1057,6 +789,7 @@ class TextInputManager private constructor() :
      * Cancels all coroutines and cleans up.
      */
     override fun onDestroy() {
+        cancelTwelveKeyComposition()
         intentReceiver?.unregisterReceiver(trime)
         intentReceiver = null
 
@@ -1075,6 +808,7 @@ class TextInputManager private constructor() :
     override fun onStartInputView(instance: EditorInstance, restarting: Boolean) {
         super.onStartInputView(instance, restarting)
         // 新輸入框/新會話：面板狀態一律復位，否則會留下「鍵盤被 GONE、面板空的」灰塊
+        if (!restarting) cancelTwelveKeyComposition()
         hideCandidatePanel()
         twelveKeyController?.reset()
         candidatePanelRoot?.visibility = android.view.View.GONE
@@ -1177,6 +911,7 @@ class TextInputManager private constructor() :
 
         // 方案開關改變 filter 輸出，使快照緩存失效並刷新。
         twelveKeyController?.invalidateForOptions()
+        PreeditPresentation.invalidate(composition.selectedText)
         if (isTwelveKeyMode()) {
             if (Rime.isComposing()) refreshTwelveKey()
         } else if (isCandidatePanelShown()) {
@@ -1226,25 +961,6 @@ class TextInputManager private constructor() :
      * 而它內部會調 [onCandidatesRefreshed] 再刷一次快照——那時快照已經是最新的，純屬重複。
      */
     private var suppressSnapshotRefresh = false
-
-    /**
-     * 緩存引擎已選未提交前綴；清組合或最終提交時合併，避免重建時丟字。
-     */
-    private var uncommittedPrefix: String = ""
-
-    /** App 側「已選但還沒上屏」的字（兜底路徑用；見 flushPendingPick）。 */
-    private val pendingPick = StringBuilder()
-
-    /** 部分選中堆棧：退格時整段還原（與 pendingPick 一一對應）。 */    private val heldPicks = ArrayDeque<HeldPick>()
-
-    // ---- 逐段拼詞的累積（記進 PhraseMemory：文字 + 各段讀音 + 完整碼串）----
-    private val pickedText = StringBuilder()
-    private val pickedReadings = StringBuilder()
-    private var pickedCode: String = ""
-    private var pickedMissingReading = false
-
-    /** 一共「分幾次選」把這串拼出來：≥2 才算逐段拼出的詞（一次選中的詞由引擎自己學）。 */
-    private var pickedPieces: Int = 0
 
     // ---- 合成候選的曝光統計（誤造詞判定用，見 PhraseMemory.score）----
     /** 本輪真出現在候選條/展開面板上的合成候選：文字 → 完整碼串。 */
@@ -1339,36 +1055,6 @@ class TextInputManager private constructor() :
 
     override fun onKey(keyEventCode: Int, metaState: Int) {
         printModifierKeyState(metaState, "keyEventCode=" + keyEventCode)
-        // 退格先清理待撤回的引擎前綴，避免改選後重複上屏。
-        if (keyEventCode == KeyEvent.KEYCODE_DEL && uncommittedPrefix.isNotEmpty()) {
-            com.hazukieq.hkrime.util.DiagLog.d("pick", "backspace drop prefix='$uncommittedPrefix'")
-            uncommittedPrefix = ""
-        }
-        // 逐段選字時暫存的字還沒上屏，退格先撤它（與引擎 preedit 的退格語義一致）。
-        if (keyEventCode == KeyEvent.KEYCODE_DEL && heldPicks.isNotEmpty()) {
-            // 整段反悔：撤掉這次選中的詞、恢復選中前的完整碼串（不是只刪一個字）。
-            val held = heldPicks.removeLast()
-            pendingPick.setLength(maxOf(0, pendingPick.length - held.text.length))
-            updatePendingPick()
-            uncommittedPrefix = ""
-            withEngineLock { Rime.clearComposition() }
-            withEngineLock { Rime.onText(held.code) }
-            trime.updateComposing()
-            refreshTwelveKey()
-            com.hazukieq.hkrime.util.DiagLog.d(
-                "pick",
-                "undo held text=${held.text} restore=${held.code} held=${heldPicks.size}",
-            )
-            return
-        }
-        if (keyEventCode == KeyEvent.KEYCODE_DEL && pendingPick.isNotEmpty()) {
-            pendingPick.setLength(pendingPick.length - 1)
-            updatePendingPick()
-            setSegmentAnchor(pendingPick.lastOrNull())
-            trime.updateComposing()
-            refreshTwelveKey()
-            return
-        }
         if (trime.handleKey(keyEventCode, metaState)) return
         if (Keycode.hasSymbolLabel(keyEventCode)) {
             needSendUpRimeKey = false
@@ -1426,7 +1112,8 @@ class TextInputManager private constructor() :
 
     private fun onCandidatePressedLocked(index: Int) {
         onPress(0)
-        if (isTwelveKeyMode() && Rime.isComposing()) {
+        if (isTwelveKeyMode() && (Rime.isComposing() || composition.active ||
+                currentSnapshot.hasCandidates || currentSnapshot.fallback != null)) {
             onTwelveKeyCandidatePressed(index)
             return
         }
@@ -1461,46 +1148,15 @@ class TextInputManager private constructor() :
 
     /** 12 鍵候選條：index 是條目下標；fallback 是條目列表末尾的本地原文項。 */
     private fun onTwelveKeyCandidatePressed(index: Int) {
-        val snapshot = twelveKeyController?.snapshot ?: return
-        // 用「最近一次綁到候選條的那份列表」做下標映射：顯示與點擊必須同一份數據，
-        // 否則非同步刷新/學習重排後會出現「看到的是看、上屏的卻是别字」。
-        val item = currentSnapshot.barItems.getOrNull(index)
+        val snapshot = currentSnapshot
+        val item = snapshot.barItems.getOrNull(index)
         if (item != null) {
-            com.hazukieq.hkrime.util.DiagLog.d(
-                "pick",
-                "bar idx=$index text=${item.text} seg=${item.segment} idx=${item.index} comment=${item.comment} rest=${item.restCode}",
+            chooseTwelveKey(item, snapshot.contextKey, CompositionSession.Origin.BAR)
+        } else if (index == snapshot.barItems.size && snapshot.fallback != null) {
+            chooseTwelveKey(
+                CandidateItem(snapshot.fallback.letters, "", -1, restCode = snapshot.remaining),
+                snapshot.contextKey, CompositionSession.Origin.FALLBACK,
             )
-            // 聯想詞（segment = 1）：整詞上屏。
-            if (item.segment == 1) {
-                pickAssociationWord(item.text, item.comment)
-                return
-            }
-            // 合成候選（App 側學到的整串詞）：整串一次上屏。
-            if (item.segment == SYNTHETIC_SEGMENT) {
-                commitPhrase(item)
-                return
-            }
-            // App 段候選交統一逐段選詞處理，保留剩餘碼與暫存前綴。
-            if (item.segment >= 0) {
-                notePickedSegment(item.text, item.comment)
-                val engineIndex = resolveEngineIndexForSegment(item.text, item.comment)
-                if (engineIndex >= 0) {
-                    learnCandidatePick(item.text, item.comment)
-                    twelveKeyController?.selectCandidate(engineIndex, item.comment)
-                    return
-                }
-                pickSegmentedCandidate(item.text, item.restCode)
-                return
-            }
-            if (holdPartialPick(item.text, item.comment, engineIndex = item.index)) return
-            notePickedSegment(item.text, item.comment)
-            learnCandidatePick(item.text, item.comment)
-            twelveKeyController?.selectCandidate(item.index, item.comment)
-            return
-        }
-        val fallback = snapshot.fallback
-        if (fallback != null && index == currentSnapshot.barItems.size) {
-            twelveKeyController?.commitFallback(fallback)
         }
     }
 

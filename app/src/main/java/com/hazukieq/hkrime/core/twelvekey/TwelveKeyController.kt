@@ -12,16 +12,12 @@ import timber.log.Timber
 
 /**
  * 12 鍵快照控制器。refresh 在 Default 線程持 ENGINE_LOCK 讀取狀態與構建，Main 發布。
- * generation 丟棄過期結果；候選條枚舉 64、面板 600。refreshSync 是顯式同步入口。
- * 選中使用引擎全局下標；部分選詞由 TextInputManager 在點擊入口攔截。
+ * generation 丟棄過期結果；候選條枚舉 64、面板 600；快照帶 contextKey 供點擊校驗。
+ * 選擇統一由 TextInputManager 的 CompositionSession 記錄與發放提交許可。
  */
 class TwelveKeyController(
     private val scope: CoroutineScope,
     private val onSnapshot: (TwelveKeySnapshot) -> Unit,
-    /** 引擎狀態已變：提交 commit buffer + 刷新 preedit（由 TextInputManager 實現）。 */
-    private val onEngineChanged: () -> Unit,
-    /** 本地原文上屏（fallback 用）。 */
-    private val onCommitText: (String) -> Unit,
 ) {
 
     var snapshot: TwelveKeySnapshot = TwelveKeySnapshot.EMPTY
@@ -50,6 +46,8 @@ class TwelveKeyController(
     /** 方案開關變化：讓候選快照緩存失效。 */
     fun invalidateForOptions() {
         optionsVersion++
+        generation++
+        refreshJob?.cancel()
     }
 
     /**
@@ -57,6 +55,8 @@ class TwelveKeyController(
      */
     fun invalidateForEngine() {
         engineVersion++
+        generation++
+        refreshJob?.cancel()
     }
 
     private var engineVersion = 0
@@ -151,89 +151,21 @@ class TwelveKeyController(
         }
     }
 
-    /**
-     * 同步刷新：僅用於用戶主動開面板/開關（需要立刻判斷有無候選），
-     * 或調試；普通按鍵請走 [refresh]。
-     */
-    fun refreshSync(): TwelveKeySnapshot {
-        generation++
-        refreshJob?.cancel()
-        var key: String? = null
-        val built = synchronized(ENGINE_LOCK) {
-            runCatching {
-                val local = TwelveKeySnapshotBuilder.local()
-                if (local.isEmpty) {
-                    TwelveKeySnapshot.EMPTY
-                } else {
-                    val k = TwelveKeySnapshotBuilder.cacheKey(
-                        local,
-                        true,
-                        segmentAnchor,
-                        segmentMode,
-                    ) + "|o" + optionsVersion
-                    key = k
-                    cacheLookup(k) { it } ?: TwelveKeySnapshotBuilder.build(
-                        local,
-                        segmentAnchor = segmentAnchor,
-                        segmented = segmentMode,
-                    )
-                }
-            }.getOrNull()
-        } ?: TwelveKeySnapshot.EMPTY
-        if (!built.isEmpty) key?.let { cachePut(it, built) }
-        emit(built)
-        return built
-    }
-
-    /**
-     * 按全局下標選中引擎候選並通知提交/刷新。
-     * 部分選詞必須先由 TextInputManager.holdPartialPick 攔截；本函數不在提交後補回剩餘碼。
-     */
-    fun selectCandidate(globalIndex: Int, reading: String = "") {
-        if (globalIndex < 0) return
-        // 先把選中的詞記到本地記憶（候選條/面板下次把同詞排前）——必須在 select 之前拿快照。
-        runCatching {
-            val snap = snapshot
-            val item = snap.barEntries.firstOrNull { it.index == globalIndex }
-                ?: snap.groups.asSequence().flatMap { it.items.asSequence() }
-                    .firstOrNull { it.index == globalIndex }
-            if (item != null) SelectionMemory.bump(item.text, item.comment)
-        }
-        val inputBefore = runCatching { Rime.RimeGetInput() }.getOrNull().orEmpty()
-        val remaining = TwelveKeyPreedit.remainingCodeAfter(reading, inputBefore)
-        val ok = runCatching { Rime.select_candidate(globalIndex) }.getOrDefault(false)
-        if (!ok) {
-            Timber.w("twelvekey: select_candidate(%d) failed", globalIndex)
-            return
-        }
-        runCatching { Rime.getContexts() }
-        // commitRimeText → updateComposing → onCandidatesRefreshed → refresh()，只重建一次快照
-        onEngineChanged()
-        com.hazukieq.hkrime.util.DiagLog.d(
-            "select",
-            "idx=$globalIndex reading='$reading' input=$inputBefore remaining=$remaining composing=${Rime.isComposing()}",
-        )
-        // 部分選詞在點擊入口暫存到 preedit，不在引擎提交後重餵剩餘碼。
-    }
-
-    /** 10 鍵碼無候選時的本地兜底：清組合，直接把字母原文上屏。 */
-    fun commitFallback(fallback: Fallback) {
-        runCatching { Rime.clearComposition() }
-        generation++
-        refreshJob?.cancel()
-        emit(TwelveKeySnapshot.EMPTY)
-        onCommitText(fallback.letters)
-    }
-
     fun reset() {
         generation++
         refreshJob?.cancel()
         emit(TwelveKeySnapshot.EMPTY)
     }
 
+    fun contextKey(local: TwelveKeySnapshotBuilder.Local): String =
+        CandidateSelection.contextKey(local.contextKey, engineVersion, optionsVersion)
+
     private fun emit(next: TwelveKeySnapshot) {
-        snapshot = next
-        onSnapshot(next)
+        val published = if (next.isEmpty) next else next.copy(
+            contextKey = CandidateSelection.contextKey(next.contextKey, engineVersion, optionsVersion),
+        )
+        snapshot = published
+        onSnapshot(published)
         if (next.hasCandidates) fallbackRetryCount = 0
         // 兜底快照（引擎暫時拿不到候選）不緩存了，但也不會自己重試：
         // 這裡排一次延遲刷新，等引擎就緒/候選落地後把候選條與 preedit 一起換成真實內容。

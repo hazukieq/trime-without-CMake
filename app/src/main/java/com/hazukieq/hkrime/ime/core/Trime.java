@@ -705,7 +705,8 @@ public class Trime extends LifecycleInputMethodService {
       // 移動光標時，更新候選區
       if ((newSelEnd < candidatesEnd) && (newSelEnd >= candidatesStart)) {
         final int n = newSelEnd - candidatesStart;
-        Rime.RimeSetCaretPos(n);
+        // 顯示拼音與暫存文字的偏移不是原碼偏移，12 鍵不由顯示游標猜測引擎位置。
+        if (!textInputManager.isTwelveKeyMode()) Rime.RimeSetCaretPos(n);
         updateComposing();
       }
     }
@@ -886,12 +887,25 @@ public class Trime extends LifecycleInputMethodService {
   }
 
   @Override
+  public void onStartInput(EditorInfo info, boolean restarting) {
+    super.onStartInput(info, restarting);
+    if (textInputManager != null) textInputManager.onEditorSessionChanged();
+  }
+
+  @Override
+  public void onFinishInput() {
+    if (textInputManager != null) textInputManager.cancelTwelveKeyComposition();
+    super.onFinishInput();
+  }
+
+  @Override
   public void onFinishInputView(boolean finishingInput) {
     // 鍵盤收起時把內存裡的日誌刷到 /sdcard/hkrime/logs/，用戶回傳的文件才不會缺尾巴。
     com.hazukieq.hkrime.util.LogFileTree.flushNow();
     super.onFinishInputView(finishingInput);
     // Dismiss any pop-ups when the input-view is being finished and hidden.
     mainKeyboardView.closing();
+    textInputManager.cancelTwelveKeyComposition();
     performEscape();
     try {
       hideCompositionView();
@@ -951,9 +965,12 @@ public class Trime extends LifecycleInputMethodService {
   public boolean onRimeKey(int[] event) {
     updateRimeOption();
     // todo 改为异步处理按键事件、刷新UI
-    final boolean ret = Rime.onKey(event);
-    activeEditorInstance.commitRimeText();
-    return ret;
+    synchronized (Rime.ENGINE_LOCK) {
+      textInputManager.beforeTwelveKeyEngineKey(event);
+      final boolean ret = Rime.onKey(event);
+      activeEditorInstance.commitRimeText();
+      return ret;
+    }
   }
 
   private boolean composeEvent(@NonNull KeyEvent event) {
@@ -1080,7 +1097,7 @@ public class Trime extends LifecycleInputMethodService {
   // 处理键盘事件(Android keycode)
   public boolean handleKey(int keyEventCode, int metaState) { // 軟鍵盤
     // 12 鍵：空格上屏候選條第一條（學習重排後引擎高亮不等於用戶看到的第一個）
-    if (textInputManager.commitTopCandidateIfTwelveKey(keyEventCode)) return true;
+    if (textInputManager.handleTwelveKeyKey(keyEventCode)) return true;
     textInputManager.setNeedSendUpRimeKey(false);
     if (onRimeKey(Event.getRimeEvent(keyEventCode, metaState))) {
       // 如果输入法消费了按键事件，则需要释放按键

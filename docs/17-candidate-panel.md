@@ -69,8 +69,8 @@ WHOLE_WORD 仅通过轻量整串码索引查询，不把无读音的大词表塞
   例如 `55` 列出所有 k/l 開頭音節，標準集音節也納入，按音節詞頻降序）。
 - 显示：左列字母行（reading=字母，不带数量）；点字母行右列列出该字母下全部单音节；
   点音节进入钻取层，右列列出该音节的字，首项是「← 返回」。
-- 选字：与左列单字组同一暂存语义——先进 `pendingPick` 留在 preedit、只消耗首键，
-  剩余码重新喂回引擎继续组下一音节；`heldPicks` 记完整原码，退格整段反悔并还原；
+- 选字：与左列单字组同一暂存语义——记入 `CompositionSession`、留在 preedit、只消耗首键，
+  剩余码重新喂回引擎继续组下一音节；日志保存选择前完整原码，退格整段反悔并还原；
   不写 PhraseMemory（单字不记词条）。
 - 位置：固定排在推荐组之后、单字组之前（tierAndSort 给 -1 档），行数也计入 capRows。
 - 与 `panel_probe.py` 的 `Data.isolated_syllables()` 同口径。
@@ -113,13 +113,27 @@ isolated + synth + split + engine + assoc + combo + wholeWord
 
 ## 点击、性能与验收
 
-TextInputManager 先判断部分选词，pendingPick 保留在 preedit，heldPicks 支持退格整段反悔。
+候选条与面板的点击都先校验条目的 contextKey，再交给同一个 `chooseTwelveKey`：
+`CompositionSession` 记录文字、读音与选择前码，未选完只留在 preedit 并重喂剩余码，
+全部选完才发放一次性提交许可；DEL 撤回最后一次选择并恢复原码，可逐次重选。
 能交给引擎的完整选择保留全局 index；所有最终提交与学习都在统一输入层执行。
-孤单联想行点字母 → 换右列（不改输入）；点音节 → 钻取字；点字 → 存 pendingPick 留在 preedit、
-只消耗首键，剩余码重新喂回引擎；退格按 heldPicks 整段还原原码；「← 返回」只恢复快照右列。
-全量构建走后台；ENGINE_LOCK 保证与按键互斥。首次无快照开面板的 refreshSync 是当前待关注入口。
+孤单联想行点字母 → 换右列（不改输入）；点音节 → 钻取字；点字 → 记入选择日志留在 preedit、
+只消耗首键，剩余码重新喂回引擎；退格整段还原原码；「← 返回」只恢复快照右列。
+全量构建走后台；ENGINE_LOCK 保证与按键互斥。开面板不再串行同步构建，快照到达后才展示。
 
 修改规则前先更新文档并确认语义；改后同步 panel_probe.py 与 golden，运行 selftest、JVM、
 真实语料、装机与性能门禁。不能把 UI 冒烟等同于语料覆盖。
 诊断读 `<userDataDir>/logs/diag.log` 的 sources、groups、bar、prefixWords、prefixIdx、all，
 结合 build/latency/enum/emit 和 bar drift；日志用于回答行是否产生、是否被合并/截断或没有渲染。
+
+## 已选读音与切分边界
+
+扣除已选的 N 个音节前，先在实际输入的词典音节跨度中寻找与候选读音相符的前 N 段。
+有相符路径时按该路径扣码；无相符路径（例如输入 tung、学习读音为 dung）时，
+回退到实际输入的最少音节、同音节数最高频切分。不能仅将 reading 重编码后直接删除前缀。
+`9aii48i5i73` 选择 `tai` 的「太」必须消耗 `9ai`，剩余 `i48i5i73`，面板包含 `go`；
+不能沿无约束切法 `9a / ii4 / 8i / 5i / 73` 扣成 `ii48i5i73`。
+
+完整性判定对运行时集合与标准集合的并集做全串可达性检查，标准音节也可参与多段切分，
+`r` 仅能在末段。同长度不足以证明完整，必须实际匹配编码并覆盖全部码位；
+整串为单音节或可完整切为多音节时都不列 `d.*` 等孤单字母行。

@@ -22,7 +22,7 @@
 | 字典有词但 App 面板没有 | 核对运行时音节过滤、import 表、PhraseMemory、App 索引加载与行配额 |
 | 面板开关改变候选条 | 比较同输入 bar/full 前 12 项与 `bar drift`；候选条必须固定使用 64 条窗口 |
 | 没候选却仍有输入 | 用 `hasCandidates` 判断；引擎空先字典兜底，再原字母兜底 |
-| 选词丢后半码或退格后重复上屏 | 检查 `remainingCodeAfter`、pendingPick、heldPicks 与 commit buffer |
+| 选词丢后半码或退格后重复上屏 | 检查 `selectedInputEnd`、`CompositionSession` 选择日志与 commit buffer |
 | 改 yaml 不生效 | 核对实际目录文件、部署完成、进程重启与 App 侧索引重新加载 |
 | 看到错误输入法界面 | 重新 ime set，并用 dumpsys window 核对 IME 包名 |
 
@@ -40,7 +40,7 @@
 - APK 只配置 arm64-v8a；x86_64 模拟器不能直接验收该 Native 库。
 - 当前 ELF LOAD 是 4 KB 对齐，尚不能声明支持 16 KB 页设备。
 - 完整音节可能遮蔽相同码的简拼解释；简拼路径还受搜索预算限制，覆盖率须按类别解释。
-- 无快照时首次开面板仍有 `refreshSync` 同步兜底，性能改动应覆盖该入口。
+- 开面板等待完整快照，不在主线程同步枚举；重点验证首次开面板的 UI 延迟。
 - 主题预览器默认按钮仍请求未随包提供的 `trime.yaml`，应打开现有客家主题；预览不能替代真机。
 - 普通单测可因缺少真实语料而跳过 RealCorpusTest；发版和相关行为改动必须确认实际执行。
 

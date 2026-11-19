@@ -9,22 +9,7 @@ import org.junit.BeforeClass
 import org.junit.Test
 import java.io.File
 
-/**
- * 面板五源 golden 對拍：App 實現 vs `tools/panel_probe.py --data app/src/main/assets/rime json`。
- *
- * 重構後面板選行規則（分桶輪轉、首字母組合、整串詞行）有兩份實現：
- * App（Kotlin）與腳本（Python）。這裡讀**同一份 assets 資料**產生的 golden JSON，
- * 逐源斷言「讀音集合 + 行內文字集合 + 行序」一致、merged 的讀音/檔位順序一致；
- * 任何一邊改規則都會在這裡先炸，而不是等真機面板漂移。
- *
- * 重新生成 golden（改規則/加碼串後必須重跑）：
- * ```bash
- * python3 tools/panel_probe.py --data app/src/main/assets/rime \
- *   json ia ia8 ia8i ia8i3 5i34i 5i34iwe 5i34iw 5i4a57 744ii we w e 4i 3a a3 \
- *   855 455 74ii ee5 5e5e 798ea 5i 7 8 9 1 3 4 5 i y 5i34iwa \
- *   > app/src/test/resources/panel-golden.json
- * ```
- */
+/** 六個 App 來源與 merged 的讀音、文字集合及行序對拍；重新生成命令見 docs/19。 */
 class PanelGoldenTest {
 
     companion object {
@@ -107,11 +92,13 @@ class PanelGoldenTest {
     fun panelSourcesMatchScriptGolden() {
         val golden = golden()
         val codes = golden.keySet().sorted()
-        assertEquals("golden 應含 32 個碼串", 32, codes.size)
+        org.junit.Assert.assertTrue("golden 必須包含選太後的各段及標準集切分",
+            codes.containsAll(listOf("9aii48i5i73", "i48i5i73", "8i5i73", "5i73", "73", "ea144", "55")))
         for (code in codes) {
             val entry = golden.getAsJsonObject(code)
             val sources = entry.getAsJsonObject("sources")
             val actual = TwelveKeySnapshotBuilder.debugPanelSources(code)
+            checkSource(code, "isolated", rowsOf(sources.getAsJsonArray("isolated")), actual.isolated)
             checkSource(code, "synth", rowsOf(sources.getAsJsonArray("synth")), actual.synth)
             checkSource(code, "split", rowsOf(sources.getAsJsonArray("split")), actual.split)
             checkSource(code, "assoc", rowsOf(sources.getAsJsonArray("assoc")), actual.assoc)

@@ -43,6 +43,7 @@ class CandidatePanelAdapter(
         val segment: Int = -1,
         /** 選中後要重新餵回引擎的剩餘碼（按段選字用；空表示沒有剩餘）。 */
         val restCode: String = "",
+        val contextKey: String = "",
     )
 
     private val density = context.resources.displayMetrics.density
@@ -192,7 +193,9 @@ class CandidatePanelAdapter(
     companion object {
         private val DIFF = object : DiffUtil.ItemCallback<Item>() {
             override fun areItemsTheSame(oldItem: Item, newItem: Item): Boolean =
-                oldItem.index == newItem.index
+                oldItem.text == newItem.text && oldItem.comment == newItem.comment &&
+                    oldItem.index == newItem.index && oldItem.segment == newItem.segment &&
+                    oldItem.restCode == newItem.restCode && oldItem.contextKey == newItem.contextKey
 
             override fun areContentsTheSame(oldItem: Item, newItem: Item): Boolean =
                 oldItem == newItem

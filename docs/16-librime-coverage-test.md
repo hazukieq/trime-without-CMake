@@ -70,7 +70,7 @@ RealCorpusTest 读 `HKRIME_REAL_DATA`、`HKRIME_CORPUS` 和 `HKRIME_CORPUS_USERD
 
 ## 逐步流程工具
 
-`tools/preedit_flow.py` 使用 host-test 的 `--script -` 交互模式复现 pendingPick、heldPicks
-和剩余码处理，可输入 type、bar、pick、left、right、back、commit、clear、state 命令。
+`tools/preedit_flow.py` 使用 host-test 的 `--script -` 交互模式复现选择日志、提交许可、
+退格还原与剩余码处理，可输入 type、bar、pick、left、right、back、commit、clear、state 命令。
 它按引擎顺序选候选，未覆盖 App 学习重排、64/600 窗口差异及全部面板排序，不能替代 JVM 和真机验收。
 这部分工具正在工作树中开发，使用前确认源码和 PC 构建状态。

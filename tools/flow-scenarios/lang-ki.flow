@@ -3,7 +3,8 @@
 type 5a4i5i
 left lang
 right 冷
-assert pending ""
+assert pending 冷
+assert input 5i
 assert composing 1
 left ki
 right 起

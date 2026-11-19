@@ -10,16 +10,19 @@
 
 ## 状态与上屏
 
-`pendingPick` 是 App 暂存的已选文字，`heldPicks` 保存每次部分选择的文字和选择前完整码；
-`uncommittedPrefix` 保存引擎中已选但未提交的前缀。它们与引擎输入共同构成当前组合。
+`CompositionSession` 保存剩余码、选择日志（文字/读音/选择前原码/实际消费码/来源）
+与一次性提交许可；引擎自身仍可能保存已选未提交的前缀（`getCompositionPrefix`）。
+两者与引擎输入共同构成当前组合。
 
-选择只覆盖前几节的候选时，`holdPartialPick` 把词留在 preedit，清组合并重喂剩余码。
-剩余码由 `remainingCodeAfter(reading, input)` 按输入解码出的前 N 个音节扣除，
-不能按候选读音重新编码后做字符串前缀匹配。全部选完或引擎提交时，将暂存前缀与 commit buffer
-按顺序一次提交。退格先清待撤销引擎前缀，再弹出 heldPicks 一整段并恢复原完整码。
-
-`express_editor` 可能在候选 end 等于输入长度时自动提交，因此部分选词必须在点击入口拦截，
-不能调用 select_candidate 后再把剩余码补回去。切换输入框、回车、清组合与退出要防止前缀残留。
+候选条、展开面板、空格与回车都走同一个 `chooseTwelveKey`：先用快照 contextKey 排除过期点击，
+再由 `CandidateSelection.consumedEnd` 证实在当前码串上的消费边界，然后记入选择日志。
+未选完时清组合并重喂剩余码，已选文字只留在 preedit；剩余码由 `selectedInputEnd`
+按已选读音约束的实际输入跨度扣除，不能按候选读音重新编码后做字符串前缀匹配。
+全部码位消耗后状态机才发放一次提交许可，`commitThrough` 写入编辑器成功后才清空日志。
+`express_editor` 可能在候选 end 等于输入长度时自动提交，因此部分选择不能直接调 select_candidate；
+引擎意外 commit 由 `consumeTwelveKeyEngineCommit` 拦截并恢复待选码。
+DEL 在任意界面撤回最后一次选择并恢复该次选择前的完整原码，可逐次回退重选。
+切换输入框、回车与退出不清空未完成组合以外的选择记录。
 
 ## 候选与学习
 

@@ -33,23 +33,17 @@ class EditorInstance(private val ims: InputMethodService) {
 
     var lastCommittedText: CharSequence = ""
 
-    fun commitText(text: CharSequence, dispatchToRime: Boolean = true): Boolean {
-        val ic = inputConnection ?: return false
-        ic.commitText(text, 1)
-        lastCommittedText = text
-        // 統計「用戶常用字 / 用戶自己組的詞」：固定候選區按這兩項排序（不用靜態詞表）。
-        runCatching { com.hazukieq.hkrime.core.twelvekey.SegmentMemory.bump(text) }
-        // Fix pressing Delete key will clear the input box issue on BlackBerry
-        ic.clearMetaKeyStates(KeyEvent.getModifierMetaStateMask())
-        return true
-    }
+    fun commitText(text: CharSequence, dispatchToRime: Boolean = true): Boolean = commitToEditor(text)
 
-    // 直接commit不做任何处理
-    fun commitText(text: CharSequence): Boolean {
+    fun commitText(text: CharSequence): Boolean = commitToEditor(text)
+
+    private fun commitToEditor(text: CharSequence): Boolean {
         val ic = inputConnection ?: return false
-        ic.commitText(text, 1)
-        // 此提交重載也記用字記憶，覆蓋引擎和面板提交入口。
+        if (!textInputManager.commitEditorText(text.toString(),
+                com.hazukieq.hkrime.core.twelvekey.CompositionSession.EditorIdentity(editorInfo, ic)) { ic.commitText(text, 1) }) return false
+        lastCommittedText = text
         runCatching { com.hazukieq.hkrime.core.twelvekey.SegmentMemory.bump(text) }
+        runCatching { ic.clearMetaKeyStates(KeyEvent.getModifierMetaStateMask()) }
         return true
     }
 
@@ -57,6 +51,9 @@ class EditorInstance(private val ims: InputMethodService) {
      * Commits the text got from Rime.
      */
     fun commitRimeText(): Boolean {
+        if ((textInputManager.isTwelveKeyMode() && !Rime.isAsciiMode()) || textInputManager.hasTwelveKeySession()) {
+            return textInputManager.consumeTwelveKeyEngineCommit()
+        }
         val ret = Rime.getCommit()
         if (ret) {
             commitText(Rime.getCommitText())
@@ -74,8 +71,8 @@ class EditorInstance(private val ims: InputMethodService) {
             InlineModeType.INLINE_PREVIEW ->
                 textInputManager.currentPreviewText()
                     ?: if (textInputManager.isTwelveKeyMode()) "" else Rime.getComposingText()
-            InlineModeType.INLINE_COMPOSITION -> Rime.getCompositionText()
-            InlineModeType.INLINE_INPUT -> Rime.RimeGetInput()
+            InlineModeType.INLINE_COMPOSITION -> textInputManager.currentCompositionText() ?: Rime.getCompositionText()
+            InlineModeType.INLINE_INPUT -> textInputManager.currentInputText() ?: Rime.RimeGetInput()
             else -> ""
         }
         if (ic.getSelectedText(0).isNullOrEmpty() || !composingText.isNullOrEmpty()) {

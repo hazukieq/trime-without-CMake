@@ -431,6 +431,10 @@ public class Rime {
     return mStatus.is_ascii_mode;
   }
 
+  public static String getRawPreedit() {
+    return mContext == null || mContext.composition == null ? "" : mContext.composition.preedit;
+  }
+
   public static RimeComposition getComposition() {
     if (mContext == null) return null;
     RimeComposition composition = mContext.composition;
@@ -439,13 +443,14 @@ public class Rime {
     if (composition != null
         && composition.preedit != null
         && "hakka_jiugong".equals(getSchemaId())) {
-      // 12 鍵 preedit 的全部規則都在 TwelveKeyPreedit.render() 裡（單一入口）：
-      // 讀音取「候選條第一條」優先（App 排序，所見即所讀）、引擎 menu 第一條兜底；
-      // 保留已選前綴、尾部碼段轉拼音、按下的鍵全部顯示、App 暫存前綴拼在最前。
+      // 12 鍵 preedit 的顯示規則在 PreeditPresentation（綁定快照 + 緩存），
+      // 解碼/改寫在 TwelveKeyPreedit；讀音取「候選條第一條」優先、引擎 menu 第一條兜底，
+      // 保留已選文字與前綴、尾部碼段轉拼音、按下的鍵全部顯示。
       RimeCandidate[] cs = mContext.getCandidates();
       String engineText = (cs != null && cs.length > 0) ? cs[0].text : null;
       String engineComment = (cs != null && cs.length > 0) ? cs[0].comment : null;
-      String decoded = TwelveKeyPreedit.INSTANCE.render(composition.preedit, engineText, engineComment);
+      String decoded = com.hazukieq.hkrime.core.twelvekey.PreeditPresentation.INSTANCE.render(
+          composition.preedit, RimeGetInput(), engineText, engineComment);
       if (com.hazukieq.hkrime.util.DiagLog.INSTANCE.getVerbose()) {
         com.hazukieq.hkrime.util.DiagLog.INSTANCE.d(
             "preedit",

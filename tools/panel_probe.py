@@ -2,7 +2,7 @@
 """十二鍵面板規則的 Python 參考實現，與 App 同步維護。
 
 讀取 --data 指定目錄（默認 /tmp/hkrime-real-data），只使用主詞典及其 import 表。
-syllables/chars/assoc/prefix/panel 用於診斷，json 輸出五源與 merged 供 golden 對拍，
+syllables/chars/assoc/prefix/panel 用於診斷，json 輸出六源與 merged 供 golden 對拍，
 preedit 復現讀音與剩餘碼，selftest 驗證規則；build-syllables 生成測試用標準音節集。
 詳見 docs/17-candidate-panel.md 與 docs/19-panel-maintenance.md。
 """
@@ -10,6 +10,8 @@ preedit 復現讀音與剩餘碼，selftest 驗證規則；build-syllables 生�
 from __future__ import annotations
 
 import argparse
+import hashlib
+import itertools
 import json
 import os
 import re
@@ -122,12 +124,17 @@ class Data:
         # 与 App 的 RimeDictSource.namesWithImports 一致：**只加载 hakka.dict.yaml 的
         # import_tables 展开出来的词表**。目录里可能还有 luna_pinyin 这类别的方案词典
         # （`li xing` 就是这么混进来的），12 键方案不该用它们。
-        for name in self._import_names(main):
-            path = os.path.join(data_dir, name + ".dict.yaml")
+        imports = [os.path.join(data_dir, name + ".dict.yaml") for name in self._import_names(main)]
+        for path in imports:
             if os.path.isfile(path):
                 # 進口詞典的單字讀音也要並入（`渠 gia` 只在 zon），與 App load() 同口徑；
                 # 只並入標準音集收錄的音節（排除 bon/hop 這類方案外拼寫）。
                 self._load_dict(path, allowed=self.standard_syllables)
+        self.syllables = set(self.syllable_freq)
+        self.complete_codes = {code_of(s) for s in self.standard_syllables | self.syllables}
+        self.non_suffix_codes = {code_of(s) for s in self.standard_syllables | self.syllables if s != "r"}
+        for path in imports:
+            if os.path.isfile(path):
                 self._load_words(path)
         self._sort_assoc()
         self._build_initials_index()
@@ -163,12 +170,13 @@ class Data:
             self.code_to_syllables[code_of(syl)].append(syl)
 
     def _load_syllables(self, data_dir: str) -> set[str]:
-        """詞表校驗只用主詞典音節，與 App 運行時一致。
-        標準集另存 standard_syllables，僅供 selftest 驗證主詞典集合被完整覆蓋。"""
+        """載入標準音節集；詞表校驗集合在所有進口單字讀音載入後確定。"""
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         path = os.environ.get(
             "HKRIME_SYLLABLES",
-            os.path.join(root, "app", "src", "main", "assets", "rime", "hakka_syllables.txt"),
+            os.path.join(data_dir, "hakka_syllables.txt") if os.path.isfile(
+                os.path.join(data_dir, "hakka_syllables.txt")
+            ) else os.path.join(root, "app", "src", "main", "assets", "rime", "hakka_syllables.txt"),
         )
         canon: set[str] = set()
         if os.path.isfile(path):
@@ -309,20 +317,42 @@ class Data:
     # -- 查询 ------------------------------------------------------------
 
     def decode(self, codes: str) -> list[str] | None:
-        """最少音节切法（镜像 TwelveKeyPreedit.decode 的 DP 结果形态）。"""
+        """最少音節優先，同段數按詞頻擇優，r 僅末段；與 App DP 一致。"""
         n = len(codes)
-        best: list[list[str] | None] = [None] * (n + 1)
-        best[0] = []
-        for i in range(1, n + 1):
-            for j in range(max(0, i - 6), i):
-                if best[j] is None:
+        best: list[tuple[list[str], int] | None] = [None] * (n + 1)
+        best[0] = ([], 0)
+        for start in range(n):
+            if best[start] is None:
+                continue
+            spans, freq = best[start]
+            for end in range(start + 1, min(n, start + 6) + 1):
+                part = codes[start:end]
+                syllables = self.code_to_syllables.get(part, ())
+                if not syllables:
                     continue
-                head = codes[j:i]
-                if head in self.code_to_syllables:
-                    cand = best[j] + [head]
-                    if best[i] is None or len(cand) < len(best[i]):
-                        best[i] = cand
-        return best[n]
+                syllable = max(syllables, key=lambda s: self.syllable_freq[s])
+                if syllable == "r" and end != n:
+                    continue
+                candidate = (spans + [part], freq + self.syllable_freq[syllable])
+                old = best[end]
+                if old is None or len(candidate[0]) < len(old[0]) or (
+                    len(candidate[0]) == len(old[0]) and candidate[1] > old[1]
+                ):
+                    best[end] = candidate
+        return best[n][0] if n and best[n] is not None else None
+
+    def has_full_syllable(self, codes: str) -> bool:
+        clean = codes.replace("'", "")
+        reachable = {0}
+        for start in range(len(clean)):
+            if start not in reachable:
+                continue
+            for end in range(start + 1, min(len(clean), start + 6) + 1):
+                part = clean[start:end]
+                pool = self.complete_codes if end == len(clean) else self.non_suffix_codes
+                if part in pool:
+                    reachable.add(end)
+        return bool(clean) and len(clean) in reachable
 
     def is_single_syllable(self, codes: str) -> bool:
         return codes in self.code_to_syllables
@@ -472,7 +502,7 @@ class Data:
             if not syllables:
                 syllables = self.syllables_for_segment(head, quota, False, allow_suffix_only)
             source = "exact" if head_complete else "prefix"
-            # 這一行來自哪個切法（json 子命令的五源劃分用）：
+            # 這一行來自哪個切法（json 子命令的六源劃分用）：
             # synth = 整串碼本身就是一個完整音節（split 0、rest 空）；其餘切法的單字組 = split。
             # 注意 `source` 欄位已被「exact/prefix」佔用，這裡另開 `origin`，不改既有語義。
             origin = "synth" if index == 0 and not rest else "split"
@@ -1047,46 +1077,36 @@ class Data:
                 seen.setdefault(row["reading"], (length, "词行"))
         return [(reading, length, kind) for reading, (length, kind) in seen.items()]
 
-    def standard_decode(self, codes: str, limit: int = 64) -> list[str]:
-        """用標準音集切分整串碼；只回完整切法（診斷 App 運行時缺失的音節，如 gia）。"""
+    def standard_decode(self, codes: str) -> list[str]:
+        """返回所有完整標準切法涉及的音節；不展平截斷 DFS，不納入死路或中段 r。"""
         clean = codes.replace("'", "")
-        by_code: dict[str, list[str]] = {}
-        for syl in self.standard_syllables:
-            code = code_of(syl)
-            if code:
-                by_code.setdefault(code, []).append(syl)
-        out: list[str] = []
-        max_len = max((len(c) for c in by_code), default=1)
-
-        def walk(pos: int, acc: list[str]) -> None:
-            if len(out) >= limit:
-                return
-            if pos == len(clean):
-                out.extend(acc)
-                return
-            for end in range(pos + 1, min(len(clean), pos + max_len) + 1):
-                for syl in by_code.get(clean[pos:end], ()):
-                    walk(end, acc + [syl])
-                    if len(out) >= limit:
-                        return
-
-        walk(0, [])
-        return out
+        by_code: dict[str, list[str]] = defaultdict(list)
+        for syllable in sorted(self.standard_syllables):
+            by_code[code_of(syllable)].append(syllable)
+        edges = [[] for _ in range(len(clean) + 1)]
+        forward = {0}
+        for start in range(len(clean)):
+            for end in range(start + 1, min(len(clean), start + 6) + 1):
+                for syllable in by_code.get(clean[start:end], ()):
+                    if syllable == "r" and end != len(clean):
+                        continue
+                    edges[start].append((end, syllable))
+                    if start in forward:
+                        forward.add(end)
+        backward = {len(clean)}
+        out = set()
+        for start in range(len(clean) - 1, -1, -1):
+            for end, syllable in edges[start]:
+                if end in backward:
+                    backward.add(start)
+                    if start in forward:
+                        out.add(syllable)
+        return sorted(out)
 
     def isolated_syllables(self, codes: str) -> list[tuple[str, list[str]]]:
-        """孤單聯想：整串碼不能構成完整音節時，首鍵字母各列可達單音節。
-
-        可達 = 該音節的碼以目前輸入為前綴（繼續按鍵就能得到它）。
-        只針對多鍵輸入（單鍵已由合成音節/單字行覆蓋）；整串碼恰好就是一個
-        完整音節時（ea7→dap、eai→dai）也不生成。
-        """
+        """多鍵且整串無完整切分時，通配列出首鍵字母下的全部音節。"""
         clean = codes.replace("'", "")
-        # 完整音節判定必須看標準音節集：gia 不在主詞典但標準集有，碼 iia 已算完整音節。
-        standard_codes = {code_of(syl) for syl in self.standard_syllables}
-        if len(clean) < 2 or clean in standard_codes:
-            return []
-        # 多音節但整串可完整切分（4a834 → ma jun）同樣不出孤立鍵。
-        if self.decode(clean) is not None:
+        if len(clean) < 2 or self.has_full_syllable(clean):
             return []
         letters = self.key_initial_letters(clean[0], is_last=len(clean) == 1)
         universe = set(self.syllable_freq) | set(self.standard_syllables)
@@ -1483,7 +1503,7 @@ def _row_items(g: dict) -> list[str]:
 
 
 def build_json_payload(data: Data, raw_codes: list[str]) -> dict:
-    """鏡像 App 五個本地來源與最終 merged 行；輸出供 golden 對拍。"""
+    """鏡像 App 六個本地來源與最終 merged 行；輸出供 golden 對拍。"""
     payload: dict[str, dict] = {}
     for raw in raw_codes:
         codes = parse_code(raw)
@@ -1531,16 +1551,128 @@ def cmd_json(args, data: Data) -> None:
     print(json.dumps(build_json_payload(data, args.codes), ensure_ascii=False, indent=2))
 
 
+def _canonical_spelling(syllable: str) -> str:
+    for old, new in (("iam", "ian"), ("am", "an"), ("om", "on"), ("im", "in"),
+                     ("em", "en"), ("ap", "at"), ("ep", "et"), ("up", "ut"), ("w", "u")):
+        if syllable.endswith(old):
+            return syllable[:-len(old)] + new
+    return syllable
+
+
+def selected_input_end(data: Data, reading: str, codes: str) -> int | None:
+    """選擇的消費證明；None 與已消費全部碼的 len(codes) 嚴格區別。"""
+    tokens = reading.replace("［", "").replace("］", "").split()
+    if not tokens or any(not re.fullmatch("[a-z]+", t) for t in tokens) or "r" in tokens[:-1]:
+        return None
+    offsets = [i for i, ch in enumerate(codes) if ch != "'" and not ch.isspace()]
+    clean = "".join(codes[i] for i in offsets)
+    if not clean:
+        return None
+    pos = 0
+    matched = True
+    for token in tokens:
+        if pos == len(clean):
+            break
+        if token == "r" and pos + 1 != len(clean):
+            return None
+        full = code_of(token)
+        alias = next((length for length in range(min(6, len(clean) - pos), 0, -1)
+                      if any(_canonical_spelling(token) == _canonical_spelling(s)
+                             for s in data.code_to_syllables.get(clean[pos:pos + length], ()))), None)
+        if clean.startswith(full, pos):
+            pos += len(full)
+        elif alias is not None:
+            pos += alias
+        elif token[0] in KEY_LETTERS.get(clean[pos], "") and token[0] not in "aeiou":
+            pos += 1
+        elif full.startswith(clean[pos:]):
+            pos = len(clean)
+        else:
+            matched = False
+            break
+    if not matched:
+        if any(t not in data.syllable_freq for t in tokens):
+            return None
+        spans = data.decode(clean)
+        if not spans or len(spans) < len(tokens):
+            return None
+        pos = sum(len(part) for part in spans[:len(tokens)])
+    return offsets[pos - 1] + 1 if pos else None
+
+
 def remaining_code_after(data: Data, reading: str, codes: str) -> str:
-    """按輸入的實際音節切分扣除前 N 節，不以讀音重編碼作前綴匹配。"""
-    tokens = [t for t in reading.replace("\u3000", " ").split(" ") if t]
-    if not tokens or not codes:
-        return ""
-    spans = data.decode(codes)
-    if not spans or len(spans) < len(tokens):
-        return ""
-    consumed = sum(len(seg) for seg in spans[: len(tokens)])
-    return codes[consumed:]
+    consumed = selected_input_end(data, reading, codes)
+    return codes[consumed:].lstrip("' ") if consumed is not None else ""
+
+
+def cmd_coverage(args, data: Data) -> None:
+    """有限穷举：真实音节编码的有序对、短键串、实际词表全部选词边界。"""
+    counts = defaultdict(int)
+    failures = []
+
+    def check(ok: bool, category: str, **case) -> None:
+        counts[category] += 1
+        if not ok:
+            counts["failures"] += 1
+            if len(failures) < 30:
+                failures.append({"category": category, **case})
+
+    # 独立正则语言作为完整性判定 oracle，不调用被测 DP。
+    complete = sorted(data.complete_codes, key=lambda c: (-len(c), c))
+    non_suffix = sorted(data.non_suffix_codes, key=lambda c: (-len(c), c))
+    oracle = re.compile("(?:" + "|".join(map(re.escape, non_suffix)) + ")*"
+                        "(?:" + "|".join(map(re.escape, complete)) + ")")
+    for size in range(1, args.max_keys + 1):
+        for keys in itertools.product(KEY_LETTERS, repeat=size):
+            code = "".join(keys)
+            expected = oracle.fullmatch(code) is not None
+            check(data.has_full_syllable(code) == expected, "key_strings", code=code)
+            if expected:
+                check(not data.isolated_syllables(code), "complete_without_isolated", code=code)
+    for first in non_suffix:
+        for second in complete:
+            code = first + second
+            check(data.has_full_syllable(code), "ordered_code_pairs", code=code)
+
+    runtime = {code: next(s for s in syllables if s != "r")
+               for code, syllables in data.code_to_syllables.items()
+               if any(s != "r" for s in syllables)}
+    for first, reading in runtime.items():
+        for second in data.code_to_syllables:
+            code = first + second
+            got = remaining_code_after(data, reading, code)
+            check(got == second, "selected_pair_boundaries", code=code, pick=reading, got=got, want=second)
+
+    readings = {tuple(tokens) for tokens, _, _ in data.word_codes}
+    readings.add(("tai", "go", "ji", "li", "pu"))
+    for tokens in sorted(readings):
+        if "r" in tokens[:-1]:
+            counts["suffix_invalid_readings"] += 1
+            continue
+        parts = [code_of(t) for t in tokens]
+        for selected in range(1, len(tokens) + 1):
+            code = "".join(parts)
+            pick = " ".join(tokens[:selected])
+            want = "".join(parts[selected:])
+            got = remaining_code_after(data, pick, code)
+            check(got == want, "dictionary_pick_boundaries", code=code, pick=pick, got=got, want=want)
+    remaining = remaining_code_after(data, "tai", "9aii48i5i73")
+    check(remaining == "i48i5i73" and any(g["reading"] == "go" for g in data.panel(remaining)),
+          "tai_panel", remaining=remaining)
+    files = [os.path.join(data.dir, "hakka.dict.yaml"), data.syllable_file]
+    files += [os.path.join(data.dir, name + ".dict.yaml")
+              for name in data._import_names(files[0])]
+    hashes = {os.path.abspath(path): hashlib.sha256(open(path, "rb").read()).hexdigest()
+              for path in files if os.path.isfile(path)}
+    counts["failures"] += 0
+    report = {"data": os.path.abspath(data.dir), "max_keys": args.max_keys,
+              "runtime_syllables": len(data.syllable_freq), "standard_syllables": len(data.standard_syllables),
+              "unique_word_readings": len(readings), "counts": dict(counts),
+              "failures": failures, "sha256": hashes,
+              "scope": "dictionary-derived finite coverage; no device UI or userdb refresh"}
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    if counts["failures"]:
+        raise SystemExit(1)
 
 
 def cmd_preedit(args, data: Data) -> None:
@@ -1772,7 +1904,7 @@ def cmd_selftest(args, data: Data) -> None:
     # 6) 单字：ji 全部字（>>100，验证「列全部」而不是 60 字截断）
     expect(len(data.syllable_chars.get("ji", [])) > 100, f"ji 字数 = {len(data.syllable_chars.get('ji', []))}")
 
-    # 7) json 输出 schema（App golden 单测对拍）：五源恒在、merged 读音不重复、档位升序
+    # 7) json 输出 schema（App golden 单测对拍）：六源恒在、merged 读音不重复、档位升序
     def tier_of(reading: str) -> int:
         n = len([t for t in reading.split(" ") if t])
         return 2 if n == 0 else (0 if n == 1 else 1)
@@ -1782,7 +1914,7 @@ def cmd_selftest(args, data: Data) -> None:
         sources = entry.get("sources") or {}
         expect(
             list(sources) == ["synth", "split", "assoc", "combo", "whole_word", "isolated"],
-            f"json[{code}] sources 五个 key 均在且有序：{list(sources)}",
+            f"json[{code}] sources 六个 key 均在且有序：{list(sources)}",
         )
         expect(
             all(
@@ -1790,7 +1922,7 @@ def cmd_selftest(args, data: Data) -> None:
                 for part in sources.values()
                 for row in part
             ),
-            f"json[{code}] 五源每行都有 reading(str)/items(list)",
+            f"json[{code}] 六源每行都有 reading(str)/items(list)",
         )
         merged = entry.get("merged") or []
         readings = [row["reading"] for row in merged]
@@ -1836,6 +1968,16 @@ def cmd_selftest(args, data: Data) -> None:
     )
 
     # 驗證 preedit 切分與部分選詞後剩餘碼。
+    expect(remaining_code_after(data, "tai", "9aii48i5i73") == "i48i5i73",
+           "選太按 tai 的實際跨度扣碼，不能多留一個 i")
+    expect(any(row["reading"] == "go" and _row_items(row) for row in data.panel("i48i5i73")),
+           "選太後面板保留 go 及其候選")
+    expect(data.has_full_syllable("ea144") and not data.isolated_syllables("ea144"),
+           "標準集音節可參與多段完整切分，不列 d/f 孤立行")
+    expect({"tai", "go"} <= set(data.standard_decode("9aii4")),
+           "標準切分診斷包含全部完整路徑中的 tai/go，不按展平音節數截斷")
+    expect("r" not in data.standard_decode("35i"), "標準切分診斷禁止中段 r")
+
     code_partial = "5i4ii8i9934i54iei9"
     spans_partial = data.decode(code_partial) or []
     expect(
@@ -1896,7 +2038,7 @@ def main() -> None:
     p_panel.add_argument("codes")
     p_panel.set_defaults(func=cmd_panel)
 
-    p_json = sub.add_parser("json", help="结构化输出五源 + merged（App 侧 golden 单测对拍）")
+    p_json = sub.add_parser("json", help="结构化输出六源 + merged（App 侧 golden 单测对拍）")
     p_json.add_argument("codes", nargs="+", help="一个或多个码串/键名，如 5i4a57 'kl ghi mno abc ps'")
     p_json.set_defaults(func=cmd_json)
 
@@ -1931,6 +2073,10 @@ def main() -> None:
         help="输出文件（默认 App assets 路径）",
     )
     p_bs.set_defaults(func=cmd_build_syllables)
+
+    p_cov = sub.add_parser("coverage", help="穷举有序音节码对、短键串与词表选词边界，JSON 报告")
+    p_cov.add_argument("--max-keys", type=int, choices=range(1, 6), default=4)
+    p_cov.set_defaults(func=cmd_coverage)
 
     p_self = sub.add_parser("selftest", help="跑文档样例自检（CI 可用）")
     p_self.set_defaults(func=cmd_selftest)
