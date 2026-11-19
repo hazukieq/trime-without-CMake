@@ -55,4 +55,16 @@ class CandidateSelectionTest {
         assertEquals(2, CandidateSelection.consumedEnd(original, "55", CompositionSession.Origin.FALLBACK))
         assertNull(CandidateSelection.consumedEnd(original, "555", CompositionSession.Origin.FALLBACK))
     }
+
+    @Test fun punctuationInputIsRoutedToTheEngineNotTheCodeJournal() {
+        // 12 鍵的 "/" 在引擎裡是標點候選（、/／/÷），沒有可證實的音節碼位；
+        // 這種輸入必須交引擎直選提交，不能套用 selectedInputEnd 的碼位解析。
+        assertTrue(CompositionInput.isCodeString("9aii48i5i73"))
+        assertTrue(CompositionInput.isCodeString("9ai' i4"))
+        for (input in listOf("/", "、", "，", "÷", "", "9ai/")) {
+            assertFalse("input=$input", CompositionInput.isCodeString(input))
+        }
+        assertNull(CandidateSelection.consumedEnd(CandidateItem("、", "全角", 0), "/", CompositionSession.Origin.BAR))
+        assertNull(CandidateSelection.consumedEnd(CandidateItem("/", "半角", 2), "/", CompositionSession.Origin.BAR))
+    }
 }

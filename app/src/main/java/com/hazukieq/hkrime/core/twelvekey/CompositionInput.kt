@@ -5,6 +5,10 @@ object CompositionInput {
     private const val CODE_KEYS = "aei5479381wy'"
     data class Intent(val code: String, val allowRawCommit: Boolean)
 
+    /** 碼串僅含碼字母、分隔符與空白；標點/符號輸入不走 12 鍵選擇日誌。 */
+    fun isCodeString(input: String): Boolean =
+        input.isNotEmpty() && input.all { it in CODE_KEYS || it == '\'' || it.isWhitespace() }
+
     fun beforeKey(input: String, caret: Int, key: Int, hasSelection: Boolean): Intent {
         val position = caret.coerceIn(0, input.length)
         val isCodeKey = key in 0..127 && key.toChar() in CODE_KEYS

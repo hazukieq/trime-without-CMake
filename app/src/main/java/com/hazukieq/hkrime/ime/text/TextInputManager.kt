@@ -418,6 +418,11 @@ class TextInputManager private constructor() :
                 refreshTwelveKey()
                 return@withEngineLock
             }
+            // 標點/符號不是 12 鍵碼串，沒有可證實的碼位消費：交引擎選中並提交。
+            if (!CompositionInput.isCodeString(local.input)) {
+                selectEngineCandidate(item)
+                return@withEngineLock
+            }
             val consumed = CandidateSelection.consumedEnd(item, local.remaining, origin) ?: run {
                 Timber.w("twelvekey: unresolved selection text=%s reading=%s", item.text, item.comment)
                 refreshTwelveKey()
@@ -449,6 +454,26 @@ class TextInputManager private constructor() :
             trime.updateComposing()
             refreshTwelveKey()
         }
+    }
+
+    /** 非碼串（標點/符號）候選：不記選擇日誌，交引擎選中並立即提交。 */
+    private fun selectEngineCandidate(item: CandidateItem) {
+        if (item.index < 0) {
+            refreshTwelveKey()
+            return
+        }
+        val ok = runCatching { Rime.select_candidate(item.index) }.getOrDefault(false)
+        if (!ok) {
+            Timber.w("twelvekey: engine candidate %d not selectable", item.index)
+            refreshTwelveKey()
+            return
+        }
+        runCatching { Rime.getContexts() }
+        // 使用者明確點選的非碼串候選，允許本次引擎 commit buffer 直通編輯器。
+        rawEngineCommitAllowed = true
+        activeEditorInstance.commitRimeText()
+        trime.updateComposing()
+        refreshTwelveKey()
     }
 
     private fun commitCompletedSelection() {
@@ -521,8 +546,12 @@ class TextInputManager private constructor() :
             restoreTwelveKeyCode(composition.remaining)
         } else {
             val actual = Rime.RimeGetInput().orEmpty()
-            if (actual.isEmpty() && composition.remaining.isNotEmpty()) restoreTwelveKeyCode(composition.remaining)
-            else composition.input(actual)
+            when {
+                actual.isEmpty() && composition.remaining.isNotEmpty() -> restoreTwelveKeyCode(composition.remaining)
+                // 標點/符號不是碼串：不進 12 鍵選擇日誌，等用戶明確點選後直通提交。
+                !CompositionInput.isCodeString(actual) -> composition.cancel()
+                else -> composition.input(actual)
+            }
         }
         PreeditPresentation.invalidate(composition.selectedText)
         trime.updateComposing()
