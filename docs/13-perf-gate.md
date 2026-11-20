@@ -21,14 +21,17 @@ python3 tools/perf-gate.py --log /tmp/hkrime.log --no-trigger
 | op=merge | 1.0ms | 合并/分档/截断 |
 | op=engine | 60ms | 当前组合候选枚举 |
 | build_p90 / build_max | 40 / 120ms | 缓存 miss 的真实快照构建 |
+| build_full_p90 / build_full_max | 90 / 200ms | 展开面板的完整快照构建 |
 | latency_p90 / latency_max | 80 / 300ms | 按键到快照就绪，含排队与引擎 |
-| assoc_load | 1.5s | 后台词表索引加载 |
+| assoc_load | 2.5s | 后台词表索引加载 |
 
 App 实现在 `core/twelvekey/PerfGate.kt`。微基准只读，不喂键、不提交、不写用户词典；
 引擎枚举仅在当前有组合时测量。日志结束时主动 flush。
 脚本按进程开始标记隔离样本，真实按键延迟不足时不能把微基准 PASS 当作端到端验收。
+快照 key 含原始 preedit 空格及控制分隔符，解析按物理换行及 `cached=` 边界进行；
+不能用单个无空白 token 匹配 key，否则会漏掉多音节输入的完整面板样本。
 
 分组、联想、排序、快照改动后及发布前运行。出现卡顿先看哪个 op 超阈值，再比较
 `twelvekey:build`、`twelvekey:latency`、枚举和 emit 慢日志；Native 再用 simpleperf。
 adb 连点会影响 latency，报告必须注明设备、版本、输入方式、缓存与样本范围。
-当前首次开面板同步兜底也须单独验证，不能仅凭后台构建指标推断 UI 无阻塞。
+首次开面板须单独验证等待后台完整快照后的实际呈现，不能仅凭后台构建指标推断 UI 无阻塞。

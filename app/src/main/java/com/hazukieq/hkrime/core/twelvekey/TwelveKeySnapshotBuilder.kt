@@ -31,6 +31,7 @@ object TwelveKeySnapshotBuilder {
     private const val MAX_FALLBACK_CODE = TwelveKeyTuning.MAX_FALLBACK_CODE
 
     /** 沒讀音 comment 的組佔位標題（見 [TwelveKeyTuning.BLANK_READING]）。 */
+    private const val FIRST_SEGMENT_CHARS = 4
     private const val BLANK_READING = TwelveKeyTuning.BLANK_READING
 
     /** UI 線程同步算出的「本地部分」；segmentsKey 用於區分「input 不變但分段變了」。 */
@@ -133,6 +134,7 @@ object TwelveKeySnapshotBuilder {
                     text = row.getOrNull(0) ?: "",
                     comment = cleanComment(row.getOrNull(1)),
                     index = index,
+                    engineSpan = EngineCandidateSpan.fromRow(row),
                 )
             }
         } else {
@@ -210,7 +212,7 @@ object TwelveKeySnapshotBuilder {
                 .distinctBy { it.text }
                 .take(TwelveKeyTuning.BAR_ITEMS)
         } else {
-            barList(barOrdered)
+            withFirstSegmentChars(barList(barOrdered), ordered, remaining)
         }
         // 推薦組最多 30 詞與 10 單字；詞來自聯想/組合/整串與引擎詞，單字可用段組補位。
         val recommend = recommendWords(ordered, panelRows, local.remaining)
@@ -247,6 +249,10 @@ object TwelveKeySnapshotBuilder {
         if (degraded) {
             Timber.w("twelvekey: enumerate native missing, degraded to single page (%d)", flat.size)
         }
+        val inputBinder = CandidateSelection.InputBinder(remaining, consumedEnd)
+        val boundGroups = groupsWithRecommend.map { group -> group.copy(items = group.items.map(inputBinder::bind)) }
+        val boundBar = barEntries.map(inputBinder::bind)
+        val boundRecommend = recommend.map(inputBinder::bind)
         DiagLog.d(
             "snapshot",
             "build code=${input} wantGroups=$wantGroups groups=${groupsWithRecommend.size}" +
@@ -266,11 +272,11 @@ object TwelveKeySnapshotBuilder {
             input = input,
             consumedEnd = consumedEnd,
             remaining = remaining,
-            groups = groupsWithRecommend,
+            groups = boundGroups,
             fallback = fallback,
             degradedToSinglePage = degraded,
-            barEntries = barEntries,
-            recommend = recommend,
+            barEntries = boundBar,
+            recommend = boundRecommend,
             previewText = previewText,
             inlineText = inlineText,
             contextKey = local.contextKey,
@@ -315,7 +321,7 @@ object TwelveKeySnapshotBuilder {
      * 一種碼串可能有多種合法切法（`744ii` = son+gi 或 song+g**），但面板只列**第一段**：
      *  1) 整串是一個音節（`we` = the）→ 先列這個音節的單字組；
      *  2) 再把每個碼位當獨立段切開（`w` = th*、`e` = d/e/f*），給出「第一段的音節組 + 聯想詞行」，
-     *     點下去之後剩餘碼自動遞歸（pickSegmentedCandidate 會把 rest 餵回引擎）。
+     *     選字後統一選擇入口按原碼跨度消費，未選尾碼重新餵回引擎。
      *
      * 配額：第一種切法吃完整配額；備選切法減半（[TwelveKeyTuning.SECONDARY_SPLIT_DIVISOR]），
      * 避免次要解讀把左列灌滿。音節豐富的鍵放開到 24（[TwelveKeyTuning.SEGMENT_SYLLABLE_LIMIT_RICH]）。
@@ -992,6 +998,35 @@ object TwelveKeySnapshotBuilder {
 
     private fun barList(ranked: List<CandidateItem>): List<CandidateItem> =
         CandidateRanking.rankBar(ranked, BAR_ITEMS)
+
+    /**
+     * 候選條保證「第一待選段」的單字可選。
+     *
+     * 多音節碼時引擎把整詞（`與下載`、`下載`…）排在前面，單字要翻到十幾屏之後；
+     * 逐段選字（自造詞）就沒法從候選條完成。這裡把第一段的單字取到條首，
+     * 其餘候選保持引擎順序並按文字去重。單音節碼或條內已有單字時不動。
+     */
+    private fun withFirstSegmentChars(
+        bar: List<CandidateItem>,
+        ranked: List<CandidateItem>,
+        remaining: String,
+    ): List<CandidateItem> {
+        if (remaining.isEmpty() || bar.any { it.text.length == 1 }) return bar
+        val head = splitParts(remaining).firstOrNull() ?: return bar
+        if (head.rest.isEmpty()) return bar
+        val syllables = head.syllables.take(FIRST_SEGMENT_CHARS).toSet()
+        if (syllables.isEmpty()) return bar
+        val chars = ranked.asSequence()
+            .filter { it.text.length == 1 }
+            .filter { it.comment.trim().substringBefore(' ') in syllables }
+            .distinctBy { it.text }
+            .take(FIRST_SEGMENT_CHARS)
+            .toList()
+        if (chars.isEmpty()) return bar
+        val seen = chars.mapTo(HashSet()) { it.text }
+        return (chars + bar.filterNot { it.text in seen }).take(TwelveKeyTuning.BAR_ITEMS)
+    }
+
 
     /**
      * 推薦候選沿引擎/學習基礎順序取詞，結合面板詞行和段組單字補位。

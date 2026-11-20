@@ -12,7 +12,7 @@
 | `ime/keyboard/` | 布局、绘制、触摸、按键事件 |
 | `ime/text/TextInputManager.kt` | 输入状态、候选点击、部分选词、提交、学习 |
 | `core/Rime.java` | JNI 门面、session、上下文、候选枚举、维护 |
-| `core/twelvekey/` | 快照、排序、面板行流水线、学习记忆和性能微基准 |
+| `core/twelvekey/` | 快照及原码跨度、选择日志、preedit 显示、左栏导航、排序、学习记忆和性能微基准 |
 | `core/TwelveKeyPreedit.kt` | 编码解码、preedit、字表、词表与联想索引 |
 | `data/`、`util/` | 配置、目录、OpenCC、部署、同步、日志及方案适配 |
 
@@ -25,7 +25,7 @@ KeyboardView / Event → Trime / TextInputManager → Rime.onKey → librime
 → TwelveKeyController.refresh
 → TwelveKeySnapshotBuilder.build
 → TwelveKeySnapshot
-→ CandidateBarBinder / CandidatePanelController / preedit 与嵌入式预览
+→ CandidateBarBinder / CandidatePanelController / 输入法 preedit
 ```
 
 `CandidateItem.index` 保留引擎全局下标；排序后的界面位置不能当作引擎下标。

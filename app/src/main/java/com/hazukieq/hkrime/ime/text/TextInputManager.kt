@@ -25,7 +25,7 @@ import com.hazukieq.hkrime.core.twelvekey.TwelveKeyController
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshot
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder
 import com.hazukieq.hkrime.data.AppPrefs
-import com.hazukieq.hkrime.ime.enums.InlineModeType
+import com.hazukieq.hkrime.util.DiagLog
 import com.hazukieq.hkrime.data.Config
 import com.hazukieq.hkrime.databinding.InputRootBinding
 import com.hazukieq.hkrime.ime.broadcast.IntentReceiver
@@ -100,6 +100,11 @@ class TextInputManager private constructor() :
         private val DELIMITER_PROPERTY_KEY = """^((\{Escape\})?[^{}]+).*$""".toRegex()
         /** Delimiter regex to split language/locale tags. */
         private val DELIMITER_SPLITTER = """[-_]""".toRegex()
+        /** 逐字組詞接續時間窗（毫秒）：超過即視為新詞。 */
+        private const val RUN_WINDOW_MS = 8_000L
+        /** 接續組詞的最大字數，避免整句被併成一條詞。 */
+        private const val MAX_RUN_LENGTH = 8
+
         private var instance: TextInputManager? = null
 
         @Synchronized
@@ -247,27 +252,6 @@ class TextInputManager private constructor() :
     }.getOrDefault(false)
 
     /**
-     * 12 鍵預編輯預覽文字：取「固定候選欄第一條」，讓嵌入式預覽與候選欄顯示同一個字。
-     *
-     * 引擎的 commit_text_preview 是引擎順序第一條；12 鍵候選條會被 SelectionMemory
-     * 重排（用戶常用字優先），兩者不一致時會出現「候選欄是怕、預覽是啥」的錯位。
-     */
-    fun currentPreviewText(): String? {
-        if (!isTwelveKeyMode()) return null
-        return withEngineLock {
-            PreeditPresentation.preview(Rime.getRawPreedit().orEmpty(), Rime.RimeGetInput().orEmpty())
-        }
-    }
-
-    fun currentCompositionText(): String? = if (!isTwelveKeyMode()) null else withEngineLock {
-        PreeditPresentation.render(Rime.getRawPreedit(), Rime.RimeGetInput().orEmpty())
-    }
-
-    fun currentInputText(): String? = if (!isTwelveKeyMode()) null else withEngineLock {
-        composition.selectedText + Rime.RimeGetInput().orEmpty()
-    }
-
-    /**
      * 「用戶想要面板開著」的意圖。
      *
      * 只靠 [isCandidatePanelShown] 判斷會漏：選字/上屏那一瞬間 view 可能短暫不可見，
@@ -361,7 +345,6 @@ class TextInputManager private constructor() :
         if (panelWanted && snapshot.groups.isNotEmpty() && candidatePanelController?.isShown != true) {
             candidatePanelController?.show()
         }
-        applyInlinePreview()
         if (snapshot.isEmpty || (!snapshot.hasCandidates && snapshot.fallback == null)) {
             if (candidatePanelController?.isShown == true) candidatePanelController?.hide()
         }
@@ -385,20 +368,6 @@ class TextInputManager private constructor() :
             .onFailure { Timber.e(it, "twelvekey: preedit refresh failed") }
         suppressSnapshotRefresh = false
     }
-
-    /**
-     * 12 鍵 preedit 預覽與候選條同幀落地：快照一到就把第一條寫進 preedit。
-     * 只在「嵌入式編輯模式 = 首選」時接管；其他模式仍由 EditorInstance 按各自來源更新。
-     */
-    private fun applyInlinePreview() {
-        if (!isTwelveKeyMode()) return
-        if (prefs.keyboard.inlinePreedit != InlineModeType.INLINE_PREVIEW) return
-        val ic = activeEditorInstance.inputConnection ?: return
-        val text = currentPreviewText().orEmpty()
-        runCatching { ic.setComposingText(text, 1) }
-            .onFailure { Timber.e(it, "twelvekey: inline preview failed") }
-    }
-
 
     private val composition = CompositionSession()
     private var preservePanelReading = false
@@ -431,7 +400,7 @@ class TextInputManager private constructor() :
             // 原生部分選中不應與 App 日誌並存；保留原碼，退格仍可交引擎撤回。
             if (local.consumedEnd != 0) { refreshTwelveKey(); return@withEngineLock }
             composition.input(local.remaining)
-            if (!composition.pick(item.text, item.comment, consumed, origin)) return@withEngineLock
+            if (!composition.pick(item.text, item.inputSpan!!.reading, consumed, origin)) return@withEngineLock
             preservePanelReading = true
             twelveKeyController?.invalidateForEngine()
             PreeditPresentation.invalidate(composition.selectedText)
@@ -443,7 +412,8 @@ class TextInputManager private constructor() :
                     val current = runCatching { Rime.candidatesSnapshot(item.index + 1) }.getOrNull()
                         ?.getOrNull(item.index)
                     if (current?.getOrNull(0) == item.text &&
-                        TwelveKeySnapshotBuilder.cleanCommentForSelection(current.getOrNull(1)) == item.comment) {
+                        (item.engineSpan?.let { it == com.hazukieq.hkrime.core.twelvekey.EngineCandidateSpan.fromRow(current) }
+                            ?: (TwelveKeySnapshotBuilder.cleanCommentForSelection(current.getOrNull(1)) == item.inputSpan.reading))) {
                         runCatching { Rime.select_candidate(item.index); Rime.getContexts(); Rime.getCommit() }
                     }
                 }
@@ -489,6 +459,7 @@ class TextInputManager private constructor() :
     )
 
     fun onEditorSessionChanged() {
+        resetLearnedRunIfStale()
         withEngineLock {
             val editor = currentEditorIdentity()
             if (!composition.bindEditor(editor)) {
@@ -522,10 +493,47 @@ class TextInputManager private constructor() :
                 PhraseMemory.learnPick(pick.beforeCode, pick.text, pick.reading)
             }
         }
-        if (completed.picks.size >= 2 && text.length >= 2 && completed.picks.all { it.reading.isNotBlank() }) {
-            PhraseMemory.record(completed.code, text, completed.picks.joinToString(" ") { it.reading })
+        val readings = completed.picks.joinToString(" ") { it.reading }
+        val learnable = text.isNotEmpty() &&
+            completed.picks.isNotEmpty() &&
+            completed.picks.all { it.reading.isNotBlank() }
+        if (learnable) {
+            val now = System.currentTimeMillis()
+            // 逐字上屏（每段一次提交）也要能攒成詞：同一編輯器、時間窗內接續的提交併進同一條碼串。
+            // 只有「單次點選上屏」才接續（逐段打字）；一次組合內連點多段本身已是整詞，重新開一條。
+            val continues = completed.picks.size == 1 && runText.isNotEmpty() &&
+                now - runAt <= RUN_WINDOW_MS && runText.length + text.length <= MAX_RUN_LENGTH
+            runCode = if (continues) runCode + completed.code else completed.code
+            runText = if (continues) runText + text else text
+            runReadings = if (continues) "$runReadings $readings" else readings
+            runAt = now
+            // 只在「本次提交本身就是詞」或「剛好湊夠兩字」時落庫，避免整句被逐字拆成一串前綴詞。
+            android.util.Log.i("HKLEARN", "commit code=${completed.code} text=$text picks=${completed.picks.size} run=$runCode/$runText/${runReadings}")
+            if (runText.length >= 2 && (text.length >= 2 || runText.length == 2)) {
+                PhraseMemory.record(runCode, runText, runReadings.trim())
+            }
+        } else {
+            resetLearnedRun()
         }
         }.onFailure { Timber.e(it, "twelvekey: post-commit learning failed") }
+    }
+
+    /** 逐字組詞的接續緩衝：跨提交累積碼串/文字/讀音，逾時或換編輯器即斷開。 */
+    private var runCode = ""
+    private var runText = ""
+    private var runReadings = ""
+    private var runAt = 0L
+
+    /** 只有真的離開接續時間窗才斷開逐字組詞，避免提交後的收尾流程把緩衝清掉。 */
+    private fun resetLearnedRunIfStale() {
+        if (System.currentTimeMillis() - runAt > RUN_WINDOW_MS) resetLearnedRun()
+    }
+
+    private fun resetLearnedRun() {
+        runCode = ""
+        runText = ""
+        runReadings = ""
+        runAt = 0L
     }
 
     private fun restoreTwelveKeyCode(code: String) {
@@ -610,6 +618,8 @@ class TextInputManager private constructor() :
     }
 
     fun cancelTwelveKeyComposition() {
+        // 提交後的收尾也會走這裡；剛上屏 1 秒內的「接續組詞」緩衝要留著，只有真的取消才斷開。
+        resetLearnedRunIfStale()
         withEngineLock {
             val hadSession = composition.active || isTwelveKeyMode()
             composition.cancel()
@@ -676,6 +686,10 @@ class TextInputManager private constructor() :
                     comment = syllable,
                     index = -1,
                     segment = ISOLATED_CHAR_SEGMENT,
+                    inputSpan = CandidateSelection.bind(
+                        CandidateItem(ch, syllable, -1, segment = ISOLATED_CHAR_SEGMENT),
+                        currentSnapshot.remaining,
+                    ).inputSpan,
                 ),
             )
         }
@@ -689,12 +703,12 @@ class TextInputManager private constructor() :
         if (item.segment == ISOLATED_BACK_SEGMENT) { candidatePanelController?.restoreGrid(); return }
         val fallback = currentSnapshot.fallback
         if (fallback != null && item.index < 0 && item.segment == -1 && item.text == fallback.letters) {
-            chooseTwelveKey(CandidateItem(item.text, "", -1, restCode = currentSnapshot.remaining),
+            chooseTwelveKey(CandidateSelection.fallback(item.text, currentSnapshot.remaining),
                 item.contextKey, CompositionSession.Origin.FALLBACK)
             return
         }
         chooseTwelveKey(
-            CandidateItem(item.text, item.comment, item.index, item.segment, item.restCode),
+            CandidateItem(item.text, item.comment, item.index, item.segment, item.restCode, item.inputSpan),
             item.contextKey,
             if (item.segment == ISOLATED_CHAR_SEGMENT) CompositionSession.Origin.ISOLATED else CompositionSession.Origin.PANEL,
         )
@@ -1183,7 +1197,7 @@ class TextInputManager private constructor() :
             chooseTwelveKey(item, snapshot.contextKey, CompositionSession.Origin.BAR)
         } else if (index == snapshot.barItems.size && snapshot.fallback != null) {
             chooseTwelveKey(
-                CandidateItem(snapshot.fallback.letters, "", -1, restCode = snapshot.remaining),
+                CandidateSelection.fallback(snapshot.fallback.letters, snapshot.remaining),
                 snapshot.contextKey, CompositionSession.Origin.FALLBACK,
             )
         }

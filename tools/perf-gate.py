@@ -55,14 +55,14 @@ READY_LINE = re.compile(
     r" charFreq=(?P<charfreq>\d+) charRank=(?P<charrank>\d+) assocReady=(?P<assoc>\w+)"
 )
 LATENCY_LINE = re.compile(r"twelvekey:latency (?P<ms>[0-9.]+)ms input=\[(?P<input>[^\]]*)\]")
-BUILD_LINE = re.compile(r"twelvekey:build (?P<key>\S+) cached=(?P<cached>true|false) ms=(?P<ms>[0-9.]+)")
+BUILD_LINE = re.compile(r"twelvekey:build (?P<key>.*?) cached=(?P<cached>true|false) ms=(?P<ms>[0-9.]+)")
 ASSOC_LOAD = re.compile(r"assoc keys=(?P<keys>\d+).*?load=(?P<ms>\d+)ms")
 DONE_LINE = re.compile(r"perfgate: done total=(?P<ms>[0-9.]+)ms")
 
 
 def sh(cmd: list[str]) -> str:
     try:
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=60).stdout
+        return subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=60).stdout
     except Exception as exc:  # noqa: BLE001 - 诊断脚本：任何失败都当作没数据
         print(f"[perf-gate] command failed: {' '.join(cmd)}: {exc}", file=sys.stderr)
         return ""
@@ -85,7 +85,8 @@ def fetch_log(serial: str | None) -> str:
 def parse(text: str) -> dict:
     out: dict = {"ops": {}, "ready": None, "latencies": [], "builds": [], "builds_full": [],
                  "assoc_load": None, "total": None}
-    lines = text.splitlines()
+    # contextKey 含原始 preedit（空格）及分隔符，不能當作無空白 token 或 Unicode 行分隔。
+    lines = text.split("\n")
     # 只統計本次進程樣本，避免跨進程日誌混入。
     start = 0
     for idx, line in enumerate(lines):

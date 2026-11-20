@@ -49,7 +49,7 @@ class NativeCompositionFlowTest {
             while (true) {
                 val line = reader.readLine() ?: error("native EOF while $command")
                 if (line == "END") return next.also { state = it }
-                val parts = line.split('\t', limit = 4)
+                val parts = line.split('\t', limit = 5)
                 when (parts[0]) {
                     "I" -> next.input = parts.getOrElse(1) { "" }
                     "P" -> next.preedit = parts.getOrElse(1) { "" }
@@ -57,6 +57,11 @@ class NativeCompositionFlowTest {
                     "S" -> next.segments.add(line)
                     "D" -> next.candidates.add(CandidateItem(parts[2],
                         TwelveKeySnapshotBuilder.cleanCommentForSelection(parts.getOrNull(3)), parts[1].toInt()))
+                    "M" -> {
+                        val index = parts[1].toInt()
+                        next.candidates[index] = next.candidates[index].copy(engineSpan =
+                            EngineCandidateSpan(parts[2].toInt(), parts[3].toInt(), parts.getOrElse(4) { "" }))
+                    }
                 }
             }
         }
@@ -86,7 +91,7 @@ class NativeCompositionFlowTest {
             if (!CandidateSelection.isCurrent(snap.contextKey, local().contextKey) || state.input.isEmpty()) return false
             val consumed = CandidateSelection.consumedEnd(item, state.input, origin) ?: return false
             session.input(state.input)
-            if (!session.pick(item.text, item.comment, consumed, origin)) return false
+            if (!session.pick(item.text, item.inputSpan!!.reading, consumed, origin)) return false
             if (session.remaining.isNotEmpty()) restore(session.remaining)
             else {
                 if (item.index >= 0) send("select ${item.index}")
@@ -127,7 +132,8 @@ class NativeCompositionFlowTest {
             val original = "9aii48i5i73"
             d.type(original)
             val old = d.barWord("太")
-            assertTrue(d.choose(old, CompositionSession.Origin.BAR))
+            assertTrue(d.choose(old.first to old.second.copy(comment = "display-only unrelated text"),
+                CompositionSession.Origin.BAR))
             assertEquals("i48i5i73", d.state.input)
             assertEquals("太", d.session.selectedText)
             assertFalse(d.choose(old, CompositionSession.Origin.BAR)) // 過期/重複點擊。
@@ -197,11 +203,41 @@ class NativeCompositionFlowTest {
             val full = d.snapshot(true)
             assertTrue(full.groups.any { it.segment == ISOLATED_SEGMENT })
             val char = TwelveKeyPreedit.charsForSyllable("ka").first()
-            val isolated = CandidateItem(char, "ka", -1, segment = ISOLATED_CHAR_SEGMENT)
+            val isolated = CandidateSelection.bind(CandidateItem(char, "ka", -1, segment = ISOLATED_CHAR_SEGMENT), "55")
             assertTrue(d.choose(full to isolated, CompositionSession.Origin.ISOLATED))
             assertEquals("5", d.state.input)
             assertTrue(d.commits.isEmpty())
             d.undo(); assertEquals("55", d.state.input)
+        }
+    }
+
+    @Test(timeout = 90000) fun actualOpenccEmoticonsConsumeNativeRangesAndUndoAcrossSurfaces() {
+        Driver().use { d ->
+            d.send("option ywz 1")
+            val code = "ia8i3"
+            d.type(code + "9ai")
+            val converted = d.state.candidates.filter { it.comment.contains("加油") && it.text != "加油" }
+            assertTrue("真實 OpenCC 必須產生加油表情", converted.size >= 2)
+            for ((n, emoji) in converted.take(2).withIndex()) {
+                val full = d.snapshot(true)
+                val row = full.groups.flatMap { it.items }.first { it.text == emoji.text }
+                val span = requireNotNull(row.inputSpan)
+                assertEquals(5, span.end)
+                assertEquals("ga jiu", span.reading)
+                assertTrue(d.choose(full to row, if (n == 0) CompositionSession.Origin.PANEL else CompositionSession.Origin.BAR))
+                assertEquals("9ai", d.state.input)
+                assertEquals(emoji.text, d.session.selectedText)
+                assertTrue(d.commits.isEmpty())
+                d.undo()
+                assertEquals(code + "9ai", d.state.input)
+            }
+            d.type(code)
+            val full = d.snapshot(true)
+            val emoji = full.groups.flatMap { it.items }.first { it.comment.contains("加油") && it.text != "加油" }
+            assertTrue(d.choose(full to emoji, CompositionSession.Origin.PANEL))
+            assertEquals(listOf(emoji.text), d.commits)
+            d.writeCompleted()
+            assertEquals(1, d.commits.size)
         }
     }
 }

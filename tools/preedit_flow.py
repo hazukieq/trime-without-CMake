@@ -2,7 +2,7 @@
 """PC librime + App 部分选词、撤销、学习排序的行为模拟。
 
 --data 同时指定引擎与面板索引的数据目录；不指定时使用现有设备快照，否则随包数据。
-bar/pick 使用 64 条引擎窗口、最多展示 12 项；left/right 查询最多 600 条引擎候选。
+bar/pick 使用 64 条引擎窗口、最多展示 12 项；left/right 合并 App 字典行与最多 600 条引擎候选。
 panel 诊断 App 字典来源，不渲染 UI。assert 支持 remaining、panel_has、no_isolated，
 以及 committed/pending/input/composing/bar_first。找不到候选、未知命令或断言失败均退出非零。
 示例见 docs/14-preedit.md。
@@ -228,6 +228,13 @@ class SelectionMemory:
         self.scores[k] = count * 1000 + seq
 
 
+@dataclass(frozen=True)
+class CodeSpan:
+    code: str
+    end: int
+    reading: str
+
+
 @dataclass
 class BarItem:
     text: str
@@ -236,6 +243,7 @@ class BarItem:
     segment: int = -1
     rest: str = ""
     context: tuple[str, str] = ("", "")
+    span: CodeSpan | None = None
 
 
 @dataclass
@@ -451,11 +459,32 @@ class Sim:
             out.append(it)
         return out
 
+    def _bind_items(self, items: list[BarItem]) -> list[BarItem]:
+        from panel_probe import selected_input_end
+
+        code = self.unconsumed()
+        cache: dict[tuple[str, int, str], CodeSpan | None] = {}
+        out: list[BarItem] = []
+        for it in items:
+            key = (it.comment, it.segment, it.rest)
+            if key not in cache:
+                if it.segment == -5:
+                    end = next((i + 1 for i, ch in enumerate(code) if ch != "'" and not ch.isspace()), None)
+                elif it.segment == -4:
+                    end = None  # 音節導航不授予選字消費權。
+                elif it.segment == 0 and it.index < 0:
+                    end = len(code) - len(it.rest) if code.endswith(it.rest) else None
+                else:
+                    end = selected_input_end(data(), it.comment, code)
+                cache[key] = CodeSpan(code, end, it.comment) if end is not None and 1 <= end <= len(code) else None
+            out.append(replace(it, context=(self.state.input, self.state.preedit), span=cache[key]))
+        return out
+
     def bar_items(self) -> list[BarItem]:
         """App 候選條：永遠只取前 64 條引擎候選做學習排序+學習詞混排，展示 12 項。"""
         flat = self._engine_items()[: self.BAR_WINDOW]
         items = self._ordered(flat)[: self.BAR_ITEMS]
-        return [replace(it, context=(self.state.input, self.state.preedit)) for it in items]
+        return self._bind_items(items)
 
     def panel_items(self) -> list[BarItem]:
         if self.drill:
@@ -467,7 +496,7 @@ class Sim:
                 for text in row.get("chars" if segment == 0 else "items", ()):
                     items.append(BarItem(text, row["reading"], -1, segment, row.get("rest", "")))
             items += self._ordered(self._engine_items())
-        return [replace(it, context=(self.state.input, self.state.preedit)) for it in items]
+        return self._bind_items(items)
 
     def bar(self, n: int) -> None:
         items = self.bar_items()
@@ -492,8 +521,6 @@ class Sim:
         return False
 
     def _pick_item(self, it: BarItem) -> None:
-        from panel_probe import selected_input_end
-
         if it.context != (self.state.input, self.state.preedit) or not self.state.input:
             print("  ignored stale candidate")
             return
@@ -501,19 +528,15 @@ class Sim:
             self.drill = it.text
             return
         code = self.unconsumed()
-        if it.segment == -5:
-            consumed = next((i + 1 for i, ch in enumerate(code) if ch != "'" and not ch.isspace()), None)
-        elif it.segment == 0 and it.index < 0:
-            consumed = len(code) - len(it.rest) if code.endswith(it.rest) else None
-        else:
-            consumed = selected_input_end(data(), it.comment, code)
-        if consumed is None or not 1 <= consumed <= len(code):
+        span = it.span
+        if span is None or span.code != code or not 1 <= span.end <= len(code):
             self.failures += 1
             print("  ! unresolved candidate coverage; original code retained")
             return
+        consumed = span.end
         while consumed < len(code) and (code[consumed] == "'" or code[consumed].isspace()):
             consumed += 1
-        self.held.append((it.text, it.comment, code, code[:consumed]))
+        self.held.append((it.text, span.reading, code, code[:consumed]))
         self.pending += it.text
         self.expected_code = code[consumed:]
         self.ready = not self.expected_code

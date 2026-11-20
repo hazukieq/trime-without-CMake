@@ -9,6 +9,8 @@
 |---|---|
 | TwelveKeyPreedit | 音节、解码、词表解析、不可变索引与查询 |
 | TwelveKeySnapshotBuilder | 来源构造、引擎组装、快照投影和推荐 |
+| CandidateInputBoundary / CandidateSelection | 构建时证实并绑定原码跨度；点击时校验原码与快照，禁止重算显示 comment |
+| PreeditPresentation / PanelNavigation | 只读显示帧与左栏活跃组；不选择、不消费编码、不提交 |
 | PanelRow | 行模型、唯一合并、前缀收敛、分档、总行数截断 |
 | CandidateRanking | 候选条与组内排序纯函数 |
 | TwelveKeyTuning | 配额和策略常量及其影响说明 |
@@ -42,6 +44,8 @@ python3 tools/panel_probe.py --data app/src/main/assets/rime \
 
 1. 语义改动先写文档并向用户确认；实现和脚本一起修改。
 2. selftest、PanelGoldenTest、排序与快照单测通过；真实语料重新生成并确认 RealCorpusTest 无跳过。
+   `CandidateSelectionTest` 覆盖原码跨度与同长度异码；`PanelNavigationTest` 覆盖切组和渲染不消费编码；
+   `NativeCompositionFlowTest` 在真实 PC 引擎上验证显示 comment 改变不影响扣码及跨界面撤销。
 3. 安装后确认实际 IME，检查真实词表加载、diag 的各源与最终行、部分选词及撤销行为。
 4. 性能门禁和首次开面板/连续输入验收通过，候选条开合前后不漂移。
 

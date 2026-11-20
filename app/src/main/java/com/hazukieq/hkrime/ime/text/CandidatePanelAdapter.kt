@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.hazukieq.hkrime.core.Rime
+import com.hazukieq.hkrime.core.twelvekey.InputCodeSpan
 import com.hazukieq.hkrime.data.Config
 
 /**
@@ -27,7 +28,7 @@ import com.hazukieq.hkrime.data.Config
  * - 底色是比鍵盤淺一層的表面色，圓角 14dp，不加陰影（IME 面板不適合投影）；
  * - 觸摸反饋用 ripple，而不是改變字色。
  *
- * [Item.index] 是 librime menu 的全局下標，點擊後直接 Rime.select_candidate(index)。
+ * 點擊攜帶原碼跨度與快照標識回調統一選擇入口，不在 Adapter 選詞或提交。
  */
 class CandidatePanelAdapter(
     private val context: Context,
@@ -44,6 +45,7 @@ class CandidatePanelAdapter(
         /** 選中後要重新餵回引擎的剩餘碼（按段選字用；空表示沒有剩餘）。 */
         val restCode: String = "",
         val contextKey: String = "",
+        val inputSpan: InputCodeSpan? = null,
     )
 
     private val density = context.resources.displayMetrics.density
@@ -195,7 +197,8 @@ class CandidatePanelAdapter(
             override fun areItemsTheSame(oldItem: Item, newItem: Item): Boolean =
                 oldItem.text == newItem.text && oldItem.comment == newItem.comment &&
                     oldItem.index == newItem.index && oldItem.segment == newItem.segment &&
-                    oldItem.restCode == newItem.restCode && oldItem.contextKey == newItem.contextKey
+                    oldItem.restCode == newItem.restCode && oldItem.contextKey == newItem.contextKey &&
+                    oldItem.inputSpan == newItem.inputSpan
 
             override fun areContentsTheSame(oldItem: Item, newItem: Item): Boolean =
                 oldItem == newItem

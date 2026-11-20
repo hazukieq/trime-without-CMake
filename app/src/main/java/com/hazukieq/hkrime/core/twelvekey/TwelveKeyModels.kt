@@ -7,8 +7,7 @@ package com.hazukieq.hkrime.core.twelvekey
 /**
  * 合成候選（App 側「逐段拼出來的組詞」）的 [CandidateItem.segment] 標記。
  *
- * 它不來自 librime：引擎裝不出這種整串（`enable_sentence: false`），所以點擊時不能走
- * `select_candidate`，只能整串上屏；完整碼串放在 [CandidateItem.restCode] 裡，上屏後用它記學習。
+ * 它不來自 librime；選擇依綁定的原碼跨度進入同一份選擇日誌，不用引擎下標選中。
  */
 const val SYNTHETIC_SEGMENT = -2
 
@@ -43,7 +42,23 @@ data class CandidateItem(
     val segment: Int = -1,
     /** 選中後要重新餵回引擎的剩餘碼（按段選字用；空表示沒有剩餘）。 */
     val restCode: String = "",
+    /** 生成快照時證實的原碼跨度；顯示 comment/左欄折疊不得改寫。 */
+    val inputSpan: InputCodeSpan? = null,
+    /** 引擎原始輸入的絕對跨度，與顯示說明分離；App 合成項沒有此欄。 */
+    val engineSpan: EngineCandidateSpan? = null,
 )
+
+data class EngineCandidateSpan(val start: Int, val end: Int, val sourceComment: String) {
+    companion object {
+        fun fromRow(row: Array<String>): EngineCandidateSpan? = if (row.size < 5) null else
+            EngineCandidateSpan(row[2].toIntOrNull() ?: -1, row[3].toIntOrNull() ?: -1, row[4])
+    }
+}
+
+/** 相對於當次剩餘原碼的消費終點，並保留選擇用的原始讀音。 */
+data class InputCodeSpan(val code: String, val end: Int, val reading: String) {
+    fun matches(input: String): Boolean = code == input && end in 1..input.length
+}
 
 /** 左列一個音節組：reading 是精確拼音（comment），items 是該讀音下的全部候選。 */
 data class SyllableGroup(

@@ -7,6 +7,24 @@ assert input i48i5i73
 assert remaining i48i5i73
 assert panel_has go
 assert no_isolated 1
+left go
+assert input i48i5i73
+assert pending 太
+assert held 1
+assert commit_count 0
+left ho
+assert input i48i5i73
+assert held 1
+left go
+right 哥
+assert input 8i5i73
+assert pending 太哥
+assert held 2
+assert commit_count 0
+back
+assert input i48i5i73
+assert pending 太
+assert held 1
 panel
 back
 assert pending ""

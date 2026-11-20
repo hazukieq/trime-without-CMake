@@ -327,4 +327,40 @@ class PhraseMemoryTest {
         assertEquals(listOf("醫院", "這種", "以液難"), merged.map { it.text })
         PhraseMemory.clear()
     }
+
+    @Test
+    fun `newly recorded phrase survives a full memory instead of being evicted`() {
+        PhraseMemory.clear()
+        val now = 2000L * day
+        // 記憶體塞滿且全是高分老詞：舊排序會把剛學到的（typed=1）立刻淘汰。
+        repeat(PhraseMemory.MAX_ENTRIES) { i ->
+            PhraseMemory.putForTest(
+                "old$i",
+                listOf(PhraseMemory.Entry("老詞$i", "lau ci", typed = 9, lastUsedAt = now - 5 * day, picked = 9)),
+            )
+        }
+        PhraseMemory.record("8iia8ai", "已下載", "ji ha zai")
+        // 一次手拼還在 MIN_COUNT 之下（未進候選），但必須留在記憶裡等下一個字。
+        assertTrue(PhraseMemory.allEntries().any { it.text == "已下載" })
+        PhraseMemory.record("8iia8ai", "已下載", "ji ha zai")
+        assertEquals("已下載", PhraseMemory.candidatesFor("8iia8ai").first().text)
+        PhraseMemory.clear()
+    }
+
+    @Test
+    fun `recently learned phrase is never the first to be dropped`() {
+        PhraseMemory.clear()
+        val now = System.currentTimeMillis()
+        repeat(PhraseMemory.MAX_ENTRIES) { i ->
+            PhraseMemory.putForTest(
+                "old$i",
+                listOf(PhraseMemory.Entry("老詞$i", "lau ci", typed = 9, lastUsedAt = now - 5 * day, picked = 9)),
+            )
+        }
+        // 剛寫入的詞在保護窗內，即使分數最低也不得被淘汰。
+        PhraseMemory.putForTest("fresh", listOf(PhraseMemory.Entry("新詞", "xin ci", typed = 1, lastUsedAt = now)))
+        PhraseMemory.record("another", "另一詞", "lin ji ci")
+        assertTrue(PhraseMemory.allEntries().any { it.text == "新詞" })
+        PhraseMemory.clear()
+    }
 }

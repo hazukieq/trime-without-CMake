@@ -42,10 +42,7 @@ class CandidatePanelController(
 
     private val groupList = groupListView
     private var snapshot: TwelveKeySnapshot = TwelveKeySnapshot.EMPTY
-    /** 左列折疊後的下標（詞行併入第一個音節組）。 */
-    private var activeDisplay = 0
-    private var lastDisplayedReading: String? = null
-    private var lastInput: String? = null
+    private val navigation = PanelNavigation()
 
     /**
      * 所有方案（12 鍵、全字母 26 鍵…）都只讀同一份 [snapshot]：
@@ -86,7 +83,7 @@ class CandidatePanelController(
             onHideKeyboard?.invoke()
             return
         }
-        activeDisplay = 0
+        navigation.resetSelection()
         show()
     }
 
@@ -113,31 +110,12 @@ class CandidatePanelController(
         }
         groupAdapter.clear()
         gridAdapter.clear()
-        lastInput = null
+        navigation.resetSelection()
     }
 
     /** 每次按鍵/上屏後由上層調用：整個面板只讀這一份快照。 */
     fun submit(next: TwelveKeySnapshot, preserveReading: Boolean = false) {
-        val inputChanged = next.input != lastInput
-        if (inputChanged) lastInput = next.input
-
-        if (inputChanged && !preserveReading) {
-            // 新輸入回第 0 組，不隨候選條首選自動滾動定位。
-            activeDisplay = 0
-        } else {
-            // 連續消費：input 不變、groups 變了；當前左列讀音還在就保持，否則回第 0 組。
-            // 推薦組（reading 為空）不參與保持，否則逐段選字時會一直卡在推薦。
-            val display = foldGroupsForDisplay(next.groups)
-            val keep = if (!lastDisplayedReading.isNullOrEmpty()) {
-                display.indexOfFirst {
-                    it.reading == lastDisplayedReading && it.segment != RECOMMEND_SEGMENT
-                }
-            } else {
-                -1
-            }
-            activeDisplay = if (keep >= 0) keep else 0
-        }
-
+        navigation.submit(next, preserveReading)
         snapshot = next
         if (!next.hasCandidates && next.fallback == null) {
             if (isShown) hide()
@@ -149,8 +127,7 @@ class CandidatePanelController(
     }
 
     private fun pickGroup(group: CandidateGroupAdapter.GroupItem) {
-        if (group.index == activeDisplay) return
-        activeDisplay = group.index
+        if (!navigation.select(group.index, group.reading, group.contextKey)) return
         // 切組：只把右格滾到頂，左列保持當前滾動位置。
         render(scrollGrid = true, scrollGroups = false)
     }
@@ -169,8 +146,9 @@ class CandidatePanelController(
             grid?.scrollToPosition(0)
             return
         }
-        val display = foldGroupsForDisplay(groups)
-        if (activeDisplay !in display.indices) activeDisplay = 0
+        val display = navigation.groups
+        if (display.isEmpty()) return
+        val activeDisplay = navigation.activeIndex
         groupAdapter.submit(
             display.mapIndexed { index, group ->
                 CandidateGroupAdapter.GroupItem(
@@ -178,10 +156,10 @@ class CandidatePanelController(
                     reading = group.reading,
                     selected = index == activeDisplay,
                     count = group.items.size,
+                    contextKey = snapshot.contextKey,
                 )
             },
         )
-        lastDisplayedReading = display[activeDisplay].reading
         gridAdapter.setShowComment(display.size >= 2)
         gridAdapter.submit(
             display[activeDisplay].items.map {
@@ -192,6 +170,7 @@ class CandidatePanelController(
                     segment = it.segment,
                     restCode = it.restCode,
                     contextKey = snapshot.contextKey,
+                    inputSpan = it.inputSpan,
                 )
             },
         )

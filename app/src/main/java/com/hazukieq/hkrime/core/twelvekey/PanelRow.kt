@@ -232,10 +232,11 @@ internal fun foldGroupsForDisplay(groups: List<SyllableGroup>): List<PanelDispla
     return order.map { (reading, items) ->
         val seen = HashSet<String>()
         val unique = items.filter { seen.add(it.text) }
-        // 折進來的詞在前（多音節輸入時更相關），音節本身的字在後。
+        // 單字在前、折進來的詞在後：三音節碼時第一音節組會併入上百個詞行，
+        // 詞若排在單字前面，逐段選字要翻十幾屏（自造詞因此拼不完）。
         PanelDisplayGroup(
             reading = reading,
-            items = unique.sortedBy { if (it.segment == 0) 1 else 0 },
+            items = unique.sortedBy { if (it.segment == 0) 0 else 1 },
             segment = segments[reading] ?: -1,
         )
     }

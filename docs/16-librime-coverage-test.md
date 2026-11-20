@@ -19,8 +19,13 @@ ANDROID_SERIAL=<serial> ./pull-real-data.sh
 ```
 
 pull 脚本使用 adb，多个设备时通过 ANDROID_SERIAL 选目标。它拉取实际方案、词典、
-import 表、短语、OpenCC txt 和 sync 的 userdb 导出，不提交这些个人文件。
+import 表、短语、OpenCC 的 txt/json/ocd2 和 sync 的 userdb 导出，不提交这些个人文件。
 脚本在 `/tmp/hkrime-host-run` 建可写副本并部署；再次运行会重置该临时目录，不能并行运行。
+
+OpenCC 的 simplifier（`ywz` 颜文字/表情、`lenth` 联想短语）除了 txt 还需要配置 json
+和转换词典 ocd2。真机由 deploy 生成 ocd2；PC 端 `run-host-test.sh` 会复制 json，
+并用 `third_party/OpenCC/build-host/src/tools/opencc_dict` 就地编译缺失的 ocd2。
+没有这一步时 simplifier 静默不生效，语料里不会出现表情候选，相关测试会失真。
 需要 sync 导出时先在设备完成本地同步，再拉取，不能把不存在的导出当空词库。
 
 ## 结果口径

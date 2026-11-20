@@ -37,8 +37,13 @@ class PanelDisplayFoldTest {
         val bau = display.first { it.reading == "bau" }
         assertTrue(bau.items.any { it.text == "报站" })
         assertTrue("引擎词行也应折入：${man.items.map { it.text }}", man.items.any { it.text == "慢進" })
-        // 詞在字前（多音節輸入時詞更相關）
-        assertTrue("詞應在字前：${man.items.map { it.text }}", man.items.first().text == "慢走" || man.items.first().text == "慢進")
+        // 字在詞前（逐段選字先要這一音節的字；詞行折在後面）
+        val firstChar = man.items.indexOfFirst { it.segment == 0 }
+        val firstWord = man.items.indexOfFirst { it.segment != 0 }
+        assertTrue(
+            "字應在詞前：${man.items.map { it.text }}",
+            firstChar >= 0 && firstWord >= 0 && firstChar < firstWord,
+        )
     }
 
     @Test

@@ -36,6 +36,7 @@ class CandidateGroupAdapter(
         /** 兼容非 12 鍵的舊分段左列：已轉換前綴置灰 */
         val converted: Boolean = false,
         val incomplete: Boolean = false,
+        val contextKey: String = "",
     )
 
     private val density = context.resources.displayMetrics.density
@@ -185,7 +186,8 @@ class CandidateGroupAdapter(
     companion object {
         private val DIFF = object : DiffUtil.ItemCallback<GroupItem>() {
             override fun areItemsTheSame(oldItem: GroupItem, newItem: GroupItem): Boolean =
-                oldItem.index == newItem.index
+                oldItem.index == newItem.index && oldItem.reading == newItem.reading &&
+                    oldItem.contextKey == newItem.contextKey
 
             override fun areContentsTheSame(oldItem: GroupItem, newItem: GroupItem): Boolean =
                 oldItem == newItem

@@ -4,7 +4,12 @@
 
 TextInputManager → TwelveKeyController.refresh → TwelveKeySnapshotBuilder → 不可变快照 →
 CandidateBarBinder / CandidatePanelController。面板只画快照并回调选择，不独立访问引擎。
-`CandidateItem.index` 是全局引擎下标，`segment/restCode` 参与 App 候选点击分发。
+`CandidateItem.index` 是全局引擎下标，`segment/restCode` 参与 App 候选构造。
+条目在快照发布前绑定剩余原码的 `InputCodeSpan`；候选条、推荐、折叠组与右列保留同一跨度，
+选字不按显示拼音或左栏标题重新算消费长度。缺失或与当前剩余原码不符的跨度不能选择。
+引擎候选优先使用 Native 返回的实际 start/end；表情/OpenCC 的 `[加油]` 等说明不是拼音，
+不能参与扣码。包装候选的原始读音只用于学习；没有合法读音仍可按已证实的引擎跨度选择，
+但不写入读音词组学习。部分表情选择仍保留尾码与撤销记录，不能直接绕过提交许可。
 普通引擎项 index ≥ 0；App 项 index=-1；合成学习词 segment=-2；推荐组 segment=-3。
 PanelRow 的 0/1 表示单字组/词行，不能混同所有 CandidateItem 的点击语义。
 
@@ -24,7 +29,8 @@ PanelRow 的 0/1 表示单字组/词行，不能混同所有 CandidateItem 的�
 | ENGINE | engineRows | 引擎 comment 分组，转成 PanelRow 后参与同一流水线 |
 | ISOLATED | isolatedRows | 孤单联想字母行（`k`/`l`）：剩余码无完整音节时通配列出该字母下全部单音节 |
 
-字表来自主词典；词表只读 hakka 的 import_tables。运行时音节集合只用主词典，不读标准集资产。
+字表来自主词典和 hakka 的 import_tables 中标准集允许的单字读音；词表只读这些 import_tables。
+标准集还用于完整音节判定与孤单联想音节列表。
 带读音词条任一音节越界则整条丢弃；PhraseMemory 的文字/读音索引与词表索引合并，
 面板学习词和候选条同源，不另读 userdb 快照。
 
@@ -32,6 +38,7 @@ PanelRow 的 0/1 表示单字组/词行，不能混同所有 CandidateItem 的�
 
 splitParts 枚举首段切法。段码是完整音节时只取 exact：`4i → mh/mi/nh/ni`、
 `ea → da/fa`、`74 → po/so`；只有前缀或 exact 为空才展开。
+完整性直接查询原始编码表的键，不从显示解码结果、字符数或同长度推断。
 每码位普通上限 16 个音节，丰富键上限 24，备选切法配额减半；段组单字上限 1000。
 `r` 只允许在无剩余码的词尾，不能成为第一段或中间段简拼。
 简拼候选在面板必须具体化，不显示带星号或单字母通配读音。
@@ -79,10 +86,17 @@ WHOLE_WORD 仅通过轻量整串码索引查询，不把无读音的大词表塞
 
 - 多音节词行（联想 `man jiu`、组合 `jen cin kung ze`、整串词行）不再单独占左列一行，
   而是折进**第一个音节**的组：`man jiu` 的詞进 `man` 组，左列只看到 `man`。
-- 只改展示：`snapshot.groups`、点击语义（`item.segment`）、推荐来源、golden 都不变；
-  右格点组时先显示折进来的词、再显示该音节的字；词仍按原 segment/restCode 走部分选词语义。
+- 只改展示：`snapshot.groups`、点击语义（`item.segment`）、推荐来源、golden 都不变。
+- 右格顺序：**本音节的字在前，折进来的词在后**（`segment == 0` 优先）。三音节码时第一组可能
+  并入上百个词行，词若排在字前，逐段选字要翻十几屏，自造词根本拼不完；词仍按原
+  segment/restCode 走部分选词语义。
 - 推荐组（reading 空）与孤单联想字母行（segment -4..-6）**不折叠**，孤立音节 `d`/`f` 保持独立行。
+- 候选条另有一条兜底：多音节码时把**第一待选段的单字**提到条首（见 `withFirstSegmentChars()`），
+  否则引擎把 `与下载`/`下载` 这类整词排前面，单字要翻十几屏，逐段选字（自造词）无法从候选条完成。
+  单音节码或条内已有单字时不动，其余候选保持引擎顺序并去重。
 - 连续选字时左列保持当前折后的 reading；新输入回第 0 组。
+- 左列导航只接收快照与剩余原码；点击仅切换活跃展示组和右列，不能修改引擎、preedit 或选择日志。
+  旧快照的左栏点击不生效；只有右列的字词点击进入统一选择入口。
 - 实现：`PanelRow.kt` 的 `foldGroupsForDisplay()`（纯函数，`PanelDisplayFoldTest` 覆盖）。
 
 ## 唯一合并流水线

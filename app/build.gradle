@@ -28,6 +28,14 @@ android {
         }
     }
 
+    // 真实语料帧（40k 词典 + 30k 用户词库，含引擎原码跨度）单文件 70MB 量级，
+    // 默认测试堆会在 RealCorpusTest 里 OOM；固定 2g。
+    testOptions {
+        unitTests.all {
+            maxHeapSize = "2g"
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false

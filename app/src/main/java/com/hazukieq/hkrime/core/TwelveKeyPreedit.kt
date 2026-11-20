@@ -421,7 +421,7 @@ object TwelveKeyPreedit {
     /**
      * 讀音 → 完整碼串（`lin gi jit dung` → `5i4ii8i9e34i`）。
      *
-     * 上屏 App 側詞條時用來判斷「這條詞只覆蓋了輸入的前幾個音節，後面還有剩餘碼」。
+     * 供索引與診斷使用；實際消費範圍由候選綁定的原碼跨度決定。
      */
     internal fun codeOfReading(reading: String): String {
         val tokens = reading.split(' ', '\u3000').filter { it.isNotEmpty() }
@@ -433,48 +433,6 @@ object TwelveKeyPreedit {
             sb.append(code)
         }
         return sb.toString()
-    }
-
-    /** 返回已證實選擇後的尾碼；真正選擇應使用可區分 null 的 selectedInputEnd。 */
-    internal fun remainingCodeAfter(wordReading: String, input: String): String =
-        selectedInputEnd(wordReading, input)?.let { input.substring(it).trimStart('\'', ' ') }.orEmpty()
-
-    /** 真正選擇用的碼位證明；與顯示的寬鬆讀音補齊分離，null 表示不能安全選擇。 */
-    internal fun selectedInputEnd(reading: String, input: String): Int? {
-        val tokens = parseComment(reading)?.takeIf { it.isNotEmpty() } ?: return null
-        if (input.isEmpty()) return null
-        val offsets = input.indices.filter { input[it] != '\'' && !input[it].isWhitespace() }
-        val codes = offsets.map { input[it] }.joinToString("")
-        if (codes.isEmpty()) return null
-        if (tokens.any { token -> token.any { it !in 'a'..'z' } }) return null
-        if (tokens.dropLast(1).any { isSuffixOnlySyllable(it) }) return null
-        var pos = 0
-        var matched = true
-        for (token in tokens) {
-            if (pos == codes.length) break // 引擎補全的詞尾沒有額外按鍵需要消費。
-            if (isSuffixOnlySyllable(token) && pos + 1 != codes.length) return null
-            val full = codeOf(token)
-            val aliasLength = (minOf(6, codes.length - pos) downTo 1).firstOrNull { length ->
-                codeToSyllables[codes.substring(pos, pos + length)].orEmpty().any {
-                    isSpellingAlias(token, it.syllable)
-                }
-            }
-            when {
-                codes.startsWith(full, pos) -> pos += full.length
-                aliasLength != null -> pos += aliasLength
-                token.first() in keyLetters(codes[pos]) && token.first() !in "aeiou" -> pos++
-                full.startsWith(codes.substring(pos)) -> pos = codes.length
-                else -> { matched = false; break }
-            }
-        }
-        if (!matched) {
-            // 學習詞的異讀可能不同於實際輸入（dung/tung），只用完整輸入跨度回退。
-            if (tokens.any { it !in syllableSet }) return null
-            val spans = decodeSpans(codes) ?: return null
-            if (spans.size < tokens.size) return null
-            pos = spans.take(tokens.size).sumOf { it.first.length }
-        }
-        return offsets.getOrNull(pos - 1)?.plus(1)
     }
 
     /** PhraseMemory 變化時重建「學習詞 → 讀音」索引（面板與候選條同源）。 */
@@ -1067,7 +1025,7 @@ object TwelveKeyPreedit {
     }
 
     /** 單鍵碼 → 該鍵覆蓋的字母（與鍵盤 12 鍵的分組一致）。 */
-    private fun keyLetters(c: Char): String = when (c) {
+    internal fun keyLetters(c: Char): String = when (c) {
         'a' -> "abc"
         'e' -> "def"
         'i' -> "ghi"
@@ -1185,10 +1143,13 @@ object TwelveKeyPreedit {
         return charTable[first.toString()] ?: ""
     }
 
+    internal fun isKnownSyllable(syllable: String): Boolean = syllable in syllableSet
+
+    internal fun exactSyllables(code: String): List<String> =
+        codeToSyllables[code].orEmpty().map { it.syllable }
+
     fun isSingleSyllable(codes: String): Boolean {
-        if (codes.isEmpty()) return false
-        val decoded = decode(codes) ?: return false
-        return decoded.split(' ').size == 1
+        return codeToSyllables.containsKey(codes)
     }
 
     /**
@@ -1471,7 +1432,7 @@ object TwelveKeyPreedit {
      * 兩個讀音是否只是 schema 的 derive 規則造成的拼寫別名（`cw` ↔ `cu`、`gap` ↔ `gat` …），
      * 而不是兩個不同的音節（`than` vs `the`）。別名才可以把 comment 換成本地解碼讀音。
      */
-    private fun isSpellingAlias(a: String, b: String): Boolean {
+    internal fun isSpellingAlias(a: String, b: String): Boolean {
         if (a.isEmpty() || b.isEmpty()) return false
         return canonicalSpelling(a) == canonicalSpelling(b)
     }
@@ -1561,7 +1522,7 @@ object TwelveKeyPreedit {
      * 單段碼解碼為碼跨度與音節；無法切成完整音節時返回 null。
      * 跨度僅協助覆蓋判斷，不能用推測讀音替代首選 comment。
      */
-    private fun decodeSpans(input: String): List<Pair<String, String>>? {
+    internal fun decodeSpans(input: String): List<Pair<String, String>>? {
         if (input.isEmpty()) return null
         val n = input.length
         // 先比「音節數量少」，再比「詞頻高」：避免被 ngh/mi 這類高頻短音節切碎

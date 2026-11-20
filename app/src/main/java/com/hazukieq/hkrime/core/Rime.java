@@ -949,8 +949,8 @@ public class Rime {
   }
 
   /**
-   * 使用 packed native 一次返回 text/comment 串，減少 JNI 字串與陣列分配。
-   * 格式為 text\u0001comment\u0002 重複，解析後保持全局候選下標。
+   * 使用 packed native 返回 text/comment/start/end/sourceComment，保留全局候選下標。
+   * 兼容舊庫 text/comment 兩字段記錄。
    * packed 符號不可用時回退逐項枚舉。
    */
   public static List<String[]> candidatesSnapshot(int maxCount) {
@@ -966,19 +966,7 @@ public class Rime {
       }
       return out;
     }
-    if (packed == null || packed.isEmpty()) return new ArrayList<>(0);
-    List<String[]> out = new ArrayList<>();
-    int n = packed.length();
-    int start = 0;
-    while (start < n) {
-      int sep = packed.indexOf('\u0001', start);
-      if (sep < 0) break;
-      int end = packed.indexOf('\u0002', sep + 1);
-      if (end < 0) break;
-      out.add(new String[] {packed.substring(start, sep), packed.substring(sep + 1, end)});
-      start = end + 1;
-    }
-    return out;
+    return PackedCandidates.parse(packed);
   }
 
   public static int RimeGetCaretPos() {

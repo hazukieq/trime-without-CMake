@@ -22,7 +22,9 @@
 | 字典有词但 App 面板没有 | 核对运行时音节过滤、import 表、PhraseMemory、App 索引加载与行配额 |
 | 面板开关改变候选条 | 比较同输入 bar/full 前 12 项与 `bar drift`；候选条必须固定使用 64 条窗口 |
 | 没候选却仍有输入 | 用 `hasCandidates` 判断；引擎空先字典兜底，再原字母兜底 |
-| 选词丢后半码或退格后重复上屏 | 检查 `selectedInputEnd`、`CompositionSession` 选择日志与 commit buffer |
+| 选词丢后半码或退格后重复上屏 | 检查快照绑定的 `InputCodeSpan`、`CandidateInputBoundary`、选择日志与 commit buffer |
+| 切换输入框后留下未选文字 | 十二键不得向宿主写 composing；同时检查文本内容与 composing span，不能只数 commitText 调用 |
+| 悬浮 preedit 盖住候选条 | Android 6+ 核对绝对屏幕坐标；不能将刘海 inset 与固定状态栏高度混算 |
 | 改 yaml 不生效 | 核对实际目录文件、部署完成、进程重启与 App 侧索引重新加载 |
 | 看到错误输入法界面 | 重新 ime set，并用 dumpsys window 核对 IME 包名 |
 
@@ -37,7 +39,8 @@
 
 ## 当前限制
 
-- APK 只配置 arm64-v8a；x86_64 模拟器不能直接验收该 Native 库。
+- APK 只配置 arm64-v8a；x86_64 模拟器须具有 ARM64 native bridge 才能运行。
+  Android 34 Google APIs AVD 已通过 `libndk_translation.so` 执行本库；功能测试不能代替 ARM64 真机性能验收。
 - 当前 ELF LOAD 是 4 KB 对齐，尚不能声明支持 16 KB 页设备。
 - 完整音节可能遮蔽相同码的简拼解释；简拼路径还受搜索预算限制，覆盖率须按类别解释。
 - 开面板等待完整快照，不在主线程同步枚举；重点验证首次开面板的 UI 延迟。

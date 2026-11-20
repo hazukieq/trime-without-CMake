@@ -7,15 +7,18 @@ import org.junit.Test
 
 class CandidateSelectionTest {
     companion object { @JvmStatic @BeforeClass fun load() { OfflineDictionary.load() } }
+    private fun boundEnd(item: CandidateItem, code: String, origin: CompositionSession.Origin): Int? =
+        CandidateSelection.consumedEnd(CandidateSelection.bind(item, code), code, origin)
+
     @Test fun allOriginsShareTheSamePartialBoundary() {
         CompositionSession.Origin.values().filter { it != CompositionSession.Origin.FALLBACK }.forEach { origin ->
             val item = CandidateItem("太", "tai", 0)
-            assertEquals(3, CandidateSelection.consumedEnd(item, "9aii48i5i73", origin))
+            assertEquals(3, boundEnd(item, "9aii48i5i73", origin))
         }
     }
     @Test fun unknownReadingIsUnresolvedRatherThanComplete() {
-        assertNull(CandidateSelection.consumedEnd(CandidateItem("未知", "", 0), "55", CompositionSession.Origin.BAR))
-        assertNull(CandidateSelection.consumedEnd(CandidateItem("未知", "???", -1, segment = 1), "i4", CompositionSession.Origin.PANEL))
+        assertNull(boundEnd(CandidateItem("未知", "", 0), "55", CompositionSession.Origin.BAR))
+        assertNull(boundEnd(CandidateItem("未知", "???", -1, segment = 1), "i4", CompositionSession.Origin.PANEL))
         assertFalse(CandidateSelection.isCurrent("", ""))
         assertFalse(CandidateSelection.isCurrent("old", "new"))
         val before = CandidateSelection.contextKey("same input", 1, 0)
@@ -24,16 +27,16 @@ class CandidateSelectionTest {
     }
     @Test fun explicitDictionarySplitAndIsolatedConsumeOnlyTheirOwnSpan() {
         val dictionary = CandidateItem("哥", "go", -1, segment = 0, restCode = "8i5i73")
-        assertEquals(2, CandidateSelection.consumedEnd(dictionary, "i48i5i73", CompositionSession.Origin.PANEL))
-        assertNull(CandidateSelection.consumedEnd(dictionary.copy(restCode = "wrong"), "i48i5i73", CompositionSession.Origin.PANEL))
+        assertEquals(2, boundEnd(dictionary, "i48i5i73", CompositionSession.Origin.PANEL))
+        assertNull(boundEnd(dictionary.copy(restCode = "wrong"), "i48i5i73", CompositionSession.Origin.PANEL))
         val isolated = CandidateItem("客", "ka", -1, segment = ISOLATED_CHAR_SEGMENT)
-        assertEquals(1, CandidateSelection.consumedEnd(isolated, "55", CompositionSession.Origin.ISOLATED))
+        assertEquals(1, boundEnd(isolated, "55", CompositionSession.Origin.ISOLATED))
     }
     @Test fun abbreviationAliasesAndPartialTailKeepUnselectedCode() {
-        assertEquals(1, TwelveKeyPreedit.selectedInputEnd("ka", "55"))
-        assertEquals(3, TwelveKeyPreedit.selectedInputEnd("tai", "9ai55"))
-        assertEquals(12, TwelveKeyPreedit.selectedInputEnd("lin gi jit dung", "5i4ii8i9934i54iei9"))
-        assertEquals(3, TwelveKeyPreedit.selectedInputEnd("tai", "9ai'i4"))
+        assertEquals(1, CandidateInputBoundary.selectedInputEnd("ka", "55"))
+        assertEquals(3, CandidateInputBoundary.selectedInputEnd("tai", "9ai55"))
+        assertEquals(12, CandidateInputBoundary.selectedInputEnd("lin gi jit dung", "5i4ii8i9934i54iei9"))
+        assertEquals(3, CandidateInputBoundary.selectedInputEnd("tai", "9ai'i4"))
     }
     @Test fun everyRuntimeEncodedPairKeepsItsUnselectedSecondCode() {
         val readings = OfflineDictionary.runtimeSyllables.filter { it != "r" }
@@ -43,7 +46,7 @@ class CandidateSelectionTest {
         readings.forEach { (first, reading) ->
             lastCodes.forEach { last ->
                 assertEquals("$reading / $last", first.length,
-                    TwelveKeyPreedit.selectedInputEnd(reading, first + last))
+                    CandidateInputBoundary.selectedInputEnd(reading, first + last))
                 checked++
             }
         }
@@ -51,9 +54,44 @@ class CandidateSelectionTest {
         assertTrue(checked > 180000)
     }
     @Test fun fallbackRequiresAnExplicitConfirmationOfTheEntireCode() {
-        val original = CandidateItem("klkl", "", -1, restCode = "55")
+        val original = CandidateSelection.fallback("klkl", "55")
         assertEquals(2, CandidateSelection.consumedEnd(original, "55", CompositionSession.Origin.FALLBACK))
         assertNull(CandidateSelection.consumedEnd(original, "555", CompositionSession.Origin.FALLBACK))
+    }
+
+    @Test fun clickRequiresABoundSpanAndDoesNotReparseDisplayComment() {
+        val code = "9aii48i5i73"
+        val unbound = CandidateItem("太", "tai", 0)
+        assertNull(CandidateSelection.consumedEnd(unbound, code, CompositionSession.Origin.BAR))
+        val bound = CandidateSelection.bind(unbound, code)
+        assertEquals(InputCodeSpan(code, 3, "tai"), bound.inputSpan)
+        val displayed = bound.copy(comment = "太 · 任意显示长度 go ji li pu")
+        assertEquals(3, CandidateSelection.consumedEnd(displayed, code, CompositionSession.Origin.BAR))
+        assertEquals("tai", displayed.inputSpan!!.reading)
+        // 同長度的其他原碼不能借用舊跨度。
+        assertNull(CandidateSelection.consumedEnd(bound, "eaii48i5i73", CompositionSession.Origin.BAR))
+        assertNull(CandidateSelection.consumedEnd(bound.copy(inputSpan = InputCodeSpan(code, 999, "tai")),
+            code, CompositionSession.Origin.BAR))
+    }
+
+    @Test fun exactSyllablesMatchActualCodesRatherThanDisplayOrCodeLength() {
+        for (code in listOf("ea", "4i", "74", "we", "i4")) {
+            val exact = TwelveKeyPreedit.syllablesForSegment(code, 1000, exactOnly = true)
+            assertTrue(exact.isNotEmpty())
+            assertTrue(exact.all { TwelveKeyPreedit.codeOf(it) == code })
+            assertTrue(TwelveKeyPreedit.isSingleSyllable(code))
+        }
+        assertEquals(2, "go".length)
+        assertEquals(2, "ea".length)
+        assertFalse(TwelveKeyPreedit.exactSyllables("ea").contains("go"))
+        assertNull(CandidateSelection.bind(CandidateItem("哥", "go", -1, segment = 0), "ea").inputSpan)
+        assertEquals("we", TwelveKeyPreedit.codeOf("the"))
+        assertFalse(TwelveKeyPreedit.isSingleSyllable("xx"))
+        OfflineDictionary.runtimeSyllables.forEach { reading ->
+            val code = TwelveKeyPreedit.codeOf(reading)
+            assertTrue(TwelveKeyPreedit.exactSyllables(code).contains(reading))
+            assertTrue(TwelveKeyPreedit.isSingleSyllable(code))
+        }
     }
 
     @Test fun punctuationInputIsRoutedToTheEngineNotTheCodeJournal() {
@@ -64,7 +102,7 @@ class CandidateSelectionTest {
         for (input in listOf("/", "、", "，", "÷", "", "9ai/")) {
             assertFalse("input=$input", CompositionInput.isCodeString(input))
         }
-        assertNull(CandidateSelection.consumedEnd(CandidateItem("、", "全角", 0), "/", CompositionSession.Origin.BAR))
-        assertNull(CandidateSelection.consumedEnd(CandidateItem("/", "半角", 2), "/", CompositionSession.Origin.BAR))
+        assertNull(boundEnd(CandidateItem("、", "全角", 0), "/", CompositionSession.Origin.BAR))
+        assertNull(boundEnd(CandidateItem("/", "半角", 2), "/", CompositionSession.Origin.BAR))
     }
 }

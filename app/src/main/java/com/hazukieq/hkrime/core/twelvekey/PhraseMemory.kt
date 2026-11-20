@@ -12,7 +12,7 @@ object PhraseMemory {
     private const val PREFS = "twelvekey_phrases"
 
     /** 全局詞條上限（LRU 淘汰時按分數低者先丟）。 */
-    const val MAX_ENTRIES = 200
+    const val MAX_ENTRIES = 400
 
     /** 同一個碼串最多留幾條不同文字的詞條。 */
     const val MAX_PER_CODE = 8
@@ -39,6 +39,9 @@ object PhraseMemory {
      * 只清理 App 合成記憶：曝光達門檻、從未點選且手拼不超門檻的創制詞。
      * 引擎候選不參與此清理。
      */
+    /** 淘汰時保護「最近用過」的時間窗（毫秒）：新詞不得剛寫就被清掉。 */
+    const val PROTECT_MS = 60_000L
+
     const val PURGE_SHOWN = 8
     const val PURGE_MAX_TYPED = 2
 
@@ -277,7 +280,7 @@ object PhraseMemory {
     /**
      * 全部學習詞（面板匹配用：面板要像候選條一樣吃同一份「詞→讀音」）。
      *
-     * 條目上限 [MAX_ENTRIES]=200，直接攤平即可，不需要索引。
+     * 條目上限 [MAX_ENTRIES]=400，直接攤平即可，不需要索引。
      */
     internal fun allEntries(): List<Entry> = byCode.values.flatten()
 
@@ -308,11 +311,15 @@ object PhraseMemory {
         if (total <= MAX_ENTRIES) return
         // 全局超限：按「分數最低」淘汰，直到回到上限。
         var drop = total - MAX_ENTRIES
+        // 剛學到的詞分數最低（typed=1、picked=0），排序淘汰會立刻把它刪掉，
+        // 使用者就會覺得「打了十次也不見」。最近一分鐘用過的詞不參與本輪淘汰。
+        val protected = now - PROTECT_MS
         val flat: List<Pair<String, Entry>> = byCode.entries.flatMap { (code, list) ->
             list.map { entry -> code to entry }
-        }.sortedWith(
-            compareBy<Pair<String, Entry>> { score(it.second, now) }.thenBy { it.second.lastUsedAt },
-        )
+        }.filterNot { it.second.lastUsedAt >= protected }
+            .sortedWith(
+                compareBy<Pair<String, Entry>> { score(it.second, now) }.thenBy { it.second.lastUsedAt },
+            )
         val e = prefs?.edit()
         flat.forEach { (code, entry) ->
             if (drop <= 0) return@forEach

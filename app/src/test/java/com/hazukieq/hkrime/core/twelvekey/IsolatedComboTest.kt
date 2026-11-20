@@ -30,7 +30,7 @@ class IsolatedComboTest {
 
     @Test
     fun selectingTaiPreservesGoAtAmbiguousBoundary() {
-        val remaining = TwelveKeyPreedit.remainingCodeAfter("tai", "9aii48i5i73")
+        val remaining = CandidateInputBoundary.remainingCodeAfter("tai", "9aii48i5i73")
         assertEquals("i48i5i73", remaining)
         assertTrue(TwelveKeySnapshotBuilder.splitParts(remaining).any {
             "go" in it.syllables && it.rest == "8i5i73"
@@ -58,7 +58,7 @@ class IsolatedComboTest {
         readings.forEach { (firstCode, reading) ->
             readings.keys.forEach { lastCode ->
                 assertEquals("$reading / $lastCode", lastCode,
-                    TwelveKeyPreedit.remainingCodeAfter(reading, firstCode + lastCode))
+                    CandidateInputBoundary.remainingCodeAfter(reading, firstCode + lastCode))
             }
         }
     }

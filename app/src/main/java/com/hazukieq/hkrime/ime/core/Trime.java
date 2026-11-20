@@ -236,8 +236,7 @@ public class Trime extends LifecycleInputMethodService {
             y = Math.min(maxY, y);
             y = Math.max(minY, y);
           }
-          y -= BarUtils.getStatusBarHeight(); // 不包含狀態欄
-
+          if (VERSION.SDK_INT < VERSION_CODES.M) y -= BarUtils.getStatusBarHeight();
           try {
             if (!mPopupWindow.isShowing()) {
               mPopupWindow.showAtLocation(mCandidateRoot, Gravity.START | Gravity.TOP, x, y);
@@ -768,6 +767,8 @@ public class Trime extends LifecycleInputMethodService {
     mPopupWindow.setInputMethodMode(PopupWindow.INPUT_METHOD_NOT_NEEDED);
     if (VERSION.SDK_INT >= VERSION_CODES.M) {
       mPopupWindow.setWindowLayoutType(dialogType);
+      // 位置由 getLocationOnScreen 計算；統一為屏幕座標，包含劉海/狀態欄 inset。
+      mPopupWindow.setIsLaidOutInScreen(true);
     }
     hideCompositionView();
 
@@ -902,10 +903,10 @@ public class Trime extends LifecycleInputMethodService {
   public void onFinishInputView(boolean finishingInput) {
     // 鍵盤收起時把內存裡的日誌刷到 /sdcard/hkrime/logs/，用戶回傳的文件才不會缺尾巴。
     com.hazukieq.hkrime.util.LogFileTree.flushNow();
+    textInputManager.cancelTwelveKeyComposition();
     super.onFinishInputView(finishingInput);
     // Dismiss any pop-ups when the input-view is being finished and hidden.
     mainKeyboardView.closing();
-    textInputManager.cancelTwelveKeyComposition();
     performEscape();
     try {
       hideCompositionView();

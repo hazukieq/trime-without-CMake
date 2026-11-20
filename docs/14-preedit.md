@@ -4,8 +4,14 @@
 
 统一入口为 `PreeditPresentation`：`publish` 绑定当前快照，`render`/`preview` 以实际输入码、
 原始 preedit、候选 comment 与本地解码结果计算显示，`TwelveKeyPreedit` 只负责解码与改写。
-候选条首选、previewText、inlineText 和待选拼音要保持同源。
+候选条首选、快照预览和待选拼音要保持同源。
 已选文字（`CompositionSession.selectedText`）与引擎已选前缀只能各带一次，不能把光标标记当成已选文字。
+
+十二键待选内容仅在输入法自己的 preedit 中显示，不调用宿主的 `setComposingText`，
+嵌入式编辑模式只用于其他输入模式。Android 切换焦点时可能自行结束 composing 并保留文字，
+事后清理旧 InputConnection 不能可靠撤回；因此只有全部选完后的 `commitText` 才能写入宿主。
+悬浮 preedit 在 Android 6+ 使用屏幕绝对坐标，与候选条的 `getLocationOnScreen` 一致，
+不再手工扣状态栏高度，避免刘海 inset 使窗口盖住候选条。
 
 候选读音可能使用别名拼写。`canonicalSpelling` 规范化 w/u、入声尾与鼻音尾等别名；
 覆盖长度按本地解码的整节输入消耗。对不同音节不能套用别名规则。
@@ -13,9 +19,12 @@
 
 ## 剩余输入
 
-`remainingCodeAfter(wordReading, input)` 先用已选读音约束实际输入的前 N 段词典跨度，
+引擎候选在快照构建时直接使用 Native 候选的实际 start/end，不从表情说明或显示读音推测。
+App 合成候选与旧库兼容路径由 `CandidateInputBoundary` 用候选原始读音约束实际输入的前 N 段词典跨度，
 无法匹配时回退到输入自身的最少音节、同段数最高频切分。不能直接重编码 comment 后删前缀，
 多读音或别名可能与输入不同。没有可靠跨度或完整切分时不猜剩余。
+每个可选择条目携带 `InputCodeSpan`，绑定生成时的剩余原码、消费终点及原始读音；
+点击只校验并使用该跨度，不再解析显示 comment 或 preedit。显示改写不改变扣码或撤销记录。
 `9aii48i5i73` 选 `tai` 的「太」后剩余必须为 `i48i5i73`，面板保留 `go`。
 PC 复现入口：
 
@@ -74,7 +83,7 @@ python3 tools/preedit_flow.py --scenario tools/flow-scenarios/userdb-learned.flo
 `back`/`del`、`commit`、`clear`、`state`、
 `panel`、`assert committed|pending|input|remaining|composing|bar_first <值>`、
 `assert panel_has <音节>`、`assert no_isolated 1`；`bar` 无参数时打印当前候选条。
-`left` 只列 comment 首节等于该音节的候选。
+`left` 只切换展示组，不选字、不改选择记录；`right` 才选择该组的字词。
 
 学习记忆（与 Kotlin 同口径）：
 
@@ -90,7 +99,7 @@ python3 tools/preedit_flow.py --scenario tools/flow-scenarios/userdb-learned.flo
 - `--no-learning`：完全按引擎顺序（对照用）。
 
 候选条与面板窗口：`bar`/`pick` 只在前 64 条引擎候选中做学习排序与学习词混排、展示 12 项；
-`left`/`right` 用全量候选（host-test 最多印 600 条），对应展开面板路径。
+`left`/`right` 合并 App 字典行与全量引擎候选（host-test 最多印 600 条），对应展开面板路径。
 
 引擎侧 userdb 也在本地闭环：先跑一次 `rime-jni/host-test/pull-real-data.sh`
 （会拉 `*.userdb` LevelDB 目录）作为初始快照；`run-host-test.sh` 把它复制进 user dir，
@@ -100,7 +109,7 @@ librime 自己加载并在本次 session 结束时写回 user dir。脚本再把
 （候选排序里既有引擎 userdb 的 commits，也有 App 两份记忆。）
 
 `--data <目录>` 同时指定引擎部署与 App 字典索引来源；默认优先现有设备快照，缺失时使用 assets。
-`panel` 与 `assert panel_has` 查询 App 字典来源；`left/right` 仍查询引擎候选，不等同于 Android 点击测试。
+`panel` 与 `assert panel_has` 查询 App 字典来源；`left/right` 模拟展示分组与原码跨度选择，不等同于 Android 点击测试。
 找不到候选、引擎提前退出、未知命令及断言失败均报错，不能据此宣称 UI 或设备用户词库验收通过。
 
 复现选「太」后的面板与退格还原（fixture 只提供 SelectionMemory 排序，使太出现在候选条）：

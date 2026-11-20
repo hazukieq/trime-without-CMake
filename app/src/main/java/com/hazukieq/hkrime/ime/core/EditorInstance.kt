@@ -64,15 +64,15 @@ class EditorInstance(private val ims: InputMethodService) {
     }
 
     fun updateComposingText() {
+        // 切換焦點可由宿主自行結束 composing，不能靠事後取消阻止未選內容上屏。
+        // 十二鍵的待選狀態只畫在輸入法 preedit，全部選完才經提交許可寫入宿主。
+        if (textInputManager.isTwelveKeyMode() || textInputManager.hasTwelveKeySession()) return
         val ic = inputConnection ?: return
         val composingText = when (prefs.keyboard.inlinePreedit) {
-            // 12 鍵：預覽文字來自最近一次發佈的快照（= 候選條第 0 條），與候選條同源；
-            // 快照尚未到達時先清空，等 applyInlinePreview() 同幀寫入，避免閃一下引擎順序的字。
             InlineModeType.INLINE_PREVIEW ->
-                textInputManager.currentPreviewText()
-                    ?: if (textInputManager.isTwelveKeyMode()) "" else Rime.getComposingText()
-            InlineModeType.INLINE_COMPOSITION -> textInputManager.currentCompositionText() ?: Rime.getCompositionText()
-            InlineModeType.INLINE_INPUT -> textInputManager.currentInputText() ?: Rime.RimeGetInput()
+                Rime.getComposingText()
+            InlineModeType.INLINE_COMPOSITION -> Rime.getCompositionText()
+            InlineModeType.INLINE_INPUT -> Rime.RimeGetInput()
             else -> ""
         }
         if (ic.getSelectedText(0).isNullOrEmpty() || !composingText.isNullOrEmpty()) {

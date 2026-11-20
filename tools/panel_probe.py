@@ -1679,7 +1679,7 @@ def cmd_preedit(args, data: Data) -> None:
     """复现 App preedit 切分，以及「选中只覆盖前几音节的词之后剩余什么码」。
 
     PC 侧对拍 librime 引擎行为的命令见 `rime-jni/host-test/run-host-test.sh --probe <code> --select <i>`；
-    这里复现的是 App 自己的判定（TwelveKeyPreedit.decode / remainingCodeAfter）。
+    这里复现的是 App 自己的判定（TwelveKeyPreedit.decode / CandidateInputBoundary）。
     """
     codes = parse_code(args.codes)
     spans = data.decode(codes) or []
@@ -1968,6 +1968,11 @@ def cmd_selftest(args, data: Data) -> None:
     )
 
     # 驗證 preedit 切分與部分選詞後剩餘碼。
+    expect(len(code_of("go")) == len("ea") and
+           "go" not in data.syllables_for_segment("ea", 1000, True),
+           "同長度異碼不能進 exact：go 的碼 i4 不能匹配 ea")
+    expect(code_of("the") == "we" and data.is_single_syllable("we"),
+           "完整性按原始碼匹配，不要求顯示音節與碼串等長")
     expect(remaining_code_after(data, "tai", "9aii48i5i73") == "i48i5i73",
            "選太按 tai 的實際跨度扣碼，不能多留一個 i")
     expect(any(row["reading"] == "go" and _row_items(row) for row in data.panel("i48i5i73")),
@@ -2042,7 +2047,7 @@ def main() -> None:
     p_json.add_argument("codes", nargs="+", help="一个或多个码串/键名，如 5i4a57 'kl ghi mno abc ps'")
     p_json.set_defaults(func=cmd_json)
 
-    p_pre = sub.add_parser("preedit", help="复现 preedit 切分与「选词后剩余输入」（App remainingCodeAfter）")
+    p_pre = sub.add_parser("preedit", help="复现 preedit 切分与「选词后剩余输入」（App CandidateInputBoundary）")
     p_pre.add_argument("codes")
     p_pre.add_argument("--pick", default="", help="被选中的词读音，如 'lin gi jit dung'")
     p_pre.set_defaults(func=cmd_preedit)
