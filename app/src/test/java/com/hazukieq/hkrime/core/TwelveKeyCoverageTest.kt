@@ -207,9 +207,10 @@ class TwelveKeyCoverageTest {
             wantGroups = true,
             candidatesOverride = emptyList(),
         )
-        val assoc = snapshot.groups.filter { it.segment == 1 }
+        // 12 鍵左列只放確認行；聯想詞行在流水線裏（右側候選來源）。
+        val assoc = TwelveKeySnapshotBuilder.debugPanelSources("ee5").merged.filter { it.segment == 1 }
         assertTrue(
-            "引擎空兜底時應有聯想詞行，實際 ${snapshot.groups.map { it.reading }}",
+            "引擎空兜底時應有聯想詞行，實際 ${assoc.map { it.reading }}",
             assoc.isNotEmpty(),
         )
         assertTrue(
@@ -259,8 +260,8 @@ class TwelveKeyCoverageTest {
             "推薦應含遠程控制：${snapshot.recommend.map { it.text }}",
             snapshot.recommend.any { it.text == "远程控制" },
         )
-        val row = snapshot.groups.firstOrNull { it.reading == "jen cin" }
-        assertTrue("jen cin 分組應存在", row != null)
+        val row = TwelveKeySnapshotBuilder.debugPanelSources(code).merged.firstOrNull { it.reading == "jen cin" }
+        assertTrue("jen cin 聯想行應存在", row != null)
         assertTrue(
             "jen cin 行內應含遠程控制：${row!!.items.map { it.text }}",
             row.items.any { it.text == "远程控制" },

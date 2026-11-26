@@ -82,11 +82,20 @@ class NativeCompositionFlowTest {
             val snap = snapshot()
             return snap to (snap.barItems.firstOrNull { it.text == text } ?: error("not in visible bar: $text"))
         }
+        fun confirmSyllable(reading: String) {
+            check(session.confirmPhonetic(reading, initialOnly = false))
+            send("initial " + PhoneticSelection.constraint(session.phonetics))
+            send("clear")
+            if (session.remaining.isNotEmpty()) send("type " + session.remaining)
+            assertEquals(session.remaining, state.input)
+            assertTrue(state.commit.isEmpty())
+        }
+        /** 12 鍵新模型：先確認完整音節，再從右側候選裏選首段漢字。 */
         fun panelSyllable(reading: String): Pair<TwelveKeySnapshot, CandidateItem> {
+            confirmSyllable(reading)
             val snap = snapshot(true)
-            val item = foldGroupsForDisplay(snap.groups).asSequence().flatMap { it.items.asSequence() }
-                .firstOrNull { it.index < 0 && it.segment == 0 && it.comment == reading }
-                ?: error("dictionary syllable absent: $reading")
+            val item = snap.recommend.firstOrNull { it.segment == INITIAL_CHAR_SEGMENT && it.comment == reading }
+                ?: error("first segment char absent: $reading")
             return snap to item
         }
         fun choose(pair: Pair<TwelveKeySnapshot, CandidateItem>, origin: CompositionSession.Origin): Boolean {
@@ -223,6 +232,8 @@ class NativeCompositionFlowTest {
             assertEquals(beforeOpen, d.snapshot(true).barItems)
             assertTrue(d.choose(d.panelSyllable("go"), CompositionSession.Origin.PANEL))
             assertTrue(d.commits.isEmpty())
+            // 確認音節與選字是兩步：先撤回選字，再撤回確認，最後才是上一個字。
+            d.undo(); assertEquals("i48i5i73", d.state.input); assertEquals("太", d.session.selectedText)
             d.undo(); assertEquals("i48i5i73", d.state.input); assertEquals("太", d.session.selectedText)
             d.undo(); assertEquals(original, d.state.input); assertEquals("", d.session.selectedText)
             assertTrue(d.choose(d.panelSyllable("tai"), CompositionSession.Origin.PANEL))
@@ -325,10 +336,12 @@ class NativeCompositionFlowTest {
             d.session.cancel()
             d.type("55")
             val full = d.snapshot(true)
-            assertTrue(full.groups.any { it.segment == ISOLATED_SEGMENT })
-            val char = TwelveKeyPreedit.charsForSyllable("ka").first()
-            val isolated = CandidateSelection.bind(CandidateItem(char, "ka", -1, segment = ISOLATED_CHAR_SEGMENT), "55")
-            assertTrue(d.choose(full to isolated, CompositionSession.Origin.ISOLATED))
+            assertTrue("左列應有可確認的字母", full.groups.any { it.segment == INITIAL_LETTER_SEGMENT })
+            d.confirmLetter('k')
+            val confirmed = d.snapshot(true)
+            val ch = confirmed.recommend.firstOrNull { it.segment == INITIAL_CHAR_SEGMENT }
+                ?: error("確認首拼後應有首段漢字")
+            assertTrue(d.choose(confirmed to ch, CompositionSession.Origin.PANEL))
             assertEquals("5", d.state.input)
             assertTrue(d.commits.isEmpty())
             d.undo(); assertEquals("55", d.state.input)
@@ -343,8 +356,8 @@ class NativeCompositionFlowTest {
             val converted = d.state.candidates.filter { it.comment.contains("加油") && it.text != "加油" }
             assertTrue("真實 OpenCC 必須產生加油表情", converted.size >= 2)
             for ((n, emoji) in converted.take(2).withIndex()) {
-                val full = d.snapshot(true)
-                val row = full.groups.flatMap { it.items }.first { it.text == emoji.text }
+                val full = d.snapshot()
+                val row = full.barItems.first { it.text == emoji.text }
                 val span = requireNotNull(row.inputSpan)
                 assertEquals(5, span.end)
                 assertEquals("ga jiu", span.reading)
@@ -356,8 +369,8 @@ class NativeCompositionFlowTest {
                 assertEquals(code + "9ai", d.state.input)
             }
             d.type(code)
-            val full = d.snapshot(true)
-            val emoji = full.groups.flatMap { it.items }.first { it.comment.contains("加油") && it.text != "加油" }
+            val full = d.snapshot()
+            val emoji = full.barItems.first { it.comment.contains("加油") && it.text != "加油" }
             assertTrue(d.choose(full to emoji, CompositionSession.Origin.PANEL))
             assertEquals(listOf(emoji.text), d.commits)
             d.writeCompleted()

@@ -24,9 +24,10 @@
 | TextInputManager | 点击、部分选择、撤销、提交与学习 |
 | CandidatePanelController / adapters | 展示、开合、活跃组与点击回调 |
 
-确认过拼音后由 `phoneticSnapshot` 发布引擎词（0006 保留简拼分支）与 App 首段汉字，
-`PhoneticSelection` 依据记录的原码段核对剩余边界；左列字母行是同一份 groups 的
-`INITIAL_LETTER_SEGMENT` 行，点击回输入层确认/细化，PanelNavigation 本身仍只读。
+12 键面板左列由 `confirmGroups` 生成：当前待确认码的「码前缀完整音节 + 下一键首拼」，
+点按回输入层确认/细化；右列固定推荐组（当前确认序列的候选），左右解耦，
+PanelNavigation 本身仍只读。确认态由 `phoneticSnapshot` 发布引擎词（0006 保留简拼分支）
+与 App 首段汉字；`PhoneticSelection` 依据记录的原码段核对剩余边界；
 首段汉字 `INITIAL_CHAR_SEGMENT` 的跨度由 restCode 反推，只消费首段。
 
 新增来源必须进入 `mergeRows → collapsePrefixRows → tierAndSort → capRows`。

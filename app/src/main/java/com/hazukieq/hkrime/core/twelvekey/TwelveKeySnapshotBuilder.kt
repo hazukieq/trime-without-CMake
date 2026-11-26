@@ -247,13 +247,13 @@ object TwelveKeySnapshotBuilder {
                 ),
             )
         }
-        // 左列字母行與音節組同一份列表（原「首拼」獨立列已取消）：有待確認碼時列其合法首拼。
-        val letterRows = if (mapFallbackLetters) {
-            InitialDisambiguation.choices(remaining).map { letter ->
-                SyllableGroup(letter.toString(), emptyList(), emptyList(), INITIAL_LETTER_SEGMENT)
-            }
-        } else emptyList()
-        val groupsWithRecommend = recommendRow + panelRows.map { it.toSyllableGroup() } + letterRows
+        // 12 鍵：左列只放「確認」行（把模糊碼轉成確切音節/首字母），與右側候選徹底分離；
+        // 其它方案保持原來的「讀音組 + 右格」導航。
+        val groupsWithRecommend = if (mapFallbackLetters) {
+            recommendRow + confirmGroups(remaining, emptyList())
+        } else {
+            recommendRow + panelRows.map { it.toSyllableGroup() }
+        }
         // 預覽文字與候選條第 0 條同源：一次算好，隨快照發佈。
         val previewText = barEntries.firstOrNull { it.text.isNotEmpty() }?.text ?: ""
         // 已選前綴（librime context 裡尚未 commit 的字）+ 第一條候選 = 嵌入式預覽全文
@@ -351,20 +351,8 @@ object TwelveKeySnapshotBuilder {
             .take(TwelveKeyTuning.BAR_ITEMS)
         val letters = letterChoices(code, phonetics)
         val groups = if (wantGroups) {
-            val byNextReading = matched.groupBy { item ->
-                TwelveKeyPreedit.parseComment(item.inputSpan?.reading.orEmpty())
-                    ?.getOrNull(phonetics.size).orEmpty()
-            }
-            // 待確認音節行只按原碼生成，不受引擎窗口影響；最後一段已到尾時只剩字母行。
-            val readings = splitParts(pending).flatMap { it.syllables }.distinct().sorted()
-                .filter { byNextReading[it].orEmpty().isNotEmpty() }
-            val letterRows = letters.map { letter ->
-                SyllableGroup(letter.toString(), emptyList(), emptyList(), INITIAL_LETTER_SEGMENT)
-            }
             listOf(SyllableGroup("", emptyList(), recommend, RECOMMEND_SEGMENT)) +
-                readings.take((TwelveKeyTuning.MAX_GROUPS - 1 - letterRows.size).coerceAtLeast(0))
-                    .map { reading -> SyllableGroup(reading, listOf(reading), byNextReading[reading].orEmpty()) } +
-                letterRows
+                confirmGroups(code, phonetics)
         } else emptyList()
         val preview = bar.firstOrNull()?.text.orEmpty()
         DiagLog.d("snapshot", "build code=${local.input} mode=confirm wantGroups=$wantGroups" +
@@ -382,6 +370,35 @@ object TwelveKeySnapshotBuilder {
             engineOrderOnly = !appRankingEnabled,
             phonetics = phonetics, phoneticNavigation = true,
         )
+    }
+
+    /**
+     * 左列「確認」行：把當前待確認碼轉成確切音節或首字母。
+     *
+     * 完整音節 = 碼前綴命中的音節（`5a → ka/la`，`we → the`，`5we → 無`）；
+     * 字母 = 下一個碼鍵的合法首拼（`5a → k/l`）。點按即確認該段並推進；
+     * 待確認碼為空時，列最後一段簡拼可切換的字母（`b ↔ c`）。
+     */
+    internal fun confirmGroups(code: String, phonetics: List<PhoneticSelection>): List<SyllableGroup> {
+        val pending = PhoneticSelection.pending(code, phonetics)
+        val rows = ArrayList<SyllableGroup>()
+        if (pending.isNotEmpty()) {
+            TwelveKeyPreedit.syllablesCompletingPrefix(pending)
+                .take(TwelveKeyTuning.MAX_CONFIRM_SYLLABLES)
+                .forEach { syllable ->
+                    rows.add(SyllableGroup(syllable, listOf(syllable), emptyList()))
+                }
+            InitialDisambiguation.choices(pending).forEach { letter ->
+                rows.add(SyllableGroup(letter.toString(), emptyList(), emptyList(), INITIAL_LETTER_SEGMENT))
+            }
+            return rows
+        }
+        val last = phonetics.lastOrNull() ?: return rows
+        if (!last.initialOnly) return rows
+        InitialDisambiguation.choices(last.code).forEach { letter ->
+            rows.add(SyllableGroup(letter.toString(), emptyList(), emptyList(), INITIAL_LETTER_SEGMENT))
+        }
+        return rows
     }
 
     /**

@@ -14,7 +14,8 @@ internal class PanelNavigation {
         val previous = groups.getOrNull(activeIndex)?.reading?.takeIf { it.isNotEmpty() }
         val changed = snapshot.remaining != lastRemaining || snapshot.phonetics != phonetics
         groups = foldGroupsForDisplay(snapshot.groups, snapshot.engineOrderOnly)
-        activeIndex = if (changed && !preserveReading) 0 else {
+        // 12 鍵左列是確認行、右列固定推薦組：不做「保留上次讀音」的選組。
+        activeIndex = if (snapshot.phoneticNavigation || (changed && !preserveReading)) 0 else {
             groups.indexOfFirst { it.reading == previous && it.segment != RECOMMEND_SEGMENT }
                 .coerceAtLeast(0)
         }

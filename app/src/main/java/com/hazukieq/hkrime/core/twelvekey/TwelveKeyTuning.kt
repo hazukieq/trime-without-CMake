@@ -44,6 +44,9 @@ object TwelveKeyTuning {
      */
     const val CONFIRM_CHARS_AFTER_WORDS = 6
 
+    /** 左列「确认」行的完整音节上限：只列码前缀命中的音节，避免长码左列过长。 */
+    const val MAX_CONFIRM_SYLLABLES = 24
+
 
 
     /**

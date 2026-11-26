@@ -138,16 +138,16 @@ class CandidatePanelController(
             navigation.select(group.index, group.reading, group.contextKey)
             return
         }
-        // 字母行與音節組同一份左列，但語義不同：字母確認/細化首拼，不改右列分組。
-        if (target.segment == INITIAL_LETTER_SEGMENT) {
-            onInitialLetter?.invoke(target.reading)
-            return
-        }
-        if (snapshot.phoneticNavigation && target.segment > ISOLATED_SEGMENT &&
-            target.segment != RECOMMEND_SEGMENT && target.reading.isNotBlank() &&
-            com.hazukieq.hkrime.core.TwelveKeyPreedit.isKnownSyllable(target.reading) &&
-            PhoneticSelection.pending(snapshot.remaining, snapshot.phonetics).isNotEmpty()) {
-            onConfirmPhonetic?.invoke(target.reading, false, group.contextKey)
+        if (snapshot.phoneticNavigation) {
+            // 12 鍵：左右徹底分離。左列只負責把模糊碼確認成確切音節/首字母，
+            // 右列內容由快照的推薦組決定，不隨左列點擊切組。
+            when {
+                target.segment == INITIAL_LETTER_SEGMENT -> onInitialLetter?.invoke(target.reading)
+                target.segment == RECOMMEND_SEGMENT -> Unit
+                target.reading.isNotBlank() &&
+                    com.hazukieq.hkrime.core.TwelveKeyPreedit.isKnownSyllable(target.reading) ->
+                    onConfirmPhonetic?.invoke(target.reading, false, group.contextKey)
+            }
             return
         }
         if (!navigation.select(group.index, group.reading, group.contextKey)) return
@@ -175,15 +175,21 @@ class CandidatePanelController(
         }
         val display = navigation.groups
         if (display.isEmpty()) return
-        val activeDisplay = navigation.activeIndex
+        val recommendIndex = display.indexOfFirst { it.segment == RECOMMEND_SEGMENT }
+        // 12 鍵右列固定是「當前確認序列的候選」（推薦組），與左列點擊解耦。
+        val gridIndex = if (snapshot.phoneticNavigation && recommendIndex >= 0) recommendIndex
+        else navigation.activeIndex
         groupAdapter.submit(
             display.mapIndexed { index, group ->
                 CandidateGroupAdapter.GroupItem(
                     index = index,
                     reading = group.reading,
-                    selected = index == activeDisplay ||
-                        (group.segment == INITIAL_LETTER_SEGMENT &&
-                            group.reading.firstOrNull() == snapshot.initial),
+                    selected = if (snapshot.phoneticNavigation) {
+                        group.segment == INITIAL_LETTER_SEGMENT &&
+                            group.reading.firstOrNull() == snapshot.initial
+                    } else {
+                        index == navigation.activeIndex
+                    },
                     count = group.items.size,
                     contextKey = snapshot.contextKey,
                 )
@@ -191,7 +197,7 @@ class CandidatePanelController(
         )
         gridAdapter.setShowComment(display.size >= 2)
         gridAdapter.submit(
-            display[activeDisplay].items.map {
+            display[gridIndex].items.map {
                 CandidatePanelAdapter.Item(
                     text = it.text,
                     comment = it.comment,

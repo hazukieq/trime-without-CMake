@@ -83,9 +83,11 @@ class LearnedWordSourceTest {
             wantGroups = true,
             candidatesOverride = emptyList(),
         )
-        val row = snapshot.groups.firstOrNull { it.reading == "bi cam" }
-        assertNotNull("面板應有 bi cam 行，實際 ${snapshot.groups.map { it.reading }}", row)
-        assertTrue("bi cam 行應含 B站", row!!.items.any { it.text == "B站" })
-        assertTrue("推薦組也應帶上 B站", snapshot.recommend.any { it.text == "B站" })
+        // 12 鍵左列只放確認行；學習詞進右側候選（推薦組）與流水線行。
+        assertTrue("右側候選應帶上 B站：${snapshot.recommend.map { it.text }}",
+            snapshot.recommend.any { it.text == "B站" })
+        val merged = TwelveKeySnapshotBuilder.debugPanelSources("aaa4").merged
+        assertTrue("學習詞應進面板合併行：${merged.map { it.reading }}",
+            merged.any { row -> row.reading == "bi cam" && row.items.any { it.text == "B站" } })
     }
 }
