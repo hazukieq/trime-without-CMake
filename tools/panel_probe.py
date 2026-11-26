@@ -256,7 +256,7 @@ class Data:
                 if cjk_only and 3 <= len(word) <= 6:
                     tokens = [self.char_first.get(c) for c in word]
                     if all(t and t.isalpha() and t in self.syllables for t in tokens):
-                        key = tuple(t[0] for t in tokens)
+                        key = tuple(initial_unit(t) for t in tokens)
                         self.multi_initials.setdefault(key, []).append((tokens, word))
                 if cjk_only and len(word) not in (2, 3, 4):
                     continue
@@ -418,7 +418,9 @@ class Data:
             return []
 
         def allowed(syl: str) -> bool:
-            return (allow_suffix_only or syl not in SUFFIX_ONLY_SYLLABLES) and (initial is None or syl.startswith(initial))
+            return (allow_suffix_only or syl not in SUFFIX_ONLY_SYLLABLES) and (
+                initial is None or initial_unit(syl) == initial
+            )
 
         exact: list[str] = []
         prefix: list[tuple[str, str]] = []
@@ -589,7 +591,7 @@ class Data:
             for second, words in by_second.items():
                 if not first or not second:
                     continue
-                key = (first[0], second[0])
+                key = (initial_unit(first), initial_unit(second))
                 bucket = self.by_initials.setdefault(key, [])
                 for word in words:
                     bucket.append(([first, second], word))
@@ -597,7 +599,7 @@ class Data:
         for tokens, word, _code in self.word_codes:
             if len(tokens) < 2:
                 continue
-            key = tuple(t[0] for t in tokens)
+            key = tuple(initial_unit(t) for t in tokens)
             bucket = self.by_initials.setdefault(key, [])
             bucket.append((tokens, word))
         # 純詞表多字詞（App `multiInitialWords` 鏡像）：按整串首字母入索引。
@@ -611,7 +613,7 @@ class Data:
         def _add_hybrid(tokens: list[str], word: str) -> None:
             if len(tokens) < 2:
                 return
-            prefix = "".join(t[0] for t in tokens[:-1])
+            prefix = "|".join(initial_unit(t) for t in tokens[:-1])
             key = prefix + "|" + tokens[-1]
             self.by_hybrid.setdefault(key, []).append((tokens, word))
         for first, by_second in self.assoc.items():
@@ -626,18 +628,23 @@ class Data:
             _add_hybrid(tokens, word)
 
     def key_initial_letters(self, code_char: str, is_last: bool = False) -> list[str]:
-        """每鍵取合法首字母，排除元音；後綴 r 僅末鍵允許。"""
-        letters = KEY_LETTERS.get(code_char, "")
-        initials = sorted(
+        """每鍵取合法首字母單元，排除元音；後綴 r 僅末鍵允許。
+
+        th/ng/nz 按整段返回（模板聲母），不拆成 t/h；鍵→單元由音節的碼首鍵決定。
+        """
+        units = sorted(
             {
-                syl[0]
+                initial_unit(syl)
                 for syl in self.syllable_freq
-                if syl and syl[0] in letters and syl[0] not in VOWEL_LETTERS
+                if syl
+                and code_of(syl)[:1] == code_char
+                and initial_unit(syl)
+                and not (len(initial_unit(syl)) == 1 and initial_unit(syl) in VOWEL_LETTERS)
             }
         )
         if not is_last:
-            initials = [x for x in initials if x not in SUFFIX_ONLY_SYLLABLES]
-        return initials
+            units = [x for x in units if x not in SUFFIX_ONLY_SYLLABLES]
+        return units
 
     def syllables_completing_prefix(self, code: str) -> list[str]:
         """「整段碼的前綴恰好是一個完整音節」的那些音節（`8e99` → ze/zet；`8i` → zi/ji）。
@@ -660,7 +667,7 @@ class Data:
         if not initials:
             return []
         wanted = set(initials)
-        return sorted({syl for syl in self.syllables if syl and syl[0] in wanted})
+        return sorted({syl for syl in self.syllables if syl and initial_unit(syl) in wanted})
 
     def initial_pattern_combos(self, codes: str) -> list[tuple[str, ...]]:
         """首字母組合的**規則**（每鍵一個音節首字母、元音自由；不管詞條存不存在）。
@@ -749,7 +756,7 @@ class Data:
         entries_by_combo: list[list[tuple[str, list[str]]]] = []
         for combo in combos:
             if len(combo[-1]) > 1:
-                entries = self.by_hybrid.get("".join(combo[:-1]) + "|" + combo[-1]) or []
+                entries = self.by_hybrid.get("|".join(combo[:-1]) + "|" + combo[-1]) or []
             else:
                 entries = self.by_initials.get(combo) or []
             grouped: "OrderedDict[str, list[str]]" = OrderedDict()
@@ -806,7 +813,7 @@ class Data:
                 words = by_second[second][:ASSOC_WORDS]
                 if not words:
                     continue
-                buckets.setdefault((first[0], second[0]), []).append(
+                buckets.setdefault((initial_unit(first), initial_unit(second)), []).append(
                     (f"{first} {second}", words)
                 )
         return buckets
@@ -887,7 +894,7 @@ class Data:
                 words = by_second[second][:ASSOC_WORDS]
                 if not words:
                     continue
-                buckets.setdefault((first[0], second[0]), []).append(
+                buckets.setdefault((initial_unit(first), initial_unit(second)), []).append(
                     (f"{first} {second}", words)
                 )
         if not buckets:
@@ -920,7 +927,7 @@ class Data:
         for second, words in by_second.items():
             if not second:
                 continue
-            if initials and second[0] not in initials:
+            if initials and initial_unit(second) not in initials:
                 continue
             rows.append((f"{first} {second}", words[:ASSOC_WORDS]))
         rows.sort(key=lambda x: x[0])
@@ -1121,8 +1128,9 @@ class Data:
         universe = set(self.syllable_freq) | set(self.standard_syllables)
         out: list[tuple[str, list[str]]] = []
         for letter in letters:
-            # 通配口徑：只看首字母，不受剩餘碼前綴限制（55 → 所有 k/l 開頭音節）。
-            syls = [syl for syl in universe if syl.startswith(letter)]
+            # 通配口徑：只看首字母單元，不受剩餘碼前綴限制（55 → 所有 k/l 開頭音節）；
+            # th/ng/nz 是組合聲母，不能按 t/n 前綴混進來。
+            syls = [syl for syl in universe if initial_unit(syl) == letter]
             syls.sort(key=lambda syl: (-self.syllable_freq.get(syl, 0), syl))
             if syls:
                 out.append((letter, syls))
@@ -1212,6 +1220,18 @@ KEY_NAME_TO_CODE = {
 
 # 後綴 r 只允許詞尾。
 SUFFIX_ONLY_SYLLABLES = {"r"}
+
+# 組合聲母：th/ng/nz 是一個首字母單元（引擎簡拼也按整段），不得拆成 t/h。
+INITIAL_UNIT_PREFIXES = ("th", "ng", "nz")
+
+
+def initial_unit(syllable: str) -> str:
+    if not syllable:
+        return ""
+    for prefix in INITIAL_UNIT_PREFIXES:
+        if syllable.startswith(prefix):
+            return prefix
+    return syllable[0]
 
 # 元音字母（不能作音节首字母）
 VOWEL_LETTERS = set("aeiou")
@@ -1323,7 +1343,7 @@ def cmd_syllables(args, data: Data) -> None:
                 print("   实际存在词语: （无）")
             # 4) 联想行：合成音节选完之后的后缀联想（`ga` → `ga zi=挂纸`）
             def combo_of(reading: str) -> str:
-                return "·".join(t[0] for t in reading.split(" "))
+                return "·".join(initial_unit(t) for t in reading.split(" "))
 
             assoc_rows = [g for g in rows if g["segment"] == 1 and g.get("source") == "assoc"]
             if assoc_rows:
@@ -1359,7 +1379,7 @@ def cmd_syllables(args, data: Data) -> None:
         for tokens, _w, _c in data.word_codes:
             if len(tokens) != len(keys):
                 continue
-            key = tuple(t[0] for t in tokens)
+            key = tuple(initial_unit(t) for t in tokens)
             counts[key] = counts.get(key, 0) + 1
         print()
         shown_input = (
@@ -1474,7 +1494,7 @@ def cmd_assoc(args, data: Data) -> None:
     picked = [
         (f"{args.first} {second}", words[:ASSOC_WORDS])
         for second, words in rows.items()
-        if second and second[0] == args.initial
+        if second and initial_unit(second) == args.initial
     ]
     picked.sort(key=lambda x: x[0])
     print(f"# 联想 {args.first!r} + 首字母 {args.initial!r} → {len(picked)} 行")

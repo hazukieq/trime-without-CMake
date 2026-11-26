@@ -54,7 +54,8 @@ data class PhoneticSelection(val reading: String, val code: String, val initialO
         fun resolve(reading: String, code: String, initialOnly: Boolean): PhoneticSelection? {
             if (code.isEmpty()) return null
             val end = if (initialOnly) {
-                if (reading.length != 1 || reading[0] !in InitialDisambiguation.choices(code)) return null
+                // th/ng/nz 是組合聲母單元，按整段匹配，不拆字母。
+                if (reading.isEmpty() || reading !in InitialDisambiguation.choices(code)) return null
                 1
             } else {
                 // 確認完整音節不能借用簡拼或失配解碼的回退邊界。

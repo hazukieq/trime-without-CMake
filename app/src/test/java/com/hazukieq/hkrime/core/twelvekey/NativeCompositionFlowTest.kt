@@ -125,7 +125,7 @@ class NativeCompositionFlowTest {
             send("clear"); if (code.isNotEmpty()) send("type $code")
         }
         fun confirmLetter(letter: Char) {
-            check(session.onInitialLetter(letter))
+            check(session.onInitialLetter(letter.toString()))
             send("initial " + PhoneticSelection.constraint(session.phonetics))
             send("clear")
             if (session.remaining.isNotEmpty()) send("type " + session.remaining)
@@ -268,7 +268,7 @@ class NativeCompositionFlowTest {
             assertTrue(d.commits.isEmpty())
             d.undo()
             assertEquals(original, d.state.input)
-            assertEquals('l', d.session.initial)
+            assertEquals("l", d.session.initial)
             d.undo()
             assertNull(d.session.initial)
             assertEquals(originalItems, d.state.candidates)

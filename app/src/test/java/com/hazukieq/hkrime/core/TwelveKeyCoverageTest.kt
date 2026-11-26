@@ -233,11 +233,11 @@ class TwelveKeyCoverageTest {
         val patterns = TwelveKeyPreedit.initialPatterns("aaa4")
         assertTrue(
             "應含 b·can：${patterns.map { it.key }}",
-            patterns.any { it.initials == listOf('b') && it.tail == "can" },
+            patterns.any { it.initials == listOf("b") && it.tail == "can" },
         )
         assertTrue(
             "應含 b·cam：${patterns.map { it.key }}",
-            patterns.any { it.initials == listOf('b') && it.tail == "cam" },
+            patterns.any { it.initials == listOf("b") && it.tail == "cam" },
         )
         assertTrue(
             "簡拼前綴不得含元音：${patterns.filter { it.isHybrid }.map { it.initials }}",

@@ -35,8 +35,8 @@ class CompositionSession {
     val selectedText: String get() = state.journal.joinToString("") { it.text }
     val active: Boolean get() = state.let { it.remaining.isNotEmpty() || it.journal.isNotEmpty() }
     val canUndo: Boolean get() = state.undo.isNotEmpty()
-    /** 最後一個「只確認首拼」的字母，供面板顯示選中態；完整音節不算。 */
-    val initial: Char? get() = state.phonetics.lastOrNull()?.takeIf { it.initialOnly }?.reading?.firstOrNull()
+    /** 最後一個「只確認首拼」的單元（th/ng/nz 整段），供面板顯示選中態；完整音節不算。 */
+    val initial: String? get() = state.phonetics.lastOrNull()?.takeIf { it.initialOnly }?.reading
     val phonetics: List<PhoneticSelection> get() = state.phonetics.toList()
 
     /** 待確認原碼：已確認段只按實際原碼跨度扣減。 */
@@ -82,13 +82,13 @@ class CompositionSession {
     }
 
     /** 同一鍵的另一個首拼：替換最後一段的字母，不改變原碼跨度。 */
-    @Synchronized fun refineInitial(letter: Char): Boolean {
+    @Synchronized fun refineInitial(letter: String): Boolean {
         val old = state
         val last = old.phonetics.lastOrNull() ?: return false
-        if (!last.initialOnly || last.reading == letter.toString()) return false
+        if (!last.initialOnly || last.reading == letter) return false
         if (PhoneticSelection.pending(old.remaining, old.phonetics).isNotEmpty()) return false
         if (letter !in InitialDisambiguation.choices(last.code)) return false
-        state = old.copy(phonetics = old.phonetics.dropLast(1) + last.copy(reading = letter.toString()),
+        state = old.copy(phonetics = old.phonetics.dropLast(1) + last.copy(reading = letter),
             undo = old.undo + Undo(null, old.phonetics))
         return true
     }
@@ -96,12 +96,12 @@ class CompositionSession {
     /**
      * 左列字母行統一入口：還有待確認碼就確認下一段的首拼；否則替換最後一段的字母。
      */
-    @Synchronized fun onInitialLetter(letter: Char): Boolean {
+    @Synchronized fun onInitialLetter(letter: String): Boolean {
         val old = state
         if (old.remaining.isEmpty() || old.completion != null) return false
         val pending = PhoneticSelection.pending(old.remaining, old.phonetics)
         return if (pending.isEmpty()) refineInitial(letter)
-        else confirmPhonetic(letter.toString(), initialOnly = true)
+        else confirmPhonetic(letter, initialOnly = true)
     }
 
     /** consumedEnd 是實際原碼的偏移，必須由選擇解析器證實，不能以空尾碼猜測。 */

@@ -120,11 +120,11 @@ object TwelveKeyPreedit {
      * 用 [TwelveKeyTuning.INITIAL_COMBO_PATTERN_LIMIT] 封頂組合數，避免 2^k 爆炸。
      */
     @Volatile
-    private var initialLettersByCode: Map<Char, List<Char>> = emptyMap()
+    private var initialUnitsByCode: Map<Char, List<String>> = emptyMap()
 
-    /** 同 [initialLettersByCode]，但**允許末鍵**貢獻後綴音節首字母（`r`）。 */
+    /** 同 [initialUnitsByCode]，但**允許末鍵**貢獻後綴音節首字母（`r`）。 */
     @Volatile
-    private var initialLettersByCodeLast: Map<Char, List<Char>> = emptyMap()
+    private var initialUnitsByCodeLast: Map<Char, List<String>> = emptyMap()
 
     // ---- 只讀診斷（性能門禁 PerfGate / 單測用）----
     fun debugSyllableCount(): Int = table.size
@@ -373,8 +373,8 @@ object TwelveKeyPreedit {
                     syllables.add(syllable)
                 }
                 if (complete && (syllableSet.isEmpty() || syllables.all { it in syllableSet })) {
-                    val key = syllables.joinToString("") { it.first().toString() }
-                    if (key.length == word.length) {
+                    val key = syllables.joinToString("|") { initialUnit(it) }
+                    if (key.isNotEmpty() && syllables.none { initialUnit(it).isEmpty() }) {
                         multiInitialWords
                             .getOrPut(key) { LinkedHashMap() }
                             .getOrPut(syllables.joinToString(" ")) { LinkedHashSet() }
@@ -456,11 +456,11 @@ object TwelveKeyPreedit {
                     .getOrPut(tokens[1]) { LinkedHashSet() }
                     .add(text)
             }
-            val initials = tokens.joinToString("") { it.first().toString() }
+            val initials = tokens.joinToString("|") { initialUnit(it) }
             initial.getOrPut(initials) { LinkedHashMap() }
                 .getOrPut(reading) { LinkedHashSet() }
                 .add(text)
-            val prefix = tokens.dropLast(1).joinToString("") { it.first().toString() }
+            val prefix = tokens.dropLast(1).joinToString("|") { initialUnit(it) }
             hybrid.getOrPut(prefix + "|" + tokens.last()) { LinkedHashMap() }
                 .getOrPut(reading) { LinkedHashSet() }
                 .add(text)
@@ -587,14 +587,14 @@ object TwelveKeyPreedit {
         codes: String,
         maxReadings: Int = 4,
         perReading: Int = 6,
-        initial: Char? = null,
+        initial: String? = null,
     ): List<Pair<String, List<String>>> {
         val prefix = codes.replace("'", "").replace(" ", "")
         val entries = wordCodeIndex
         if (prefix.isEmpty() || entries.isEmpty()) return emptyList()
         val rows = LinkedHashMap<String, LinkedHashSet<String>>()
         for (entry in entries) {
-            if (entry.tokens.size < 2 || (initial != null && entry.tokens[0].firstOrNull() != initial)) continue
+            if (entry.tokens.size < 2 || (initial != null && initialUnit(entry.tokens[0]) != initial)) continue
             // 整串前綴詞查詢要求第一音節完整編碼已包含在輸入中。
             val firstCode = codeOf(entry.tokens[0])
             if (firstCode.isEmpty() || !prefix.startsWith(firstCode)) continue
@@ -703,23 +703,33 @@ object TwelveKeyPreedit {
             .take(limit)
     }
 
-    /** 由音節集合重建「碼位 → 可作首字母的字母」索引（[finishLoading] 後呼叫一次）。 */
+    /**
+     * 音節的首字母單元：`th`/`ng`/`nz` 是**組合聲母**（引擎也按整段簡拼），不得拆成 t/h。
+     * 其餘音節取首字母；元音開頭的音節回傳元音本身（由調用方排除）。
+     */
+    internal fun initialUnit(syllable: String): String = when {
+        syllable.isEmpty() -> ""
+        syllable.startsWith("th") -> "th"
+        syllable.startsWith("ng") -> "ng"
+        syllable.startsWith("nz") -> "nz"
+        else -> syllable.first().toString()
+    }
+
+    /** 由音節集合重建「碼位 → 可作首字母的單元」索引（[finishLoading] 後呼叫一次）。 */
     private fun rebuildInitialLetters() {
-        val normal = HashMap<Char, MutableSet<Char>>()
-        val last = HashMap<Char, MutableSet<Char>>()
+        val normal = HashMap<Char, MutableSet<String>>()
+        val last = HashMap<Char, MutableSet<String>>()
         val vowels = TwelveKeyTuning.VOWEL_LETTERS
         syllableSet.forEach { syllable ->
-            val initial = syllable.firstOrNull() ?: return@forEach
-            if (initial in vowels) return@forEach
+            val unit = initialUnit(syllable)
+            if (unit.isEmpty() || (unit.length == 1 && unit[0] in vowels)) return@forEach
             val suffixOnly = isSuffixOnlySyllable(syllable)
-            TwelveKeyTuning.KEY_LETTERS.forEach { (code, letters) ->
-                if (initial !in letters) return@forEach
-                if (!suffixOnly) normal.getOrPut(code) { LinkedHashSet() }.add(initial)
-                last.getOrPut(code) { LinkedHashSet() }.add(initial)
-            }
+            val code = codeOf(syllable).firstOrNull() ?: return@forEach
+            if (!suffixOnly) normal.getOrPut(code) { LinkedHashSet() }.add(unit)
+            last.getOrPut(code) { LinkedHashSet() }.add(unit)
         }
-        initialLettersByCode = normal.mapValues { it.value.sorted() }
-        initialLettersByCodeLast = last.mapValues { it.value.sorted() }
+        initialUnitsByCode = normal.mapValues { it.value.sorted() }
+        initialUnitsByCodeLast = last.mapValues { it.value.sorted() }
         // 首字母索引只收主詞典音節，按字典序固定以與腳本逐行對拍。
         syllablesByInitial = syllableSet
             .filter { it.isNotEmpty() }
@@ -762,12 +772,12 @@ object TwelveKeyPreedit {
      * 面板聯想行（`ASSOC`）用：每個音節只由「該音節首字母」約束，元音不固定。
      * 與 `tools/panel_probe.py` 的 `syllables_by_initials()` 同口徑。
      */
-    internal fun syllablesByInitials(initials: Collection<Char>): List<String> {
+    internal fun syllablesByInitials(initials: Collection<String>): List<String> {
         if (initials.isEmpty()) return emptyList()
         val out = ArrayList<String>()
         val seen = HashSet<String>()
         initials.forEach { initial ->
-            syllablesByInitial[initial]?.forEach { syllable ->
+            syllableSet.filter { initialUnit(it) == initial }.sorted().forEach { syllable ->
                 if (seen.add(syllable)) out.add(syllable)
             }
         }
@@ -780,8 +790,8 @@ object TwelveKeyPreedit {
      * 與 `tools/panel_probe.py` 的 `key_initial_letters()` 同口徑；首字母集合取自
      * 客家話音節集合（主詞典），不讀任何外部資產。
      */
-    internal fun keyInitialLetters(codeChar: Char, isLast: Boolean): List<Char> =
-        (if (isLast) initialLettersByCodeLast else initialLettersByCode)[codeChar] ?: emptyList()
+    internal fun keyInitialUnits(codeChar: Char, isLast: Boolean): List<String> =
+        (if (isLast) initialUnitsByCodeLast else initialUnitsByCode)[codeChar] ?: emptyList()
 
     /**
      * 每鍵取一個音節首字母的笛卡爾積（`ia8` → `(g|h)(z|j)` 4 組）。
@@ -790,41 +800,41 @@ object TwelveKeyPreedit {
      * `5i4a57` 6 鍵恰好 64 組仍生成，7 鍵以上通常超限 → 整組不生成。
      * 任一鍵沒有任何可用首字母（純元音鍵、`0` 等）也整組不生成。
      */
-    internal fun initialCombos(codes: String, initial: Char? = null): List<List<Char>> {
+    internal fun initialCombos(codes: String, initial: String? = null): List<List<String>> {
         val clean = codes.replace("'", "")
         if (clean.isEmpty()) return emptyList()
-        var combos: List<List<Char>> = listOf(emptyList())
+        var combos: List<List<String>> = listOf(emptyList())
         for ((index, ch) in clean.withIndex()) {
-            val letters = keyInitialLetters(ch, isLast = index == clean.lastIndex)
+            val units = keyInitialUnits(ch, isLast = index == clean.lastIndex)
                 .filter { index != 0 || initial == null || it == initial }
-            if (letters.isEmpty()) return emptyList()
-            combos = combos.flatMap { prefix -> letters.map { prefix + it } }
+            if (units.isEmpty()) return emptyList()
+            combos = combos.flatMap { prefix -> units.map { prefix + it } }
             if (combos.size > TwelveKeyTuning.INITIAL_COMBO_PATTERN_LIMIT) return emptyList()
         }
         return combos
     }
 
-    /** 一個召回首字母模式：純簡拼（每音節一個首字母）或「簡拼 + 最後一個完整音節」。 */
-    internal data class InitialPattern(val initials: List<Char>, val tail: String? = null) {
+    /** 一個召回首字母模式：純簡拼（每音節一個首字母單元）或「簡拼 + 最後一個完整音節」。 */
+    internal data class InitialPattern(val initials: List<String>, val tail: String? = null) {
         val isHybrid: Boolean get() = tail != null
-        val key: String get() = initials.joinToString("") + (tail?.let { "|$it" } ?: "")
+        val key: String get() = initials.joinToString("|") + (tail?.let { "|$it" } ?: "")
     }
 
     /**
      * 前段各鍵提供一個音節首字母，最後碼段必須是完整音節。
      * 枚舉各切法，完整性由 isSingleSyllable / exact 音節集合判定。
      */
-    internal fun initialHybridPatterns(codes: String, initial: Char? = null): List<InitialPattern> {
+    internal fun initialHybridPatterns(codes: String, initial: String? = null): List<InitialPattern> {
         val clean = codes.replace("'", "")
         if (clean.length < 2) return emptyList()
         val out = ArrayList<InitialPattern>()
         for (k in 1 until clean.length) {
             val suffix = clean.substring(k)
             if (!isSingleSyllable(suffix)) continue
-            var prefixes: List<List<Char>> = listOf(emptyList())
+            var prefixes: List<List<String>> = listOf(emptyList())
             var ok = true
             for (i in 0 until k) {
-                val letters = keyInitialLetters(clean[i], isLast = false)
+                val letters = keyInitialUnits(clean[i], isLast = false)
                     .filter { i != 0 || initial == null || it == initial }
                 if (letters.isEmpty()) { ok = false; break }
                 prefixes = prefixes.flatMap { p -> letters.map { p + it } }
@@ -852,7 +862,7 @@ object TwelveKeyPreedit {
      * 若把它們排滿 [TwelveKeyTuning.INITIAL_COMBO_MAX_ROWS] 行，簡拼+完整音節（如 `b|cam`）
      * 就永遠輪不到，學習詞/長音節聯想會被吞掉。
      */
-    internal fun initialPatterns(codes: String, initial: Char? = null): List<InitialPattern> {
+    internal fun initialPatterns(codes: String, initial: String? = null): List<InitialPattern> {
         val pure = initialCombos(codes, initial).map { InitialPattern(it) }
         val hybrids = initialHybridPatterns(codes, initial)
         val all = ArrayList<InitialPattern>(pure.size + hybrids.size)
@@ -871,7 +881,7 @@ object TwelveKeyPreedit {
     /** 按模式查詞表（純簡拼走 [initialPatternIndex]，混合走 [hybridPatternIndex]）。 */
     internal fun wordsByPattern(pattern: InitialPattern): List<Pair<String, List<String>>> {
         ensureLearnedIndex()
-        val key = pattern.initials.joinToString("")
+        val key = pattern.initials.joinToString("|")
         val base = if (pattern.isHybrid) hybridPatternIndex[pattern.key] ?: emptyList()
         else initialPatternIndex[key] ?: emptyList()
         val learned = if (pattern.isHybrid) learnedHybrid[pattern.key] ?: emptyList()
@@ -902,8 +912,9 @@ object TwelveKeyPreedit {
         val byPattern = HashMap<String, LinkedHashMap<String, LinkedHashSet<String>>>()
         fun add(tokens: List<String>, word: String) {
             if (tokens.size < 2) return
-            val key = tokens.joinToString("") { it.firstOrNull()?.toString() ?: "" }
-            if (key.length != tokens.size) return
+            val units = tokens.map { initialUnit(it) }
+            if (units.any { it.isEmpty() }) return
+            val key = units.joinToString("|")
             val reading = tokens.joinToString(" ")
             byPattern.getOrPut(key) { LinkedHashMap() }
                 .getOrPut(reading) { LinkedHashSet() }
@@ -914,8 +925,8 @@ object TwelveKeyPreedit {
         val byHybrid = HashMap<String, LinkedHashMap<String, LinkedHashSet<String>>>()
         fun addHybrid(tokens: List<String>, word: String) {
             if (tokens.size < 2) return
-            val prefix = tokens.dropLast(1).joinToString("") { it.firstOrNull()?.toString() ?: "" }
-            if (prefix.length != tokens.size - 1) return
+            val prefix = tokens.dropLast(1).joinToString("|") { initialUnit(it) }
+            if (prefix.isEmpty()) return
             val key = prefix + "|" + tokens.last()
             val reading = tokens.joinToString(" ")
             byHybrid.getOrPut(key) { LinkedHashMap() }
@@ -951,9 +962,9 @@ object TwelveKeyPreedit {
      * 只回傳**音節數與 [pattern] 相同、且每個音節首字母都對上**的詞條
      * （對應 `panel_probe.py` 的 `by_initials`）。行內按讀音字典序。
      */
-    internal fun wordsByInitialPattern(pattern: List<Char>): List<Pair<String, List<String>>> {
+    internal fun wordsByInitialPattern(pattern: List<String>): List<Pair<String, List<String>>> {
         if (pattern.size < 2) return emptyList()
-        return initialPatternIndex[pattern.joinToString("")] ?: emptyList()
+        return initialPatternIndex[pattern.joinToString("|")] ?: emptyList()
     }
 
     /**
@@ -1054,12 +1065,12 @@ object TwelveKeyPreedit {
         exactOnly: Boolean = false,
         totalLimit: Int = MAX_SYLLABLES_TOTAL,
         allowSuffixOnly: Boolean = false,
-        initial: Char? = null,
+        initial: String? = null,
     ): List<String> {
         if (code.isEmpty()) return emptyList()
         // 後綴音節（`r`）只在「這一段就是輸入的結尾」時才允許；見 [SUFFIX_ONLY_SYLLABLES]。
         fun allowed(e: Entry): Boolean = (allowSuffixOnly || !isSuffixOnlySyllable(e.syllable)) &&
-            (initial == null || e.syllable.firstOrNull() == initial)
+            (initial == null || initialUnit(e.syllable) == initial)
         val exact = ArrayList<Entry>()
         // 前綴命中記住「code 之後的下一個碼位」：分桶時用它，`w`（th 鍵）才能同時給出
         // than（下一個 a）與 the（下一個 e）；只按音節首字母分桶時 th* 全是 t、the 系列會擠掉 than。
@@ -1204,18 +1215,18 @@ object TwelveKeyPreedit {
      * 列表是通配口徑：只看音節首字母，不受剩餘碼前綴限制（`55` → 所有 k/l 開頭音節），
      * 所以不會出現 `gia*` 這種「按剩餘碼前綴收窄」的假組合。標準集音節也納入。
      */
-    internal fun isolatedSyllables(code: String): List<Pair<Char, List<String>>> {
+    internal fun isolatedSyllables(code: String): List<Pair<String, List<String>>> {
         val clean = code.replace("'", "")
         if (clean.length < 2 || hasFullSyllable(clean)) return emptyList()
         val universe = LinkedHashSet<String>(syllableSet.size + standardSyllables.size)
         universe.addAll(syllableSet)
         universe.addAll(standardSyllables)
-        val out = ArrayList<Pair<Char, List<String>>>(2)
-        keyInitialLetters(clean[0], isLast = false).forEach { letter ->
+        val out = ArrayList<Pair<String, List<String>>>(2)
+        keyInitialUnits(clean[0], isLast = false).forEach { unit ->
             val syls = universe
-                .filter { it.firstOrNull() == letter }
+                .filter { initialUnit(it) == unit }
                 .sortedWith(compareByDescending<String> { syllableFreq[it] ?: 0 }.thenBy { it })
-            if (syls.isNotEmpty()) out.add(letter to syls)
+            if (syls.isNotEmpty()) out.add(unit to syls)
         }
         return out
     }

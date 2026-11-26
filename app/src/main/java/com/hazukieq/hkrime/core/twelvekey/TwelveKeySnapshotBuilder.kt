@@ -108,7 +108,7 @@ object TwelveKeySnapshotBuilder {
         wantGroups: Boolean = true,
         /** 單測注入：非 null 時不碰引擎，直接用這份候選（text/comment/index）。 */
         candidatesOverride: List<CandidateItem>? = null,
-        initial: Char? = null,
+        initial: String? = null,
         appRankingEnabled: Boolean = true,
         phonetics: List<PhoneticSelection> = emptyList(),
     ): TwelveKeySnapshot {
@@ -304,7 +304,7 @@ object TwelveKeySnapshotBuilder {
             contextKey = local.contextKey,
             rawPreedit = local.rawPreedit,
             initialChoices = if (mapFallbackLetters) InitialDisambiguation.choices(remaining) else emptyList(),
-            initial = initial,
+            initial = null,
             phoneticNavigation = mapFallbackLetters,
         )
     }
@@ -389,14 +389,14 @@ object TwelveKeySnapshotBuilder {
                     rows.add(SyllableGroup(syllable, listOf(syllable), emptyList()))
                 }
             InitialDisambiguation.choices(pending).forEach { letter ->
-                rows.add(SyllableGroup(letter.toString(), emptyList(), emptyList(), INITIAL_LETTER_SEGMENT))
+                rows.add(SyllableGroup(letter, emptyList(), emptyList(), INITIAL_LETTER_SEGMENT))
             }
             return rows
         }
         val last = phonetics.lastOrNull() ?: return rows
         if (!last.initialOnly) return rows
         InitialDisambiguation.choices(last.code).forEach { letter ->
-            rows.add(SyllableGroup(letter.toString(), emptyList(), emptyList(), INITIAL_LETTER_SEGMENT))
+            rows.add(SyllableGroup(letter, emptyList(), emptyList(), INITIAL_LETTER_SEGMENT))
         }
         return rows
     }
@@ -405,7 +405,7 @@ object TwelveKeySnapshotBuilder {
      * 左列字母：有待確認碼就列待確認首鍵的合法首拼；否則列最後一段（簡拼）可切換的首拼。
      * 與 [TwelveKeyPreedit.keyInitialLetters] 同口徑，不在 UI 重複判定。
      */
-    internal fun letterChoices(code: String, phonetics: List<PhoneticSelection>): List<Char> {
+    internal fun letterChoices(code: String, phonetics: List<PhoneticSelection>): List<String> {
         val pending = PhoneticSelection.pending(code, phonetics)
         if (pending.isNotEmpty()) return InitialDisambiguation.choices(pending)
         val last = phonetics.lastOrNull() ?: return InitialDisambiguation.choices(code)
@@ -414,18 +414,18 @@ object TwelveKeySnapshotBuilder {
     }
 
     /** 選中態：只有「原碼已到尾、最後一段是簡拼」時才高亮字母（可切換）。 */
-    internal fun selectedLetter(code: String, phonetics: List<PhoneticSelection>): Char? {
+    internal fun selectedLetter(code: String, phonetics: List<PhoneticSelection>): String? {
         val last = phonetics.lastOrNull() ?: return null
         if (!last.initialOnly) return null
         if (PhoneticSelection.pending(code, phonetics).isNotEmpty()) return null
-        return last.reading.firstOrNull()
+        return last.reading
     }
 
     /** 首段漢字：簡拼段取該首字母下全部音節的字；完整音節取該音節的字。 */
     private fun firstSegmentChars(first: PhoneticSelection, code: String): List<CandidateItem> {
-        val initial = first.reading.firstOrNull() ?: return emptyList()
+        val unit = TwelveKeyPreedit.initialUnit(first.reading)
         val syllables = if (first.initialOnly) {
-            TwelveKeyPreedit.syllablesByInitials(listOf(initial))
+            TwelveKeyPreedit.syllablesByInitials(listOf(unit))
         } else {
             listOf(first.reading)
         }
@@ -458,7 +458,7 @@ object TwelveKeySnapshotBuilder {
         flat: List<CandidateItem>,
         wantGroups: Boolean,
         mapFallbackLetters: Boolean,
-        initial: Char?,
+        initial: String?,
         degraded: Boolean,
     ): TwelveKeySnapshot {
         val binder = CandidateSelection.InputBinder(local.remaining, local.consumedEnd)
@@ -486,7 +486,7 @@ object TwelveKeySnapshotBuilder {
             contextKey = local.contextKey,
             rawPreedit = local.rawPreedit,
             initialChoices = if (mapFallbackLetters) InitialDisambiguation.choices(local.remaining) else emptyList(),
-            initial = initial,
+            initial = null,
             engineOrderOnly = true,
             phoneticNavigation = mapFallbackLetters,
         )
@@ -534,7 +534,7 @@ object TwelveKeySnapshotBuilder {
      * 配額：第一種切法吃完整配額；備選切法減半（[TwelveKeyTuning.SECONDARY_SPLIT_DIVISOR]），
      * 避免次要解讀把左列灌滿。音節豐富的鍵放開到 24（[TwelveKeyTuning.SEGMENT_SYLLABLE_LIMIT_RICH]）。
      */
-    internal fun splitParts(codes: String, initial: Char? = null): List<SplitPart> {
+    internal fun splitParts(codes: String, initial: String? = null): List<SplitPart> {
         if (codes.isEmpty()) return emptyList()
         val single = if (TwelveKeyPreedit.isSingleSyllable(codes)) listOf(codes to "") else emptyList()
         val splits = (single + TwelveKeyPreedit.splitHeads(codes)).distinctBy { it.first }
@@ -628,13 +628,13 @@ object TwelveKeySnapshotBuilder {
      * `ee` → {d,f}、`5` → {k,l}；`r` 只在該段只有一個碼位且是輸入末鍵時才出現。
      * 與 `panel_probe.py` 的 `key_initial_letters(part[0], is_last=...)` 同口徑。
      */
-    private fun partInitials(code: String, isLastKey: Boolean): List<Char> {
+    private fun partInitials(code: String, isLastKey: Boolean): List<String> {
         val first = code.firstOrNull() ?: return emptyList()
-        return TwelveKeyPreedit.keyInitialLetters(first, isLast = isLastKey && code.length == 1)
+        return TwelveKeyPreedit.keyInitialUnits(first, isLast = isLastKey && code.length == 1)
     }
 
-    internal fun assocRows(parts: List<SplitPart>, initial: Char? = null): List<PanelRow> {
-        val buckets = LinkedHashMap<Pair<Char, Char>, MutableList<PanelRow>>()
+    internal fun assocRows(parts: List<SplitPart>, initial: String? = null): List<PanelRow> {
+        val buckets = LinkedHashMap<Pair<String, String>, MutableList<PanelRow>>()
         parts.forEachIndexed { index, part ->
             val isLastPart = index == parts.lastIndex
             // 有剩餘碼時按每段第一鍵首字母匹配，元音自由。
@@ -672,7 +672,7 @@ object TwelveKeySnapshotBuilder {
                 else -> TwelveKeyPreedit.syllablesByInitials(partInitials(part.rest, isLastKey = isLastPart))
             }
             for (first in firstCandidates) {
-                if (!InitialDisambiguation.matches(initial, first)) continue
+                if (initial != null && TwelveKeyPreedit.initialUnit(first) != initial) continue
                 val bySecond = TwelveKeyPreedit.assocSecondMap(first)
                 if (bySecond.isEmpty()) continue
                 // 第二段無可展開音節時回退第一音節的全部後續，與腳本保持一致。
@@ -684,8 +684,9 @@ object TwelveKeySnapshotBuilder {
                     if (second.isEmpty()) continue
                     val words = bySecond[second]?.take(ASSOC_WORDS) ?: continue
                     if (words.isEmpty()) continue
-                    buckets.getOrPut(first[0] to second[0]) { ArrayList() }
-                        .add(assocRow("$first $second", words))
+                    buckets.getOrPut(
+                        TwelveKeyPreedit.initialUnit(first) to TwelveKeyPreedit.initialUnit(second),
+                    ) { ArrayList() }.add(assocRow("$first $second", words))
                 }
             }
         }
@@ -699,12 +700,12 @@ object TwelveKeySnapshotBuilder {
      * 再在組之間輪轉；總數封頂後按 reading 字典序排序（顯示順序由後續 tierAndSort 再排一次）。
      */
     private fun pickBucketRows(
-        buckets: Map<Pair<Char, Char>, List<PanelRow>>,
+        buckets: Map<Pair<String, String>, List<PanelRow>>,
         maxRows: Int,
     ): List<PanelRow> {
         if (buckets.isEmpty() || maxRows <= 0) return emptyList()
         val sortedKeys = buckets.keys.sortedWith(compareBy({ it.first }, { it.second }))
-        val groups = LinkedHashMap<Char, MutableList<List<PanelRow>>>()
+        val groups = LinkedHashMap<String, MutableList<List<PanelRow>>>()
         sortedKeys.forEach { key ->
             groups.getOrPut(key.first) { ArrayList() }
                 // 桶內排序必須**確定**：詞數降序、同詞數按 reading。兩份實現（App/腳本）
@@ -717,7 +718,7 @@ object TwelveKeySnapshotBuilder {
                     )
                 )
         }
-        val flat = LinkedHashMap<Char, MutableList<PanelRow>>()
+        val flat = LinkedHashMap<String, MutableList<PanelRow>>()
         groups.forEach { (initial, bucketRows) ->
             val rows = ArrayList<PanelRow>()
             var round = 0
@@ -734,7 +735,7 @@ object TwelveKeySnapshotBuilder {
             }
             flat[initial] = rows
         }
-        val cursors = HashMap<Char, Int>()
+        val cursors = HashMap<String, Int>()
         val picked = ArrayList<PanelRow>(maxRows)
         val seen = HashSet<String>()
         while (picked.size < maxRows) {
@@ -767,7 +768,7 @@ object TwelveKeySnapshotBuilder {
      * 源 4：首字母序列查真實詞行，包含純簡拼與簡拼+完整末音節。
      * 按組合兩輪選行，總組合數和行數受 Tuning 限制，對應腳本 initial_pattern_rows。
      */
-    internal fun initialComboRows(codes: String, initial: Char? = null): List<PanelRow> {
+    internal fun initialComboRows(codes: String, initial: String? = null): List<PanelRow> {
         if (codes.length < 2) return emptyList()
         // 純簡拼與簡拼+完整末音節共同參與選行；完整音節由集合判定。
         val combos = TwelveKeyPreedit.initialPatterns(codes, initial)
@@ -813,7 +814,7 @@ object TwelveKeySnapshotBuilder {
      * 源 5：用輕量整串碼索引查多音節詞，第一音節必須打全。
      * 不對無讀音大詞表重新建重索引或全量排序。
      */
-    internal fun wholeWordRows(remaining: String, initial: Char? = null): List<PanelRow> {
+    internal fun wholeWordRows(remaining: String, initial: String? = null): List<PanelRow> {
         val codes = remaining.replace("'", "")
         if (codes.isEmpty()) return emptyList()
         val rows = runCatching {
@@ -853,7 +854,7 @@ object TwelveKeySnapshotBuilder {
         if (groups.isEmpty()) return emptyList()
         return groups.map { (letter, syllables) ->
             PanelRow(
-                reading = letter.toString(),
+                reading = letter,
                 items = syllables.map { syllable ->
                     CandidateItem(
                         text = syllable,
@@ -956,7 +957,7 @@ object TwelveKeySnapshotBuilder {
         anchor: Char?,
         engineGroups: List<SyllableGroup>,
         includePanelOnlySources: Boolean,
-        initial: Char? = null,
+        initial: String? = null,
     ): PanelBuild = computePanel(remaining, anchor, engineGroups, includePanelOnlySources, initial).build
 
     /**
@@ -964,7 +965,7 @@ object TwelveKeySnapshotBuilder {
      *
      * 僅供 `internal` 調用；UI 永遠只看到 [buildPanelRows] 投影出的 `SyllableGroup`。
      */
-    internal fun debugPanelSources(codes: String, initial: Char? = null): PanelSources =
+    internal fun debugPanelSources(codes: String, initial: String? = null): PanelSources =
         computePanel(codes, null, emptyList(), includePanelOnlySources = true, initial = initial).let { c ->
             PanelSources(
                 isolated = if (initial == null) isolatedRows(codes) else emptyList(),
@@ -1003,7 +1004,7 @@ object TwelveKeySnapshotBuilder {
         anchor: Char?,
         engineGroups: List<SyllableGroup>,
         includePanelOnlySources: Boolean,
-        initial: Char? = null,
+        initial: String? = null,
     ): PanelComputation {
         val codes = remaining.replace("'", "")
         if (codes.isEmpty()) {
@@ -1183,7 +1184,7 @@ object TwelveKeySnapshotBuilder {
         ranked: List<CandidateItem>,
         code: String,
         now: Long,
-        initial: Char? = null,
+        initial: String? = null,
     ): List<CandidateItem> {
         if (ranked.isEmpty() || code.isEmpty()) return ranked
         val phrases = PhraseMemory.candidatesFor(code, now).filter { InitialDisambiguation.matches(initial, it.readings) }
@@ -1225,7 +1226,7 @@ object TwelveKeySnapshotBuilder {
         bar: List<CandidateItem>,
         ranked: List<CandidateItem>,
         remaining: String,
-        initial: Char? = null,
+        initial: String? = null,
     ): List<CandidateItem> {
         if (remaining.isEmpty() || bar.isEmpty() || bar.any { it.text.length == 1 }) return bar
         val head = splitParts(remaining, initial).firstOrNull() ?: return bar

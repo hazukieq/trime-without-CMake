@@ -186,7 +186,7 @@ class CandidatePanelController(
                     reading = group.reading,
                     selected = if (snapshot.phoneticNavigation) {
                         group.segment == INITIAL_LETTER_SEGMENT &&
-                            group.reading.firstOrNull() == snapshot.initial
+                            group.reading == snapshot.initial
                     } else {
                         index == navigation.activeIndex
                     },

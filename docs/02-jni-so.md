@@ -7,8 +7,8 @@
 | App 库 | `app/libs/arm64-v8a/librime_jni.so` |
 | 构建入口 | `../rime-jni/script/build.sh`，默认 Release |
 | 引擎 | librime 1.17.0，Lua/charcode/octagram 合并插件 |
-| 大小 | 6,425,848 字节 |
-| SHA-256 | `67b143a93c5fe06600e16a1503f511c98a9e9adaab58a202607715ca01cd4934` |
+| 大小 | 6,425,960 字节 |
+| SHA-256 | `8b40fe0eb771758353a494f74e35ed70fa4b515c7a8fa406dc4a001184b9ea4d` |
 | JNI 契约 | 源码声明 77，导出 77，缺失/额外/`Java_com_osfans_trime_` 残留均为 0 |
 | ELF LOAD 对齐 | 当前三个 LOAD 段均为 `0x1000`（4 KB） |
 
@@ -24,7 +24,7 @@ JNI 胶水在 `../rime-jni/glue/`，`rime_api_compat.h` 将全局包装函数转
 `candidatesSnapshot` 优先使用 packed 枚举，每项以 `\u0002` 结束，字段以 `\u0001` 分隔：
 `text / comment / start / end / sourceComment / index`。start/end 是引擎候选在原始输入中的真实范围，
 sourceComment 来自穿透 Shadow/Uniquified 包装后的候选，用于读音与学习；显示 comment 独立保留。
-index 是筛选前 menu 的全局下标；`hkrime_initial` 属性保存已确认拼音序列：`~l ~h =man` 中 `~` 按首拼匹配、`=` 按完整音节匹配；
+index 是筛选前 menu 的全局下标；`hkrime_initial` 属性保存已确认拼音序列：`~l ~h =man` 中 `~` 按首拼**单元**匹配（`~th` 整段；th/ng/nz 不拆 t/h）、`=` 按完整音节匹配；
 单字母值兼容底层单段探针；非空属性同时让 librime 保留简拼分支（0006），因此它既是过滤器
 也是「确认态」开关。先匹配再截取窗口，
 仍按原 menu 下标选择；部分选字可以覆盖确认序列的前几段，App 再校验原码边界。空属性解除约束。两字段、五字段记录继续兼容。

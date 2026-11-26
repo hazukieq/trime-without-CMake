@@ -309,7 +309,7 @@ class TextInputManager private constructor() :
             val local = TwelveKeySnapshotBuilder.local()
             if (!composition.bindEditor(currentEditorIdentity())) return@withEngineLock
             composition.input(local.remaining)
-            if (!composition.onInitialLetter(letter.firstOrNull() ?: return@withEngineLock)) return@withEngineLock
+            if (!composition.onInitialLetter(letter)) return@withEngineLock
             applyPhoneticChange()
         }
     }

@@ -67,10 +67,10 @@ class IsolatedComboTest {
     fun multiKeyNonSyllableListsAllSyllablesByLetter() {
         // 55（kl kl）沒有完整音節：通配列出所有 k/l 開頭音節，不受前綴限制
         val groups = TwelveKeyPreedit.isolatedSyllables("55")
-        assertEquals(listOf('k', 'l'), groups.map { it.first })
+        assertEquals(listOf("k", "l"), groups.map { it.first })
         groups.forEach { (letter, syllables) ->
             assertTrue(syllables.isNotEmpty())
-            syllables.forEach { syllable -> assertEquals(letter, syllable.first()) }
+            syllables.forEach { syllable -> assertEquals(letter, TwelveKeyPreedit.initialUnit(syllable)) }
         }
         assertTrue(groups[0].second.any { it == "ka" })
         assertTrue(groups[1].second.any { it.startsWith("la") })

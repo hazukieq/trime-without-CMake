@@ -127,7 +127,7 @@ class PanelGoldenTest {
         for ((initial, cases) in golden.entrySet()) {
             for ((code, entry) in cases.asJsonObject.entrySet()) {
                 val sources = entry.asJsonObject.getAsJsonObject("sources")
-                val actual = TwelveKeySnapshotBuilder.debugPanelSources(code, initial.single())
+                val actual = TwelveKeySnapshotBuilder.debugPanelSources(code, initial)
                 for ((name, rows) in listOf("isolated" to actual.isolated, "synth" to actual.synth,
                     "split" to actual.split, "assoc" to actual.assoc, "combo" to actual.combo,
                     "whole_word" to actual.wholeWord)) {

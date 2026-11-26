@@ -37,8 +37,8 @@ class InitialDisambiguationTest {
     @Test fun letterConfirmIsChronologicalWithPicksAndUndo() {
         val session = CompositionSession()
         session.input("5ai8i")
-        assertEquals(listOf('k', 'l'), InitialDisambiguation.choices(session.remaining))
-        assertTrue(session.onInitialLetter('k'))
+        assertEquals(listOf("k", "l"), InitialDisambiguation.choices(session.remaining))
+        assertTrue(session.onInitialLetter("k"))
         assertEquals(listOf(PhoneticSelection("k", "5", true)), session.phonetics)
         assertEquals("ai8i", session.pending)
         assertFalse(session.allowsCommit("开"))
@@ -46,7 +46,7 @@ class InitialDisambiguationTest {
         assertTrue(session.pick("开", "kai", 3, CompositionSession.Origin.PANEL))
         assertEquals("8i", session.remaining)
         assertEquals(emptyList<PhoneticSelection>(), session.phonetics)
-        assertTrue(session.onInitialLetter('j'))
+        assertTrue(session.onInitialLetter("j"))
         assertEquals(listOf(PhoneticSelection("j", "8", true)), session.phonetics)
         assertEquals("i", session.pending)
         assertEquals("8i", session.undo())
@@ -54,7 +54,7 @@ class InitialDisambiguationTest {
         assertEquals("开", session.selectedText)
         assertEquals("5ai8i", session.undo())
         assertEquals(listOf(PhoneticSelection("k", "5", true)), session.phonetics)
-        assertEquals('k', session.initial)
+        assertEquals("k", session.initial)
         assertEquals("", session.selectedText)
         assertEquals("5ai8i", session.undo())
         assertNull(session.initial)
@@ -65,20 +65,20 @@ class InitialDisambiguationTest {
     @Test fun lastInitialCanBeRefinedWithoutLosingKeys() {
         val session = CompositionSession()
         session.input("5")
-        assertTrue(session.onInitialLetter('k'))
+        assertTrue(session.onInitialLetter("k"))
         assertEquals("", session.pending)
         assertTrue(session.refinable)
-        assertFalse(session.onInitialLetter('k'))
-        assertTrue(session.onInitialLetter('l'))
-        assertEquals('l', session.initial)
+        assertFalse(session.onInitialLetter("k"))
+        assertTrue(session.onInitialLetter("l"))
+        assertEquals("l", session.initial)
         assertEquals(listOf(PhoneticSelection("l", "5", true)), session.phonetics)
         assertEquals("5", session.undo())
-        assertEquals('k', session.initial)
+        assertEquals("k", session.initial)
         assertEquals("5", session.undo())
         assertNull(session.initial)
         assertFalse(session.canUndo)
         // 追加按鍵：已確認段（原碼前綴）保留，待確認尾碼增長。
-        assertTrue(session.onInitialLetter('k'))
+        assertTrue(session.onInitialLetter("k"))
         session.input("5i")
         assertEquals(listOf(PhoneticSelection("k", "5", true)), session.phonetics)
         assertEquals("i", session.pending)
@@ -90,15 +90,15 @@ class InitialDisambiguationTest {
     @Test fun editingTheHeadDropsConfirmedSegmentsButKeepsSelectedPicks() {
         val session = CompositionSession()
         session.input("5ai8i")
-        assertTrue(session.onInitialLetter('k'))
+        assertTrue(session.onInitialLetter("k"))
         assertTrue(session.pick("开", "kai", 3, CompositionSession.Origin.BAR))
-        assertTrue(session.onInitialLetter('j'))
+        assertTrue(session.onInitialLetter("j"))
         session.input("i4")
         assertEquals(emptyList<PhoneticSelection>(), session.phonetics)
         assertEquals("开", session.selectedText)
         assertEquals("5ai8i", session.undo())
         assertEquals(listOf(PhoneticSelection("k", "5", true)), session.phonetics)
-        assertEquals('k', session.initial)
+        assertEquals("k", session.initial)
         assertEquals("", session.selectedText)
         assertEquals("5ai8i", session.undo())
         assertNull(session.initial)
@@ -119,7 +119,7 @@ class InitialDisambiguationTest {
             local, 600, wantGroups = true, candidatesOverride = engine, phonetics = listOf(k),
         )
         // 待確認鍵（a = abc）的合法首拼：b/c；a 是元音，不作首字母。
-        assertEquals(listOf('b', 'c'), snap.initialChoices)
+        assertEquals(listOf("b", "c"), snap.initialChoices)
         assertNull(snap.initial)
         // 引擎詞在前；單音節 卡（跨度 2）與已確認的切分衝突，被跨度校驗排除。
         assertEquals("其妻", snap.barItems.first().text)
@@ -147,21 +147,21 @@ class InitialDisambiguationTest {
             local, 600, wantGroups = true, candidatesOverride = engine, phonetics = listOf(k, kb),
         )
         assertEquals(code, snap.remaining)
-        assertEquals('b', snap.initial)
-        assertEquals(listOf('b', 'c'), snap.initialChoices)
+        assertEquals("b", snap.initial)
+        assertEquals(listOf("b", "c"), snap.initialChoices)
         assertEquals(listOf("去吧"), snap.recommend.filter { it.index >= 0 }.map { it.text })
         // 首段仍是 k：跨两段的整音节字（ka）不能冒充已确认序列。
         assertTrue(snap.recommend.none { it.text == "卡" && it.index >= 0 })
     }
 
     @Test fun initialLetterChoicesFollowPendingAndRefinableSegments() {
-        assertEquals(listOf('k', 'l'), TwelveKeySnapshotBuilder.letterChoices("5a", emptyList()))
+        assertEquals(listOf("k", "l"), TwelveKeySnapshotBuilder.letterChoices("5a", emptyList()))
         val k = PhoneticSelection("k", "5", true)
-        assertEquals(listOf('b', 'c'), TwelveKeySnapshotBuilder.letterChoices("5a", listOf(k)))
+        assertEquals(listOf("b", "c"), TwelveKeySnapshotBuilder.letterChoices("5a", listOf(k)))
         assertNull(TwelveKeySnapshotBuilder.selectedLetter("5a", listOf(k)))
         val kb = PhoneticSelection("b", "a", true)
-        assertEquals(listOf('b', 'c'), TwelveKeySnapshotBuilder.letterChoices("5a", listOf(k, kb)))
-        assertEquals('b', TwelveKeySnapshotBuilder.selectedLetter("5a", listOf(k, kb)))
+        assertEquals(listOf("b", "c"), TwelveKeySnapshotBuilder.letterChoices("5a", listOf(k, kb)))
+        assertEquals("b", TwelveKeySnapshotBuilder.selectedLetter("5a", listOf(k, kb)))
         assertTrue(TwelveKeySnapshotBuilder.letterChoices("5a", listOf(k, PhoneticSelection("ka", "5a", false))).isEmpty())
     }
 
@@ -195,9 +195,9 @@ class InitialDisambiguationTest {
 
     @Test fun constraintIsAppliedBeforeCartesianProductBudget() {
         assertTrue(TwelveKeyPreedit.initialCombos("5555555").isEmpty())
-        val constrained = TwelveKeyPreedit.initialCombos("5555555", 'l')
+        val constrained = TwelveKeyPreedit.initialCombos("5555555", "l")
         assertEquals(64, constrained.size)
-        assertTrue(constrained.all { it.first() == 'l' && it.size == 7 })
+        assertTrue(constrained.all { it.first() == "l" && it.size == 7 })
         assertEquals(64, constrained.distinct().size)
     }
 
@@ -244,8 +244,8 @@ class InitialDisambiguationTest {
             engineSpan = EngineCandidateSpan(0, 4, "ki ki")) } +
             CandidateItem("起", "ki", 64, engineSpan = EngineCandidateSpan(0, 2, "ki"))
         val local = TwelveKeySnapshotBuilder.Local(input, 0, input, "")
-        val bar = TwelveKeySnapshotBuilder.build(local, 64, wantGroups = false, candidatesOverride = all, initial = 'k')
-        val full = TwelveKeySnapshotBuilder.build(local, wantGroups = true, candidatesOverride = all, initial = 'k')
+        val bar = TwelveKeySnapshotBuilder.build(local, 64, wantGroups = false, candidatesOverride = all, initial = "k")
+        val full = TwelveKeySnapshotBuilder.build(local, wantGroups = true, candidatesOverride = all, initial = "k")
         assertEquals(bar.barItems, full.barItems)
         assertEquals(bar.previewText, full.previewText)
         assertTrue(full.groups.flatMap { it.items }.any { it.index == 64 })
@@ -258,13 +258,13 @@ class InitialDisambiguationTest {
             engineSpan = EngineCandidateSpan(0, 3, "li ki")) } +
             CandidateItem("开启", "kai ki", 700, engineSpan = EngineCandidateSpan(0, 3, "kai ki"))
         val local = TwelveKeySnapshotBuilder.Local(input, 0, input, "")
-        val bar = TwelveKeySnapshotBuilder.build(local, 64, wantGroups = false, candidatesOverride = all, initial = 'k')
-        val full = TwelveKeySnapshotBuilder.build(local, wantGroups = true, candidatesOverride = all, initial = 'k')
+        val bar = TwelveKeySnapshotBuilder.build(local, 64, wantGroups = false, candidatesOverride = all, initial = "k")
+        val full = TwelveKeySnapshotBuilder.build(local, wantGroups = true, candidatesOverride = all, initial = "k")
         assertEquals("开启", bar.barItems.first().text)
         assertEquals(700, bar.barItems.first().index)
         assertEquals(3, bar.barItems.first().inputSpan?.end)
         assertEquals(bar.barItems, full.barItems)
         assertEquals(input, full.remaining)
-        assertEquals(listOf('k', 'l'), full.initialChoices)
+        assertEquals(listOf("k", "l"), full.initialChoices)
     }
 }
