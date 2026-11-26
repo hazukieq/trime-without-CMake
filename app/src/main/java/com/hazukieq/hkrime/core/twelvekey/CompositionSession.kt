@@ -81,15 +81,14 @@ class CompositionSession {
         return true
     }
 
-    /** 同一鍵的另一個首拼：替換最後一段的字母，不改變原碼跨度。 */
+    /** 同一鍵的另一個首拼：原地替換最後一段字母，不改變原碼跨度，也不重複堆積撤銷棧。 */
     @Synchronized fun refineInitial(letter: String): Boolean {
         val old = state
         val last = old.phonetics.lastOrNull() ?: return false
         if (!last.initialOnly || last.reading == letter) return false
         if (PhoneticSelection.pending(old.remaining, old.phonetics).isNotEmpty()) return false
         if (letter !in InitialDisambiguation.choices(last.code)) return false
-        state = old.copy(phonetics = old.phonetics.dropLast(1) + last.copy(reading = letter),
-            undo = old.undo + Undo(null, old.phonetics))
+        state = old.copy(phonetics = old.phonetics.dropLast(1) + last.copy(reading = letter))
         return true
     }
 

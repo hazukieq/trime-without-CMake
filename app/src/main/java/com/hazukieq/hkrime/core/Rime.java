@@ -442,7 +442,7 @@ public class Rime {
     // （一個碼對應多個字母），這裡改用字典反查音節，切不出來就維持原樣。
     if (composition != null
         && composition.preedit != null
-        && "hakka_jiugong".equals(getSchemaId())) {
+        && isTwelveKeySchema()) {
       // 12 鍵 preedit 的顯示規則在 PreeditPresentation（綁定快照 + 緩存），
       // 解碼/改寫在 TwelveKeyPreedit；讀音取「候選條第一條」優先、引擎 menu 第一條兜底，
       // 保留已選文字與前綴、尾部碼段轉拼音、按下的鍵全部顯示。
@@ -466,6 +466,17 @@ public class Rime {
         rewritten.preedit = decoded;
         rewritten.normalizeAfterRewrite();
         return rewritten;
+      }
+    } else if (composition != null && composition.preedit != null) {
+      String rawInput = RimeGetInput();
+      if (rawInput != null && rawInput.indexOf('\'') >= 0) {
+        String restored = TwelveKeyPreedit.restoreDelimiters(composition.preedit, rawInput);
+        if (restored != null && !restored.equals(composition.preedit)) {
+          RimeComposition rewritten = composition.copy();
+          rewritten.preedit = restored;
+          rewritten.normalizeAfterRewrite();
+          return rewritten;
+        }
       }
     }
     return composition;
@@ -549,8 +560,45 @@ public class Rime {
     }
     Timber.d(methodName + "initSchema");
     initSchema();
+    if (!maintenancePending) {
+      warmupEngineAsync();
+    }
 
     Timber.d(methodName + "finish");
+  }
+
+  private static volatile String sWarmedSchema = null;
+
+  /**
+   * 后台预热引擎：提前触发词典/棱镜页入与 UserDictionary 快速索引构建，
+   * 避免冷启动或首次安装后的首键在主线程卡顿。
+   */
+  public static void warmupEngineAsync() {
+    final Thread t =
+        new Thread(
+            () -> {
+              final long t0 = System.nanoTime();
+              synchronized (ENGINE_LOCK) {
+                try {
+                  if (!isEngineReady()) return;
+                  final String sid = getSchemaId();
+                  if (sid == null || sid.isEmpty() || sid.equals(sWarmedSchema)) return;
+                  if (isComposing() || get_option("ascii_mode")) return;
+                  process_key('a', 0);
+                  clear_composition();
+                  get_context(mContext);
+                  sWarmedSchema = sid;
+                  Timber.i(
+                      "Rime: engine warmup done for %s in %dms",
+                      sid, (System.nanoTime() - t0) / 1_000_000);
+                } catch (Throwable e) {
+                  Timber.w(e, "Rime: engine warmup failed");
+                }
+              }
+            },
+            "rime-warmup");
+    t.setDaemon(true);
+    t.start();
   }
 
   /** 背景執行維護，完成後回主線程補建 session / 重讀方案 / 讓輸入法重綁鍵盤。 */
@@ -581,6 +629,7 @@ public class Rime {
           return;
         }
       }
+      warmupEngineAsync();
       rebindKeyboardWhenServiceReady(0);
     });
   }
@@ -787,6 +836,32 @@ public class Rime {
     // 維護被延後時還沒有 session，native 返回 null：統一成 .default（= 無方案），
     // 讓 isEmpty()/UI 走「無方案」分支而不是 NPE。
     return schema == null ? ".default" : schema;
+  }
+
+  /**
+   * 讀取方案聲明的 `keyboard/type`（如 `12key`、`qwerty`、`9key`）。
+   * 缺省為 `qwerty`；對尚未重新部署的舊版 `hakka_jiugong` 兼容視為 `12key`。
+   */
+  public static String getSchemaKeyboardType(String schemaId) {
+    if (schemaId == null || schemaId.isEmpty() || ".default".equals(schemaId)) {
+      return com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_QWERTY;
+    }
+    try {
+      Object v = schema_get_value(schemaId, "keyboard/type");
+      if (v != null && !v.toString().trim().isEmpty()) {
+        return com.hazukieq.hkrime.data.KeyboardLayoutResolver.normalizeType(v.toString());
+      }
+    } catch (Throwable ignored) {
+    }
+    if ("hakka_jiugong".equals(schemaId)) {
+      return com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_12KEY;
+    }
+    return com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_QWERTY;
+  }
+
+  public static boolean isTwelveKeySchema() {
+    return com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_12KEY.equals(
+        getSchemaKeyboardType(getSchemaId()));
   }
 
   private static boolean isEmpty(@NonNull String s) {
@@ -1183,6 +1258,12 @@ public class Rime {
 
   /** packed 版：`text\u0001comment\u0002…`，见 {@link #candidatesSnapshot(int)}。 */
   public static native String enumerate_candidates_packed(int maxCount);
+
+  /** [hkrime] 顯式寫入原生用戶詞庫（text + 空格分隔音節讀音）。 */
+  public static native boolean learn_phrase(String text, String readings);
+
+  /** [hkrime] 查詢單音節常用字（用戶詞庫優先 + 主詞典烘焙字頻降序）。 */
+  public static native String[] query_syllable_chars(String syllable, int limit);
 
   public static native void set_caret_pos(int caret_pos);
 

@@ -7,6 +7,12 @@
     <PreferenceCategory
         app:iconSpaceReserved="false"
         app:title="@string/pref_keyboard__function">
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="keyboard__show_window"
+            android:title="@string/keyboard__show_window_title"
+            android:summary="@string/keyboard__show_window_summary"
+            app:iconSpaceReserved="false" />
         <com.hazukieq.hkrime.settings.components.ModernListPreference
             android:defaultValue="none"
             android:entries="@array/keyboard__inline_entries"
@@ -15,58 +21,7 @@
             android:title="@string/keyboard__inline_preedit_title"
             app:iconSpaceReserved="false"
             app:useSimpleSummaryProvider="true" />
-        <com.hazukieq.hkrime.settings.components.ModernListPreference
-            android:defaultValue="auto_show"
-            android:entries="@array/keyboard__fullscreen_mode_entries"
-            android:entryValues="@array/keyboard__fullscreen_mode_values"
-            android:key="keyboard__fullscreen_mode"
-            android:title="@string/keyboard__fullscreen_mode_title"
-            app:iconSpaceReserved="false"
-            app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
-
-    <PreferenceCategory
-        app:iconSpaceReserved="false"
-        app:title="@string/pref_keyboard__candidate">
-        <SwitchPreferenceCompat
-            android:defaultValue="true"
-            android:key="keyboard__candidate_algorithm"
-            android:title="@string/keyboard__candidate_algorithm_title"
-            android:summary="@string/keyboard__candidate_algorithm_summary"
-            app:iconSpaceReserved="false" />
-        <SwitchPreferenceCompat
-            android:defaultValue="true"
-            android:key="keyboard__show_window"
-            android:title="@string/keyboard__show_window_title"
-            app:iconSpaceReserved="false" />
-        <SwitchPreferenceCompat
-            android:defaultValue="true"
-            android:key="keyboard__soft_cursor"
-            android:title="@string/keyboard__soft_cursor_title"
-            app:iconSpaceReserved="false" />
-
-
-
-        <SwitchPreferenceCompat
-            android:defaultValue="false"
-            android:key="keyboard__long_click_delete_candidate"
-            android:title="@string/keyboard__long_click_delete_candidate_title"
-            app:iconSpaceReserved="false" />
-
-        <com.hazukieq.hkrime.settings.components.DialogSeekBarPreference
-            android:dependency="keyboard__long_click_delete_candidate"
-            android:defaultValue="2000"
-            android:key="keyboard__key_delete_candidate_timeout"
-            android:title="@string/keyboard__delete_candidate_timeout_title"
-            android:widgetLayout="@layout/seek_bar_dialog"
-            app:allowDividerAbove="false"
-            app:iconSpaceReserved="false"
-            app:max="5000"
-            app:min="500"
-            app:seekBarIncrement="500"
-            app:unit="@string/unit__time_ms" />
-    </PreferenceCategory>
-
 
     <PreferenceCategory
         app:iconSpaceReserved="false"
@@ -75,10 +30,6 @@
         <SwitchPreferenceCompat
             android:key="keyboard__key_sound"
             android:title="@string/keyboard__key_sound_title"
-            app:iconSpaceReserved="false" />
-        <Preference
-            android:key="keyboard__key_sound_package"
-            android:title="@string/keyboard__key_sound_package_title"
             app:iconSpaceReserved="false" />
         <com.hazukieq.hkrime.settings.components.DialogSeekBarPreference
             android:defaultValue="-1"
@@ -97,66 +48,12 @@
             android:key="keyboard__key_vibration"
             android:title="@string/keyboard__key_vibration_title"
             app:iconSpaceReserved="false" />
-        <com.hazukieq.hkrime.settings.components.DialogSeekBarPreference
-            android:defaultValue="-1"
-            android:dependency="keyboard__key_vibration"
-            android:key="keyboard__key_vibration_duration"
-            android:title="@string/keyboard__key_vibration_duration_title"
-            app:allowDividerAbove="false"
-            app:iconSpaceReserved="false"
-            app:max="100"
-            app:min="0"
-            app:seekBarIncrement="1"
-            app:systemDefaultValue="-1"
-            app:systemDefaultValueText="@string/pref__system_default"
-            app:unit="@string/unit__time_ms" />
-        <com.hazukieq.hkrime.settings.components.DialogSeekBarPreference
-            android:defaultValue="-1"
-            android:dependency="keyboard__key_vibration"
-            android:key="keyboard__key_vibration_amplitude"
-            android:title="@string/keyboard__key_vibration_amplitude_title"
-            app:allowDividerAbove="false"
-            app:iconSpaceReserved="false"
-            app:max="255"
-            app:min="0"
-            app:seekBarIncrement="1"
-            app:systemDefaultValue="-1"
-            app:systemDefaultValueText="@string/pref__system_default"
-            app:unit="" />
-        <!--        <SwitchPreference android:key="key_vibrate_default_amplitude" android:title="@string/key_vibrate_default_amplitude"/>-->
-        <SwitchPreferenceCompat
-            android:key="keyboard__speak_key_press"
-            android:title="@string/keyboard__speak_key_press_title"
-            app:iconSpaceReserved="false" />
-        <SwitchPreferenceCompat
-            android:key="keyboard__speak_commit"
-            android:title="@string/keyboard__speak_key_commit_title"
-            app:iconSpaceReserved="false" />
         <SwitchPreferenceCompat
             android:key="keyboard__swipe_enabled"
             android:title="@string/keyboard__swipe_enabled"
+            android:summary="@string/keyboard__swipe_enabled_summary"
             android:defaultValue="true"
             app:iconSpaceReserved="false" />
-        <com.hazukieq.hkrime.settings.components.DialogSeekBarPreference
-            android:defaultValue="80"
-            android:key="keyboard__key_swipe_travel"
-            android:title="@string/keyboard__key_swipe_travel_title"
-            app:allowDividerAbove="false"
-            app:iconSpaceReserved="false"
-            app:max="400"
-            app:min="0"
-            app:seekBarIncrement="10"
-            app:unit="" />
-        <com.hazukieq.hkrime.settings.components.DialogSeekBarPreference
-            android:defaultValue="800"
-            android:key="keyboard__key_swipe_velocity"
-            android:title="@string/keyboard__key_swipe_velocity"
-            app:allowDividerAbove="false"
-            app:iconSpaceReserved="false"
-            app:max="30000"
-            app:min="0"
-            app:seekBarIncrement="100"
-            app:unit="" />
         <com.hazukieq.hkrime.settings.components.DialogSeekBarPreference
             android:defaultValue="20"
             android:key="keyboard__key_long_press_timeout"
@@ -165,16 +62,6 @@
             app:allowDividerAbove="false"
             app:iconSpaceReserved="false"
             app:max="60"
-            app:min="10"
-            app:seekBarIncrement="10"
-            app:unit="@string/unit__time_ms" />
-        <com.hazukieq.hkrime.settings.components.DialogSeekBarPreference
-            android:defaultValue="40"
-            android:key="keyboard__key_repeat_interval"
-            android:title="@string/keyboard__key_repeat_interval_title"
-            app:allowDividerAbove="false"
-            app:iconSpaceReserved="false"
-            app:max="100"
             app:min="10"
             app:seekBarIncrement="10"
             app:unit="@string/unit__time_ms" />

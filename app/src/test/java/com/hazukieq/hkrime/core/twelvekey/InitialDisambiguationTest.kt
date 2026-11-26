@@ -70,10 +70,11 @@ class InitialDisambiguationTest {
         assertTrue(session.refinable)
         assertFalse(session.onInitialLetter("k"))
         assertTrue(session.onInitialLetter("l"))
+        assertTrue(session.onInitialLetter("k"))
+        assertTrue(session.onInitialLetter("l"))
         assertEquals("l", session.initial)
         assertEquals(listOf(PhoneticSelection("l", "5", true)), session.phonetics)
-        assertEquals("5", session.undo())
-        assertEquals("k", session.initial)
+        // 反覆切換末段首拼不堆積撤銷棧，退格一次直接撤回該段
         assertEquals("5", session.undo())
         assertNull(session.initial)
         assertFalse(session.canUndo)

@@ -11,11 +11,9 @@ import com.hazukieq.hkrime.core.twelvekey.CandidateSelection
 import com.hazukieq.hkrime.core.twelvekey.CompositionInput
 import com.hazukieq.hkrime.core.twelvekey.CompositionSession
 import com.hazukieq.hkrime.core.twelvekey.PreeditPresentation
-import com.hazukieq.hkrime.core.twelvekey.SelectionMemory
 import com.hazukieq.hkrime.core.twelvekey.CandidateBarBinder
 import com.hazukieq.hkrime.core.twelvekey.CandidateItem
 import com.hazukieq.hkrime.core.twelvekey.Fallback
-import com.hazukieq.hkrime.core.twelvekey.PhraseMemory
 import com.hazukieq.hkrime.core.twelvekey.ISOLATED_BACK_SEGMENT
 import com.hazukieq.hkrime.core.twelvekey.ISOLATED_CHAR_SEGMENT
 import com.hazukieq.hkrime.core.twelvekey.ISOLATED_SEGMENT
@@ -37,6 +35,7 @@ import com.hazukieq.hkrime.ime.keyboard.Event
 import com.hazukieq.hkrime.ime.keyboard.Keyboard.printModifierKeyState
 import com.hazukieq.hkrime.ime.keyboard.KeyboardSwitcher
 import com.hazukieq.hkrime.ime.keyboard.KeyboardView
+import com.hazukieq.hkrime.ime.symbol.SymbolPanelController
 import com.hazukieq.hkrime.util.ShortcutUtils
 import com.hazukieq.hkrime.util.startsWithAsciiChar
 import kotlinx.coroutines.CoroutineScope
@@ -79,6 +78,7 @@ class TextInputManager private constructor() :
     /** 12 鍵：一次按鍵 = 一個不可變快照，候選條與面板都只讀它。 */
     private var twelveKeyController: TwelveKeyController? = null
     private var candidatePanelController: CandidatePanelController? = null
+    private var symbolPanelController: SymbolPanelController? = null
     private var candidateBarBinder: CandidateBarBinder? = null
 
 
@@ -230,6 +230,25 @@ class TextInputManager private constructor() :
             // 面板右下的退格鍵：與鍵盤退格走同一條鏈路（引擎刪除 + 通知刷新面板）
             controller.onBackspace = { onKey(KeyEvent.KEYCODE_DEL, 0) }
         }
+        val symBinding = uiBinding.main.symbolPanel
+        symbolPanelController = SymbolPanelController(
+            context = trime,
+            keyboardView = uiBinding.main.mainKeyboardView,
+            inputArea = uiBinding.main.inputArea,
+            panelRoot = symBinding.symbolPanelRoot,
+            gridView = symBinding.symbolGrid,
+            tabsView = symBinding.symbolTabs,
+            btnBack = symBinding.symbolBtnBack,
+            btnUp = symBinding.symbolBtnUp,
+            btnDown = symBinding.symbolBtnDown,
+            btnLock = symBinding.symbolBtnLock,
+            actionColumn = symBinding.symbolActionCol,
+            dividerHorizontal = symBinding.symbolDividerH,
+        ).also { controller ->
+            controller.onCommitSymbol = { symbol ->
+                activeEditorInstance.commitText(symbol, false)
+            }
+        }
         candidateBarBinder = CandidateBarBinder(candidateView)
         twelveKeyController = TwelveKeyController(
             scope = this,
@@ -247,10 +266,12 @@ class TextInputManager private constructor() :
     // ---------- 候選展開面板 ----------
 
     fun isTwelveKeyMode(): Boolean = runCatching {
-        // 主題 style/keyboards 裡的名字是 hakka_jiugong（其 preset 為 jiugong_simp），兩者都接受
         val keyboard = keyboardSwitcher.getCurrentKeyboardName()
-        Rime.getSchemaId() == "hakka_jiugong" &&
-            (keyboard == "hakka_jiugong" || keyboard == "jiugong_simp")
+        Rime.isTwelveKeySchema() &&
+            Config.get(trime).isKeyboardLayoutOfType(
+                keyboard,
+                com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_12KEY,
+            )
     }.getOrDefault(false)
 
     /**
@@ -315,14 +336,28 @@ class TextInputManager private constructor() :
     }
 
     /**
-     * 拼音確認/細化後必須重建引擎菜單：保留簡拼分支的開關在翻譯器建菜單時讀會話屬性，
-     * 只改屬性再枚舉拿到的仍是舊菜單。確認階段尚未選字，重餵原碼安全。
+     * 拼音確認/細化後立刻用緩存或樂觀快照推進左列與預覽（<1ms），
+     * 同時把引擎原碼重放與全量枚舉交給後台線程無縫補齊。
      */
     private fun applyPhoneticChange() {
-        twelveKeyController?.phonetics = composition.phonetics
-        restoreTwelveKeyCode(composition.remaining)
-        PreeditPresentation.invalidate(composition.selectedText, composition.phonetics)
+        val rem = composition.remaining
+        val confirmed = composition.phonetics
+        val full = panelWanted || isCandidatePanelShown()
+        twelveKeyController?.scheduleRestore(rem, confirmed)
+        PreeditPresentation.invalidate(composition.selectedText, confirmed)
         preservePanelReading = false
+        val instant = twelveKeyController?.lookupCached(rem, confirmed, full)
+            ?: TwelveKeySnapshotBuilder.optimisticPhonetic(
+                previous = currentSnapshot,
+                remaining = rem,
+                phonetics = confirmed,
+                appRankingEnabled = prefs.keyboard.candidateAlgorithmEnabled,
+            )
+        if (instant != null) {
+            onTwelveKeySnapshot(instant)
+        } else {
+            trime.updateComposing()
+        }
         refreshTwelveKey()
     }
 
@@ -362,6 +397,7 @@ class TextInputManager private constructor() :
     fun hideCandidatePanel() {
         panelWanted = false
         candidatePanelController?.hide()
+        symbolPanelController?.hide()
         candidateView?.setPanelOpen(false)
         if (Rime.isComposing()) {
             runCatching { trime.updateComposing() }
@@ -385,9 +421,6 @@ class TextInputManager private constructor() :
         }
         if (snapshot.isEmpty) {
             if (!composition.active) panelWanted = false
-            flushPhraseExposure()
-        } else {
-            collectPhraseExposure(snapshot)
         }
         currentSnapshot = snapshot
         val preferredChanged = PreeditPresentation.publish(snapshot, composition.selectedText)
@@ -428,6 +461,7 @@ class TextInputManager private constructor() :
     /** 所有 12 鍵來源先證實消費範圍，再寫同一份選擇日誌。 */
     private fun chooseTwelveKey(item: CandidateItem, contextKey: String, origin: CompositionSession.Origin) {
         withEngineLock {
+            twelveKeyController?.flushPendingRestoreLocked()
             if (!composition.bindEditor(currentEditorIdentity())) {
                 cancelTwelveKeyComposition()
                 refreshTwelveKey()
@@ -542,35 +576,33 @@ class TextInputManager private constructor() :
 
     private fun learnCompletedSelection(completed: CompositionSession.Completion) {
         val text = completed.text
-        runCatching { completed.picks.forEach { pick ->
-            SelectionMemory.bump(pick.text, pick.reading)
-            pickedSynthetic.add(pick.text)
-            if (pick.text.length >= 2 && pick.reading.isNotBlank()) {
-                PhraseMemory.learnPick(pick.beforeCode, pick.text, pick.reading)
+        runCatching {
+            var learned = false
+            completed.picks.forEach { pick ->
+                if (pick.text.isNotEmpty() && pick.reading.isNotBlank()) {
+                    if (Rime.learn_phrase(pick.text, pick.reading)) learned = true
+                }
             }
-        }
-        val readings = completed.picks.joinToString(" ") { it.reading }
-        val learnable = text.isNotEmpty() &&
-            completed.picks.isNotEmpty() &&
-            completed.picks.all { it.reading.isNotBlank() }
-        if (learnable) {
-            val now = System.currentTimeMillis()
-            // 逐字上屏（每段一次提交）也要能攒成詞：同一編輯器、時間窗內接續的提交併進同一條碼串。
-            // 只有「單次點選上屏」才接續（逐段打字）；一次組合內連點多段本身已是整詞，重新開一條。
-            val continues = completed.picks.size == 1 && runText.isNotEmpty() &&
-                now - runAt <= RUN_WINDOW_MS && runText.length + text.length <= MAX_RUN_LENGTH
-            runCode = if (continues) runCode + completed.code else completed.code
-            runText = if (continues) runText + text else text
-            runReadings = if (continues) "$runReadings $readings" else readings
-            runAt = now
-            // 只在「本次提交本身就是詞」或「剛好湊夠兩字」時落庫，避免整句被逐字拆成一串前綴詞。
-            android.util.Log.i("HKLEARN", "commit code=${completed.code} text=$text picks=${completed.picks.size} run=$runCode/$runText/${runReadings}")
-            if (runText.length >= 2 && (text.length >= 2 || runText.length == 2)) {
-                PhraseMemory.record(runCode, runText, runReadings.trim())
+            val readings = completed.picks.joinToString(" ") { it.reading }
+            val learnable = text.isNotEmpty() &&
+                completed.picks.isNotEmpty() &&
+                completed.picks.all { it.reading.isNotBlank() }
+            if (learnable) {
+                val now = System.currentTimeMillis()
+                // 逐字上屏（每段一次提交）也要能攒成詞：同一編輯器、時間窗內接續的提交併進同一條碼串，直接寫入原生 userdb。
+                val continues = completed.picks.size == 1 && runText.isNotEmpty() &&
+                    now - runAt <= RUN_WINDOW_MS && runText.length + text.length <= MAX_RUN_LENGTH
+                runCode = if (continues) runCode + completed.code else completed.code
+                runText = if (continues) runText + text else text
+                runReadings = if (continues) "$runReadings $readings" else readings
+                runAt = now
+                if (runText.length >= 2 && (text.length >= 2 || runText.length == 2 || completed.picks.size >= 2)) {
+                    if (Rime.learn_phrase(runText, runReadings.trim())) learned = true
+                }
+            } else {
+                resetLearnedRun()
             }
-        } else {
-            resetLearnedRun()
-        }
+            if (learned) twelveKeyController?.invalidateForEngine()
         }.onFailure { Timber.e(it, "twelvekey: post-commit learning failed") }
     }
 
@@ -632,6 +664,7 @@ class TextInputManager private constructor() :
         if (!isTwelveKeyMode() || Rime.isAsciiMode() || event.isEmpty()) return
         if (event.size > 1 && event[1] and Rime.META_RELEASE_ON != 0) return
         onEditorSessionChanged()
+        twelveKeyController?.flushPendingRestoreLocked()
         if (Rime.RimeGetInput().isNullOrEmpty() && composition.remaining.isNotEmpty()) {
             restoreTwelveKeyCode(composition.remaining)
         }
@@ -654,13 +687,29 @@ class TextInputManager private constructor() :
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_DEL && composition.canUndo) {
+            var restoredCode: String? = null
             withEngineLock {
-                composition.undo()?.let { restoreTwelveKeyCode(it) }
+                restoredCode = composition.undo()?.also { restored ->
+                    twelveKeyController?.scheduleRestore(restored, composition.phonetics)
+                }
                 PreeditPresentation.invalidate(composition.selectedText, composition.phonetics)
-                twelveKeyController?.invalidateForEngine()
                 preservePanelReading = true
             }
-            trime.updateComposing()
+            val rem = restoredCode ?: composition.remaining
+            val confirmed = composition.phonetics
+            val full = panelWanted || isCandidatePanelShown()
+            val instant = twelveKeyController?.lookupCached(rem, confirmed, full)
+                ?: TwelveKeySnapshotBuilder.optimisticPhonetic(
+                    previous = currentSnapshot,
+                    remaining = rem,
+                    phonetics = confirmed,
+                    appRankingEnabled = prefs.keyboard.candidateAlgorithmEnabled,
+                )
+            if (instant != null) {
+                onTwelveKeySnapshot(instant)
+            } else {
+                trime.updateComposing()
+            }
             refreshTwelveKey()
             return true
         }
@@ -690,39 +739,6 @@ class TextInputManager private constructor() :
             if (hadSession) Rime.clearComposition()
             twelveKeyController?.invalidateForEngine()
         }
-    }
-
-    /** 記下本輪真展示過的合成候選（候選條必算；展開面板打開時也算）。 */
-    private fun collectPhraseExposure(snapshot: TwelveKeySnapshot) {
-        snapshot.barItems.forEach { item ->
-            if (item.segment == SYNTHETIC_SEGMENT && item.text.isNotEmpty()) {
-                shownSynthetic[item.text] = item.restCode
-            }
-        }
-        if (panelWanted || isCandidatePanelShown()) {
-            snapshot.groups.forEach { group ->
-                group.items.forEach { item ->
-                    if (item.segment == SYNTHETIC_SEGMENT && item.text.isNotEmpty()) {
-                        shownSynthetic[item.text] = item.restCode
-                    }
-                }
-            }
-        }
-    }
-
-    /** 本輪結束：露過面但沒被點選的合成候選，各 +1 曝光。 */
-    private fun flushPhraseExposure() {
-        val shown = shownSynthetic
-        if (shown.isEmpty()) {
-            pickedSynthetic.clear()
-            return
-        }
-        val picked = pickedSynthetic
-        shown.forEach { (text, code) ->
-            if (!picked.contains(text) && code.isNotEmpty()) PhraseMemory.noteShown(code, text)
-        }
-        shown.clear()
-        picked.clear()
     }
 
     /**
@@ -1067,12 +1083,6 @@ class TextInputManager private constructor() :
      */
     private var suppressSnapshotRefresh = false
 
-    // ---- 合成候選的曝光統計（誤造詞判定用，見 PhraseMemory.score）----
-    /** 本輪真出現在候選條/展開面板上的合成候選：文字 → 完整碼串。 */
-    private val shownSynthetic = LinkedHashMap<String, String>()
-    /** 本輪被點選過的合成候選文字。 */
-    private val pickedSynthetic = HashSet<String>()
-
     override fun onEvent(event: Event?) {
         lastKeyAtNs = System.nanoTime()
         withEngineLock { onEventLocked(event) }
@@ -1095,6 +1105,13 @@ class TextInputManager private constructor() :
                 activeEditorInstance.commitRimeText()
             }
             KeyEvent.KEYCODE_EISU -> { // Switch keyboard
+                val symbolTab = SymbolPanelController.mapSelectToInitialTab(event.select)
+                if (symbolTab != null) {
+                    hideCandidatePanel()
+                    symbolPanelController?.show(symbolTab)
+                    return
+                }
+                symbolPanelController?.hide()
                 keyboardSwitcher.switchToKeyboard(event.select)
                 /** Set ascii mode according to keyboard's settings, can not place into [Rime.handleRimeNotification] */
                 Rime.setOption("ascii_mode", keyboardSwitcher.asciiMode)
@@ -1132,6 +1149,9 @@ class TextInputManager private constructor() :
                 } else if (event.command == "candidate_panel") {
                     // 12 鍵 /、：在組字中切換候選面板，主題對應 Panel_toggle 事件。
                     toggleCandidatePanel()
+                } else if (event.command == "symbol_panel") {
+                    hideCandidatePanel()
+                    symbolPanelController?.show(event.option)
                 } else {
                     val textFromCommand = ShortcutUtils
                         .call(trime, event.command, arg)

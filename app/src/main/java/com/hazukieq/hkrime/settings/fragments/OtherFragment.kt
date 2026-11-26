@@ -48,16 +48,7 @@ class OtherFragment :
         super.onPrepareOptionsMenu(menu)
     }
 
-    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
-        val trime = Trime.getServiceOrNull()
-        when (key) {
-            "other__show_status_bar_icon" -> {
-                if (sharedPreferences?.getBoolean(key, false) == true) {
-                    trime?.showStatusIcon(R.drawable.ic_trime_status)
-                } else { trime?.hideStatusIcon() }
-            }
-        }
-    }
+    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) = Unit
 
     override fun onResume() {
         super.onResume()
@@ -66,7 +57,6 @@ class OtherFragment :
 
     override fun onPause() {
         super.onPause()
-        updateLauncherIconStatus()
         preferenceScreen.sharedPreferences!!.unregisterOnSharedPreferenceChangeListener(this)
     }
 

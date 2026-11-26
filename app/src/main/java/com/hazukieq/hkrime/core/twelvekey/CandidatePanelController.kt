@@ -120,6 +120,7 @@ class CandidatePanelController(
 
     /** 每次按鍵/上屏後由上層調用：整個面板只讀這一份快照。 */
     fun submit(next: TwelveKeySnapshot, preserveReading: Boolean = false) {
+        val prevInput = snapshot.input
         val advanced = next.phonetics != snapshot.phonetics
         navigation.submit(next, preserveReading)
         snapshot = next
@@ -128,8 +129,8 @@ class CandidatePanelController(
             return
         }
         if (!isShown) return
-        // 右列內容變了就回頂；左列只在原碼真的變了才回頂，否則點底部字母會把字母行滾出視野。
-        render(scrollGrid = advanced, scrollGroups = next.input != snapshot.input)
+        // 右列內容變了就回頂；左列在確認推進或原碼變化時回頂。
+        render(scrollGrid = advanced, scrollGroups = advanced || next.input != prevInput)
     }
 
     private fun pickGroup(group: CandidateGroupAdapter.GroupItem) {
@@ -176,26 +177,27 @@ class CandidatePanelController(
         val display = navigation.groups
         if (display.isEmpty()) return
         val recommendIndex = display.indexOfFirst { it.segment == RECOMMEND_SEGMENT }
-        // 12 鍵右列固定是「當前確認序列的候選」（推薦組），與左列點擊解耦。
+        // 12 鍵右列固定是「當前確認序列的候選」，左列不再顯示冗餘的「推荐」行。
         val gridIndex = if (snapshot.phoneticNavigation && recommendIndex >= 0) recommendIndex
         else navigation.activeIndex
-        groupAdapter.submit(
-            display.mapIndexed { index, group ->
-                CandidateGroupAdapter.GroupItem(
-                    index = index,
-                    reading = group.reading,
-                    selected = if (snapshot.phoneticNavigation) {
-                        group.segment == INITIAL_LETTER_SEGMENT &&
-                            group.reading == snapshot.initial
-                    } else {
-                        index == navigation.activeIndex
-                    },
-                    count = group.items.size,
-                    contextKey = snapshot.contextKey,
-                )
-            },
-        )
-        gridAdapter.setShowComment(display.size >= 2)
+        val leftItems = display.mapIndexedNotNull { index, group ->
+            if (group.segment == RECOMMEND_SEGMENT || group.reading.isBlank()) return@mapIndexedNotNull null
+            CandidateGroupAdapter.GroupItem(
+                index = index,
+                reading = group.reading,
+                selected = if (snapshot.phoneticNavigation) {
+                    group.segment == INITIAL_LETTER_SEGMENT &&
+                        group.reading == snapshot.initial
+                } else {
+                    index == navigation.activeIndex
+                },
+                count = group.items.size,
+                contextKey = snapshot.contextKey,
+            )
+        }
+        groupList?.visibility = if (leftItems.isEmpty()) View.GONE else View.VISIBLE
+        groupAdapter.submit(leftItems)
+        gridAdapter.setShowComment(leftItems.isNotEmpty())
         gridAdapter.submit(
             display[gridIndex].items.map {
                 CandidatePanelAdapter.Item(

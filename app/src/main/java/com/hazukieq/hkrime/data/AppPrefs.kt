@@ -263,15 +263,39 @@ class AppPrefs(
         companion object {
             const val SELECTED_THEME = "looks__selected_theme"
             const val SELECTED_COLOR = "looks__selected_color_scheme"
+            const val SELECTED_KEYBOARD_LAYOUT_PREFIX = "looks__keyboard_layout__"
+            const val SYMBOL_TAB_ORDER = "looks__symbol_tab_order"
+            const val SYMBOL_TAB_HIDDEN = "looks__symbol_tab_hidden"
             const val AUTO_DARK = "looks__auto_dark"
             const val USE_MINI_KEYBOARD = "looks__use_mini_keyboard"
         }
         var selectedTheme: String
-            get() = prefs.getPref(SELECTED_THEME, "hakka_theme.trime")
+            get() = prefs.getPref(SELECTED_THEME, "hakka.trime")
             set(v) = prefs.setPref(SELECTED_THEME, v)
         var selectedColor: String
             get() = prefs.getPref(SELECTED_COLOR, "default")
             set(v) = prefs.setPref(SELECTED_COLOR, v)
+        fun selectedKeyboardLayout(schemaId: String?): String {
+            if (schemaId.isNullOrBlank()) return ""
+            return prefs.getPref(SELECTED_KEYBOARD_LAYOUT_PREFIX + schemaId, "")
+        }
+        fun setSelectedKeyboardLayout(schemaId: String?, layoutId: String?) {
+            if (schemaId.isNullOrBlank()) return
+            prefs.setPref(SELECTED_KEYBOARD_LAYOUT_PREFIX + schemaId, layoutId?.trim().orEmpty())
+        }
+        var symbolTabOrder: List<String>
+            get() = prefs.getPref(SYMBOL_TAB_ORDER, "")
+                .split(',')
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+            set(v) = prefs.setPref(SYMBOL_TAB_ORDER, v.joinToString(","))
+        var symbolTabHidden: Set<String>
+            get() = prefs.getPref(SYMBOL_TAB_HIDDEN, "")
+                .split(',')
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .toSet()
+            set(v) = prefs.setPref(SYMBOL_TAB_HIDDEN, v.joinToString(","))
         var autoDark: Boolean = false
             get() = prefs.getPref(AUTO_DARK, false)
             private set

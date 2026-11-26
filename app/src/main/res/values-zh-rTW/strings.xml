@@ -51,6 +51,18 @@
     <string name="pref_schemas_summary">從已安裝的方案中選擇要使用的方案</string>
     <string name="looks__selected_color_title">配色</string>
     <string name="looks__selected_color_summary">選取想要的鍵盤配色</string>
+    <string name="looks__selected_keyboard_layout_title">鍵盤布局</string>
+    <string name="looks__symbol_tabs_title">符號與表情分類</string>
+    <string name="looks__symbol_tabs_summary">調整底部標籤次序、顯示隱藏或新增分類</string>
+    <string name="looks__symbol_tabs_dialog_hint">勾選控制顯示，點箭頭調整順序；也可新增自訂 .txt 分類。</string>
+    <string name="looks__symbol_tabs_add">新增分類</string>
+    <string name="looks__symbol_tabs_add_name_hint">分類名稱（如：常用詞）</string>
+    <string name="looks__symbol_tabs_add_content_hint">輸入符號或表情，以空格或換行分隔</string>
+    <string name="looks__symbol_tabs_add_invalid">請填寫分類名稱與至少一個符號</string>
+    <string name="looks__symbol_tabs_keep_one">至少保留一個分類</string>
+    <string name="looks__selected_keyboard_layout_summary">僅展示當前方案支援的布局</string>
+    <string name="looks__selected_keyboard_layout_dialog_title">鍵盤布局 · %1$s（%2$s）</string>
+    <string name="looks__keyboard_layout_follow_theme">跟隨主題默認</string>
     <string name="conf__reset_title">回廠</string>
     <string name="conf__reset_summary">使用預設設定覆蓋共享資料夾下同名檔案</string>
     <string name="settings__keyboard_preferences_title">偏好設定</string>
@@ -68,7 +80,8 @@
     <string name="keyboard__long_click_delete_candidate_title">長按刪除候選詞</string>
     <string name="keyboard__show_switches_title">在候選欄中顯示狀態</string>
     <string name="keyboard__show_key_popup_title">按鍵時彈出顯示字符</string>
-    <string name="keyboard__show_window_title">顯示懸浮窗</string>
+    <string name="keyboard__show_window_title">懸浮編碼條</string>
+    <string name="keyboard__show_window_summary">在鍵盤上方顯示正在輸入的拼音</string>
     <string name="keyboard__inline_preedit_title">嵌入式編輯模式</string>
     <string-array name="keyboard__inline_entries">
         <item>首選</item>
@@ -184,7 +197,8 @@
     <string name="keyboard__key_swipe_time_hi_title">判定為連續擊鍵的時間間隔</string>
     <string name="keyboard__hook_fast_input">攔截字母鍵的快速輸入</string>
     <string name="keyboard__hook_fast_input_summary">合併多次按鍵輸入為一次，從而縮減出候選的時間，但交互的反饋感會變差(暫未實現此功能)</string>
-    <string name="keyboard__swipe_enabled">允許觸發按鍵的滑動手勢</string>
+    <string name="keyboard__swipe_enabled">按鍵滑動</string>
+    <string name="keyboard__swipe_enabled_summary">滑動按鍵快速輸入擴展符號</string>
     <string name="keyboard__key_swipe_velocity">觸發按鍵滑動手勢的速度（距離/速度滿足其一即可）</string>
     <string name="keyboard__key_swipe_velocity_hi">連續擊鍵時觸發滑動手勢的速度</string>
     <string name="about__buildinfo">編譯信息</string>

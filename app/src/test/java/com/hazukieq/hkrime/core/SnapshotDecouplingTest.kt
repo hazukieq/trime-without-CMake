@@ -1,7 +1,6 @@
 package com.hazukieq.hkrime.core
 
 import com.hazukieq.hkrime.core.twelvekey.CandidateItem
-import com.hazukieq.hkrime.core.twelvekey.PhraseMemory
 import com.hazukieq.hkrime.core.twelvekey.SYNTHETIC_SEGMENT
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeyTuning
@@ -66,16 +65,12 @@ class SnapshotDecouplingTest {
         assertTrue("full 模式必須建出分組", full.groups.isNotEmpty())
     }
 
-    /** 面板全量枚舉不得改變固定條的學習混排與去重結果。 */
+    /** 面板全量枚舉不得改變固定條的順序與去重結果。 */
     @Test
     fun barIsUnaffectedByFullPanelEnumeration() {
-        PhraseMemory.clear()
         val code = "5i34i"
-        val learned = "学习词"
-        repeat(3) { PhraseMemory.learnPick(code, learned, "li voi") }
         val candidates = (0 until 80).map { i ->
-            if (i == 70) CandidateItem(learned, "li voi", i)
-            else CandidateItem("候选$i", "li voi", i)
+            CandidateItem("候选$i", "li voi", i)
         }
         val bar = TwelveKeySnapshotBuilder.build(
             local(code),
@@ -98,7 +93,6 @@ class SnapshotDecouplingTest {
             full.barEntries.map { it.text },
         )
         assertEquals("previewText 也要一致", bar.previewText, full.previewText)
-        PhraseMemory.clear()
     }
 
     /** 引擎空時先用字典段組兜底，不直接顯示原字母。 */

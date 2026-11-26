@@ -52,6 +52,18 @@
     <string name="pref_schemas_summary">Select Installed Schemas</string>
     <string name="looks__selected_color_title">Colors</string>
     <string name="looks__selected_color_summary">Select Desired Color for Keyboard</string>
+    <string name="looks__selected_keyboard_layout_title">Keyboard Layout</string>
+    <string name="looks__symbol_tabs_title">Symbol &amp; Emoji Tabs</string>
+    <string name="looks__symbol_tabs_summary">Reorder, show/hide, or add custom symbol categories</string>
+    <string name="looks__symbol_tabs_dialog_hint">Check to show in bottom bar, use arrows to reorder, or add a custom .txt category.</string>
+    <string name="looks__symbol_tabs_add">Add Category</string>
+    <string name="looks__symbol_tabs_add_name_hint">Category name (e.g. Custom)</string>
+    <string name="looks__symbol_tabs_add_content_hint">Symbols separated by spaces or new lines</string>
+    <string name="looks__symbol_tabs_add_invalid">Please enter both category name and symbols</string>
+    <string name="looks__symbol_tabs_keep_one">Keep at least one category enabled</string>
+    <string name="looks__selected_keyboard_layout_summary">Select layout compatible with current schema</string>
+    <string name="looks__selected_keyboard_layout_dialog_title">Layout · %1$s (%2$s)</string>
+    <string name="looks__keyboard_layout_follow_theme">Follow theme default</string>
     <string name="conf__reset_title">Reset</string>
     <string name="conf__reset_summary">Use Default Settings to Replace the contents in shared directory</string>
     <string name="settings__keyboard_preferences_title">Preferences</string>
@@ -69,7 +81,8 @@
     <string name="keyboard__long_click_delete_candidate_title">Long click to delete candidate</string>
     <string name="keyboard__show_switches_title">Show switches in candidate bar</string>
     <string name="keyboard__show_key_popup_title">Popup on key press</string>
-    <string name="keyboard__show_window_title">Show floating window when composing</string>
+    <string name="keyboard__show_window_title">Floating pinyin bar</string>
+    <string name="keyboard__show_window_summary">Show composing pinyin above the keyboard</string>
     <string name="keyboard__inline_preedit_title">Composing text in editor</string>
     <string-array name="keyboard__inline_entries">
         <item>Preview</item>
@@ -183,7 +196,8 @@
     <string name="keyboard__key_swipe_time_hi_title">Determine the time interval for consecutive keystrokes</string>
     <string name="keyboard__hook_fast_input">Time interval as fast input </string>
     <string name="keyboard__hook_fast_input_summary">Merge multiple key inputs into one, thereby reducing the time for candidates, but the interactive feedback will become worse (It will be comming soon)</string>
-    <string name="keyboard__swipe_enabled">Allow swipe gestures to trigger keys</string>
+    <string name="keyboard__swipe_enabled">Key swipe gestures</string>
+    <string name="keyboard__swipe_enabled_summary">Swipe keys to input extra symbols</string>
     <string name="keyboard__key_swipe_velocity">The speed of triggering the button swipe gesture (the distance/velocity is sufficient)</string>
     <string name="keyboard__key_swipe_velocity_hi">The velocity of the swipe gesture on consecutive keystrokes</string>
     <string name="about__buildinfo">Build info</string>

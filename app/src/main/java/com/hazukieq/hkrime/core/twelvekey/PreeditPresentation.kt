@@ -46,13 +46,13 @@ object PreeditPresentation {
         cached?.takeIf { it.key == key }?.let { return it.text }
         val frame = current.frame?.takeIf { it.matches(input, raw) }
         val text = if (current.phonetics.isEmpty()) {
-            TwelveKeyPreedit.rewrite(raw, frame?.text ?: engineText, frame?.comment ?: engineComment)
+            TwelveKeyPreedit.rewrite(raw, frame?.text ?: engineText, frame?.comment ?: engineComment, rawInput = input)
                 ?: raw.replace("\u2038", "")
         } else {
             val pending = PhoneticSelection.pending(input, current.phonetics)
             val tailReading = TwelveKeyPreedit.parseComment(frame?.comment ?: engineComment.orEmpty())
                 ?.drop(current.phonetics.size)?.joinToString(" ")
-            val tail = if (pending.isEmpty()) "" else TwelveKeyPreedit.rewrite(pending, null, tailReading) ?: pending
+            val tail = if (pending.isEmpty()) "" else TwelveKeyPreedit.rewrite(pending, null, tailReading, rawInput = pending) ?: pending
             (current.phonetics.map { it.reading } + listOf(tail).filter { it.isNotEmpty() }).joinToString("'")
         }
         val rendered = (current.selected + text).takeIf { it.isNotEmpty() }

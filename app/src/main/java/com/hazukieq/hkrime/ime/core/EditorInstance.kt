@@ -42,7 +42,6 @@ class EditorInstance(private val ims: InputMethodService) {
         if (!textInputManager.commitEditorText(text.toString(),
                 com.hazukieq.hkrime.core.twelvekey.CompositionSession.EditorIdentity(editorInfo, ic)) { ic.commitText(text, 1) }) return false
         lastCommittedText = text
-        runCatching { com.hazukieq.hkrime.core.twelvekey.SegmentMemory.bump(text) }
         runCatching { ic.clearMetaKeyStates(KeyEvent.getModifierMetaStateMask()) }
         return true
     }

@@ -1,7 +1,6 @@
 package com.hazukieq.hkrime.core
 
 import android.content.Context
-import com.hazukieq.hkrime.core.twelvekey.PhraseMemory
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeyTuning
 import timber.log.Timber
 import java.util.HashMap
@@ -40,14 +39,6 @@ object TwelveKeyPreedit {
      * 由 [finishWordIndex] 併入 [initialPatternIndex]。上限只按 CJK 3~6 字，避免 17 萬條全量。
      */
     private val multiInitialWords = HashMap<String, LinkedHashMap<String, LinkedHashSet<String>>>()
-
-    // 學習詞讀音索引來自 PhraseMemory，與候選條共享文字和讀音，不讀 userdb 快照。
-
-    private var learnedIndexVersion = -1
-    private var learnedAssoc: Map<String, Map<String, List<String>>> = emptyMap()
-    private var learnedInitial: Map<String, List<Pair<String, List<String>>>> = emptyMap()
-    private var learnedHybrid: Map<String, List<Pair<String, List<String>>>> = emptyMap()
-    private var learnedWords: Set<String> = emptySet()
 
     /**
      * 整串碼前綴索引收錄自帶完整讀音的詞條，用於多音節詞行輕量查詢。
@@ -435,54 +426,8 @@ object TwelveKeyPreedit {
         return sb.toString()
     }
 
-    /** PhraseMemory 變化時重建「學習詞 → 讀音」索引（面板與候選條同源）。 */
-    private fun ensureLearnedIndex() {
-        val version = PhraseMemory.version
-        if (version == learnedIndexVersion) return
-        val assoc = HashMap<String, LinkedHashMap<String, LinkedHashSet<String>>>()
-        val initial = HashMap<String, LinkedHashMap<String, LinkedHashSet<String>>>()
-        val hybrid = HashMap<String, LinkedHashMap<String, LinkedHashSet<String>>>()
-        val words = HashSet<String>()
-        PhraseMemory.allEntries().forEach { entry ->
-            val text = entry.text
-            if (text.isEmpty()) return@forEach
-            val tokens = entry.readings.split(' ', '\u3000').filter { it.isNotEmpty() }
-            if (tokens.size < 2) return@forEach
-            if (syllableSet.isNotEmpty() && tokens.any { it !in syllableSet }) return@forEach
-            val reading = tokens.joinToString(" ")
-            words.add(text)
-            if (tokens.size == 2) {
-                assoc.getOrPut(tokens[0]) { LinkedHashMap() }
-                    .getOrPut(tokens[1]) { LinkedHashSet() }
-                    .add(text)
-            }
-            val initials = tokens.joinToString("|") { initialUnit(it) }
-            initial.getOrPut(initials) { LinkedHashMap() }
-                .getOrPut(reading) { LinkedHashSet() }
-                .add(text)
-            val prefix = tokens.dropLast(1).joinToString("|") { initialUnit(it) }
-            hybrid.getOrPut(prefix + "|" + tokens.last()) { LinkedHashMap() }
-                .getOrPut(reading) { LinkedHashSet() }
-                .add(text)
-        }
-        learnedAssoc = assoc.mapValues { (_, rows) -> rows.mapValues { (_, ws) -> ws.toList() } }
-        fun freeze(src: HashMap<String, LinkedHashMap<String, LinkedHashSet<String>>>) =
-            src.mapValues { (_, rows) ->
-                rows.entries.sortedBy { it.key }.map { it.key to it.value.toList() }
-            }
-        learnedInitial = freeze(initial)
-        learnedHybrid = freeze(hybrid)
-        learnedWords = words
-        learnedIndexVersion = version
-    }
-
-    /**
-     * 學習詞在面板選行階段優先，最終顯示仍按讀音排序。
-     */
-    internal fun isLearnedWord(word: String): Boolean {
-        ensureLearnedIndex()
-        return word in learnedWords
-    }
+    /** 學習記憶已收歸 librime 原生 userdb，App 側不再維護獨立學習詞索引。 */
+    internal fun isLearnedWord(@Suppress("UNUSED_PARAMETER") word: String): Boolean = false
 
     /** 診斷：整串碼表裡到底有沒有某個詞（真機排查「面板查不到」用；數量小，開銷可忽略）。 */
     fun debugWordCodeEntries(probeWord: String = "Linux"): String {
@@ -502,11 +447,6 @@ object TwelveKeyPreedit {
     internal fun clearWordDataForTest() {
         assocWords.clear()
         multiInitialWords.clear()
-        learnedIndexVersion = -1
-        learnedAssoc = emptyMap()
-        learnedInitial = emptyMap()
-        learnedHybrid = emptyMap()
-        learnedWords = emptySet()
         wordCodeEntries.clear()
         wordCodeIndex = emptyList()
         assocByFirst = emptyMap()
@@ -880,22 +820,9 @@ object TwelveKeyPreedit {
 
     /** 按模式查詞表（純簡拼走 [initialPatternIndex]，混合走 [hybridPatternIndex]）。 */
     internal fun wordsByPattern(pattern: InitialPattern): List<Pair<String, List<String>>> {
-        ensureLearnedIndex()
         val key = pattern.initials.joinToString("|")
-        val base = if (pattern.isHybrid) hybridPatternIndex[pattern.key] ?: emptyList()
+        return if (pattern.isHybrid) hybridPatternIndex[pattern.key] ?: emptyList()
         else initialPatternIndex[key] ?: emptyList()
-        val learned = if (pattern.isHybrid) learnedHybrid[pattern.key] ?: emptyList()
-        else learnedInitial[key] ?: emptyList()
-        if (learned.isEmpty()) return base
-        // 學過的詞與資產詞表按讀音合併（同讀音取並集；行內順序沿用資產詞表在前）。
-        val merged = LinkedHashMap<String, LinkedHashSet<String>>()
-        base.forEach { (reading, words) ->
-            merged.getOrPut(reading) { LinkedHashSet() }.addAll(words)
-        }
-        learned.forEach { (reading, words) ->
-            merged.getOrPut(reading) { LinkedHashSet() }.addAll(words)
-        }
-        return merged.entries.sortedBy { it.key }.map { it.key to it.value.toList() }
     }
 
     /**
@@ -972,19 +899,8 @@ object TwelveKeyPreedit {
      *
      * 返回的是**已按熱度降序**的詞列表；沒有聯想詞回空 map。
      */
-    internal fun assocSecondMap(first: String): Map<String, List<String>> {
-        ensureLearnedIndex()
-        val base = assocByFirst[first]
-        val learned = learnedAssoc[first]
-        if (learned == null || learned.isEmpty()) return base ?: emptyMap()
-        if (base == null) return learned
-        val merged = LinkedHashMap<String, List<String>>(base)
-        learned.forEach { (second, words) ->
-            val had = merged[second]
-            merged[second] = if (had == null) words else had + words
-        }
-        return merged
-    }
+    internal fun assocSecondMap(first: String): Map<String, List<String>> =
+        assocByFirst[first] ?: emptyMap()
 
     /** 詞典行載入後統一收尾：音節次數 → code 表。 */
     internal fun finishLoading(counts: HashMap<String, Int>) {
@@ -1317,12 +1233,9 @@ object TwelveKeyPreedit {
      *
      * @param anchor 剛上屏的前一個字（分詞逐段選字用，可為 null）
      */
-    fun rankChars(chars: List<String>, anchor: Char?): List<String> =
+    fun rankChars(chars: List<String>, @Suppress("UNUSED_PARAMETER") anchor: Char?): List<String> =
         if (chars.size < 2) chars else chars.sortedWith(
-            compareByDescending<String> {
-                com.hazukieq.hkrime.core.twelvekey.SegmentMemory.bigramScore(anchor, it)
-            }.thenByDescending { com.hazukieq.hkrime.core.twelvekey.SegmentMemory.charScore(it) }
-                .thenByDescending { generalScore(it) },
+            compareByDescending { generalScore(it) },
         )
 
     /**
@@ -1353,7 +1266,12 @@ object TwelveKeyPreedit {
         return aligned.joinToString(" ")
     }
 
-    fun rewrite(preedit: String?, hint: String? = null, preferred: String? = null): String? {
+    fun rewrite(
+        preedit: String?,
+        hint: String? = null,
+        preferred: String? = null,
+        rawInput: String? = null,
+    ): String? {
         if (preedit.isNullOrEmpty() || table.isEmpty()) return null
         // `‸`(U+2038) 是 librime 的光標標記，不屬於前綴也不屬於碼段，先整串剝掉再切。
         val clean = preedit.replace(CARET_MARK, "")
@@ -1363,26 +1281,150 @@ object TwelveKeyPreedit {
         if (split == clean.length) return null          // 尾端沒有碼段：已選完
         val prefix = clean.substring(0, split)
         val codes = clean.substring(split)
-        // 去掉 librime 的分段分隔符（`5i34i wa4`、`5i34i'w`）：那些不是用戶按下的鍵。
+        // 去掉 librime 的分段分隔符（`5i34i wa4`），但記錄用戶顯式按下的分詞鍵 `'` 位置。
         val cleanCodes = codes.replace(CODE_SEPARATORS, "")
+        val quotePositions = collectQuotePositions(rawInput, codes, cleanCodes.length)
         val engine = parseComment(preferred)
         if (engine != null) {
-            val coverage = resolveCovered(cleanCodes, engine)
+            val coverage = resolveCoveredWithOffsets(cleanCodes, engine)
             if (coverage != null) {
+                val out = StringBuilder()
+                for (i in coverage.second.indices) {
+                    val (endPos, seg) = coverage.second[i]
+                    if (i > 0) {
+                        val prevEnd = coverage.second[i - 1].first
+                        out.append(if (prevEnd in quotePositions) '\'' else ' ')
+                    }
+                    out.append(seg)
+                    if (i == coverage.second.lastIndex && endPos < cleanCodes.length) {
+                        out.append(if (endPos in quotePositions) '\'' else ' ')
+                    }
+                }
                 val tail = cleanCodes.substring(coverage.first)
-                return prefix + (coverage.second + listOfNotNull(tail.takeIf { it.isNotEmpty() })).joinToString(" ")
+                if (tail.isNotEmpty()) {
+                    out.append(formatTailWithQuotes(tail, coverage.first, quotePositions))
+                } else if (cleanCodes.length in quotePositions) {
+                    out.append('\'')
+                }
+                return prefix + out.toString()
             }
-            return prefix + cleanCodes
+            return prefix + formatTailWithQuotes(cleanCodes, 0, quotePositions)
+        }
+        if (quotePositions.isNotEmpty()) {
+            return prefix + decodeSegmentsWithQuotes(cleanCodes, quotePositions, hint)
         }
         return decodeWithPartialTail(codes, hint)?.split(' ')?.joinToString(" ") {
             if (it.isNotEmpty() && it.all { ch -> ch in CODE_LETTERS }) codeLetters(it) else it
         }?.let { prefix + it }
     }
 
+    /**
+     * 收集用戶顯式按下的分詞鍵 `'` 在 [cleanLen] 碼串中的偏移位置（含末尾 `'`，偏移 = cleanLen）。
+     * 優先從 librime 原始輸入 [rawInput] 讀取（因為 librime 的 preedit 常把 `'` 替換成空格），
+     * 缺失時回退讀取 [codes] 本身。
+     */
+    private fun collectQuotePositions(rawInput: String?, codes: String, cleanLen: Int): Set<Int> {
+        val source = if (!rawInput.isNullOrEmpty() && rawInput.indexOf('\'') >= 0) rawInput else codes
+        if (source.indexOf('\'') < 0) return emptySet()
+        // 若 rawInput 比當前剩餘碼長（前面已選中若干字），只看尾端對齊 cleanLen 的區間。
+        val totalNonSep = source.count { it != '\'' && !it.isWhitespace() }
+        val skip = (totalNonSep - cleanLen).coerceAtLeast(0)
+        val positions = HashSet<Int>()
+        var seen = 0
+        for (ch in source) {
+            when {
+                ch == '\'' -> if (seen >= skip) positions.add(seen - skip)
+                ch.isWhitespace() -> Unit
+                else -> seen++
+            }
+        }
+        return positions
+    }
+
+    private fun formatTailWithQuotes(tail: String, baseOffset: Int, quotePositions: Set<Int>): String {
+        if (quotePositions.isEmpty()) return tail
+        val out = StringBuilder(tail.length + quotePositions.size)
+        for (i in tail.indices) {
+            if (i > 0 && (baseOffset + i) in quotePositions) out.append('\'')
+            out.append(tail[i])
+        }
+        if ((baseOffset + tail.length) in quotePositions) out.append('\'')
+        return out.toString()
+    }
+
+    private fun decodeSegmentsWithQuotes(
+        cleanCodes: String,
+        quotePositions: Set<Int>,
+        hint: String?,
+    ): String {
+        val cuts = quotePositions.filter { it in 1 until cleanCodes.length }.sorted()
+        val parts = ArrayList<String>()
+        var start = 0
+        for (cut in cuts) {
+            parts.add(cleanCodes.substring(start, cut))
+            start = cut
+        }
+        if (start < cleanCodes.length) parts.add(cleanCodes.substring(start))
+        val decoded = parts.joinToString("'") { part ->
+            decodeWithPartialTail(part, if (parts.size == 1) hint else null)
+                ?.split(' ')
+                ?.joinToString(" ") {
+                    if (it.isNotEmpty() && it.all { ch -> ch in CODE_LETTERS }) codeLetters(it) else it
+                }
+                ?: codeLetters(part)
+        }
+        return if (cleanCodes.length in quotePositions) "$decoded'" else decoded
+    }
+
+    /**
+     * 非 12 鍵方案（如 26 鍵）：把 librime preedit 中被 `speller/delimiter: " '"` 轉成空格的
+     * 用戶分詞鍵 `'` 還原回 `'`。未按分詞鍵的自動分隔空格保持不變。
+     */
+    @JvmStatic
+    fun restoreDelimiters(preedit: String?, rawInput: String?): String? {
+        if (preedit.isNullOrEmpty() || rawInput.isNullOrEmpty() || rawInput.indexOf('\'') < 0) {
+            return preedit
+        }
+        val clean = preedit.replace(CARET_MARK, "")
+        var split = clean.length
+        while (split > 0 && clean[split - 1].code < 128) split--
+        val prefix = clean.substring(0, split)
+        val tail = clean.substring(split)
+        val nonSepLen = tail.count { it != '\'' && !it.isWhitespace() }
+        val quotePositions = collectQuotePositions(rawInput, tail, nonSepLen)
+        if (quotePositions.isEmpty()) return preedit
+
+        val out = StringBuilder(tail.length + 2)
+        var nonSepIdx = 0
+        var i = 0
+        while (i < tail.length) {
+            val ch = tail[i]
+            if (ch == '\'' || ch.isWhitespace()) {
+                out.append(if (nonSepIdx in quotePositions) '\'' else ch)
+                i++
+                while (i < tail.length && tail[i].isWhitespace()) i++
+            } else {
+                out.append(ch)
+                nonSepIdx++
+                i++
+            }
+        }
+        if (nonSepLen in quotePositions && (out.isEmpty() || out.last() != '\'')) {
+            out.append('\'')
+        }
+        return prefix + out.toString()
+    }
+
     /** 對齊已輸入碼位；簡拼和半截拼音只展示已匹配部分，未輸入的音節不補全。 */
-    private fun resolveCovered(codes: String, engine: List<String>?): Pair<Int, List<String>>? {
+    private fun resolveCovered(codes: String, engine: List<String>?): Pair<Int, List<String>>? =
+        resolveCoveredWithOffsets(codes, engine)?.let { it.first to it.second.map { p -> p.second } }
+
+    private fun resolveCoveredWithOffsets(
+        codes: String,
+        engine: List<String>?,
+    ): Pair<Int, List<Pair<Int, String>>>? {
         if (engine.isNullOrEmpty() || codes.isEmpty()) return null
-        data class Match(val end: Int, val shown: List<String>, val complete: Int)
+        data class Match(val end: Int, val shown: List<Pair<Int, String>>, val complete: Int)
         val memo = HashMap<Pair<Int, Int>, Match>()
         fun align(index: Int, pos: Int): Match {
             if (index >= engine.size || pos >= codes.length) return Match(pos, emptyList(), 0)
@@ -1392,8 +1434,9 @@ object TwelveKeyPreedit {
                 val letters = Regex("^(ng|th|nz)|.").findAll(syllable).map { it.value }.toList()
                 var best = Match(pos, emptyList(), 0)
                 fun consider(length: Int, text: String, complete: Boolean) {
-                    val next = align(index + 1, pos + length)
-                    val result = Match(next.end, listOf(text) + next.shown, next.complete + if (complete) 1 else 0)
+                    val endPos = pos + length
+                    val next = align(index + 1, endPos)
+                    val result = Match(next.end, listOf(endPos to text) + next.shown, next.complete + if (complete) 1 else 0)
                     if (compareValuesBy(result, best, { it.end }, { it.shown.size }, { it.complete }) > 0) best = result
                 }
                 if (letters.size == full.length) {

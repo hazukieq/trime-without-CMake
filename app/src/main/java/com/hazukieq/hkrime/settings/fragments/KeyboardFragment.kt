@@ -45,21 +45,15 @@ class KeyboardFragment :
         val prefs = AppPrefs.defaultInstance()
         prefs.sync()
         when (key) {
-            AppPrefs.Keyboard.CANDIDATE_ALGORITHM_ENABLED -> {
-                trime?.textInputManager?.onCandidateAlgorithmChanged()
-            }
-            "keyboard__key_long_press_timeout",
-            "keyboard__key_repeat_interval" -> {
+            "keyboard__key_long_press_timeout" -> {
                 trime?.resetKeyboard()
             }
             "keyboard__show_window" -> {
-                // 懸浮編碼窗（PopupWindow）需要「顯示在其他應用上方」權限；
-                // 只有用戶主動開啟該功能時才引導授權，不在首次啟動時強索。
                 val enabled = AppPrefs.defaultInstance().keyboard.popupWindowEnabled
                 if (enabled) askOverlayPermissionIfNeeded()
                 trime?.resetCandidate()
             }
-            "keyboard__inline_preedit", "keyboard__soft_cursor" -> {
+            "keyboard__inline_preedit" -> {
                 trime?.loadConfig()
             }
         }

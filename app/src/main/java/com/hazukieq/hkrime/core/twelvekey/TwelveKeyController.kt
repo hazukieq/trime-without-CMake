@@ -34,8 +34,30 @@ class TwelveKeyController(
         set(value) {
             if (field == value) return
             field = value.toList()
-            invalidateForEngine()
+            // constraint (`|h=...`) 已在緩存鍵中，不遞增 engineVersion，退格撤銷可直接命中 LRU 緩存。
+            generation++
+            refreshJob?.cancel()
         }
+
+    /** 待在後台 ENGINE_LOCK 內重放的 (remaining, phonetics)，避免在 UI 主線程同步執行 Rime.onText()。 */
+    @Volatile private var pendingRestore: Pair<String, List<PhoneticSelection>>? = null
+
+    fun scheduleRestore(code: String, confirmed: List<PhoneticSelection>) {
+        phonetics = confirmed
+        pendingRestore = code to confirmed.toList()
+    }
+
+    /** 必須在 ENGINE_LOCK 內調用；在按鍵或後台枚舉前把待重放的碼串與約束落到引擎。 */
+    fun flushPendingRestoreLocked() {
+        val pending = pendingRestore ?: return
+        pendingRestore = null
+        val (code, confirmed) = pending
+        val constraint = PhoneticSelection.constraint(confirmed)
+        Rime.setProperty(InitialDisambiguation.PROPERTY, constraint)
+        Rime.clearComposition()
+        if (code.isNotEmpty()) Rime.onText(code)
+        Rime.getContexts()
+    }
 
     /**
      * 「按段選字」剛上屏的前一個字：分詞輸入時，下一段候選條要按與它的關聯度排序
@@ -68,6 +90,7 @@ class TwelveKeyController(
      * 選字、提交或重新初始化後增加引擎版本，使快照緩存失效。
      */
     fun invalidateForEngine() {
+        pendingRestore = null
         engineVersion++
         generation++
         refreshJob?.cancel()
@@ -86,6 +109,29 @@ class TwelveKeyController(
         synchronized(snapshots) { block(snapshots[key]) }
     private fun cachePut(key: String, value: TwelveKeySnapshot) {
         synchronized(snapshots) { snapshots[key] = value }
+    }
+
+    private fun fastCacheKey(
+        remaining: String,
+        full: Boolean,
+        constraint: String,
+        rankingEnabled: Boolean,
+    ): String =
+        "f|$remaining|${if (full) "full" else "bar"}" +
+            (if (segmentAnchor == null) "" else "|a" + segmentAnchor!!.code) +
+            (if (segmentMode) "|seg" else "") +
+            "|r${if (rankingEnabled) "1" else "0"}|h$constraint|o$optionsVersion|e$engineVersion|a${TwelveKeyPreedit.assocGeneration}"
+
+    /** UI 線程同步查 LRU 緩存（不碰引擎、不持 ENGINE_LOCK），命中時左列點選/退格 <0.1ms 落地。 */
+    fun lookupCached(
+        remaining: String,
+        confirmed: List<PhoneticSelection>,
+        full: Boolean,
+    ): TwelveKeySnapshot? {
+        if (remaining.isEmpty()) return null
+        val constraint = PhoneticSelection.constraint(confirmed)
+        val key = fastCacheKey(remaining, full, constraint, appRankingEnabled)
+        return cacheLookup(key) { it }
     }
 
     private var generation = 0
@@ -108,6 +154,7 @@ class TwelveKeyController(
             val result = run {
                 synchronized(ENGINE_LOCK) {
                     runCatching {
+                        flushPendingRestoreLocked()
                         val confirmed = phonetics
                         // 已確認段（含簡拼首段）是引擎過濾與「保留簡拼分支」的唯一依據。
                         val constraint = PhoneticSelection.constraint(confirmed)
@@ -126,11 +173,17 @@ class TwelveKeyController(
                                 rankingEnabled,
                             ) + "|h" + constraint + "|o" + optionsVersion + "|e" + engineVersion +
                                 "|a" + TwelveKeyPreedit.assocGeneration
-                            val cached = cacheLookup(key) { it }
+                            val fKey = fastCacheKey(local.remaining, full, constraint, rankingEnabled)
+                            val cached = cacheLookup(key) { it } ?: cacheLookup(fKey) { it }
                             val t0 = System.nanoTime()
+                            val limit = when {
+                                !full -> BAR_CANDIDATES
+                                confirmed.isNotEmpty() -> TwelveKeyTuning.CONFIRM_RECOMMEND_LIMIT
+                                else -> TwelveKeySnapshotBuilder.MAX_CANDIDATES
+                            }
                             val built = cached ?: TwelveKeySnapshotBuilder.build(
                                 local,
-                                if (full) TwelveKeySnapshotBuilder.MAX_CANDIDATES else BAR_CANDIDATES,
+                                limit,
                                 segmentAnchor = segmentAnchor,
                                 segmented = segmentMode,
                                 wantGroups = full,
@@ -147,7 +200,10 @@ class TwelveKeyController(
                             )
                             // 只缓存「真的有候選」的快照：兜底/空快照一旦進緩存，
                             // 同一輸入之後永遠命中它（見 invalidateForEngine 註釋）。
-                            if (cached == null && built.hasCandidates) cachePut(key, built)
+                            if (cached == null && built.hasCandidates) {
+                                cachePut(key, built)
+                                cachePut(fKey, built)
+                            }
                             Triple(local, built, true)
                         }
                     }.getOrNull()

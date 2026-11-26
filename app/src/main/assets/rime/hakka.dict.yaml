@@ -37,8855 +37,8855 @@ import_tables:   #导入拓展词典
 
 ...
 
-一	jit
-乙	jet
-二	nzi
-十	sip
-丁	den
-厂	cong
-七	cit
-卜	puk
-卜	pok
-八	bat
-人	nzin
-入	nzip
-儿	nzi
-儿	nzi
-儿	r
-儿	ji
-匕	bi
-几	gi
-九	giu
-了	liau
-了	liau
-乃	nai
-乃	nai
-刀	dau
-力	lit
-又	jiu
-三	tham
-干	gon
-干	gan
-干	gan
-于	ji
-於	ji
-於	jo
-於	qu
-于	qu
-于	jo
-亏	kui
-士	thu
-土	tu
-工	gung
-才	coi
-才	cai
-下	ha
-下	ha
-下	ha
-寸	cun
-丈	zong
-丈	cong
-大	tai
-与	ji
-与	jo
-万	van
-万	man
-上	song
-上	song
-小	thiau
-口	keu
-口	heu
-山	than
-巾	gin
-巾	gun
-千	cen
-乞	hat
-乞	ket
-川	con
-亿	jit
-介	gai
-个	ge
-个	go
-夕	cit
-么	mo
-么	mo
-久	giu
-勺	sok
-丸	jen
-丸	van
-元	nzien
-元	jen
-凡	fan
-及	kip
-及	kip
-及	gip
-广	gong
-亡	mong
-亡	vong
-门	mun
-丫	qa
-丫	ja
-义	ji
-义	nzi
-之	zi
-之	di
-尸	si
-己	gi
-已	ji
-巳	si
-巳	thu
-弓	giung
-弓	gung
-子	zw
-卫	vui
-也	ja
-女	ngh
-女	nzio
-女	nio
-刃	nziun
-飞	fui
-飞	bui
-习	thip
-叉	ca
-马	ma
-马	ma
-乡	song
-乡	hiong
-丰	fung
-王	vong
-王	qong
-开	koi
-开	hoi
-开	kai
-井	ziang
-天	ten
-夫	fu
-夫	pu
-无	vu
-无	mo
-无	mu
-云	jun
-云	hun
-专	zon
-丐	koi
-丐	kai
-丐	gai
-扎	zap
-艺	nzi
-艺	nge
-木	muk
-五	ngh
-五	ngu
-五	ngo
-支	gi
-支	zi
-厅	tang
-不	but
-不	bioi
-不	bu
-太	tai
-犬	ken
-区	ki
-区	ku
-历	lit
-历	lak
-歹	dai
-友	jiu
-友	jiu
-尤	jiu
-尤	jiu
-匹	pit
-车	ca
-车	gi
-巨	ki
-巨	gi
-巨	gio
-牙	nga
-屯	tun
-戈	go
-比	bi
-互	fu
-切	cet
-瓦	nga
-止	zi
-少	sau
-少	sau
-曰	jok
-曰	jat
-曰	jet
-日	nzit
-中	zung
-中	zung
-中	diung
-贝	bui
-贝	bi
-冈	gong
-内	nui
-水	sui
-见	gen
-午	ngu
-午	ngh
-牛	nziu
-手	siu
-气	ki
-气	si
-毛	mau
-壬	nzim
-升	sin
-夭	jau
-长	cong
-长	zong
-长	dang
-仁	nzin
-仁	jin
-什	sip
-片	pen
-仆	pok
-仆	bok
-仆	puk
-化	fa	
-仇	siu
-仇	ciu
-币	bi
-仍	nzin
-仍	jin
-仅	kiun
-斤	gin
-爪	nziau
-爪	zau
-反	fan
-介	gai
-父	pu
-父	fu
-从	cung
-仑	lun
-仑	lin
-今	gim
-今	gin
-凶	sung
-分	fun
-分	bun
-乏	fat
-公	gung
-仓	cong
-月	nziet
-氏	si
-勿	vut
-勿	mut
-欠	kiam
-风	fung
-风	biung
-丹	dan
-匀	jun
-乌	vu
-乌	qu
-乌	qo
-勾	geu
-勾	ngeu
-凤	fung
-凤	biung
-六	luk
-文	vun
-文	mun
-亢	kong
-亢	kang
-亢	hong
-方	fong
-方	piong
-方	pang
-火	fo
-为	vui
-为	vui
-斗	deu
-忆	jit
-忆	jet
-计	ge
-订	dang
-订	deng
-户	fu
-户	hu
-认	nzin
-冗	nziung
-冗	nziung
-冗	nziong
-冗	jung
-讥	gi
-心	thim
-尺	cak
-引	jin
-丑	ciu
-巴	ba
-扈	fu
-孔	kung
-队	dui
-办	pan
-以	ji
-刃	nziun
-炽	ci
-允	jun
-予	ji
-邓	ten
-邓	teng
-劝	ken
-双	thung
-双	thong
-书	su
-幻	von
-幻	van
-玉	nziuk
-刊	kan
-末	mat
-未	mi
-未	mui
-未	vui
-示	si
-击	git
-打	da
-巧	kiau
-正	zin
-正	zang
-正	zang
-扑	puk
-扑	pok
-卉	fui
-扒	bat
-功	gung
-扔	nzin
-扔	jin
-去	si
-去	ki
-去	ku
-甘	gam
-世	si
-世	se
-艾	nzioi
-艾	ngoi
-古	gu
-节	zet
-本	bun
-术	sut
-可	ko
-可	ka
-丙	biang
-左	zo
-厉	li
-石	sak
-右	jiu
-布	bu
-夯	hang
-戊	vu
-龙	lung
-平	pin
-平	piang
-灭	met
-轧	zap
-东	dung
-卡	ka
-北	bet
-占	zam
-凸	tu
-凸	tut
-卢	lu
-业	nziap
-旧	kiu
-帅	thai
-归	gui
-目	muk
-旦	dan
-且	cia
-叮	dang
-叶	jap
-甲	gak
-甲	gap
-佮	gap
-申	sin
-号	hau
-电	ten
-田	ten
-由	jiu
-只	zak
-只	zi
-只	zit
-叭	ba
-央	jong
-央	qiong
-史	thu
-兄	sung
-兄	hiung
-叽	gi
-叼	diau
-叫	giau
-叩	keu
-叨	dau
-另	lang
-另	lin
-叹	tan
-冉	nziam
-皿	min
-凹	nziap
-凹	qau
-囚	siu
-四	thi
-生	thang
-生	then
-生	sang
-矢	ci
-失	sit
-乍	zok
-乍	zak
-禾	vo
-丘	ciu
-丘	kiu
-付	fu
-仗	zong
-仗	diong
-代	toi
-代	dai
-仙	then
-们	mun
-仪	nzi
-白	pak
-仔	ze
-仔	zai
-他	ta
-斥	cak
-瓜	ga
-乎	fu
-丛	cung
-令	lin
-令	lang
-用	jung
-甩	fit
-印	jin
-印	jang
-尔	nzi
-尔	ni
-乐	lok
-乐	ngok
-句	gi
-句	gu
-匆	cung
-册	cak
-卯	mau
-犯	fan
-外	ngoi
-处	cu
-冬	dong
-冬	dung
-鸟	diau
-鸟	nziau
-务	mu
-包	bau
-饥	gi
-主	zu
-市	si
-立	lip
-冯	pang
-冯	pang
-立	lap
-玄	hen
-玄	sen
-闪	sam
-兰	lan
-半	ban
-汁	zip
-汇	fui
-头	teu
-汉	han
-汉	hon
-宁	neng
-宁	nen
-宁	nin
-宁	len
-穴	set
-它	ta
-讨	tau
-写	thia
-让	nziong
-礼	li
-礼	le
-训	sun
-必	bit
-议	nzi
-议	ji
-讯	thin
-讯	sun
-记	gi
-永	qiung
-永	jung
-永	jun
-司	thu
-尼	ni
-尼	nai
-民	min
-弗	fut
-弗	but
-弘	hung
-弘	fung
-弘	sung
-出	cut
-唾	tui
-唾	to
-辽	liau
-奶	na
-奶	nai
-奴	no
-奴	nu
-召	diau
-召	cau
-加	ga
-皮	pi
-边	ben
-孕	jun
-发	fat
-圣	sin
-对	dui
-对	doi
-台	toi
-矛	mau
-纠	giu
-纠	gau
-母	mu
-幼	jiu
-丝	thi
-邦	bong
-式	sit
-迂	ji
-刑	sin
-戎	jung
-动	dung
-动	tung
-扛	gong
-寺	thu
-吉	git
-吉	get
-扣	kau
-扣	keu
-考	kau
-托	tok
-老	lau
-巩	kung
-圾	kip
-圾	thap
-执	zip
-扩	kong
-扩	kok
-扫	thau
-扫	thau
-地	ti
-扬	jong
-场	cong
-场	tang
-耳	nzi
-芋	vu
-共	kiung
-共	gung
-芒	mong
-亚	qa
-亚	ja
-芝	zi
-朽	jiu
-朽	thiu
-朴	piau
-朴	puk
-朴	pok
-机	gi
-权	ken
-过	go
-臣	sin
-吏	li
-再	zai
-协	sap
-西	the
-西	thi
-压	qat
-厌	jan
-戌	sut
-戌	thut
-在	zai
-在	coi
-百	bak
-有	jiu
-有	qiu
-存	cun
-而	nzi
-而	ji
-页	jap
-匠	thiong
-夸	ka
-夺	tot
-灰	foi
-达	tat
-列	let
-死	thi
-成	sin
-成	sang
-夹	gap
-夹	giap
-夹	kiap
-夷	ji
-轨	gui
-邪	thia
-邪	jai
-尧	nziau
-尧	ngau
-划	vak
-掝(vak,分拨开)	vak
-㩇(vak,挥动)	vak
-划	fa
-迈	mai
-毕	bit
-至	zi
-此	cw
-此	ci
-此	ce
-贞	zin
-师	thu
-尘	cin
-尖	ziam
-劣	lot
-光	gong
-当	dong
-早	zau
-吁	qu
-吁	ji
-吐	tu
-吓	hak
-虫	cung
-曲	kiuk
-团	ton
-吕	lu
-吕	li
-同	tung
-吊	diau
-吃	hat
-因	jin
-吸	kip
-吗	ma
-吆	jau
-屿	ji
-屹	jit
-岁	thoi
-帆	fan
-回	fui
-岂	ki
-则	zet
-刚	gong
-网	mong
-肉	nziuk
-年	nzien
-朱	zu
-先	then
-丢	diu
-廷	tin
-舌	set
-竹	zuk
-迁	cen
-迁	ciam
-乔	kiau
-迄	hit
-迄	qet
-伟	vui
-传	con
-传	zon
-乒	bin
-乒	pin
-乓	bong
-乓	pong
-休	jau
-休	thiu
-伍	ngh
-伏	puk
-优	jiu
-臼	kiu
-伐	fat
-延	jen
-仲	zung
-仲	diung
-件	ken
-任	nzim
-伤	song
-价	ga
-伦	lun
-伦	lin
-份	fun
-华	fa
-仰	ngong
-仿	fong
-伙	fo
-伪	vui
-自	cw
-伊	ji
-血	set
-向	song
-似	thu
-似	si
-后	heu
-行	hang
-行	hong
-舟	ziu
-全	con
-全	cen
-会	fui
-会	voi
-杀	that
-合	hap
-兆	zau
-兆	sau
-企	ki
-众	zung
-爷	ja
-伞	than
-创	cong
-肌	gi
-肋	lak
-朵	do
-杂	cap
-危	ngui
-危	mui
-危	vui
-旬	thun
-旬	sun
-旬	cun
-旨	zi
-旭	siuk
-旭	suk
-旭	hiok
-负	fu
-各	gok
-匈	sung
-匈	hiung
-名	miang
-多	do
-争	zang
-色	thet
-壮	zong
-冲	cung	
-妆	zong
-冰	ben
-冰	bin
-庄	zong
-庆	kin
-亦	jit
-刘	liu
-齐	ce
-交	gau
-次	cw
-衣	ji
-产	than
-决	ket
-亥	hoi
-亥	hai
-充	cung
-妄	mong
-妄	vong
-闭	bi
-问	mun
-闯	cong
-羊	jong
-並	bin
-并	bin
-并	pin
-关	gon	
-米	mi
-灯	den
-州	ziu
-汗	hon
-污	vu
-污	mu
-江	gong
-汛	thin
-汛	sun
-池	ci
-池	di
-汝	nzia
-汤	tong
-忙	mong
-兴	sin
-兴	sin	
-宇	ji
-宇	qu
-守	siu
-宅	cak
-字	thu
-安	qon
-讲	gong
-军	giun
-讳	fui
-讳	vui
-讶	nga
-许	si
-许	hi
-讹	ngo
-讼	thung
-论	lun
-论	nun
-农	nung
-讽	fung
-设	set
-访	bong
-访	fong
-诀	ket
-寻	cim
-那	na
-迅	thin
-迅	sun
-尽	cin	
-尽	zin
-导	tau
-导	dau
-异	jit
-孙	thun
-弛	ci
-弛	di
-阵	cin
-阵	zin
-阳	jong
-收	siu
-阶	gai
-阴	jim
-防	bong
-防	fong
-奸	gan
-如	ji
-如	nzio
-妇	fu
-妇	pu
-妇	bu
-妃	fui
-好	hau
-她	ta
-妈	ma
-戏	si
-羽	ji
-观	gon
-欢	fon
-买	mai
-红	fung
-红	qung
-驮	to
-纤	ciam
-驯	sun
-约	jok
-级	kip
-纪	gi
-驰	ci
-纫	nziun
-巡	sun
-寿	siu
-弄	lung
-弄	nung
-麦	mak
-玖	giu
-玛	ma
-形	sin
-进	zin
-戒	gai
-吞	tun
-远	jen
-违	vui
-韧	nziun
-韧	nzin
-运	jun
-扶	pu
-扶	fu
-抚	fu
-抚	pu
-抚	vu
-坛	tan
-技	ki
-技	gi
-坏	fai
-抠	keu
-扰	jiu
-扰	jau
-扼	ngak
-扼	qak
-拒	ki
-拒	kio
-㓟	pai
-睥	pe
-找	zau
-批	pi
-址	ci
-址	zi
-扯	ce
-㨋	ca
-扯	ci
-走	zeu
-抄	cau
-坝	ba
-坝	bi
-贡	gung
-汞	gung
-攻	gung
-赤	cak
-折	zet
-折	zat
-抓	za
-抓	zau
-抓	nziau
-扳	pan
-扳	ban
-抡	lun
-扮	ban
-扮	pan
-抢	ciong
-孝	hau
-坎	kam
-坎	kam
-均	jun
-抑	jit
-抛	pau
-投	teu
-坟	fun
-坟	vun
-坑	hang
-坑	kang
-抗	kong
-坊	fong
-坊	piong
-抖	deu
-护	fu
-护	qu
-壳	hok
-志	zi
-块	kai
-扭	niu
-扭	neu
-扭	nziu
-声	sang	
-把	ba
-报	bau
-拟	ni
-拟	nzi
-却	kiok
-却	kiok
-抒	su
-劫	giap
-芙	fu
-芙	pu
-芜	mu
-芜	vu
-苇	vui
-芽	nga
-花	fa
-芹	kiun
-芥	gai
-芬	fun
-苍	cong
-芳	fong
-芳	pang
-芳	pong
-严	nziam
-芦	lu
-芯	thim
-劳	lau
-克	ket
-芭	ba
-苏	thu
-苏	thi
-杆	gon
-杜	tu
-杠	gong
-材	coi
-村	cun
-杖	zong
-杏	hen
-杉	cam
-杉	tham
-巫	vu
-巫	mu
-极	git
-极	kit
-极	gip
-极	kip
-李	li	
-杨	jong
-求	kiu
-甫	pu
-匣	gap
-匣	hap
-更	gang
-更	gong
-吾	ngo
-吾	ngai
-束	cuk
-吾	ngu
-豆	teu
-两	liong
-酉	jiu
+一	jit	1000
+乙	jet	787
+二	nzi	984
+十	sip	990
+丁	den	884
+厂	cong	939
+七	cit	961
+卜	puk	790
+卜	pok	790
+八	bat	973
+人	nzin	1000
+入	nzip	980
+儿	nzi	986
+儿	nzi	986
+儿	r	986
+儿	ji	986
+匕	bi	685
+几	gi	985
+九	giu	964
+了	liau	999
+了	liau	999
+乃	nai	824
+乃	nai	824
+刀	dau	941
+力	lit	988
+又	jiu	990
+三	tham	996
+干	gon	973
+干	gan	973
+干	gan	973
+于	ji	974
+於	ji	708
+於	jo	708
+於	qu	708
+于	qu	974
+于	jo	974
+亏	kui	806
+士	thu	964
+土	tu	958
+工	gung	994
+才	coi	986
+才	cai	986
+下	ha	997
+下	ha	997
+下	ha	997
+寸	cun	887
+丈	zong	863
+丈	cong	863
+大	tai	999
+与	ji	980
+与	jo	980
+万	van	981
+万	man	981
+上	song	999
+上	song	999
+小	thiau	997
+口	keu	989
+口	heu	989
+山	than	995
+巾	gin	773
+巾	gun	773
+千	cen	983
+乞	hat	722
+乞	ket	722
+川	con	894
+亿	jit	947
+介	gai	872
+个	ge	999
+个	go	999
+夕	cit	823
+么	mo	997
+么	mo	997
+久	giu	920
+勺	sok	636
+丸	jen	788
+丸	van	788
+元	nzien	940
+元	jen	940
+凡	fan	887
+及	kip	978
+及	kip	978
+及	gip	978
+广	gong	956
+亡	mong	890
+亡	vong	890
+门	mun	988
+丫	qa	840
+丫	ja	840
+义	ji	969
+义	nzi	969
+之	zi	999
+之	di	999
+尸	si	861
+己	gi	938
+已	ji	990
+巳	si	501
+巳	thu	501
+弓	giung	803
+弓	gung	803
+子	zw	998
+卫	vui	920
+也	ja	998
+女	ngh	989
+女	nzio	989
+女	nio	989
+刃	nziun	769
+飞	fui	974
+飞	bui	974
+习	thip	916
+叉	ca	725
+马	ma	992
+马	ma	992
+乡	song	952
+乡	hiong	952
+丰	fung	901
+王	vong	978
+王	qong	978
+开	koi	992
+开	hoi	992
+开	kai	992
+井	ziang	899
+天	ten	999
+夫	fu	950
+夫	pu	950
+无	vu	998
+无	mo	998
+无	mu	998
+云	jun	982
+云	hun	982
+专	zon	939
+丐	koi	709
+丐	kai	709
+丐	gai	709
+扎	zap	849
+艺	nzi	916
+艺	nge	916
+木	muk	968
+五	ngh	981
+五	ngu	981
+五	ngo	981
+支	gi	923
+支	zi	923
+厅	tang	882
+不	but	1000
+不	bioi	1000
+不	bu	1000
+太	tai	979
+犬	ken	875
+区	ki	991
+区	ku	991
+历	lit	917
+历	lak	917
+歹	dai	702
+友	jiu	949
+友	jiu	949
+尤	jiu	860
+尤	jiu	860
+匹	pit	782
+车	ca	991
+车	gi	991
+巨	ki	942
+巨	gi	942
+巨	gio	942
+牙	nga	916
+屯	tun	746
+戈	go	859
+比	bi	978
+互	fu	855
+切	cet	951
+瓦	nga	883
+止	zi	914
+少	sau	979
+少	sau	979
+曰	jok	757
+曰	jat	757
+曰	jet	757
+日	nzit	994
+中	zung	999
+中	zung	999
+中	diung	999
+贝	bui	866
+贝	bi	866
+冈	gong	666
+内	nui	976
+水	sui	997
+见	gen	989
+午	ngu	893
+午	ngh	893
+牛	nziu	956
+手	siu	995
+气	ki	990
+气	si	990
+毛	mau	954
+壬	nzim	524
+升	sin	901
+夭	jau	653
+长	cong	992
+长	zong	992
+长	dang	992
+仁	nzin	906
+仁	jin	906
+什	sip	987
+片	pen	970
+仆	pok	738
+仆	bok	738
+仆	puk	738
+化	fa	991
+仇	siu	851
+仇	ciu	851
+币	bi	808
+仍	nzin	908
+仍	jin	908
+仅	kiun	913
+斤	gin	763
+爪	nziau	758
+爪	zau	758
+反	fan	967
+介	gai	872
+父	pu	949
+父	fu	949
+从	cung	988
+仑	lun	698
+仑	lin	698
+今	gim	969
+今	gin	969
+凶	sung	839
+分	fun	989
+分	bun	989
+乏	fat	762
+公	gung	993
+仓	cong	800
+月	nziet	982
+氏	si	830
+勿	vut	733
+勿	mut	733
+欠	kiam	771
+风	fung	997
+风	biung	997
+丹	dan	882
+匀	jun	629
+乌	vu	892
+乌	qu	892
+乌	qo	892
+勾	geu	789
+勾	ngeu	789
+凤	fung	949
+凤	biung	949
+六	luk	959
+文	vun	995
+文	mun	995
+亢	kong	679
+亢	kang	679
+亢	hong	679
+方	fong	985
+方	piong	985
+方	pang	985
+火	fo	981
+为	vui	996
+为	vui	996
+斗	deu	941
+忆	jit	860
+忆	jet	860
+计	ge	979
+订	dang	810
+订	deng	810
+户	fu	942
+户	hu	942
+认	nzin	965
+冗	nziung	507
+冗	nziung	507
+冗	nziong	507
+冗	jung	507
+讥	gi	638
+心	thim	999
+尺	cak	890
+引	jin	918
+丑	ciu	795
+巴	ba	949
+扈	fu	576
+孔	kung	856
+队	dui	967
+办	pan	954
+以	ji	995
+刃	nziun	769
+炽	ci	660
+允	jun	785
+予	ji	789
+邓	ten	762
+邓	teng	762
+劝	ken	817
+双	thung	957
+双	thong	957
+书	su	980
+幻	von	869
+幻	van	869
+玉	nziuk	975
+刊	kan	821
+末	mat	875
+未	mi	942
+未	mui	942
+未	vui	942
+示	si	917
+击	git	957
+打	da	986
+巧	kiau	875
+正	zin	986
+正	zang	986
+正	zang	986
+扑	puk	869
+扑	pok	869
+卉	fui	649
+扒	bat	654
+功	gung	956
+扔	nzin	816
+扔	jin	816
+去	si	995
+去	ki	995
+去	ku	995
+甘	gam	888
+世	si	983
+世	se	983
+艾	nzioi	852
+艾	ngoi	852
+古	gu	970
+节	zet	968
+本	bun	984
+术	sut	959
+可	ko	992
+可	ka	992
+丙	biang	720
+左	zo	924
+厉	li	894
+石	sak	980
+右	jiu	915
+布	bu	963
+夯	hang	445
+戊	vu	526
+龙	lung	987
+平	pin	983
+平	piang	983
+灭	met	878
+轧	zap	622
+东	dung	986
+卡	ka	963
+北	bet	976
+占	zam	867
+凸	tu	643
+凸	tut	643
+卢	lu	781
+业	nziap	994
+旧	kiu	912
+帅	thai	851
+归	gui	930
+目	muk	979
+旦	dan	824
+且	cia	961
+叮	dang	738
+叶	jap	932
+甲	gak	927
+甲	gap	927
+佮	gap	411
+申	sin	833
+号	hau	951
+电	ten	996
+田	ten	919
+由	jiu	971
+只	zak	993
+只	zi	993
+只	zit	993
+叭	ba	647
+央	jong	835
+央	qiong	835
+史	thu	904
+兄	sung	933
+兄	hiung	933
+叽	gi	649
+叼	diau	592
+叫	giau	977
+叩	keu	649
+叨	dau	701
+另	lang	930
+另	lin	930
+叹	tan	906
+冉	nziam	684
+皿	min	473
+凹	nziap	655
+凹	qau	655
+囚	siu	669
+四	thi	979
+生	thang	998
+生	then	998
+生	sang	998
+矢	ci	757
+失	sit	965
+乍	zok	656
+乍	zak	656
+禾	vo	685
+丘	ciu	773
+丘	kiu	773
+付	fu	892
+仗	zong	785
+仗	diong	785
+代	toi	966
+代	dai	966
+仙	then	898
+们	mun	960
+仪	nzi	891
+白	pak	986
+仔	ze	713
+仔	zai	713
+他	ta	999
+斥	cak	767
+瓜	ga	867
+乎	fu	963
+丛	cung	770
+令	lin	953
+令	lang	953
+用	jung	988
+甩	fit	785
+印	jin	925
+印	jang	925
+尔	nzi	979
+尔	ni	979
+乐	lok	980
+乐	ngok	980
+句	gi	875
+句	gu	875
+匆	cung	833
+册	cak	872
+卯	mau	631
+犯	fan	871
+外	ngoi	985
+处	cu	975
+冬	dong	847
+冬	dung	847
+鸟	diau	908
+鸟	nziau	908
+务	mu	973
+包	bau	950
+饥	gi	805
+主	zu	982
+市	si	991
+立	lip	968
+冯	pang	797
+冯	pang	797
+立	lap	968
+玄	hen	869
+玄	sen	869
+闪	sam	925
+兰	lan	947
+半	ban	961
+汁	zip	731
+汇	fui	860
+头	teu	994
+汉	han	915
+汉	hon	915
+宁	neng	913
+宁	nen	913
+宁	nin	913
+宁	len	913
+穴	set	831
+它	ta	968
+讨	tau	879
+写	thia	930
+让	nziong	987
+礼	li	927
+礼	le	927
+训	sun	873
+必	bit	953
+议	nzi	914
+议	ji	914
+讯	thin	861
+讯	sun	861
+记	gi	961
+永	qiung	903
+永	jung	903
+永	jun	903
+司	thu	958
+尼	ni	922
+尼	nai	922
+民	min	983
+弗	fut	784
+弗	but	784
+弘	hung	692
+弘	fung	692
+弘	sung	692
+出	cut	994
+唾	tui	670
+唾	to	670
+辽	liau	714
+奶	na	873
+奶	nai	873
+奴	no	817
+奴	nu	817
+召	diau	808
+召	cau	808
+加	ga	972
+皮	pi	955
+边	ben	983
+孕	jun	741
+发	fat	995
+圣	sin	905
+对	dui	994
+对	doi	994
+台	toi	962
+矛	mau	780
+纠	giu	750
+纠	gau	750
+母	mu	938
+幼	jiu	812
+丝	thi	935
+邦	bong	826
+式	sit	950
+迂	ji	571
+刑	sin	842
+戎	jung	645
+动	dung	991
+动	tung	991
+扛	gong	654
+寺	thu	814
+吉	git	906
+吉	get	906
+扣	kau	826
+扣	keu	826
+考	kau	955
+托	tok	895
+老	lau	991
+巩	kung	600
+圾	kip	710
+圾	thap	710
+执	zip	876
+扩	kong	776
+扩	kok	776
+扫	thau	848
+扫	thau	848
+地	ti	997
+扬	jong	920
+场	cong	972
+场	tang	972
+耳	nzi	950
+芋	vu	532
+共	kiung	937
+共	gung	937
+芒	mong	843
+亚	qa	946
+亚	ja	946
+芝	zi	750
+朽	jiu	799
+朽	thiu	799
+朴	piau	751
+朴	puk	751
+朴	pok	751
+机	gi	998
+权	ken	951
+过	go	996
+臣	sin	868
+吏	li	668
+再	zai	985
+协	sap	867
+西	the	988
+西	thi	988
+压	qat	942
+厌	jan	820
+戌	sut	491
+戌	thut	491
+在	zai	1000
+在	coi	1000
+百	bak	987
+有	jiu	999
+有	qiu	999
+存	cun	927
+而	nzi	993
+而	ji	993
+页	jap	827
+匠	thiong	738
+夸	ka	786
+夺	tot	868
+灰	foi	880
+达	tat	965
+列	let	894
+死	thi	979
+成	sin	993
+成	sang	993
+夹	gap	809
+夹	giap	809
+夹	kiap	809
+夷	ji	763
+轨	gui	780
+邪	thia	836
+邪	jai	836
+尧	nziau	679
+尧	ngau	679
+划	vak	900
+掝(vak,分拨开)	vak	1
+㩇(vak,挥动)	vak	1
+划	fa	900
+迈	mai	769
+毕	bit	908
+至	zi	965
+此	cw	985
+此	ci	985
+此	ce	985
+贞	zin	743
+师	thu	974
+尘	cin	885
+尖	ziam	861
+劣	lot	721
+光	gong	983
+当	dong	989
+早	zau	963
+吁	qu	713
+吁	ji	713
+吐	tu	852
+吓	hak	886
+虫	cung	899
+曲	kiuk	945
+团	ton	938
+吕	lu	805
+吕	li	805
+同	tung	986
+吊	diau	841
+吃	hat	972
+因	jin	982
+吸	kip	907
+吗	ma	998
+吆	jau	600
+屿	ji	583
+屹	jit	552
+岁	thoi	912
+帆	fan	718
+回	fui	990
+岂	ki	808
+则	zet	941
+刚	gong	974
+网	mong	995
+肉	nziuk	943
+年	nzien	990
+朱	zu	883
+先	then	975
+丢	diu	844
+廷	tin	809
+舌	set	911
+竹	zuk	906
+迁	cen	848
+迁	ciam	848
+乔	kiau	806
+迄	hit	525
+迄	qet	525
+伟	vui	865
+传	con	966
+传	zon	966
+乒	bin	554
+乒	pin	554
+乓	bong	545
+乓	pong	545
+休	jau	902
+休	thiu	902
+伍	ngh	818
+伏	puk	860
+优	jiu	895
+臼	kiu	627
+伐	fat	795
+延	jen	838
+仲	zung	769
+仲	diung	769
+件	ken	972
+任	nzim	970
+伤	song	955
+价	ga	961
+伦	lun	865
+伦	lin	865
+份	fun	918
+华	fa	977
+仰	ngong	832
+仿	fong	886
+伙	fo	921
+伪	vui	746
+自	cw	995
+伊	ji	868
+血	set	959
+向	song	984
+似	thu	965
+似	si	965
+后	heu	995
+行	hang	996
+行	hong	996
+舟	ziu	851
+全	con	980
+全	cen	980
+会	fui	995
+会	voi	995
+杀	that	929
+合	hap	983
+兆	zau	707
+兆	sau	707
+企	ki	928
+众	zung	944
+爷	ja	933
+伞	than	679
+创	cong	896
+肌	gi	783
+肋	lak	628
+朵	do	848
+杂	cap	870
+危	ngui	889
+危	mui	889
+危	vui	889
+旬	thun	651
+旬	sun	651
+旬	cun	651
+旨	zi	724
+旭	siuk	726
+旭	suk	726
+旭	hiok	726
+负	fu	905
+各	gok	947
+匈	sung	654
+匈	hiung	654
+名	miang	988
+多	do	992
+争	zang	927
+色	thet	984
+壮	zong	855
+冲	cung	948
+妆	zong	811
+冰	ben	936
+冰	bin	936
+庄	zong	873
+庆	kin	869
+亦	jit	850
+刘	liu	946
+齐	ce	903
+交	gau	979
+次	cw	982
+衣	ji	964
+产	than	978
+决	ket	948
+亥	hoi	583
+亥	hai	583
+充	cung	904
+妄	mong	785
+妄	vong	785
+闭	bi	864
+问	mun	986
+闯	cong	665
+羊	jong	908
+並	bin	238
+并	bin	975
+并	pin	975
+关	gon	976
+米	mi	936
+灯	den	921
+州	ziu	965
+汗	hon	862
+污	vu	840
+污	mu	840
+江	gong	971
+汛	thin	426
+汛	sun	426
+池	ci	878
+池	di	878
+汝	nzia	734
+汤	tong	873
+忙	mong	950
+兴	sin	947
+兴	sin	947
+宇	ji	885
+宇	qu	885
+守	siu	914
+宅	cak	769
+字	thu	960
+安	qon	990
+讲	gong	920
+军	giun	967
+讳	fui	719
+讳	vui	719
+讶	nga	825
+许	si	968
+许	hi	968
+讹	ngo	636
+讼	thung	668
+论	lun	966
+论	nun	966
+农	nung	935
+讽	fung	714
+设	set	967
+访	bong	815
+访	fong	815
+诀	ket	728
+寻	cim	889
+那	na	998
+迅	thin	858
+迅	sun	858
+尽	cin	945
+尽	zin	945
+导	tau	921
+导	dau	921
+异	jit	930
+孙	thun	906
+弛	ci	645
+弛	di	645
+阵	cin	948
+阵	zin	948
+阳	jong	963
+收	siu	961
+阶	gai	845
+阴	jim	902
+防	bong	953
+防	fong	953
+奸	gan	849
+如	ji	993
+如	nzio	993
+妇	fu	871
+妇	pu	871
+妇	bu	871
+妃	fui	779
+好	hau	996
+她	ta	997
+妈	ma	954
+戏	si	933
+羽	ji	888
+观	gon	947
+欢	fon	931
+买	mai	915
+红	fung	971
+红	qung	971
+驮	to	536
+纤	ciam	798
+驯	sun	623
+约	jok	923
+级	kip	994
+纪	gi	891
+驰	ci	817
+纫	nziun	435
+巡	sun	770
+寿	siu	853
+弄	lung	901
+弄	nung	901
+麦	mak	854
+玖	giu	442
+玛	ma	809
+形	sin	959
+进	zin	985
+戒	gai	822
+吞	tun	852
+远	jen	969
+违	vui	810
+韧	nziun	628
+韧	nzin	628
+运	jun	961
+扶	pu	834
+扶	fu	834
+抚	fu	819
+抚	pu	819
+抚	vu	819
+坛	tan	863
+技	ki	960
+技	gi	960
+坏	fai	896
+抠	keu	548
+扰	jiu	804
+扰	jau	804
+扼	ngak	661
+扼	qak	661
+拒	ki	822
+拒	kio	822
+㓟	pai	1
+睥	pe	431
+找	zau	973
+批	pi	855
+址	ci	783
+址	zi	783
+扯	ce	809
+㨋	ca	1
+扯	ci	809
+走	zeu	987
+抄	cau	713
+坝	ba	702
+坝	bi	702
+贡	gung	720
+汞	gung	393
+攻	gung	935
+赤	cak	843
+折	zet	924
+折	zat	924
+抓	za	811
+抓	zau	811
+抓	nziau	811
+扳	pan	644
+扳	ban	644
+抡	lun	588
+扮	ban	787
+扮	pan	787
+抢	ciong	856
+孝	hau	780
+坎	kam	682
+坎	kam	682
+均	jun	886
+抑	jit	770
+抛	pau	795
+投	teu	952
+坟	fun	690
+坟	vun	690
+坑	hang	773
+坑	kang	773
+抗	kong	875
+坊	fong	738
+坊	piong	738
+抖	deu	846
+护	fu	925
+护	qu	925
+壳	hok	775
+志	zi	953
+块	kai	914
+扭	niu	834
+扭	neu	834
+扭	nziu	834
+声	sang	990
+把	ba	991
+报	bau	978
+拟	ni	749
+拟	nzi	749
+却	kiok	982
+却	kiok	982
+抒	su	559
+劫	giap	803
+芙	fu	713
+芙	pu	713
+芜	mu	584
+芜	vu	584
+苇	vui	610
+芽	nga	668
+花	fa	992
+芹	kiun	664
+芥	gai	698
+芬	fun	740
+苍	cong	845
+芳	fong	835
+芳	pang	835
+芳	pong	835
+严	nziam	915
+芦	lu	768
+芯	thim	710
+劳	lau	930
+克	ket	970
+芭	ba	600
+苏	thu	913
+苏	thi	913
+杆	gon	787
+杜	tu	850
+杠	gong	583
+材	coi	929
+村	cun	911
+杖	zong	720
+杏	hen	715
+杉	cam	651
+杉	tham	651
+巫	vu	762
+巫	mu	762
+极	git	946
+极	kit	946
+极	gip	946
+极	kip	946
+李	li	972
+杨	jong	932
+求	kiu	956
+甫	pu	710
+匣	gap	607
+匣	hap	607
+更	gang	976
+更	gong	976
+吾	ngo	788
+吾	ngai	788
+束	cuk	877
+吾	ngu	788
+豆	teu	908
+两	liong	988
+酉	jiu	571
 
 #到埕矣
-丽	li
-医	ji
-辰	sin
-励	li
-否	feu
-还	han
-还	van
-还	hai
-尬	ga
-尬	gai
-歼	ciam
-来	loi
-来	lai
-连	len
-轩	sen
-步	pu
-卤	lu
-坚	gen
-肖	thiau
-旱	hon
-盯	den
-盯	din
-盯	dang
-呈	cin
-呈	cang
-时	si
-吴	ngh
-吴	ngo
-吴	ngu
-助	cw
-县	jen
-县	qien
-里	li
-呆	ngoi
-呆	dai
-呆	ngong
-吱	zi
-吱	gi
-吠	poi
-呕	qeu
-园	jen
-旷	kong
-围	vui
-呀	ja
-吨	dun
-足	zuk
-邮	jiu
-男	nan
-困	kun
-吵	cau
-吵	cau
-串	con
-员	jen
-呐	nap
-呐	nut
-呐	na
-呐	not
-听	tang
-听	tang
-吟	nzim
-吩	pun
-吩	fun
-吹	cui
-呛	cong
-吻	vut
-吻	vun
-吻	mun
-吹	cui
-吭	kang
-吭	hang
-呜	qu
-呜	vu
-吼	hung
-吼	kung
-吧	ba
-邑	jip
-吼	hau
-吼	heu
-别	pet
-囤	tun
-囤	dun
-吮	sun
-吮	nziot
-岖	ki
-岗	gong
-帐	zong
-财	coi
-钉	dang
-针	zim
-牡	mo
-牡	meu
-牡	mu
-告	gau
-我	nga
-乱	lon
-利	li
-秃	tut
-秀	thiu
-私	thu
-每	mui
-兵	bin
-估	gu
-体	ti
-何	ho
-佐	zo
-佑	jiu
-但	dan
-伸	sin
-伸	cun
-佃	ten
-佃	ten
-作	zok
-伯	bak
-伶	leng
-伶	lang
-伶	lin
-佣	jung
-低	dai
-你	ni
-住	cu
-住	zu
-位	vui
-伴	ban
-伴	pan
-身	sin
-皂	cau
-皂	zau
-伺	cw
-佛	but
-佛	fut
-囱	tung
-囱	cung
-近	kiun
-近	gin
-彻	cet
-役	jit
-返	fan
-余	ji
-希	si
-坐	co
-谷	guk
-妥	to
-含	ham
-邻	lin
-岔	ca
-肝	gon
-肛	gong
-肚	du
-肘	ziu
-肠	cong
-龟	gui
-甸	dem
-甸	tem
-免	men
-狂	kong
-犹	jiu
-狈	bui
-狈	boi
-角	gok
-删	than
-条	tiau
-彤	tung
-卵	lon
-灸	giu
-岛	dau
-刨	pau
-迎	nziang
-饭	fan
-饭	pan
-饮	nzim
-系	he
-系	hai
-系	hai
-言	nzien
-冻	dung
-状	cong
-亩	meu
-况	kong
-床	cong
-库	ku
-庇	bi
-庇	pi
-疗	liau
-吝	lin
-应	jin
-应	jin
-冷	lang
-这	zia
-这	ze
-庐	lu
-序	thi
-辛	sin
-辛	thin
-弃	ki
-弃	si
-冶	ja
-忘	mong
-闰	jun
-闲	han
-间	gan
-闷	mun
-判	pan
-判	pun
-兑	dui
-灶	zau
-灿	cam
-灼	ziok
-弟	ti
-弟	tai
-汪	vong
-灼	sok
-沐	muk
-沐	mu
-沛	pui
-沛	fui
-汪	vong
-汰	tai
-汰	toi
-沥	lit
-沥	lak
-沙	tha
-汽	si
-沃	vok
-沦	lun
-汹	sung
-泛	fan
-沟	geu
-没	mut
-沧	cong
-没	mo
-沪	fu
-沈	sim
-沉	cim
-沁	cim
-沁	sim
-怀	fai
-忧	jiu
-忧	jau
-忱	sim
-忱	zim
-快	kai
-完	ngan
-完	van
-完	von
-宋	thung
-宏	fen
-宏	qong
-宏	hung
-牢	lau
-究	giu
-穷	kiung
-灾	zai
-良	liong
-证	zin
-启	ki
-评	pin
-评	piang
-补	bu
-补	pu
-初	co	
-社	sa
-祀	thu
-识	sit
-诈	za
-诉	su
-诉	thu
-罕	hon
-罕	han
-诊	zin
-词	cw
-译	jit
-君	giun
-灵	lin
-即	zit
-层	cen
-层	cang
-层	cin
-屁	pi
-尿	nziau
-尾	mui
-迟	ci
-迟	di
-局	kiuk
-改	goi
-张	zong
-忌	ki
-忌	gi
-际	zi
-陆	luk
-阿	qo
-阿	qa
-陈	cin
-陈	dang
-阻	zw
-阻	zo
-附	fu
-坠	cui
-妓	gi
-妙	miau
-妖	jau
-姊	zi
-妨	fong
-妒	du
-妒	tu
-努	nu
-努	no
-忍	nziun
-劲	gin
-矣	ji
-矣	qe
-鸡	gai
-鸡	ge
-纬	vui
-驱	ki
-驱	kia
-纯	cun
-纱	tha
-纲	gong
-纳	nap
-纵	zung
-驳	bok
-纷	fun
-纸	zi
-纹	vun
-纹	mun
-纺	fong
-驴	lu
-驴	li
-纽	nziu
-纽	niu
-奉	bung
-奉	fung
-玩	ngan
-玩	van
-环	van
-武	vu
-武	mu
-青	ciang
-责	zat
-责	zak
-现	sen
-表	biau
-錶	biau
-规	gui
-玫	moi
-抹	mat
-卦	ga
-卦	gak
-坷	ko
-坯	pui
-拓	tot
-坯	poi
-拓	tok
-拓	sak
-拢	lung
-拔	bat
-拔	pat
-坪	piang
-拣	gan
-坦	tan
-担	dan
-坤	kun
-押	qap
-抽	ciu
-拐	goi
-拖	to
-者	zia
-拍	pak
-顶	dang
-顶	din
-拆	cak
-拎	lin
-拎	len
-拥	jung
-抵	dai
-抵	di
-拘	geu
-势	si
-势	se
-抱	bau
-抱	pau
-拄	zu
-拄	cu
-垃	lap
-拉	lai
-拉	la
-拦	lan
-幸	hen
-拌	ban
-拧	nen
-拂	fut
-拂	fit
-拂	but
-拂	put
-拂	pat
-拂	pet
-拙	cut
-拙	zot
-拙	cot
-招	zau
-坡	po
-披	pi
-拨	bat
-拨	pat
-拨	but
-拨	put
-择	cak
-抬	toi
-择	tok
-抬	toi
-拇	mu
-拗	qau
-其	ki
-取	ci
-茉	mat
-茉	mo
-苦	ku
-苦	fu
-昔	thit
-昔	thiuk
-苛	ko
-若	nziok
-茂	mau
-茂	meu
-茂	miu
-苹	pin
-苗	miau
-英	jin
-英	qin
-苟	geu
-苑	von
-苑	van
-苞	bau
-范	fan
-直	cit
-茁	zot
-茄	kio
-茄	ke
-茎	gin
-苔	toi
-茅	mau
-枉	vong
-林	lim
-枝	gi
-枝	zi
-杯	bui
-枢	ku
-枢	ki
-柜	kui
-枚	moi
-析	thit
-析	thak
-煠	thap
-霅	thap
-霅碎	thap thui
-板	ban
-松	thung
-松	cung
-枪	ciong
-枫	fung
-构	geu
-杭	hong
-杰	ket
-述	sut
-枕	zim
-丧	thong
-丧	thong
-或	vet
-或	fet
-画	vak
-画	fa
-卧	mo
-事	thu
-刺	ci
-枣	zau
-雨	ji
-雨	qu
-卖	mai
-郁	juk
-矾	fan
-矿	kong
-码	ma
-厕	cet
-厕	cu
-奈	nai
-奔	bun
-奇	ki
-奋	fun
-奋	bun
-态	tai
-欧	qeu
-殴	qeu
-垄	lung
-補	bu
-補	pu
-妻	ci
-轰	hung
-顷	ken
-转	zon
-转	don
-斩	zam
-轮	lin
-轮	lun
-软	nzion
-到	dau
-非	fui
-非	bui
-叔	suk
-歧	ki
-肯	ken
-肯	hen
-齿	ci
-些	thia
-卓	zok
-卓	cok
-卓	diok
-虎	fu
-虏	lu
-肾	sin
-贤	hien
-贤	sen
-尚	song
-旺	vong
-具	ki
-具	gi
-具	gu
-味	vui
-味	mui
-果	go
-味	mi
-昆	kun
-国	get
-哎	qai
-咕	gu
-昌	cong
-畅	cong
-明	min
-呵	ga
-呵	go
-呵	ho
-呵	he
-畅	diong
-明	meng
-易	ji
-易	jit
-咙	lung
-昂	ngong
-迪	tit
-典	den
-固	gu
-固	go
-忠	zung
-忠	diung
-呻	sin
-咒	ziu
-咋	tha
-咋	za
-咐	fu
-咐	pu
-呼	fu
-鸣	min
-咏	qiun
-咏	jun
-呢	ni
-呢	ne
-咄	cut
-咄	cot
-咄	zot
-咄	dot
-咄	dut
-咖	ga
-岸	qon
-岸	ngan
-岩	ngam
-帖	tiap
-贴	diap
-罗	lo
-帜	zit
-帕	pak
-岭	liang
-凯	kai
-凯	koi
-败	pai
-账	diang
-账	zong
-贩	fan
-贬	ben
-购	geu
-贮	du
-贮	cu
-图	tu
-钓	diau
-制	ze
-知	di
-知	zi
-迭	det
-迭	diat
-氛	fun
-垂	cui
-牧	muk
-物	mut
-物	vut
-乖	goi
-刮	gat
-秆	gon
-和	fo
-和	vo
-季	gui
-委	vui
-秉	biang
-秉	bin
-佳	ga
-佳	gai
-侍	thu
-岳	ngok	
-供	gung
-供	giung
-供	giung
-供	gung
-使	thu
-例	le
-侠	gap
-侠	hap
-侥	giau
-侥	nziau
-版	ban
-侄	cit
-侦	zin
-侣	li
-侣	lio
-侣	lu
-侧	zet
-侧	cet
-凭	pin
-凭	pang
-侨	kiau
-佩	pui
-货	fo
-侈	ci
-依	ji
-依	qe
-卑	be
-卑	bi
-卑	bui
-的	dit
-啲	dit
-迫	pek
-迫	pok
-质	zit
-欣	sun
-征	zin
-征	zang
-往	vong
-往	vong
-往	qong
-爬	pa
-彼	pi
-彼	bi
-径	gin
-所	tho
-舍	sa
-金	gim
-刹	that
-命	miang
-肴	ngau
-肴	jau
-斧	bu
-斧	fu
-爸	ba
-采	cai
-觅	mi
-觅	mit
-觅	met
-受	siu
-乳	nziui
-贪	tam
-念	nziam
-念	nem
-贫	pin
-忿	fun
-肤	fu
-肺	pui
-肢	zi
-肢	gi
-肿	zung
-胀	zong
-朋	pen
-股	gu
-肮	qang
-肮	qong
-肪	fong
-肪	pong
-肥	pui
-服	fuk
-胁	sap
-周	ziu
-昏	fun
-鱼	ngh
-鱼	ngia
-兔	tu
-狐	fu
-忽	fut
-狗	geu
-狞	nen
-备	pi
-备	pui
-饰	si
-饱	bau
-饲	cw
-变	ben
-京	gin
-京	giang
-享	song
-庞	pang
-店	diam
-夜	ja
-庙	miau
-府	fu
-府	pu
-底	di
-底	dai
-疟	nziok
-疟	nziak
-疙	nget
-疙	get
-疚	giu
-剂	zi
-剂	zai
-卒	zut
-郊	gau
-庚	gang
-废	fui
-净	ciang
-盲	mang
-放	bong
-放	fong
-刻	ket
-育	juk
-氓	mang
-氓	min
-闸	cap
-闹	nau
-闹	nau
-郑	cang
-郑	cin
-郑	din
-券	ken
-卷	gen
-单	dan
-炬	ki
-炬	gio
-炬	gi
-炒	cau
-炊	cui
-炕	kang
-劥	kang
-炎	jam
-炉	lu
-沫	mat
-浅	cen
-法	fat
-泄	je
-泄	se
-泄	set
-沽	gu
-沽	go
-河	ho
-沾	nziam
-沾	zam
-泪	lu
-泪	lui
-沮	zo
-沮	zw
-油	jiu
-泊	pok
-泊	pak
-沿	jen
-泡	pau
-泡	pau
-注	zu
-泻	thia
-泣	lap
-泣	kip
-泞	nin
-泞	nen
-泌	bi
-泌	mi
-泳	jun
-泳	jung
-泥	nai
-沸	bui
-沸	fui
-沼	zau
-沼	zau
-波	bo
-泼	pat
-泽	cak
-治	di
-治	zi
-治	ci
-怖	bu
-怔	zin
-怔	zang
-怯	kiap
-怯	kiak
-性	thiang
-性	thin
-怕	pa
-怜	len
-怪	gai
-怡	ji
-学	hok
-宝	bau
-宗	zung
-定	tin
-宜	nzi
-宠	cung
-审	sin
-宙	ziu
-官	gon
-空	kung
-帘	liam
-宛	von
-宛	van
-实	sit
-试	ci
-试	si
-郎	long
-诗	si
-肩	gen
-房	fong
-诚	sang
-诚	sin
-衬	cun
-衫	tham
-视	si
-祈	ki
-祈	si
-话	va
-诞	dan
-诡	gui
-询	thun
-询	cun
-该	goi
-该	gai
-详	thiong
-建	gen
-建	ken
-肃	thuk
-肃	thu
-隶	li
-录	luk
-帚	ziu
-屉	ti
-居	gi
-居	gio
-届	gai
-刷	thot
-屈	kut
-屈	kuk
-屈(vut)	vut
-弧	gu
-弧	fu
-弥	ni
-弥	mi
-弥	nzi
-弦	sen
-承	sang
-承	sin
-孟	mang
-孟	men
-陋	leu
-陌	bak
-陌	mak
-陌	mo
-孤	gu
-陕	tham
-降	gong
-函	ham
-限	han
-妹	moi
-姑	gu
-姐	zia
-姐	ze
-姓	thiang
-妮	ne
-姆	mu
-姆	me
-妮	ni
-始	ci
-始	si
-迢	zau
-迢	tiau
-驾	ga
-叁	tham
-参	cam
-艰	gan
-艰	gen
-线	then
-练	len
-组	zw
-绅	sin
-细	the
-驶	thu
-织	zit
-驹	gi
-驹	ki
-驹	ku
-终	zung
-驻	zu
-驻	cu
-绊	ban
-绊	pan
-驼	to	
-绍	sau
-绎	jit
-经	gin
-贯	gon
-契	ke
-贰	nzi
-奏	ceu
-奏	zeu
-春	cun
-帮	bong
-玷	zam
-玷	nziam
-珍	zin
-玲	lin
-玲	lang
-珊	than
-玻	bo
-毒	tuk
-型	sin
-挂	gak
-挂	ga
-拭	sit
-封	fung
-持	ci
-拷	kau
-拱	gung
-项	hong
-项	song
-垮	ka
-挎	ka
-城	sang
-城	sin
-挟	gap
-挟	giap
-挠	nau
-挠	nziau
-政	zin
-赴	pu
-赴	fu
-赵	zau
-挡	dong
-拽	jet
-拽	je
-哉	zai
-挺	tin
-括	gat
-括	ko
-垢	geu
-拴	thon
-拾	hap
-拾	gap
-拾	sip
-拾	zap
-挑	tiau
-挑	tiau
-垛	do
-指	zi
-垫	tiam
-挣	zang
-挤	ze
-挤	zi
-挤	ziam
-拼	piang
-拼	pin
-挖	vat
-挖	vet
-按	qon
-挥	kui
-挪	no
-拯	zin
-拯	sin
-某	meu
-甚	sim
-荆	gin
-併	bin
-茸	jung
-革	gak
-茬	zi
-荐	zen
-荐	cen
-巷	hong
-带	dai
-草	cau
-茧	giam
-茵	jin
-茶	ca
-荒	fong
-茫	mong
-荡	tong
-荣	jung
-荤	fun
-荧	jin
-荧	jang
-故	gu
-胡	fu
-荫	jim
-荔	lai
-南	nam
-药	jok
-标	biau
-栈	can
-柑	gam
-枯	ku
-柄	biang
-栋	dung
-相	thiong
-查	ca
-柏	bak
-栅	than
-柳	liu
-柱	cu
-柿	thu
-栏	lan
-柠	nen
-树	su
-勃	bot
-勃	put
-要	qoi
-要	jau
-柬	gan
-咸	ham
-威	vui
-歪	vai
-歪	jai
-研	ngen
-砖	zon
-厘	li
-厚	pun
-厚	heu
-砌	cet
-砂	tha
-泵	dem
-泵	bang
-砚	gan
-砚	gen
-砍	kam
-面	men
-耐	nai
-耐	ngai
-耍	tha
-牵	ken
-鸥	qeu
-残	can
-轴	cuk
-殃	jong
-轻	kiang
-鸦	qa
-皆	gai
-韭	giu
-背	boi
-背	bui
-背	poi
-背	bi
-战	zen
-战	zan
-摼	kiang
-摼	kan
-点	diam
-点	niam
-虐	nziok
-虐	nziak
-临	lin
-览	lam
-竖	su
-省	then
-削	thiok
-尝	song
-尝	cong
-昧	mui
-盹	dun
-是	si
-是	ze
-盼	pan
-眨	jap
-哇	va
-哄	hung
-哑	qa
-显	sen
-冒	mau
-映	jang
-映	jin
-星	thin
-昨	cam
-昨	cak
-昨	cok
-咧	le
-昭	zau
-畏	vui
-畏	voi
-趴	pa
-胃	vui
-贵	gui
-界	gai
-虹	fung
-虾	ha
-蚁	nzi
-蚁	ni
-思	thu
-蚂	ma
-虽	thui
-品	pin
-咽	jen
-咽	jen
-咽	jin
-骂	ma
-勋	sun
-哗	fa
-咱	zan
-响	song
-哈	ha
-哈	hap
-哈	hat
-哆	do
-哆	da
-咬	ngau
-咳	kem
-咳	ket
-咪	mi
-哪	na
-哪	nai
-哟	jo
-炭	tan
-峡	hap
-峡	gap
-罚	fat
-贱	cen
-贴	tiap
-贻	ji
-骨	gut
-幽	jiu
-钙	koi
-钝	dun
-钞	cau
-钟	zung
-钢	gong
-钠	na
-钠	nap
-钥	jok
-钦	kim
-钧	jun
-钧	giun
-钩	geu
-钩	ngeu
-钮	niu
-钮	neu
-卸	thia
-缸	gong
-拜	bai
-看	kon
-矩	ki
-毡	zam
-氢	kin
-怎	zin
-牲	thang
-选	then
-适	sit
-适	gat
-秒	miau	
-香	song
-种	zung
-种	zung
-秋	ciu
-科	ko
-重	cung
-重	cung
-复	fuk
-复	puk
-竿	gon
-段	ton
-便	pen
-俩	liong
-货	fo
-贷	toi
-贷	dai
-顺	sun
-修	thiu
-俏	ciau
-俏	thiau
-保	bau
-促	cuk
-侮	vu
-俄	ngo
-俐	li
-侮	vu
-歕	pun
-侮	mu
-俭	giam
-俭	kiam
-俗	cuk
-俘	feu
-俘	fu
-信	thin
-皇	vong
-皇	fong
-泉	can
-鬼	gui
-侵	cim
-禹	ji
-侯	heu
-刁	diau
-追	zui	
-俊	zun
-盾	dun
-待	toi
-待	tai
-署	cu
-署	su
-徊	fai
-徊	fui
-衍	jen
-律	lut
-很	han
-须	thi
-叙	thi
-剑	giam
-逃	tau
-食	sit
-盆	pun
-胚	poi
-胚	pui
-胧	lung
-胆	dan
-胜	sin
-胜	thang
-焯	cok
-焯	dok
-擆	dok
-胞	bau
-胞	pau
-胖	pan
-脉	mak
-胎	toi
-勉	men
-狭	hap
-狮	thu
-独	tuk
-狰	zang
-狡	gau
-狱	nziuk
-狠	han
-贸	mau
-怨	jen
-急	gip
-饵	nzi
-饶	nziau
-蚀	sit
-蚀	set
-饺	gau
-饼	biang
-峦	lon
-弯	van
-将	ziong
-将	ziong
-奖	ziong
-哀	qoi
-亭	tin
-亮	liong
-度	tu
-迹	ziak
-迹	zit
-庭	tin
-疮	cong
-疯	fung
-疫	jit
-疤	ba
-咨	zw
-姿	zw
-亲	cin
-音	jim
-帝	di
-施	si
-闺	gui
-闻	vun
-闻	mun
-闽	min
-阀	fat
-阁	gok
-阁	gak	
-差	ca
-差	cai
-养	jong
-美	mui
-姜	giong
-叛	pan
-送	thung
-类	lui
-迷	mui
-迷	mi
-籽	ze
-娄	leu
-娄	liu
-前	cen
-首	siu
-逆	nziak
-兹	zw
-总	zung
-炼	len
-炸	za
-烁	sok
-烁	lok
-炮	pau
-炫	sen
-烂	lan
-剃	tai
-剃	ti
-洼	va
-洁	git
-洁	get
-洪	fung
-洒	tha
-洒	sa
-柒	cit
-浇	ziau	
-浊	zuk
-洞	tung
-测	cet
-测	cak
-洗	the
-活	fat
-派	pai
-派	pai
-洽	hap
-染	nzian
-染	nzian
-洽	gap
-洛	lok
-浏	liu
-济	zi
-济	ce
-济	ze
-洋	jong
-洲	ziu
-浑	fun
-浑	vun
-浓	nung
-津	zin
-恃	thu
-恃	cw
-恃	thi
-恒	vang
-恒	hang
-恢	foi
-恢	fui
-恍	gong
-恍	fong
-恬	tiam
-恤	set
-恰	hap
-恰	gap
-恼	nau
-恨	han
-举	gi
-举	gio
-觉	gok
-觉	gau
-宣	sen
-宦	fon
-宦	von
-室	sit
-宫	giung
-宫	gung
-宪	sen
-突	tuk
-突	tut
-穿	con
-窃	cet
-客	kak
-客	hak
-诫	gai
-诫	hai
-冠	gon
-诬	vu
-诬	mu
-语	nzio
-语	nzi
-语	ni
-扁	pen
-扁	ben
-袄	qau
-祖	zw
-神	sin
-祝	zuk
-祠	cw
-误	ngu
-误	mu
-误	ngo
-诱	jiu
-诲	kui
-诲	fui
-说	sot
-诵	thung
-垦	ken
-退	tui
-既	gai
-既	gi
-屋	quk
-昼	ziu
-屏	pin
-屎	si
-费	fui
-陡	deu
-逊	sun
-眉	mi
-眉	mui
-眉	moi
-孩	hoi
-陨	jun
-除	cu
-险	sem
-险	sam
-院	jen
-娃	vai
-娃	va
-姥	lau
-姥	mu
-姨	ji
-姻	jin
-娇	giau
-姚	tiau
-姚	jau
-娜	na
-怒	no
-怒	nu
-架	ga
-贺	ho
-盈	jin
-勇	jung
-怠	dai
-怠	toi
-癸	kui
-蚤	zau
-柔	jiu
-垒	loi
-垒	lui
-绑	ben
-绑	bong
-绒	jung
-结	get
-绕	nziau
-绕	nziau
-骄	giau
-绘	fui
-给	gip
-绚	sun
-绚	sen
-络	lok
-骆	lok
-绝	cet
-绞	gau
-骇	hai
-骇	hoi
-统	tung
-耕	gang
-耘	jun
-耗	hau
-耙	pa
-艳	jen
-秦	cin
-秦	sin
-泰	tai
-珠	zu
-班	ban
-素	thu
-匿	nit
-匿	nziak
-蚕	cam
-顽	ngan
-顽	van
-盏	zan
-匪	fui
-捞	lau
-栽	zai
-捕	bu
-捕	pu
-埂	gang
-捂	ngh
-捂	qen
-振	zin	
-载	zai
-赶	gon
-起	si
-起	ki
-盐	jam
-捎	thiau
-捎	thau
-捍	hon
-捏	net
-埋	mai
-捉	zuk
-捆	kun
-捐	gen
-损	thun
-袁	jen
-捌	bat
-都	du
-哲	zet
-逝	si
-捡	giam
-挫	co
-挫	co
-换	von
-挽	men
-挚	zip
-热	nziet
-恐	kung
-恐	kiung
-捣	dau
-壶	fu
-挨	qoi
-挨	qe
-挨	qai
-捅	tung
-埃	qoi
-埃	qai
-挨	ngai
-捱	ngai
-耻	ci
-耿	gang
-耽	dam
-聂	niap
-恭	giung
-恭	gung
-莽	mong
-莱	loi
-莱	lai
-莲	len
-莽	mang
-莫	muk
-莫	mak
-莫	mok
-莉	li
-荷	ho
-获	vok
-晋	zin
-啱	ngam
-晋	gin
-恶	qok
-莹	jin
-莺	jin
-真	zin
-框	kong
-梆	bong
-桂	gui
-桔	git
-栖	ci
-档	dong
-桐	tung
-株	zu
-桥	kiau
-桦	fa
-栓	thon
-桃	tau
-格	gak
-桩	zong
-校	gau
-校	gau
-核	hak
-核	hat
-核	fut
-核	vut
-样	nziong
-样	jong
-根	gin
-索	thok
-哥	go
-速	cuk
-逗	teu
-䚵	teu
-逗	deu
-栗	lit
-贾	ga
-酌	ziok
-配	pui
-翅	ci
-辱	nziuk
-唇	sun
-夏	ha
-砸	zat
-砰	bang
-砰	biang
-砰	pin
-砰	piang
-砾	lit
-础	cu
-础	co
-破	po
-原	nzien
-原	jen
-套	tau	
-逐	cuk
-逐	tuk
-烈	let
-殊	su
-殉	sun
-顾	gu
-轿	kiau
-轿	giau
-较	gau
-顿	dun
-毙	bi
-致	di
-致	zi
-柴	cai
-桌	dok
-桌	zok
-虑	li
-虑	lu
-虑	lio
-监	gam
-紧	gin
-党	dong
-逞	cin
-逞	sin
-晒	thai
-眠	min
-眠	men
-晓	nziau
-晓	ngau
-晓	sau
-哮	hau
-唠	lau
-鸭	qap
-晃	gong
-晃	long
-哺	bu
-哺	pu
-晌	song
-剔	tit
-剔	tiak
-剔	ti
-晕	fun
-晕	jun
-蚌	bung
-蚌	bang
-畔	ban
-畔	pan
-蚣	gung
-蚊	mun
-蚪	deu
-蚓	jin
-哨	thau
-哩	li
-圃	pu
-圃	bu
-哭	kuk
-哦	qo
-恩	qen
-鸯	jong
-鸯	qiong
-嗯	qen
-摁	qen
-唤	von
-唁	ngen
-唁	nzien
-唁	jen
-哼	hng
-唧	zit
-啊	qa
-唉	hai
-唉	qai
-唆	tho
-罢	ba
-峭	ciau
-峨	ngo
-峰	fung
-圆	jen
-峻	zun
-贼	cet
-贿	fui
-贿	kui
-赂	lok
-赃	zong
-钱	cen
-钳	kiam
-钻	zon
-钾	gap
-铁	tet
-铃	lang
-铃	leng
-铅	jen
-缺	ket
-氧	jong
-氨	qon
-特	tit
-特	tet
-牺	thi
-造	cau
-造	zau
-乘	sang
-乘	sin
-敌	tit
-秤	piang
-秤	pin
-租	zw
-积	zit
-秧	jong
-秩	cit
-称	cin
-称	cang
-秘	bi
-秘	mit
-透	teu
-笔	bit
-笑	thiau
-笋	thun
-债	zai
-借	zia
-值	cit
-倚	ji
-俺	ngam
-倾	kin
-倾	ken
-倒	dau
-倒	dau
-倘	tong
-俱	ki
-俱	gi
-倶	gu	
-倡	cong
-倡	cong
-候	heu
-赁	lin
-俯	pu
-俯	fu
-倍	pui
-倍	boi
-倦	gen
-健	ken
-臭	ciu
-射	sa
-躬	giung
-躬	gung
-息	thit
-倔	kut
-倔	kuk
-徒	tu
-徐	ci
-徐	cu
-殷	jin
-舰	lam
-舰	gen
-舱	cong
-般	ban
-航	hong
-途	tu
-拿	na
-耸	thung
-爹	dia
-舀	jau
-爱	qoi
-豺	coi
-豹	bau
-颁	ban
-颁	bun
-颂	thung
-翁	jung
-翁	vung
-翁	qung
-翁	qang
-胰	ji
-脆	cui
-脂	zi
-胸	sung
-胳	lok
-脏	zong
-脐	ci
-脐	ce
-胶	gau
-脑	nau
-脓	nung
-逛	gong
-狸	li
-狼	long
-卿	kin
-逢	fung
-逢	pung
-鸵	to
-留	liu
-鸳	jen
-皱	nziu
-皱	ziu
-皱	zeu
-饿	ngo
-馁	lui
-馁	nui
-凌	lin
-凄	ci
-恋	len
-桨	ziong
-浆	ziong
-衰	thoi
-衷	zung
-高	gau
-郭	gok
-席	cit
-席	ciak
-准	zun
-座	co
-症	zin
-病	piang
-疾	cit
-斋	zai
-疹	zin
-疼	tung
-疲	pi
-脊	zit
-效	ngau
-离	li
-紊	vun
-紊	min
-紊	mun
-紊	vin
-唐	tong
-瓷	cw
-资	zw
-凉	liong
-凉	long
-択	tak
-站	cam
-剖	pau
-剖	peu
-竞	gin
-部	bu
-部	pu
-旁	pong
-旅	li
-旅	lio
-畜	cuk
-阅	jet
-羞	thiu
-羞	ciu
-羔	gau
-瓶	piang
-拳	ken
-粉	fun
-料	liau
-益	jit
-兼	kiam
-兼	giam
-烤	kau
-烘	hung
-烦	fan
-烧	sau
-烛	zuk
-烟	jen
-烙	lok
-烙	lau
-递	ti
-涛	tau
-浙	zet
-涝	lau
-浦	pu
-浦	bu
-酒	ziu
-涉	sap
-消	thiau
-涡	vo
-浩	hau
-海	hoi
-海	hai
-涂	tu
-浴	juk
-浮	feu
-涣	fon
-涣	von
-涤	di
-涤	dit
-涤	tit
-流	liu
-流	leu
-润	jun
-涧	gan
-涕	ti
-浪	nong
-浪	long
-浸	zim
-涨	zong
-烫	tong
-涩	thip
-涩	giap
-涩	thep
-涌	jung
-悖	but
-悖	bot
-悖	put
-悟	ngh
-悟	ngu
-悄	thiau
-悄	ciau
-悍	hon
-悔	fui
-悔	kui
-悯	min
-悯	min
-悦	jet
-害	hoi
-宽	kon
-家	ga
-家	ka
-宵	thiau	
-宴	jen
-宾	bin
-窍	kiau
-窄	kiap
-窄	zat
-窄	zak
-容	jung
-宰	zai
-案	qon
-请	ciang
-请	cin
-朗	long
-诸	zia
-诸	zu
-诺	nziok
-诺	nok
-读	tuk
-扇	sen
-诽	bui
-诽	fui
-袜	mat
-袖	ciu
-袍	pau
-被	pi
-祥	thiong
-课	ko
-冥	min
-冥	miang
-谁	sui
-调	tiau
-调	diau
-冤	jen
-谅	liong
-谆	dun
-谈	tam
-谊	nzi
-剥	bok
-剥	bak
-恳	ken
-恳	kin
-展	zen
-展	zan
-剧	git
-剧	gi
-屑	thet
-弱	nziok
-陵	lin
-祟	thui
-陶	tau
-陷	ham
-陪	pui
-娱	mu
-娱	ngu
-娱	ngh
-娟	gen
-恕	su
-娥	ngo
-娘	nziong	
-通	tung
-能	nen
-难	nan
-预	ji
-桑	thong
-绢	gen
-绣	thiu
-验	nziam
-继	gi
-骏	zun
-球	kiu
-琐	tho
-理	li
-琉	liu
-琅	long
-捧	bung
-堵	du
-措	cw
-措	co
-描	miau
-域	vet
-域	quet
-捺	na
-捺	nai
-捺	nap
-掩	jam
-捷	ciak
-排	pai
-焉	jen
-掉	diau
-捶	cui
-赦	sa
-堆	doi
-堆	dui
-推	tui
-埠	bu
-掀	sin
-掀	sun
-掀	jen
-授	siu
-捻	nem
-教	gau
-教	gau
-掏	tau
-掐	gap
-掐	hap
-掠	liok
-掂	tiam
-掂	diam
-培	pui
-接	ziap
-掷	cit
-控	kung
-探	tam
-据	ki
-据	gi
-据	gio
-掘	kut
-掘	kuk
-掺	cam
-职	cit
-职	zit
-基	gi
-著	zu
-著	zok
-著	cok
-聆	lang
-聆	lin
-勘	kam
-聊	liau
-娶	ci
-著	zu
-著	zok
-菱	lin
-勒	let
-黄	vong
-菲	fui
-菲	bui
-萌	min
-萌	men
-萝	lo
-菌	kiun
-萎	vui
-菜	coi
-萄	tau
-菊	kiuk
-菩	pu
-菩	po
-萍	pin
-菠	bo
-萤	jin
-萤	jang
-营	jang
-营	jin
-乾	ken
-乾	gon
-萧	thiau
-萨	that
-菇	ku
-械	hai
-彬	bin
-梦	mung
-婪	lam
-梗	gang
-梧	ngu
-梧	ngh
-梧	ngo
-梢	thiau
-梅	moi
-检	giam
-梳	tho
-梯	toi
-桶	tung
-梭	tho
-救	giu
-曹	cau
-副	fu
-票	piau
-酝	jun
-酗	sung
-酗	si
-厢	thiong
-戚	cit
-硅	gai
-硅	goi
-硕	sak
-硕	thok
-奢	sa
-盔	kui
-爽	thong
-聋	lung
-袭	thip
-袭	thip
-盛	sin
-匾	ben
-雪	thet
-辅	pu
-辅	fu
-辆	liong
-颅	lu
-虚	si
-彪	biau
-雀	ziok
-堂	tang
-堂	tong
-常	song
-眶	kong
-匙	si
-晨	sin
-睁	zang
-眯	mi
-眼	ngan
-悬	sen
-野	ja
-啪	pa
-啪	pak
-啦	la
-曼	man
-晦	fui
-晚	man
-晚	van
-啄	diok
-啄	ziok
-啡	fui
-啡	bui
-距	ki
-距	gi
-距	gio
-趾	zi
-啃	ken
-跃	jok
-略	liok
-蚯	ciu
-蚯	kiu
-蛀	zu
-蛇	sa
-唬	fu
-累	lui
-累	lui
-鄂	ngok
-鄂	ngak
-唱	cong
-患	von
-患	fon
-啰	lo
-唾	tui
-唾	to
-唯	vui
-唯	vi
-啤	be
-啤	pi
-啥	sa
-啸	thiau
-崖	ngai
-崖	nga
-崎	ki
-崭	cam
-逻	lo
-崭	zam
-恇	kong
-崔	cui
-帷	vi
-帷	vui
-崩	ben
-崇	cung
-跺	dem
-跺	do
-蹬	dem
-蹬	den
-蹬	dang
-圈	ken
-婴	jin
-铐	kau
-铛	dong
-铝	lu
-铝	li
-铜	tung
-铭	min
-铭	miang
-铲	can
-银	nziun
-矫	giau
-甜	tiam
-秸	git
-梨	li
-犁	lai
-秽	thoi
-秽	ve
-移	ji
-笨	bun
-笼	lung
-笛	tak
-笙	thang
-符	pu
-符	fu
-第	ti
-敏	men
-敏	man
-敏	min
-做	zo
-袋	toi
-悠	jiu
-偿	song
-偶	ngau
-偶	ngeu
-偶	qeu
-偎	vui
-偎	voi
-偷	teu
-您	nin
-售	ciu
-售	ciu
-售	siu
-停	tin
-偏	pen
-躯	ku
-躯	ki
-兜	deu
-假	ga
-衅	thin
-徘	pai
-徘	fui
-徙	si
-徙	thai
-徙	sai
-得	det
-衔	ham
-盘	pan
-舶	pak
-船	son
-舵	to
-斜	cia
-盒	hap
-鸽	gap
-敛	liam
-悉	thit
-欲	juk
-彩	cai
-彩	coi
-领	liang
-脚	giok
-脖	bok
-脯	pu
-豚	tun
-脸	liam
-脱	tot
-象	thiong
-够	geu
-逸	jat
-猜	cai
-猪	zu
-猎	liap
-猫	miau
-凰	vong
-猖	cong
-猛	mang
-祭	zi
-馅	ham
-馆	gon
-凑	ceu
-减	gam
-毫	hau
-烹	pang
-庶	su
-麻	ma
-庵	qam
-痊	con
-痒	jong
-痕	han
-痕	hun
-廊	long
-康	kong
-庸	jung
-鹿	luk
-盗	dau
-章	zong
-竟	gin
-商	song
-族	cuk
-旋	sen
-望	mong
-望	vong
-率	thut
-率	lut
-率	thai
-阎	jam
-阐	can
-阐	san
-阐	cen
-着	cok
-羚	lin
-羚	lang
-盖	goi
-盖	gai
-眷	gen
-粘	nziam
-粘	zam
-粘	nep
-粗	cw
-粒	lap
-粒	nap
-断	ton
-断	don
-剪	zen
-兽	ciu
-兽	siu
-焊	hon
-焕	von
-焕	fon
-清	cin
-添	tiam
-鸿	fung
-淋	lim
-涯	ngai
-涯	nga
-淹	jam
-渠	ki
-渐	ciam
-淑	suk
-淌	tong
-混	fun
-混	gun
-混	kun
-淮	fai
-淆	ngau
-渊	jen
-淫	jin
-渔	ngh
-淘	tau
-淳	dun
-淳	zun
-液	jet
-液	je
-淤	ji
-淡	tam
-淀	dian
-淀	ten
-深	cim
-涮	thot
-涵	ham
-婆	po
-梁	liong
-渗	zam
-渗	cam
-情	cin
-惜	thit
-惜	thiak
-惭	ciam
-悼	dau
-惧	ki
-惧	gi
-惧	gu
-惕	tit
-惕	ti
-惟	vi
-惟	vui
-惟	qui
-惊	giang
-惦	diam
-惦	tiam
-惨	cam
-惋	von
-惋	van
-悴	cui
-悴	zut
-惯	gon
-惯	gan
-寇	keu
-寅	jin
-寄	gi
-寂	zit
-寂	suk
-宿	thuk
-窒	zit
-窑	jau
-密	mit
-密	met
-谋	meu
-谍	tiap
-谎	fong
-谐	gai
-谐	hai
-袱	puk
-袱	fuk
-祷	dau
-祸	fo
-谓	vui
-谜	mui
-谚	ngan
-谜	mi
-逮	dai
-敢	gam
-尉	vui
-屠	tu
-弹	tan
-隋	cui
-隋	sui
-随	cui
-堕	to
-堕	do
-随	sui
-蛋	cun
-蛋	dan
-蛋	tan
-隅	ngeu
-隅	ngu
-隅	nzi
-隆	lung
-隐	jun
-隐	jin
-婚	fun
-婶	sin
-婉	van
-婉	von
-颇	po
-颈	giang
-绩	zit
-绪	thi
-续	cuk
-骑	ki
-绰	zok
-绰	cok
-绳	sun
-维	vui
-绵	men
-绷	ben
-绸	ciu
-综	zung
-绽	ten
-绿	luk
-缀	zot
-缀	zui
-巢	cau
-琴	kim
-琳	lim
-琢	ziok
-琢	diok
-琼	liong
-斑	ban
-替	te
-揍	zeu
-款	kan
-款	kon
-堪	kam
-塔	tap
-搭	dap
-堰	jen
-揩	kai
-揩	gai
-越	jet
-趁	cim
-趋	ci
-趋	cu
-超	cau
-揽	lam
-提	ti
-堤	ti
-堤	bi
-堤	di
-博	bok
-揭	get
-揭	gat
-喜	si
-彭	pang
-揣	cui
-插	cap
-揪	ziu
-搜	theu
-搜	thau
-煮	zu
-援	jen
-搀	cem
-搀	cam
-裁	cai
-裁	coi
-搁	gok
-搓	co
-搓	cai
-搂	leu
-搅	gau
-壹	jit
-握	qak
-握	qok
-握	vok
-搔	thau
-揉	jiu
-斯	thu
-期	ki
-欺	ki
-联	len
-葫	fu
-散	than
-惹	nzia
-葬	zong
-募	mu
-葛	got
-董	dung
-葡	pu
-敬	gin
-葱	cung
-蒋	ziong
-蒂	di
-蒂	ni
-落	lok
-韩	hon
-朝	zau
-朝	cau
-朝	diau
-辜	gu
-葵	kui
-棒	bang
-棱	lin
-棋	ki
-椰	ja
-植	cit
-森	them
-焚	fun
-椅	ji
-椒	ziau
-棵	ko
-棵	po
-棍	gun
-椎	zui
-棉	men
-棚	pen
-棚	pang
-棕	zung
-棺	gon
-榔	long
-惠	jui
-椭	to
-惠	fui
-惑	vok
-逼	bit
-粟	lit
-棘	git
-酣	gam
-酣	ham
-酥	thu
-厨	cu
-厦	ha
-硬	ngang
-硬	nziang
-硝	thiau
-确	kok
-硫	liu
-雁	ngan
-雁	ngen
-殖	cit
-裂	let
-雄	sung
-颊	gap
-颊	hap
-雳	lit
-暂	ciam
-雅	nga
-翘	kiau
-辈	bui
-辈	pui
-悲	bui
-悲	bi
-紫	zi
-紫	zw
-紫	cw
-凿	cok
-辉	kui
-辉	fui
-敞	cong
-棠	tong
-赏	song
-掌	zong
-晴	ciang
-睐	loi
-睐	lai
-暑	cu
-暑	su
-最	zui
-晰	thit
-量	liong
-鼎	dang
-鼎	din
-鼎	den
-喷	pun
-喷	pun
-喳	za
-晶	zin
-喇	la
-遇	ngu
-遇	nzi
-喊	hem
-喊	ham
-遏	qat
-遏	qot
-晾	liong
-晾	long
-景	gin
-畴	ciu
-践	zen
-践	cen
-践	cen
-跋	bat
-跋	pat
-跌	det
-跑	pau
-跛	bai
-跛	bo
-遗	ji
-遗	qui
-蛙	va
-蛛	zu
-蜓	tin
-蜒	jen
-蛤	gep
-蛤	gap
-喝	hot
-鹃	gen
-喂	voi
-喂	vui
-喘	con
-喉	heu
-喻	lu
-喻	ji
-啼	ti
-啼	tai
-喧	sen
-嵌	kiam
-幅	fuk
-帽	mau
-赋	fu
-赌	du
-赎	suk
-赐	thi
-赐	cw
-赔	poi
-黑	het
-铸	zu
-铺	pu
-链	len
-销	thiau
-锁	tho
-锄	cw
-锄	co
-锅	go
-锈	thiu
-锋	fung
-锌	thin
-锐	jui
-甥	thang
-掰	bai
-掰	mak
-短	don
-智	zi
-氮	dam
-毯	tam
-氯	luk
-鹅	ngo
-剩	sin
-稍	thiau
-稍	thau
-程	cin
-程	cang
-程	sin
-程	sang
-稀	si
-税	soi
-筐	kong
-等	den
-筑	cuk
-策	cak
-筛	thi
-筛	thai
-筒	tung
-筏	fat
-答	dap
-筋	gin
-筝	zang
-傲	ngau
-傲	qau
-傅	fu
-牌	pai
-堡	bau
-集	thip
-㗱	zip
-焦	ziau
-傍	pong
-傍	bong
-储	cu
-皓	gau
-皓	hau
-皖	von
-皖	van
-皖	fon
-粤	jet
-奥	qau
-街	gai
-惩	cin
-御	ji
-禹	ji
-渝	ji
-瑜	ji
-翌	jit
-煜	juk
-馨	kin
-馨	thin
-鑫	thin
-歆	thin
-歆	thim
-忻	sun
-莘	thin
-焮	sun
-俞	ji
-虞	ji
-挜(ja,抓取)	ja
-捼(ja,抓挠)	ja
-搤(jak,招手)	jak
-昱	juk
-循	sun
-循	thun	
-艇	tin
-舒	su
-逾	ji
-番	pan
-番	fan
-释	thit
-禽	kim
-腊	lap
-脾	pi
-脾	pi
-腋	je
-腋	jet
-腔	kiong
-腕	von
-腕	van
-鲁	lu
-猩	thiang
-猩	thin
-猬	vui
-猾	vat
-猴	heu
-惫	bui
-惫	pi
-然	nzien
-然	jen
-馈	kui
-馋	can
-装	zong
-蛮	man
-就	ziu
-敦	dun
-斌	fu
-痘	teu
-痢	li
-痪	von
-痛	tung
-童	tung
-竣	zun
-竣	zun
-阔	fat
-善	sen
-翔	thiong
-羡	sen
-普	pu
-粪	bun
-尊	zun
-奠	ten
-道	tau
-道	dau
-遂	cui
-遂	sui
-曾	zen
-曾	cen
-焰	jam
-港	gong
-滞	ce
-湖	fu
-湘	thiong
-渣	za
-渤	but
-渺	miau
-湿	sip
-温	vun
-惗	nem
-渴	hot
-溃	kui
-溅	cen
-滑	vat
-湃	bai
-渝	ji
-湾	van
-渡	tu
-游	jiu
-滋	zw
-渲	sen
-溉	goi
-溉	gai
-溉	goi
-愤	fun
-慌	fong
-惰	to
-愕	ngok
-愕	ngak
-愣	lin
-愣	lang
-惶	fong
-惶	vong
-愧	kui
-愉	ji
-慨	koi
-慨	kai
-割	got
-寒	hon
-富	fu
-寓	ngu
-寓	ngi
-寓	nzi
-窜	con
-窝	vo
-窖	gau
-窗	cong
-窗	cung
-窘	kiun
-遍	pen
-雇	gu
-裕	ji
-裤	ku
-裤	fu
-裙	kiun
-禅	sem
-禅	sam
-禄	luk
-谢	cia
-谣	jau
-谤	bong
-谦	kiam
-犀	thai
-犀	thi
-属	suk
-屡	lui
-强	kiong
-粥	zuk
-疏	tho
-隔	gak
-隙	kiak
-隘	qai
-媒	moi
-絮	thi
-嫂	thau
-媚	mui
-媚	mi
-婿	the
-登	den
-缅	men
-缆	lam
-缉	thip
-缉	zip
-缎	ton
-缓	von
-缓	fon
-缔	ti
-缔	di
-缕	liu
-缕	leu
-缕	lu
-骗	pen
-骗	cot
-编	pen
-编	ben
-骚	thau
-缘	jen
-瑟	thit
-瑟	thet
-鹉	vu
-瑞	jui
-瑰	gui
-瑙	nau
-魂	fun
-肆	thi
-摄	sap
-摸	mo
-填	ten
-搏	bok
-缚	bok
-脯	pu
-攫	giok
-厥	get
-蕨	get
-矍	giok
-彏	guk
-崛	guk
-崛	kut
-噱	giok
-噱	kiok
-塌	tap
-鼓	gu
-摆	bai
-携	kui
-搬	bin
-搬	ban
-摇	jau
-搞	gau
-塘	tong
-摊	tan
-聘	pin
-斟	zim
-蒜	thon
-勤	kin
-勤	kiun
-螔	je
-㨠	miang
-登	dang
-直	tit
-弟	te
-穰	nzio
-篌	geu
-腹	pak
-欣	hiun
-摺	zap
-粅	mut
-熚	bit
-婩	ngok
-掁	cang
-惇	sun
-尅	kat
-騃	ngoi
-獃	ngoi
-㧗	ci
-抸	zep
-聉	tui
-制	zai
-掣	zai
-扽	dui
-卬	nziang
-靴	tho
-靶	ba
-鹊	thiak
-蓝	lam
-墓	mu
-幕	mu
-蓬	pung
-蓄	cuk
-蒲	pu
-蓉	jung
-蒙	mung
-蒸	zin
-献	sen
-椿	cun
-禁	gim
-楚	cw
-楚	co
-楷	kai
-榄	lam
-想	thiong
-槐	fai
-榆	ji
-楼	leu
-概	koi
-概	gai
-赖	lai
-酪	lok
-酬	ciu
-感	gam
-碍	qoi
-碍	qai
-碍	ngoi
-碘	dian
-碘	den
-碑	bui
-碑	bi
-碎	thui
-碰	pung
-碰	cung
-碗	von
-碌	luk
-尴	gam
-雷	lui
-零	lin
-零	lang
-雾	mu
-雾	vu
-雹	bau
-雹	pok
-辐	fuk
-辐	puk
-辑	zip
-辑	thip
-输	su
-督	duk
-频	pin
-龄	lin
-龄	lang
-鉴	gam
-睛	zin
-睹	du
-睦	muk
-睡	soi
-睬	cai
-睬	coi
-瞄	miau
-睫	ciak
-嗜	si
-鄙	pi
-嗦	tho
-嗦	thok
-愚	nzi
-愚	ngu
-暖	non
-盟	min
-盟	men
-歇	ket
-暗	qam
-媕	qam
-谙	qam
-黯	qam
-唵	qam
-唵	qan
-冉	nziam
-冉	jam
-彳亍	cit cuk
-彳	cit
-亍	cuk
-亍	cok
-娿	qo
-鹌	qam
-鹑	cun
-暇	ha
-暇	qa
-照	zau
-畸	ki
-跨	ka
-跷	kiau
-跳	tiau
-跳	tiau
-跺	do
-跪	kui
-路	lu
-跤	gau
-跟	gen
-遣	ken
-蜈	ngu
-蜈	ngh
-蜗	vo
-蛾	ngo
-蜂	fung
-蜕	soi
-蜕	tui
-嗅	siu
-嗡	qung
-嗡	vung
-嗓	thong
-署	cu
-署	su
-置	zi
-置	di
-罪	zui
-罪	cui
-罩	zau
-蜀	zuk
-幌	gong
-幌	fong
-错	co
-锚	miau
-袂	me
-锡	thiak
-锣	lo
-锤	cui
-锥	zui
-锦	gin
-键	ken
-锯	gi
-锯	gio
-锰	mang
-矮	qai
-䂐	dut
-㾑	dep
-腞	dun
-揜	qem
-盫	qem
-盫仆	qem puk
-䠋	bai
-㩧	bak
-㩧	bok
-敀	bak
-倗	pen
-辞	cw
-稚	ci
-稚	zi
-稠	neu
-颓	tui
-愁	theu
-愁	ciu
-筹	ciu
-签	ciam
-简	gan
-筷	kai
-毁	kui
-毁	fui
-舅	kiu
-鼠	cu
-催	cui
-傻	so
-像	ciong
-像	thiong
-躲	biang
-魁	kui
-躲	do
-衙	nga
-衙	ngo
-微	mi
-微	vui
-微	mui
-愈	lo
-愈	ji
-遥	jau
-腻	ni
-腰	jau
-腥	thiang
-腮	thai
-腮	thoi
-腹	pat
-腹	fuk
-腺	then
-腾	ten
-鹏	pang
-腿	tui
-腿	bi
-鲍	bau
-猿	jen
-颖	jin
-触	cuk
-解	gai
-煞	that
-𧊅	gai
-雏	cu
-雏	ci
-馍	mok
-馏	liu
-酱	ziong
-禀	lin
-禀	bin
-痹	bi
-廓	kok
-廓	gok
-痴	ci
-痰	tam
-廉	liam
-靖	cin
-新	thin
-韵	jun
-意	ji
-誊	ten
-粮	liong
-数	thu
-煎	zen
-塑	thok
-塑	cuk
-慈	cw
-煤	moi
-煌	vong
-满	man
-漠	mok
-滇	den
-滇	ten
-滇	din
-源	nzien
-源	jen
-滤	li
-滤	lio
-滥	lam
-滔	tau
-溪	kai
-溜	liu
-漓	li
-滚	gun
-溢	jit
-溯	suk
-溯	thok
-滨	bin
-溶	jung
-溺	niok
-溺	nziok
-粱	liong
-滩	tan
-慎	sin
-誉	ji
-塞	thet
-塞	thai
-寞	mok
-窥	kui
-窟	fut
-寝	cim
-谨	giun
-谨	gun
-谨	gin
-谨	kiun
-褂	ga
-裸	lo
-福	buk
-福	fuk
-谬	miu
-谬	meu
-群	kiun
-殿	ten
-殿	den
-殿	ten
-辟	pit
-辟	pet
-障	zong	
-媳	thit
-嫉	cit
-嫉	zi
-嫌	sam
-嫁	ga
-叠	tiap
-缚	bak
-缚	bok
-缝	fung
-缠	can
-缠	cen
-缤	bin
-剿	giau
-静	cin
-碧	bit
-璃	li
-赘	ngau
-赘	qau
-熬	qau
-熬	ngau
-墙	thiong
-墟	si
-嘉	ga
-摧	cui
-赫	hak
-赫	hok
-截	zet
-誓	si
-誓	se
-境	gin
-摘	zak
-摔	thai
-撇	pet
-聚	ci
-聚	cu
-慕	mu
-暮	muk
-暮	ma
-暮	mu
-落暮	la ma
-夜暮	la ma
-摹	mu
-蔓	man
-蔑	met
-蔡	cai
-蔗	za
-蔽	bi
-蔼	hoi
-蔼	qoi
-蔼	qai
-熙	si
-蔚	vui
-兢	gin
-模	mu
-模	mu
-模	mo
-槛	kiam
-槛	kam
-榴	liu
-榜	bong
-榨	za
-榕	jung
-歌	go
-遭	zau
-酵	hau
-酷	kuk
-酿	nziong
-酸	thon
-碟	tiap
-磁	sak
-磁	cw
-碱	giam
-碱	gam
-碳	tan
-愿	nzien
-需	thi
-辖	got
-裳	cong
-辗	len
-辗	nen
-雌	ci
-雌	cw
-裳	song
-颗	ko
-瞅	ciu
-墅	ja
-墅	su
-嗽	theu
-踊	jung
-蜻	cin
-蜡	lap
-蝇	jin
-蜘	zi
-蝉	can
-蝉	san
-嘛	ma
-嘀	dit
-赚	cam
-锹	ciau
-锻	ton
-镀	tu
-舞	mu
-舞	vu
-舔	tiam
-稳	vun
-熏	sun
-箕	gi
-算	thon
-箩	lo
-管	gon
-箫	thiau
-舆	ji
-僚	liau
-僧	zen
-鼻	pi
-魄	pok
-魅	mui
-魅	mi
-貌	mau
-膜	mong
-膜	mok
-膊	bok
-膊	bak
-膀	bong
-鲜	then
-疑	nzi
-疑	ngi
-孵	fu
-孵	pu
-馒	man
-裹	go
-敲	kau
-豪	hau
-膏	gau
-遮	za
-腐	fu
-腐	fu
-瘩	dap
-瘟	vun
-瘦	theu
-辣	lat
-彰	zong
-竭	get
-端	don
-旗	ki
-精	zin
-粹	cui
-粹	thui
-歉	kiam
-弊	bi
-熄	thit
-熔	jung
-煽	sen
-潇	thiau
-漆	cit
-漱	thu
-漂	piau
-漫	man
-滴	dit
-漾	jong
-演	jin
-演	jen
-漏	leu
-慢	man
-慷	kong
-寨	cai
-赛	thai
-寡	ga
-察	cat
-蜜	met
-寥	liau
-谭	tam
-肇	diau
-肇	cau
-肇	zau
-褐	hat
-褐	hot
-褪	tui
-谱	pu
-隧	sui
-隧	cui
-嫩	nun
-翠	cui
-熊	jung
-凳	den
-骡	lo
-缩	thuk
-慧	jui
-慧	fui
-撵	len
-撵	liang
-撵	nen
-撕	thu
-撕	thi
-撒	that
-撩	liau
-趣	ci
-趟	tong
-趟	tang
-撑	cang
-撑	cang
-撮	zot
-撮	cot
-撬	kiau
-播	bo
-擒	kim
-墩	dun
-撞	cung
-撞	cong
-撞	zung
-撤	cet
-增	zen
-撰	zon
-聪	tung
-聪	cung
-鞋	hai
-鞍	qon
-蕉	ziau
-蕊	jui
-蔬	tho
-蕴	vun
-蕴	jun
-横	vang
-槽	cau
-㨫	gam
-㨫	lam
-樱	jin
-橡	thiong
-樟	zong
-橄	gam
-敷	fu
-豌	von
-豌	van
-飘	piau
-醋	cw
-醋	thu
-醇	cun
-醉	zui
-搉	gok
-磕	kat
-磕	kap
-擖	kat
-搕	kap
-磊	lui
-磅	bong
-碾	len
-震	zin
-霄	thiau
-霉	moi
-谏	gan
-踦	kia
-徛	ki
-蹸	lin
-戛	gat
-戛(ga)	ga
-嘎	gat
-嘎	ga
-苓	lin
-泠	lin
-聆	lin
-聆	lang
-柃	lin
-柃	lang	
-拎	len
-瞒	mun
-瞒	man
-题	ti
-暴	bau
-暴	pau
-瞎	hat
-嘻	si
-嘶	thu
-嘲	cau
-嘹	liau
-影	jang
-影	qiang
-踢	tiak
-踏	tap
-踩	cai
-踪	zung
-蝶	tiap
-蝴	fu
-蝠	fuk
-蝎	get
-蝎	hot
-蝌	ko
-蝗	vong
-蝙	ben
-嘿	he
-嘿	het
-嘱	zuk
-嘱	suk
-幢	tung
-幢	cong
-墨	met
-镇	zin
-镇	zin
-镐	gau
-镑	bong
-靠	kau
-稽	kai
-稽	gai
-稽	gi
-稻	dau
-黎	lai
-黎	li
-稿	gau
-稼	ga
-箱	thiong
-篓	leu
-箭	zen
-篇	pen
-僵	giong
-躺	tong
-僻	pit
-僻	pet
-德	det
-艘	theu
-膝	cit
-膛	tong
-鲤	li
-鲫	zit
-熟	suk
-摩	mo
-褒	bau
-瘪	bet
-瘤	liu
-瘫	tan
-凛	lin
-颜	ngan
-毅	nzi
-糊	fu
-遵	zun
-憋	bet
-潜	ciam
-澎	pung
-潮	cau
-潭	tam
-鲨	tha
-澳	qau
-潘	pan
-澈	cet
-澜	lan
-澄	cen
-澄	den
-澄	cin
-懂	dung
-憔	ziau
-懊	qau
-憎	zen
-额	ngak
-额	nziat
-翩	pen
-褥	nziuk
-谴	ken
-鹤	hok
-憨	ham
-慰	vui
-𤗈(thiap,垫)	thiap
-劈	piak
-履	li
-豫	ji
-缭	liau
-撼	ham
-擂	lui
-操	cau
-擅	san
-擅	sen
-燕	jen
-燕	jen
-蕾	lui
-薯	cu
-薯	su
-薛	thet
-薇	mui
-薇	vui
-擎	kin
-擎	kiang
-擎	giang
-薪	thin
-薄	pok
-颠	den
-翰	han
-翰	hon
-噩	ngak
-噩	ngok
-噩	qok
-橱	cu
-橙	cang
-橘	git
-整	zang
-整	zin
-融	jung
-瓢	piau
-醒	thiang
-霍	hok
-霍	kok
-霎	thap
-霎	thak
-辙	cet
-冀	ki
-餐	con
-嘴	zoi
-嘴	zui
-踱	tu
-蹄	tai
-蹄	te
-蹂	nau
-蹂	jiu
-蟆	ma
-螃	bong
-器	ki
-器	si
-噪	zau
-鹦	jin
-赠	zen
-默	met
-黔	gim
-镜	giang
-赞	zan
-穆	muk
-篮	lam
-篡	con
-篷	pung
-篱	li
-儒	nzu
-儒	ji
-邀	jau
-衡	vang
-衡	hang
-膨	pung
-雕	diau
-鲸	gin
-磨	mo
-瘾	jin
-凝	nzin
-凝	ken
-瘸	ke
-瘸	kio
-凝	nen
-凝	ngin
-凝	ngen
-辨	ben
-辩	pen
-糙	cau
-糖	tong
-糕	gau
-燃	nzien
-燃	jen
-濒	bin
-濒	pin
-澡	cau
-激	git
-懒	lan
-憾	ham
-懈	hai
-窿	lung
-壁	biak
-避	bi
-缰	giong
-缰	kiong
-缴	giau
-戴	dai
-擦	cat
-藉	zit
-藉	cit
-鞠	giuk
-鞠	kiuk
-藏	cong
-藐	miau
-檬	mung
-檐	jam
-檀	tan
-礁	ziau
-磷	lin
-霜	thong
-霞	ha
-瞭	liau
-瞧	ciau
-瞬	sun
-瞳	tung
-瞩	zuk
-瞩	suk
-抌	dem
-瞪	cang
-曙	su
-蹋	tap
-蹋	tep
-蹈	tau
-螺	lo
-蟋	thit
-蟀	thai
-嚎	hau
-赡	sam
-赡	sem
-穗	fui
-穗	jui
-簧	vong
-魏	ngui
-魏	vui
-魏	kui
-穗	jui
-簧	fong
-簧	vong
-簇	cuk
-繁	fan
-徽	fui
-爵	ziok
-朦	mung
-臊	thau
-鳄	ngok
-癌	ngam
-辫	ben
-赢	jang
-糟	zau
-糠	hong
-糠	kong
-燥	zau
-燥	cau
-懦	no
-豁	hot
-臀	tun
-臂	bi
-翼	jit
-骤	zeu
-骤	zeu
-藕	ngau
-鞭	ben
-鞭	bin
-藤	ten
-覆	fuk
-瞻	zam
-蹦	ben
-蹦	bang
-嚣	thiau
-镰	liam
-翻	fan
-鳍	ki
-鹰	jin
-瀑	pau
-襟	gim
-璧	biak
-戳	cok
-孽	nziak
-孽	ngek
-孽	ngak
-孽	ngik
-警	gin
-蘑	mo
-藻	zau
-攀	pan
-曝	bau
-曝	pau
-蹲	dun
-蹭	zen
-蹬	dang
-蹬	den
-巅	den
-簸	bo
-簿	pok
-蟹	hai
-颤	tan
-靡	mi
-癣	then
-瓣	ban
-羹	gang
-冇	mau
-鳖	bet
-爆	bau
-疆	giong
-疆	kiong
-鬓	bin
-壤	nziong
-馨	kin
-耀	jau
-躁	zau
-蠕	thai
-蠕	nziam
-蠕	nzion
-嚼	nziai
-嚼	ziok
-嚼	ziau
-嚷	nziong
-巍	ngui
-籍	cit
-鳞	lin
-魔	mo
-糯	no
-灌	gon
-譬	bi
-蠢	cun
-霸	ba
-露	lu
-霹	pit
-躏	lin
-躏	lun
-黯	qam
-髓	cui
-赣	gung
-囊	nong
-镶	nziong
-镶	thiong
-瓤	nong
-罐	gon
-矗	cuk
-矗	dung
-乂	ngui
-乂	ngi
-乄	ngh
-乜	mia
-乜	nia
-乜	mak
-兀	ngut
-弋	jit
-孑	get
-孓	gut
-幺	jau
-亓	ki
-韦	vui
-廿	nzip
-丏	men
-卅	thap
-卅	tha
-仄	zet
-厄	qak
-厄	ngo
-仃	den
-仃	din
-仉	gi
-仂	lit
-兮	hi
-兮	he
-兮	si
-刈	nzi
-刈	nge
-爻	qau
-爻	ngau
-卞	pen
-闩	thon
-闩	con
-讣	fu
-讣	pu
-尹	jun
-夬	gai
-爿	ben
-爿	ciong
-毋	mh
-毋	vu
-毋	mu
-邗	hon
-邗	gon
-邛	kiung
-艽	kiu
-艿	jin
-札	zap
-叵	po
-叵	bo
-匝	zap
-丕	pi
-丕	poi
-丕	pui
-匜	je
-匜	ji
-劢	mai
-劢	ma
-卟	gai
-卟	gi
-叱	fa
-叱	cit
-叻	liak
-仨	tham
-仕	thu
-仟	cen
-仡	ngat
-仡	hat
-仫	mo
-仞	nziun
-卮	zi
-氐	di
-犰	kiu
-刍	cu
-刍	co
-邝	gong
-邙	mong
-汀	ten
-讦	get
-讧	gung
-讧	fung
-讧	qung
-讪	than
-讪	than
-讫	ket
-讫	kat
-尻	kau
-阡	cen
-尕	ga
-弁	pen
-驭	nzi
-驭	ngio
-匡	kong
-耒	loi
-耒	lui
-玎	den
-玎	dang
-玑	gi
-邢	sin
-圩	si
-圬	qu
-圬	vu
-圭	gui
-扦	cen
-扦	ciam
-圪	gat
-圪	ngat
-圪	nget
-圳	zun
-圹	kong
-扪	mun
-圮	pi
-圯	ji
-芊	cen
-芍	sok
-芄	van
-芄	jen
-芨	kip
-芨	gip
-芑	ki
-芎	giung
-芗	song
-亘	then
-亘	gen
-厍	sa
-夼	kong
-戍	su
-尥	liau
-乩	gi
-旯	la
-曳	je
-岌	kip
-屺	ki
-凼	tong
-囡	ngap
-钇	jet
-缶	feu
-氘	do
-氘	dau
-氖	nai
-牝	bin
-伎	gi
-伛	qu
-伛	ku
-伢	nga
-佤	va
-仵	ngu
-仵	ngh
-伥	diong
-伥	cong
-伧	cong
-伉	kong
-伫	du
-伫	cu
-囟	sin
-汆	con
-刖	nziet
-夙	thuk
-旮	ga
-刎	vun
-刎	vut
-犷	gong
-犸	ma
-舛	con
-凫	pu
-凫	fu
-邬	qu
-邬	vu
-饧	tong
-汕	than
-汔	hat
-汐	cit
-汲	gip
-汲	kip
-汜	thu
-汊	ca
-忖	cun
-忏	ciam
-忏	cen
-讴	qeu
-讵	ki
-讵	ku
-祁	ki
-讷	nap
-聿	lut
-艮	gen
-艮	gan
-艮	gin
-厾	duk
-阱	cin
-阱	ziang
-阮	ngen
-阮	ngan
-阪	ban
-丞	sin
-妁	sok
-牟	meu
-纡	ji
-纣	ciu
-纥	qat
-纥	hat
-纨	van
-纨	jen
-玕	gon
-玙	ji
-抟	ton
-抔	peu
-圻	ki
-坂	ban
-坍	tan
-坞	qu
-坞	vu
-抃	pen
-抉	get
-㧐	thung
-芫	nzien
-邯	ham
-芸	jun
-芾	bui
-芾	fui
-苈	lit
-苣	ki
-芷	zi
-㧍	bang
-芮	biang
-苋	gen
-苋	han
-芼	mau
-苌	diang
-苌	cong
-苁	cung
-芩	gim
-芪	ki
-芡	kiam
-芟	than
-苄	pen
-苎	du
-苎	cu
-苡	ji
-杌	ngut
-杓	sok
-杞	ki
-杈	ca
-忑	tet
-忑	tit
-孛	but
-邴	biang
-邳	pi
-邳	pui
-矶	gi
-奁	liam
-豕	di
-豕	si
-忒	tet
-忒	tit
-欤	ji
-轫	nziun
-迓	nga
-邶	pui
-忐	tan
-卣	jiu
-邺	nziap
-旰	gon
-呋	pu
-呋	fu
-呒	mo
-呒	mu
-呓	nzi
-呔	tai
-呖	lit
-呃	qak
-旸	jong
-吡	bit
-吡	pi
-町	tang
-町	den
-虬	kiu
-呗	bai
-呗	bui
-吽	hung
-吣	thim
-吲	jin
-帏	vui
-岐	ki
-岈	ha
-岈	nga
-岘	han
-岑	kim
-岑	cem
-岚	lam
-兕	thi
-囵	lun
-囫	fut
-钊	zau
-钋	pok
-钌	liau
-迕	ngu
-迕	ngh
-氙	than
-氚	con
-牤	mong
-佞	nin
-邱	kiu
-攸	jiu
-佚	jit
-佝	geu
-佟	dung
-佗	to
-伽	ga
-彷	pong
-彷	fong
-佘	sa
-佥	ciam
-孚	fu
-孚	pu
-豸	ci
-坌	bun
-肟	vo
-邸	di
-邸	de
-奂	fon
-劬	ki
-狄	tit
-狁	jun
-鸠	geu
-鸠	giu
-邹	ziu
-饨	dun
-饨	tun
-饩	si
-饪	nzim
-饫	ji
-饬	cit
-亨	hang
-亨	pang
-庑	mu
-庑	vu
-庋	gui
-疔	dang
-疖	zet
-肓	fong
-闱	vui
-闳	fen
-闵	mun
-闵	min
-羌	kiong
-炀	jong
-沣	fung
-沅	nzien
-沔	men
-沤	qeu
-沌	tun
-沏	cet
-沚	zi
-汨	mit
-汩	jit
-汩	qet
-沂	ngi
-沂	ji
-汾	fun
-沨	pung
-沨	fung
-汴	pen
-汶	mun
-汶	vun
-汶	vun
-沆	kong
-沆	hong
-迒	hong
-忼	kong
-匟	kong
-沩	vui
-泐	let
-泐	lit
-怃	vu
-怃	mu
-怄	qeu
-忡	cung
-忤	ngu
-忤	ngh
-忾	si
-怅	cong
-忻	sun
-忪	cung
-怆	cong
-忭	pen
-忸	niu
-忸	nziuk
-忸	nziu
-诂	gu
-诃	ho
-诅	zw
-诋	di
-诌	ciau
-诏	diau
-诏	zau
-诒	ji
-孜	zw
-陇	lung
-陀	to
-陂	po
-陉	gin
-妍	ngen
-妩	vu
-妪	ji
-妣	bi
-妊	nzim
-妗	gim
-妫	vui
-妞	nziu
-妞	niu
-姒	thi
-妤	ji
-邵	sau
-劭	diau
-刭	giang
-刭	gin
-甬	jung
-邰	toi
-纭	jun
-纰	pi
-纴	nzim
-纶	lun
-纾	su
-玮	vui
-玡	nga
-玭	pin
-玠	gai
-玢	bin
-玢	fun
-玥	nziet
-玦	ket
-盂	ji
-㩉	lap
-忝	tiam
-匦	gui
-坩	gam
-抨	biang
-抨	piang
-抨	pang
-抨	pin
-拤	cia
-坫	zam
-拈	nziam
-拈	zam
-垆	lu
-抻	sin
-抻	cun
-劼	git
-拃	zan
-拊	fu
-拊	pu
-坼	cak
-坻	di
-坻	dai
-㧟	fui
-坨	to
-坭	ni
-坭	nai
-抿	min
-抿	mun
-坳	qau
-耶	ja
-苷	gam
-苯	bun
-苤	pui
-苤	pi	
-苤	poi
-茏	lung
-苫	zam
-苫	tiam
-苜	muk
-苴	ca
-苴	cia
-苴	cw
-苒	ngiam
-苒	nziam
-苒	jam
-苘	ken
-苘	kang
-茌	ci
-苻	fu
-苓	lin
-苓	len
-茚	jang
-茚	jin
-茆	mau
-茑	diau
-茓	set
-茔	jen
-茔	jin
-茔	jang
-茕	kiang
-茕	kin
-茀	but
-茀	fut
-苕	diau
-枥	lit
-枇	pi
-杪	miau
-杳	jau
-杳	nziau
-杳	miau
-枧	gen
-枧	gan
-杵	cu
-枨	dang
-枨	cang
-枞	cung
-枋	biang
-枋	fong
-杻	ciu
-杷	pa
-杼	cu
-杼	zu
-矸	gon
-砀	tong
-刳	ku
-奄	jam
-瓯	qeu
-殁	mut
-郏	gap
-轭	qak
-郅	cit
-郅	zit
-鸢	jon
-鸢	jen
-盱	si
-盱	hi
-昊	hau
-昊	qau
-昙	tam
-杲	gau
-昃	zet
-咂	zap
-呸	pui
-呸	pe
-呸	poi
-昕	sun
-昀	jun
-旻	min
-旻	mun
-昉	fong
-炅	gin
-炅	giun
-炅	gui
-咔	ka
-畀	bi
-虮	gi
-咀	zw
-呷	hap
-呷	qap
-黾	men
-呱	ga
-呤	len
-呤	lin
-咚	dung
-噹	diong
-咆	pau
-咛	nen
-呶	nau
-呶	na
-呣	mh
-呦	jo
-呦	jiu
-咝	thi
-岢	ko
-岿	kui
-岬	gap
-岫	jiu
-帙	cit
-岣	geu
-峁	mau
-刿	gui
-迥	fang
-迥	gang
-岷	min
-剀	koi
-帔	pi
-峄	jit
-沓	tap
-囹	len
-囹	lin
-罔	vong
-罔	mong
-钍	tu
-钎	cen
-钏	con
-钒	fan
-钕	na
-钗	cai
-邾	zu
-迮	zak
-迮	zok
-牦	mau
-竺	zuk
-迤	je
-迤	ji
-佶	git
-佶	get
-佬	lau
-佰	bak
-侑	jiu
-侉	ka
-侉	qu
-臾	kui
-臾	ji
-岱	toi
-侗	tung
-侃	kon
-侃	kan
-侏	zu
-侩	koi
-佻	tiau
-佻	tau
-佾	jit
-佾	qit
-侪	cai
-佼	gau
-佼	gau
-佯	jong
-侬	nung
-帛	pak
-帛	bet
-阜	feu
-阜	fu
-侔	meu
-徂	cw
-刽	kui
-刽	koi
-郄	kiak
-怂	thung
-籴	tak
-籴	tap
-瓮	qung
-瓮	qang
-瓮	vung
-戗	cong
-肼	ziang
-䏝	zon
-肽	tai
-肱	gung
-肫	kin
-剁	do
-剁	dok
-迩	nzi
-郇	sun
-郇	thun	
-狙	zw
-狎	qap
-狍	pau
-狒	pui
-狒	fui
-咎	giu
-炙	zak
-枭	giau
-饯	cen
-饴	ji
-冽	let
-冼	then
-庖	bau
-疠	le
-疝	than
-疡	jong
-兖	jen
-妾	ziap
-劾	het
-劾	hai
-炜	vui
-𬉼	qeu
-炖	dun
-炘	sun
-炝	cong
-炔	ket
-泔	gam
-沭	sut
-泷	lung
-泸	lu
-泱	jong
-泅	siu
-泗	thi
-泠	lang
-泠	lin
-泺	luk
-泺	lok
-泺	puk
-泖	mau
-泫	sen
-泮	pan
-沱	to
-泯	min
-泓	fen
-泾	gin
-怙	fu
-怙	ku
-怵	cut
-怦	pang
-怦	pin
-怵	tut
-怛	dat
-怛	dan
-怏	jong
-怍	cok
-怍	zok
-㑜	zet
-㤘	cau
-怩	ni
-怩	ne
-怫	pui
-怫	put
-怫	fut
-怿	jit
-宕	tong
-穹	kiung
-穹	giung
-宓	met
-宓	mit
-诓	kong
-诓	gong
-诔	lui
-诖	gai
-诘	kit
-戾	le
-戾	lit
-诙	foi
-戽	fu
-郓	jun
-衩	ca
-衩	cai
-祆	qau
-祎	vui
-祉	zi
-祇	ki
-祇	zi
-诛	zu
-诜	then
-诟	keu
-诟	geu
-诠	con
-诣	zi
-诤	zang
-诤	zin
-诧	ca
-诨	ngun
-诨	fun
-诩	qu
-诩	ji
-戕	ciong
-孢	bau
-亟	git
-亟	kit
-亟	ki
-陔	gai
-陔	goi
-妲	dat
-妲	dan
-妯	cuk
-姗	than
-帑	nu
-帑	tong
-弩	nu
-孥	nu
-孥	no
-驽	nu
-虱	thit
-虱	thet
-迦	ga
-迨	dai
-绀	gam
-绁	thet
-绂	but
-绂	fut
-驷	thi
-驸	fu
-绉	nziu
-绉	ziu
-绌	zut
-驿	jit
-骀	toi
-甾	zai
-甾	zi
-珏	nziuk
-珐	fat
-珂	ko
-珑	lung
-玳	toi
-珀	pak
-顸	hon
-顸	han
-珉	min
-珈	ga
-拮	git
-拮	get
-垭	qa
-挝	ga
-挝	go
-挝	vo
-垣	jen
-挞	tat
-垤	det
-赳	giu
-贲	pun
-贲	pui
-垱	dong
-垌	tung
-郝	hok
-垧	song
-垓	goi
-垓	gai
-挦	cim
-垠	nziun
-垠	ngin
-垠	jin
-茜	cen
-荚	gap
-荑	ji
-贳	se
-荜	bit
-莒	lu
-莒	li
-莒	gi
-茼	tung
-茴	fui
-茱	zu
-莛	tin
-荞	kiau
-荞	giau
-茯	puk
-茯	fuk
-荏	nzim
-荇	hen
-荃	cen
-荃	con
-荟	qoi
-荟	zen
-荟	fui
-荀	sun
-荀	thun
-茗	miang
-茗	men
-荠	ci
-茭	gau
-茨	cw
-茨	ci
-垩	qok
-荥	jin
-荦	lok
-荨	tam
-荨	cim
-荩	zin
-剋	ket
-荪	thun
-茹	nzio
-茹	nzia
-荬	mai
-荮	ciu
-柰	nai
-柰	noi
-栉	zit
-栉	zet
-柯	ka
-柯	ko
-柘	za
-栊	lung
-柩	giu
-枰	pin
-栌	lu
-柙	qap
-柙	gap
-枵	thiau
-枵	hau
-柚	jiu
-枳	zi
-枳	zit
-柞	zok
-柞	cok
-柝	tok
-栀	gi
-栀	zi
-柢	di
-栎	lit
-枸	geu
-柈	pan
-柁	to
-枷	ga
-柽	cin
-剌	lat
-酊	dang
-酊	den
-酊	din
-郦	li
-甭	bung
-砗	ca
-砘	dun
-砒	pi
-斫	dok
-砭	ben
-砜	fung
-奎	kui
-耷	jung
-虺	fui
-殂	cw
-殇	song
-殄	ten
-殆	tai
-轱	gu
-轲	ko
-轳	lu
-轶	jit
-轸	zin
-虿	cai
-毖	bi
-觇	cam
-尜	ga
-哐	kong
-哐	kang
-眄	men
-𠳐	bong
-郢	jang
-郢	jin
-眇	miau
-眊	mau
-眈	dam
-眈	cim
-眈	sim
-禺	nzi
-哂	sin
-咴	foi
-曷	qat
-曷	hot
-昴	mau
-昱	juk
-昵	ne
-昵	ni
-昵	nit
-咦	ji
-哓	kiau
-哓	hiau
-哔	bit
-哔	bi
-畎	ken
-毗	pi
-呲	ce
-呲	ci
-胄	ciu
-畋	ten
-畈	fan
-畈	pan
-虼	gat
-虻	mong
-盅	zung
-咣	gong
-哕	qiak
-哕	qiat
-哕	fui
-剐	ga
-郧	jun
-咻	siu
-囿	jiu
-咿	ji
-咿	ngi
-軋	ngat
-奊	fe
-焫	nat
-爇	nat
-哌	pai
-哙	qai
-哙	koi
-哚	do
-咯	lok
-咯	gok
-咩	me
-咩	mi
-咤	za
-咤	za
-咤	ca
-哝	nung
-哏	gen
-哏	han
-哏	qen
-哞	meu	
-峙	ci
-峙	zi
-峣	gau
-峣	ngau
-罘	feu
-帧	zin
-峒	tung
-峤	kiau
-峋	thun
-峋	sun
-峥	zang
-峥	zin
-贶	song
-贶	thung
-钚	but
-钛	tai
-钡	bui
-钣	ban
-钤	lang
-钤	lin
-钤	len
-钨	qu
-钨	vu
-钫	fong
-钯	ba
-氡	dung
-氟	fut
-牯	gu
-郜	gau
-秕	pi
-秭	zi
-竽	ji
-竽	jo
-笈	gip
-笈	kip
-笃	duk
-俦	ciu
-俨	nziam
-俅	kiu
-俪	li
-叟	theu
-垡	fat
-垡	pet
-牮	zen
-俣	ngu
-俣	ngh
-俚	li
-皈	gui
-俑	jung
-俟	thu
-逅	qeu
-逅	geu
-逅	heu
-徇	cun
-徇	sun
-徇	thun
-徉	jong
-舢	than
-俞	ji
-郗	ci
-俎	zw
-郤	kiak
-爰	jen
-郛	fu
-郛	pu
-瓴	lin
-胨	dung
-胪	lu
-胛	gap
-胂	sin
-胙	cu
-胙	cok
-胍	ga
-胗	kin
-胗	zin
-胝	ci
-朐	gu
-朐	gi
-胫	gin
-胫	sin
-鸨	bau
-匍	pu
-狨	jung
-狯	goi
-狯	gai
-飑	pau
-飑	bau
-狩	siu
-狲	thun
-訇	hung
-逄	pong
-逄	pang
-昝	zam
-饷	song
-饸	gap
-饹	lok
-胤	jin
-孪	lon
-娈	lon
-弈	jit
-奕	jit
-庥	thiu
-疬	lit
-疣	jiu
-疥	gai
-疭	zung
-疭	cung
-庠	cong
-庠	song
-竑	hung
-彦	ngan
-彦	ngen
-飒	thap
-闼	tat
-闾	lu
-闾	li
-闿	koi
-阂	ngoi
-阂	het
-羑	jiu
-迸	bang
-迸	bin
-籼	then
-酋	kiu
-炳	biang
-炻	sak
-炽	ci
-炯	gin
-炯	gang
-炯	gen
-烀	fu
-炷	zu
-烃	gin
-烃	tin
-洱	nzi
-洹	jen
-洧	jui
-洌	let
-浃	gap
-洇	jin
-洄	fui
-洙	zu
-涎	cen
-涎	jen
-洎	ki
-洫	sit
-洫	set
-浍	goi
-浍	qoi
-洮	tau
-洵	thun
-洵	sun
-浒	fu
-浔	cim
-浕	zin
-洳	ji
-恸	tung
-恓	thi
-恹	jam
-恫	tung
-恺	koi
-恻	zet
-恂	thun
-恂	sun
-恪	kok
-恽	jun
-宥	jiu
-扃	giang
-扃	gin
-扃	gen
-衲	nap
-衽	nzim
-衿	gim
-袂	me
-祛	ki
-祛	ku
-祜	gu
-祓	but
-祓	fut
-祚	cu
-祚	co
-祚	zok
-诮	ziau
-诮	ciau
-祗	zi
-祢	nzi
-祢	ni
-祢	ne
-诰	gau
-诰	gau
-诳	kong
-鸩	cim
-鸩	dim
-鸩	dam
-昶	cong
-郡	kiun
-郡	kun
-郡	giun
-咫	zit
-咫	zi
-咫	ze	
-弭	mi
-弭	me
-牁	go
-牁	ga
-胥	the
-陛	bi
-陟	zit
-娅	qa
-娅	ja
-姮	hen
-娆	nziau
-姝	zu
-姣	gau
-姘	pin
-姹	ca
-怼	dui
-羿	nge
-羿	ji
-炱	toi
-火炱	fo tam
-矜	gim
-绔	ku
-骁	gau
-骁	giau
-骅	fa
-绗	hang
-绛	gong
-骈	pen
-骈	pin
-骈	piang
-耖	cau
-挈	ke
-挈	get
-珥	nzi
-珙	kiung
-顼	suk
-珰	dong
-珩	hang
-珧	jau
-珣	sun
-珣	thun
-珞	lok
-琤	zin
-琤	zang
-琤	zen
-珲	fun
-敖	ngau
-敖	qau
-恚	fui
-埔	bu
-埔	pu
-埕	tang
-埘	si
-埙	sun
-埚	go
-挹	jip
-耆	ki
-耄	mau
-埒	lot
-捋	lot
-贽	zi
-垸	van
-捃	giun
-盍	hap
-盍	qap
-荸	put
-莆	pu
-莳	si
-莴	vo
-莪	ngo
-莠	jiu
-莓	moi
-莜	jiu
-莅	li
-荼	tu
-莩	piau
-莩	pu
-荽	thui
-莸	jiu
-荻	tit
-莘	thin
-莎	tha
-莞	gon
-莞	van
-莨	long
-莨	liong
-鸪	gu
-莼	cun
-栲	kau
-栳	lau
-郴	cim
-桓	van
-桓	fan
-桡	nziau
-桡	nau
-桎	zi
-桢	zin
-桤	ki
-梃	tin
-栝	gat
-栝	tiam
-桕	giu
-桕	gau
-桁	hang
-桧	goi
-桧	kui
-桅	ngui
-桅	gui
-栟	bin
-桉	qon
-栩	si
-栩	hi
-逑	kiu
-逋	bu
-彧	juk
-鬲	gak
-鬲	lit
-豇	gong
-酐	gan
-逦	le
-逦	li
-厝	cw
-厝	co
-孬	nau
-孬	fai
-砝	fat
-砹	qai
-砺	le
-砺	li
-砧	zem
-砷	sin
-砟	za
-砼	tung
-砥	di
-砣	to
-剞	gi
-剞	ge
-砻	lung
-轼	sit
-轾	zi
-辂	lu
-鸫	dung
-趸	dun
-龀	cun
-龀	tun
-鸬	lu
-虔	ken
-逍	thiau
-眬	lung
-唛	mak
-晟	sin
-眩	sen
-眙	ci
-眙	ji
-哧	ci
-哽	kang
-哽	gang
-唔	ngh
-晁	cau
-晏	jen
-晏	ngan
-晏	qan
-鸮	jau
-趵	bok
-趿	thap
-畛	zin	
-蚨	fu
-蚨	pu
-蚜	nga
-蚍	pi
-蚋	nziui
-蚋	jui
-蚋	nut
-蚬	han
-蚝	mau
-蚧	gai
-唢	tho
-圄	ngu
-圄	ngh
-唣	cau
-唏	si
-盎	qong
-盎	qang
-唑	co
-崂	lau
-崃	loi
-崃	lai
-罡	gong
-罟	gu
-峪	juk
-觊	gi
-赅	goi
-钰	nziuk
-钲	zang
-钲	zin
-钴	gu
-钵	bat
-钹	pat
-钺	vat
-钽	tan
-钼	muk
-钿	ten
-铀	jiu
-铂	pak
-铂	pok
-铂	bok
-铄	sok
-铆	liu
-铈	si
-铉	sen
-铊	to
-铋	bit
-铌	ni
-铍	pi
-䥽	pat
-铎	tok
-铎	dok
-氩	ja
-氤	jin
-氦	hoi
-毪	meu
-舐	se
-秣	mat
-秫	sut
-盉	fo
-笄	gi
-笕	gen
-笊	zau
-笏	fut
-笆	ba
-俸	pung
-俸	fung
-倩	cen
-俵	biau
-偌	nzia
-若	nziok
-若	nzia
-俳	pai
-佇	nen
-咷	diau
-咷	tau
-咷	tau
-䚇	then
-覘	then
-覗	thu
-覗	thin
-䚇	thin
-㧙	met
-靡	me
-弥	me
-扞	gan
-擁	qung
-儭	cin
-親	cin
-逐	diak
-膎	hai
-閪	hai
-膦	lin
-跍	keu
-踎	meu
-趺	bu
-搦	net
-簕	net
-䁙	qen
-㰽	qen
-吂	men
-覗	thi
-俶	suk
-倬	zok
-倏	suk
-㜷	me
-恁	nim
-恁	nzim
-倭	qo
-倭	vo
-倪	nzi
-倪	ne
-俾	bi
-倜	tit
-倜	ti
-隼	thun
-隽	zun
-倌	gon
-倥	kung
-臬	nget
-蓧	tiau
-皋	gau
-郫	pi
-倨	gi
-倨	gio
-倨	gio
-衄	nuk
-颀	ki
-徕	loi
-舫	fong
-舫	pong
-釜	bu
-釜	fu
-奚	kai
-奚	hai
-衾	kim
-胯	ka
-胱	gong	
-胴	tung
-胭	jen
-胭	jin
-脍	koi
-胼	pin
-朕	zim
-脒	mi
-胺	qon
-鸱	ci
-玺	si
-玺	sai
-鸲	gu
-鸲	geu
-狷	gen
-猁	li
-狳	ji
-猃	liam
-狺	nziun
-狺	jen
-逖	tit
-桀	ket
-袅	niau
-袅	nziau
-饽	put
-凇	cung
-栾	lon
-挛	len
-挛	lon
-亳	pok
-疳	gam
-疴	ko
-疴	ko
-袔	ko
-袔	ho
-胢	ka
-疸	dan
-疽	zu
-痈	jung
-疱	pau
-痂	ga
-痉	gin
-衮	gun
-凋	diau
-颃	hong
-恣	zw
-恣	zi
-旆	pui
-旄	mau
-旃	zen
-阃	kun
-阄	geu
-阄	giu
-訚	nziun
-訚	nzin
-阆	long
-恙	jong
-粑	ba
-朔	thok
-郸	dan
-烜	se
-烜	van
-烨	jap
-烩	fui
-烊	jong
-剡	jam
-郯	tam
-烬	cin
-涑	cuk
-涑	thuk
-浯	ngh
-浯	ngu
-涞	loi
-涟	len
-娑	tha
-娑	tho
-涅	net
-涠	vui
-浞	thok
-浞	zuk
-涓	gen
-浥	jip
-涔	cim	
-浜	bang
-浜	bin
-浠	si
-浣	fan
-浣	van
-浚	zun
-悚	thung
-悭	gan
-悭	gen
-悭	qan
-悭	han
-悝	li
-悒	jip
-悌	ti
-悛	zun
-宸	sin
-窈	jau
-剜	ven
-剜	von
-诹	zeu
-诹	zu
-冢	zung
-冢	cung
-诼	ziok
-诼	diok
-袒	tan
-袢	pan
-袢	fan
-祯	zin
-诿	vui
-谀	ji
-谂	sim
-谄	ham
-谇	zut
-屐	kiak
-屙	qo
-陬	zeu
-勐	mang
-奘	zong
-奘	cong
-牂	zong
-蚩	ci
-陲	cui
-姬	gi
-娠	sin
-娌	li
-娉	pin
-娲	ga
-娲	va
-娩	men
-娴	qan
-娴	han
-娣	tai
-娣	ti
-娓	mui
-娓	vui
-婀	qo
-畚	bun
-逡	zun
-逡	cun
-绠	gen
-绠	gang
-骊	li
-绡	thiau
-骋	cin
-绥	thui
-绦	tiau
-绨	tai
-绨	ti
-骎	cim
-邕	jung
-鸶	thu
-鸶	thi
-彗	jui
-彗	thui
-彗	fui
-耜	thi
-耜	si
-焘	tau
-舂	zung
-琏	len
-琇	thiu
-麸	pu
-麸	fu
-揶	ja
-埴	sit
-埴	cit
-埯	jam
-捯	dau
-掳	lu
-掴	gok
-埸	jit
-埵	cui
-赧	nan
-埤	bi
-捭	pai
-逵	kui
-埝	diam
-埝	nziap
-堋	pen
-堋	pang
-堍	tu
-掬	kiuk
-鸷	zip
-掖	jit
-捽	cut
-捽	zut
-掊	peu
-堉	juk
-掸	tan
-捩	lit
-掮	gen
-悫	kok
-埭	tai
-埽	thau
-掇	zot
-掇	dot
-掼	gan
-掼	gon
-聃	dam
-菁	cin
-菁	ciang
-萁	ki
-菘	thung
-堇	giun
-萘	nai
-萋	ci
-萋	ce
-菽	suk
-菖	cong
-萜	tiap
-萸	ji
-萑	fan
-萑	zui
-棻	fun
-棻	pun
-菔	pet
-菔	puk
-菟	tu
-萏	tam
-萃	cui
-菏	ho
-菹	zw
-菪	tong
-菅	gan
-菀	von
-菀	van
-萦	jin
-萦	jang
-菰	gu
-菡	ham
-梵	pam
-梵	fam
-梿	len
-梏	kuk
-梏	guk
-觋	qet
-觋	qat	
-桴	feu
-桴	pu
-桷	gok
-梓	thin
-棁	cet
-棁	zot
-桫	tho
-棂	lin
-啬	thet
-郾	jan
-郾	jen
-匮	kui
-敕	cit
-豉	si
-鄄	gen
-酞	tai
-酚	fun
-戛	kat
-戛	gat
-硎	sin
-硭	mong
-硒	thi
-硖	gap
-硗	kiau
-硐	tung
-硇	nau
-硌	lok
-鸸	nzi
-鸸	ji
-瓠	fu
-瓠	pu
-匏	pau
-厩	giu
-龚	giung
-殒	jen
-殒	jun
-殓	liam
-殍	piau
-赉	loi
-赉	lai
-雩	ji
-辄	zap
-堑	ciam
-眭	gui
-眦	zi
-眦	cw
-眦	cia
-啧	zak
-晡	bu
-晤	ngu
-晤	ngh
-眺	tiau
-眵	ci
-眸	meu
-圊	cin
-喏	nzia
-喏	nak
-喵	miau
-啉	lim
-勖	suk
-晞	si
-唵	qam
-晗	ham
-冕	men
-啭	zon
-畦	kui
-趺	bu
-趺	fu
-啮	ngat
-跄	cong
-蚶	gam
-蚶	ham
-蛄	gu
-蛎	li
-蛎	le
-蛆	cw
-蛆	zw
-蚰	jiu
-蛊	gu
-圉	nzi
-蚱	za
-蚱	zak
-蛉	lin
-蛏	sin
-蚴	jiu
-啁	zau
-啁	diau
-啕	tau
-唿	fut
-啐	cut
-唼	ziap
-唷	juk
-啖	tam
-啵	bo
-啶	tin
-啷	long
-唳	lit
-唳	li
-唰	thot
-唰	sot
-啜	zot
-啜	dot
-帻	zak
-崚	lin
-崦	qam
-崦	jam
-帼	gok
-崮	gu
-崤	ngau
-崆	kung
-赇	kiu
-赈	zin
-赊	ca
-铑	lau
-铒	nzi
-铗	giap
-铗	gap
-铙	nziau
-铟	jin
-铠	koi
-铡	zet
-铢	zu
-铣	then
-铤	tin
-铧	fa
-铨	con
-铩	that
-铪	hap
-铫	jau
-铫	ciau
-铫	tau
-铬	gok
-铮	zang
-铮	zin
-铯	thet
-铰	gau
-铱	ji
-铳	cung
-铵	qon
-铷	ji
-阞	lak
-氪	ket
-牾	ngu
-牾	ngh
-鸹	gat
-秾	nung
-逶	vui
-笺	ciam
-笺	cen
-筇	kiung
-笸	bo
-笪	dat
-笮	zak
-笠	lip
-笥	thu
-笤	zau
-笳	ga
-笾	ben
-笞	ci
-偾	pun
-偾	fun
-偃	jen
-偕	gai
-偕	hai
-偈	ket
-傀	kui
-偬	cung
-偻	leu
-皑	ngoi
-皑	qoi
-皎	gau
-鸻	hang
-徜	song
-舸	ko
-舻	lu
-舴	cok
-舷	sen
-舷	hen
-龛	kam
-翎	lin
-脬	pau
-脘	van
-脲	niau
-匐	puk
-匐	pet
-猗	ji
-猡	lo
-猞	sa
-猝	zut
-猝	cut
-斛	fuk
-斛	fu
-猕	mi
-馗	kui
-馃	go
-馄	fun
-鸾	lon
-孰	suk
-庹	tu
-庾	ji
-痔	ci
-痍	ji
-疵	pi
-疵	ci
-翊	jit
-旌	zin
-旎	ni
-袤	meu
-袤	mau
-阇	du
-阈	jit
-阈	jet
-阈	vet
-阉	jam
-阊	cong
-阋	sit
-阍	fun
-阏	qat
-羟	kang
-羟	kiang
-粝	li
-粕	pak
-敝	pet
-焐	ngu
-烯	si
-焓	ham
-烽	fung
-焖	mun
-烷	van
-焗	kiuk
-焗	kuk
-焗	guk
-渍	zi
-渚	du
-渚	zu
-淇	ki
-淅	thit
-淅	si
-淞	thung
-淞	cung
-渎	duk
-渎	tuk
-涿	duk
-涿	diok
-淖	nau
-挲	tho
-淠	pi
-涸	qok
-涸	kok
-涸	gok
-涸	hok
-渑	men
-淦	gam
-淝	pui
-淬	cui
-涪	 feu
-涪	 pu
-淙	zung
-淙	cung
-涫	gan
-涫	gon
-渌	luk	
-淄	zi
-淄	ci
-惬	gap
-惬	kap
-惬	hap
-悻	hen
-悱	pui
-悱	fui
-惝	cong
-惘	mong
-悸	gui
-悸	gi
-惆	cu
-惆	ciu
-惚	fut
-惇	dun
-惮	san
-惮	don
-惮	tan
-惮	dan
-窕	tiau
-谌	sim
-谏	gan
-扈	fu
-皲	gun
-皲	giun
-谑	nziok
-谑	hiok
-裆	dong
-裆	nong
-袷	gap
-裉	gen
-谒	qet
-谒	qat
-谔	ngok
-谕	lu
-谕	ji
-谖	hen
-谖	jen
-谖	van
-谗	cam
-谙	qam
-谛	ti
-谛	di
-谝	pen
-逯	luk
-郿	mi
-隈	voi
-隈	qoi
-粜	tiau
-隍	vong
-隗	ngui
-隗	gui
-婧	ziang
-婧	ciang
-婊	biau
-婕	ciak
-娼	cong
-婢	bi
-婵	can
-婵	san
-胬	nu
-袈	ga
-翌	jit
-恿	jung
-欸	qe
-绫	lin
-骐	ki
-绮	ki
-绯	fui
-绱	song
-绱	ziong
-骒	ko
-绲	kun
-骓	cui
-骓	zui
-绶	siu
-绺	liu
-绻	gen
-绻	ken
-绾	van
-骖	cam
-缁	ci
-缁	zi
-巢	cau
-琳	lim
-琢	ziok
-琼	kiung
-琪	ki
-瑛	jin
-琦	ki
-琥	fu
-琨	kun
-靓	liang
-靓	ziang
-琰	jam
-琮	zung
-琯	gon
-琬	von
-琬	van
-琛	cim
-琚	gi
-辇	len
-鼋	ngen
-鼋	jen
-揳	set
-揳	ket
-揳	het
-堞	tiap
-搽	ca
-揸	za
-揠	jat
-堙	jin
-趄	ci
-揖	thip
-揖	zip
-咠	zip
-葺	zip
-葺	cip
-颉	git
-塄	lin
-揿	kim
-耋	det
-揄	ji
-蛩	kiung
-蛰	cit
-蛰	cet
-塆	van	
-摒	bin
-揆	kui
-掾	jen
-聒	gat
-葑	fung
-葚	sim
-靰	ngut
-靸	thap
-葳	vui
-葺	jung
-葸	si
-萼	ngok
-葆	bau
-葩	pa
-葶	tin
-蒌	leu
-萱	sen
-戟	git
-葭	ga
-楮	cu
-楮	du
-棼	fun
-棼	pun
-椟	tuk	
-棹	cau
-棹	zok
-椤	lo
-棰	cui
-赍	zi
-赍	zai
-椋	liong
-椁	gok
-椪	bin
-棣	ti
-椐	gi
-鹁	but
-鹁	put
-覃	tam
-覃	cim
-酤	gu
-酢	cu
-酢	co
-酢	cok
-酡	to
-鹂	li
-厥	ket
-殚	dan
-殛	git
-雯	vun
-雱	pong
-辊	gun
-辋	mong
-椠	ciam
-辍	zot
-辎	zi
-斐	fui
-睄	thiau
-睑	giam
-睇	ti
-睃	zun
-戢	cip
-戢	zip
-戢	sip
-喋	tiap
-喋	diap
-嗒	dep
-嗒	dap
-嗒	tap
-喃	nam
-喱	li
-喹	kui
-晷	gui
-喈	gai
-跖	zak
-跖	dak
-跗	fu
-跞	lit
-跚	than
-跎	to
-跏	ga
-跆	toi
-蛱	gap
-蛲	nziau
-蛲	nzau
-蛭	zit
-蛭	det
-蛳	thu
-蛳	thi
-蛐	kiuk
-蛔	fui
-蛔	thai
-蛞	gat
-蛞	kat
-蛴	ce
-蛟	gau
-蛘	jong
-喁	jung
-喁	ngeu
-喟	vui
-喟	kui
-啾	ciu
-啾	ziu
-嗖	theu
-喑	jim
-嗟	zia
-喽	leu
-嗞	zi
-嗞	zw
-喀	kak
-喔	qok
-喔	vo
-喙	zoi
-喙	cui
-嵘	jung
-赋	fu
-崴	vui
-遄	con
-詈	li
-嵎	ji
-嵎	ngu
-崽	ze
-嵬	ngui
-嵛	ji
-嵯	ca
-嵯	co
-嵝	lu
-嵝	leu
-嵫	zw
-幄	quk
-嵋	mi
-嵋	mui
-赕	tam
-铻	ngo
-铻	ngh
-铼	loi
-铿	gen
-锃	cang
-锂	li
-锆	gau
-锇	ngo
-锉	co
-锏	gan
-锑	ti
-锒	long
-锔	kuk
-锕	qo
-掣	ce
-矬	co
-氰	ciang
-毳	cui
-毽	gen
-犊	tuk
-犄	ji
-犋	gu
-犋	ki
-鹄	hok
-鹄	gok
-鹄(qok)	qok
-犍	gen
-嵇	qe
-嵇	gi
-黍	su
-稃	fu
-稂	long
-睥	pe
-筚	bit
-筵	jen
-筌	con
-傣	dai
-傣	tai
-傈	lit
-舄	thit
-牍	duk
-傥	tong
-傧	bin
-遑	fong
-遑	vong
-傩	no
-遁	dun
-徨	fong
-徨	vong
-媭	thi
-畲	sa
-弑	sit
-颌	gap
-颌	qap
-翕	sip
-釉	jiu
-鹆	juk
-舜	sun
-貂	diau
-腈	zin
-腌	jap
-腓	fui
-腆	den
-腴	ji
-腑	fu
-腚	tin
-腱	ken
-鱿	jiu
-鲀	dun
-鲂	fong
-颍	jin
-猢	fu
-猹	ca
-猥	voi
-猥	vui
-飓	gu
-飓	gi
-觞	song
-觚	gu
-猱	nau
-颎	gin
-飧	thun
-馇	za
-馊	theu
-亵	thet
-脔	lon
-裒	feu
-裒	peu
-裒	bau	
-痣	zi
-痨	lau
-痦	ngu
-痦	ngh
-痞	pi
-痤	co
-痫	han
-痫	qan
-痧	tha
-赓	gang
-竦	thung
-瓿	bu
-瓿	piau
-瓿	pu
-啻	si
-啻	ci
-啻	di
-颏	hai
-颏	hoi
-颏	goi
-鹇	han
-阑	lan
-阒	ket
-阕	ket
-粞	thi
-遒	ciu
-遒	siu
-孳	zw
-焯	cok
-焯	zok
-焜	kun
-焙	bui
-焱	jam
-鹈	ti
-湛	zam
-湛	cam
-湛	tam
-渫	thet
-渫	tiap
-湮	jin
-湮	jen
-湎	men
-湜	cit
-渭	vui
-湍	ton
-湍	con
-湫	ciu
-溲	thau
-湟	vong
-溆	ci
-溆	thi
-溆	cu
-湲	jen
-湔	zen
-湉	tiam
-渥	qok
-渥	vok
-渥	vo
-湄	mi
-湄	mui
-滁	cu
-愠	vun
-惺	thin
-愦	gui
-惴	cui
-惴	zui
-惴	con
-愀	ziu
-愎	bit
-愔	jim
-喾	kok
-喾	kuk
-寐	mi
-寐	mui
-谟	mu	
-扉	fui
-裢	len
-裎	cin
-裥	gan
-祾	lin
-祺	ki
-谠	dong
-幂	met
-幂	mit
-谡	suk
-谥	jit
-谧	mit
-遐	ha
-孱	can
-孱	zan
-弼	pet
-弼	pit
-巽	sun
-骘	cit
-媪	vun
-媛	jen
-婷	tin
-巯	ciu
-翚	gui
-皴	zun
-婺	vu
-婺	mu
-骛	mu
-骛	vu
-缂	gak
-缃	thiong
-缄	gam
-㜣	nen
-彘	ci
-彘	ce
-喫	ke
-缇	ti
-缈	miau
-缌	thu
-缑	geu
-缒	cui
-缒	dui
-缗	min
-缗	fun
-飨	song
-耢	lau
-瑚	fu
-瑁	mau
-瑜	ji
-瑗	jen
-瑄	sen
-瑕	ha
-遨	ngau
-遨	qau
-骜	ngau
-骜	qau
-韫	vun
-髡	kun
-塬	nzien
-塬	jen
-鄢	jen
-趔	let
-趑	cw
-趑	zw
-摅	lu
-摅	su
-摁	qen
-蜇	zet
-搋	cai
-搪	tong
-搐	cuk
-搛	liam
-搛	giam
-搠	thok
-摈	bin
-彀	geu
-毂	guk
-搦	nak
-搦	nit
-搡	thung
-搡	thong
-蓁	zin
-戡	kam
-蓍	si
-鄞	giun
-鄞	nziun
-靳	giun
-靳	gin
-蓐	juk
-蓐	nziuk
-蓦	mak
-蓦	mok
-蓦	mu
-鹋	miau	
-蒽	qen
-蓓	poi
-蓓	pui
-蓖	bi
-蓊	qang
-蓊	jung
-蒯	kai
-蓟	gi
-蓟	ge
-蓑	tho
-蓑	thoi
-蒿	gau	
-蒺	cit
-蓠	li
-蒟	gi
-蒡	pong
-蒹	giam
-蒴	thok
-蒗	long
-蓥	qang
-蓥	jin
-蓥	jang
-颐	ji
-楔	thiap
-楔	thet
-楠	nam
-楂	za
-楝	len
-楫	thip
-楫	ziap
-楫	zip
-楸	ciu
-椴	ton
-槌	cui
-楯	dun
-皙	thit
-榈	li
-榈	lu
-槎	ca
-榉	gi
-楦	sen
-楣	mi
-楹	jin
-椽	jen
-椽	con
-裘	giu
-裘	kiu
-剽	piau
-甄	zin	
-酮	tung
-酰	then
-酯	zi
-酩	miang
-蜃	sin
-碛	zak
-碓	doi
-硼	pen
-碉	diau
-碚	pui
-碇	tin
-碇	dang
-碜	cam
-碜	cap
-鹌	qap
-鹌	qam
-辏	ceu
-龃	zw
-龃	cia
-龃	co	
-龅	pau
-龅	bau
-訾	zi
-訾	zw
-粲	can
-虞	ngu
-虞	ji
-虞	ngi
-虞	nzi
-睚	ngai
-睚	nga
-嗪	zin
-嗪	sin
-嗪	cin
-韪	vui
-韪	qui
-嗷	ngau
-嗷	qau
-嗉	thio
-睨	nzi
-睢	hui
-睢	sui
-雎	zio
-雎	cio
-雎	zi
-雎	ci
-雎	cw
-睥	pe
-嘟	du
-嗑	hap
-嗑	gap
-嗫	nziap
-嗫	nziap
-嗬	ho
-嗔	cin
-嗔	ten
-嗝	gak
-戥	cin
-戥	din
-嗄	qat
-嗄	sap
-嗄	ha
-煦	si
-煦	hi
-暄	sen
-遢	tap
-暌	kui
-跬	gui
-跬	ka
-跬	gai
-跶	tat
-跸	bit
-跐	ci
-跣	then
-跹	cen
-跻	zi
-跻	ze
-跻	ce
-蛸	thau
-蜊	li
-蜍	su
-蜍	cu
-蜉	feu
-蜣	kong
-蜣	kiong
-畹	van
-蛹	jung
-嗣	thu
-嗣	cw
-嗯	nh
-嗥	hau	
-嗲	dia
-嗳	qoi
-嗌	jit
-嗌	qiak
-嗍	sok
-嗨	hai
-嗐	hoi
-嗐	hai
-嗤	ce
-嗵	tung
-罨	jang
-罨	jam
-嵊	sin
-嵩	thung
-嵩	cung
-嵩	siung
-嵩	sung
-嵴	zit
-骰	teu
-骰	thai
-锗	zia
-锛	bun
-锜	ki
-锝	det
-锞	go
-锟	kun
-锢	gu
-锨	sun
-锩	gen
-锭	ten
-锭	tin
-锱	zi
-雉	cui
-雉	ci
-氲	jun
-氲	vun
-犏	pen
-歃	cap
-稞	ko
-稗	pai
-稗	pi
-稔	nzim
-稔	nem
-筠	giun
-筠	jun
-筢	pa
-筮	se
-筮	ci
-筲	thau
-筲	thiau
-筱	thiau
-牒	tiap
-牒	kiap
-煲	bau
-敫	giau
-敫	git
-徭	jau
-愆	gen
-愆	ken
-艄	thiau
-觎	ji
-毹	ji
-貊	mak
-貅	siu
-貉	hok
-貉	mok
-颔	ham
-腠	ceu
-腩	nam
-腼	men
-腭	ngok
-腧	ji
-塍	sun
-媵	jin
-媵	jang
-詹	zam
-鲅	bat
-鲆	pin
-鲇	nziam
-鲈	lu
-稣	su
-鲋	fu
-鲐	toi
-肄	ji
-肄	thi
-鹐	giam
-鹐	kiam
-飕	thiu
-飕	theu
-觥	gong
-遛	liu	
-馐	thiu
-鹑	sun
-鹑	cun
-亶	dan
-瘃	diok
-痱	fui
-痼	gu
-痿	vui
-瘐	ji
-瘁	zut
-瘆	cam
-麂	gi
-裔	ji
-裔	je
-歆	him
-歆	sim
-旒	liu
-雍	jung
-雍	qung
-阖	hap
-阗	ten
-阙	ket
-羧	tho	
-豢	fan
-豢	van
-粳	gang
-猷	jiu
-煳	fu
-煜	juk
-煨	voi
-煅	ton
-煊	sen	
-煸	ben
-煸	pen
-煺	tui
-滟	jen
-溱	zin
-溘	hap
-溘	kap
-漭	mang
-漭	mong
-滢	jin
-溥	pu
-溧	lit
-溽	nziuk
-溽	juk
-裟	tha
-溻	tap
-溷	fun
-滗	bit
-滫	thiu
-滫	theu
-溴	ciu
-滏	pu
-滃	qung
-滃	vung
-滦	lon
-溏	tong
-滂	pang
-滂	pong
-滓	za
-溟	min
-滪	ji
-愫	tho
-愫	thu
-慑	sap
-慊	kiam
-慊	kiap
-鲎	heu
-骞	kian
-骞	kan	
-窦	deu
-窠	ko
-窣	cut
-裱	biau
-褚	du
-裨	bi
-裨	be
-裨	pi
-裾	gi
-裰	dot
-禊	he
-谩	man
-谪	zak
-媾	geu
-嫫	mu
-媲	pe
-媲	pi
-嫒	qoi
-嫔	bin
-媸	ci
-缙	zin
-缜	cin
-缛	nziuk
-辔	pui
-辔	bi
-骝	leu
-缟	gau
-缡	li
-缢	jit
-缣	giam
-骟	sen
-耥	tong
-璈	ngau
-璈	qau
-瑶	jau
-瑭	tong
-獒	ngau
-獒	qau
-觏	geu
-慝	nit
-慝	tit
-嫠	li
-韬	tau
-叆	qoi
-髦	mau
-摽	biau
-摽	piau
-墁	man
-撂	liok
-摞	lo
-撄	jin
-翥	zu
-踅	ce
-踅	cet
-摭	zak
-摭	zat
-墉	jung
-墒	song
-榖	guk
-綦	ki
-蔫	jen
-蔷	thit
-蔷	thet
-蔷	ciong
-蔷	ciang
-蔷	thiong
-靺	mat
-靼	dan
-鞅	jong
-靿	jau
-甍	men
-甍	mang
-蔸	deu
-蔟	cuk
-蔺	lin
-戬	zen
-蕖	ki
-蔻	keu
-蓿	thuk
-斡	qat
-斡	gon
-鹕	fu
-蓼	liau
-蓼	luk
-榛	zin
-榛	cin
-榧	fui
-榻	tap
-榫	thun
-榭	cia
-槔	gau
-榱	thoi
-槁	gau
-槟	bin
-槠	zu
-榷	kok
-僰	pet
-僰	bo
-酽	nziam
-酶	moi
-酹	 loi
-酹	 lui
-酹	 lot
-酹	 lai
-厮	thu
-碡	tuk
-碴	za
-碣	get
-碲	di
-磋	co
-臧	zong
-豨	si
-殡	bin
-霆	tin
-霁	ze
-霁	zi
-霁	ce
-辕	jen
-蜚	fui
-蜚	bui
-裴	fui
-翡	fui
-龇	cai
-龇	cw
-龇	ce
-龈	nziun
-睿	jui
-䁖	leu
-睽	kui
-嘞	let
-嘞	le
-嘈	cau
-嘌	piau
-嘁	cit
-嘁	ci
-嘎	gat
-嘎	kat
-嘎	ga
-暧	qoi
-暝	min
-暝	men
-踌	diu
-踌	ciu
-踉	long
-踉	liong
-蜞	ki
-蜥	thit
-蜮	vet
-蝈	gok
-蝈	get
-蜴	jit
-蜱	bi
-蜩	tiau
-蜩	diu
-蜷	ken
-蜿	van
-螂	long
-蜢	mang
-嘘	si
-嘘	hi
-嘡	diong
-嘡	dong
-噹	dang
-鹗	ngok
-嘣	bung
-嘣	bang
-嘤	jin
-嘚	det
-嗾	theu
-嗾	cuk
-嘧	mit
-罴	pi
-罱	lam
-幔	man
-嶂	zong
-幛	zong
-赙	fu
-罂	qang
-骷	gu
-骶	di
-鹘	gut
-锲	ket
-锲	ke
-锲(异读kak)	kak
-锴	kai
-锶	thu
-锷	ngak
-锷	ngok
-锸	cap
-锵	ziong
-锵	ciang
-镁	mui
-镂	leu
-犒	gau
-犒	kau
-箐	ziang
-箐	zin
-箦	zak
-箦	ciak
-箧	kap
-箍	ku
-箍	keu
-箸	zu
-箸	cu
-箬	nziok
-箬	jok
-箅	bi
-箪	dan
-箔	pok
-箔	pak
-箜	kung
-箢	von
-箓	luk
-毓	juk
-僖	si
-儆	gin
-儆	kiang
-僳	thuk
-僭	ziam
-僭	zem
-劁	ziau
-僮	tung
-魃	pat
-魆	sut
-睾	gau
-睾	cak
-艋	mang
-鄱	po
-膈	gak
-膑	bin
-鲑	gui
-鲔	jiu
-鲚	ce
-鲛	gau
-鲟	cim
-獐	zong
-觫	thuk
-雒	lok
-夤	jin
-馑	kiun
-馑	gin
-銮	lon
-塾	suk
-麽	mo
-瘌	lat
-瘊	heu
-瘘	leu
-瘙	thau
-廖	liau
-韶	sau
-旖	ji
-膂	li
-阚	gam
-鄯	sen
-鄯	san
-鲞	thiang
-粿	ko
-粼	lin
-粽	zung
-糁	tham
-槊	thok
-鹚	zw
-鹚	cw
-熘	liu
-熥	tung
-潢	vong
-漕	cau
-滹	fu
-漯	lui
-漶	von
-潋	liam
-潴	zu
-漪	ji
-漉	luk
-漳	zong
-漩	sen
-澉	gam
-潍	vui
-慵	jung
-搴	ken
-窨	jim
-寤	ngu
-寤	mu
-寤	ngh
-綮	ki
-谮	zim
-褡	dap
-褙	boi
-褓	bau
-褛	lu
-褛	leu
-褛	li
-褊	ben
-谯	ciau
-谰	lan
-谲	get
-暨	gi
-屣	thai
-屣	thi
-鹛	mi	
-嫣	jen
-嫱	ciong
-嫱	thiong
-嫖	piau
-嫦	song
-嫚	man
-嫘	lui
-嫡	dit
-鼐	nai
-翟	tit
-翟	cak
-翟	cet
-瞀	meu
-鹜	mu
-鹜	vu
-骠	piau
-骠	biau
-缥	piau
-缦	man
-缧	lui
-缨	jin
-骢	cung	
-缪	liau
-缫	thau
-耦	ngeu
-耦	ngau
-耦	qeu
-耧	leu
-瑾	kiun
-瑾	giun
-瑾	gin
-璜	vong
-璀	cui
-璎	jin
-璁	cung
-璋	zong
-璇	sen
-奭	sit
-奭	sak
-髯	nziam
-髯	jam
-髫	tiau
-脁	tiau
-髫	diau
-撷	ket
-撷	het
-撅	ket
-赭	za
-撸	lu
-鋆	giun
-撙	zun
-撺	con
-墀	ci
-聩	ngai
-聩	gui
-觐	gin
-觐	giun
-鞑	tat
-蕙	jui
-蕙	fui
-鞒	kiau
-蕈	cim
-蕨	ket
-蕤	jui
-蕤	nziui
-蕞	zui
-蕺	zip
-蕺	sip
-瞢	mung
-蕃	pan
-蕃	fan
-蕲	ki
-赜	zak
-赜	cak
-槿	giun
-槿	kiun
-槿	gin
-樯	ciong
-樯	thiong
-槭	cit
-樗	hu
-樗	su
-樗	cu
-樘	tong
-樘	dang
-樘	cang
-樊	fan
-樊	pan
-槲	fuk
-醌	kun
-醅	poi
-醅	pui
-靥	jap
-靥	jam
-魇	jam
-餍	jam
-磔	zak
-磙	gun
-霈	pai
-霈	pui
-辘	luk
-龉	ngh
-龉	ngu
-龊	cok
-觑	thio
-觑	cu
-觑	ci
-㞘(duk,坨)	duk
-瞌	kap
-瞌	hap
-瞋	zin
-瞋	cin
-瞑	men
-瞑	min
-嘭	bung
-嘭	pung
-噎	jit
-噎	qet
-噶	got
-噶	ga
-颙	ngiung
-颙	nziung
-颙	jung
-暹	thiam
-噘	ket
-踔	zok
-踔	dok
-踔	diau
-踝	ka
-踝	fai
-踟	ci
-踟	di
-踒	voi
-踒	vo
-踒	vai
-踒	qo
-踬	zit
-踬	zi
-踮	diam
-踯	cit
-踯	cak
-踺	ken
-踞	gio
-踞	gi
-蝽	cun
-蝾	jung
-蝻	nam
-蝰	kui
-蝮	fuk
-蝮	buk
-螋	theu
-蝓	ji
-蝣	jiu
-蝼	leu
-噗	puk
-噗	pok
-噗	buk
-嘬	zot
-嘬	cui
-颚	ngok
-噍	ziau
-噢	qo
-噙	kim
-噜	lu
-噌	cen
-噔	den
-噔	dang
-颛	zon	
-幞	puk
-幡	fan
-幡	pan
-嶙	lin
-嶝	den
-骺	heu
-骼	gok
-骼	gak
-骸	hoi
-骸	hai
-镊	nziap
-镊	niap
-镉	gak
-镌	zon
-镍	net
-镏	liu
-镒	jit
-镓	ga
-镔	bin
-稷	zit
-箴	gam
-箴	zim
-篑	kui
-篁	vong
-篁	fong
-篌	heu
-篆	zon
-篆	con
-牖	jiu
-儋	dam
-儋	zam
-徵	din
-徵	zin
-徵	zi
-徵	di
-磐	pan
-虢	gak
-虢	ngut
-鹞	jau
-膘	piau
-膘	biau
-滕	ten
-滕	tin
-鲠	gang
-鲡	li
-鲢	len
-鲣	gen
-鲥	si
-鲧	gun
-鲩	van
-鲩	fun
-獗	ket
-獗	get
-獠	liau
-觯	zi
-馓	than
-馔	zon
-馔	pan
-麾	fui
-廛	cen
-瘛	ce
-瘛	cet
-瘼	mok
-瘢	ban
-瘠	zit
-齑	ze
-齑	zi
-羯	get
-羰	tong
-羰	tang
-𥻗	za
-遴	lin
-糌	zan
-糍	zi
-糍	zw
-糅	jiu
-糅	nziu
-熜	cung
-熜	tung
-熵	song
-熠	jip
-澍	su
-澌	thu
-潸	than
-潦	liau
-潦	lau
-潲	thau
-鋈	vok
-潟	thit
-潼	tung
-潺	can
-潺	zan
-憬	gin
-憧	cung
-憧	tung
-憧	diong
-寮	liau
-窳	jiu
-窳	ji
-谳	nget
-谳	jen
-褴	lam
-褟	dap
-褫	ti
-褫	ci
-谵	zam
-熨	qut
-熨	jun
-屦	gu
-屦	lu
-嬉	si
-嬉	hi
-勰	hap
-勰	sap
-戮	luk
-蝥	mau
-缬	het
-缬	ket
-缮	sen
-缯	zen
-骣	can
-畿	gi
-耩	geu
-耨	neu
-耪	pong
-璞	pok
-璟	gin
-靛	ten
-璠	fan
-璘	lin
-聱	ngau
-螯	ngau
-髻	gi
-髭	zi
-髹	siu
-髹	thiu
-擀	gon
-熹	si
-甏	pang
-擞	theu
-縠	guk
-磬	kin
-颞	nziap
-蕻	fung
-蕻	giung
-鞘	ciau
-鞘	thiau
-颟	man
-薤	hai
-薤	he
-薨	hung
-檠	kin
-檠	kiang
-薏	ji
-薮	theu
-薜	pit
-薅	hau
-薅	gau
-樾	jet
-橛	ket
-橇	kiau
-樵	ziau
-檎	kim
-橹	lu
-樽	zun
-樨	thi
-橼	jen
-墼	git
-橐	tok
-翮	gak
-醛	con
-醐	fu
-醍	ti
-醚	mi
-醚	mui
-磲	ki
-赝	ngen
-赝	ngan
-赝	jen
-飙	biau
-殪	je
-殪	ji
-霖	lim
-霏	fui
-霓	nzi
-霓	ni
-霓	ji
-錾	zam
-錾	cam
-辚	lin
-臻	zin
-遽	gi
-氅	cong
-瞟	piau
-瞠	cang
-瞠	cin
-瞠	tong
-瞰	kam
-嚄	vok
-嚄	hok
-嚄	qok
-嚆	hau	
-噤	gim
-暾	dun
-蹀	tiap
-蹀	diap
-踹	ton
-踹	don
-踹	coi
-踹	cai
-踵	zung
-踽	gi
-踽	ki
-蹉	co
-蹁	pen
-螨	man
-蟒	mang
-螈	nzien
-螅	thit
-螭	li
-螠	jit
-螟	min
-噱	giok
-噱	kiak
-噱	giak
-噬	se
-噬	si
-噫	ji
-噻	thai
-噼	pit
-噼	bit
-罹	li
-圜	ven
-圜	jen
-䦃	ziok
-镖	biau
-镗	dang
-镗	tong
-镗	tang
-镘	man
-镚	ben
-镛	jung
-镝	dit
-镞	zuk
-镠	liu
-氇	lo
-氇	lu
-氆	pu
-憩	ke
-穑	thet
-穑	thit
-篝	geu
-篥	lit
-篦	bin
-篦	bi
-篦	pi
-篪	ci
-篙	gau
-盥	gon
-劓	ngi
-劓	nzi
-翱	ngau
-翱	qau
-魉	liong
-魈	thiau
-徼	giau
-歙	hap
-膳	sen
-膦	lin
-膙	giong
-鲮	lin
-鲱	fui
-鲲	kun
-鲳	cong
-鲴	gu
-鲵	nge
-鲷	diau
-鲷	diu
-鲻	zi
-獴	mung
-獭	tat
-獭	cat
-獬	hai
-邂	hai
-邂	gai
-鹧	za
-廨	gai
-赟	jin
-赟	jun
-瘰	lo
-廪	lim
-瘿	jin
-瘵	zai
-瘴	zong
-癃	lung
-瘳	liau
-瘳	ciu
-斓	lan
-麇	giun
-麇	kun
-麈	cin
-嬴	jang
-壅	qung
-羲	si
-羲	ji
-糗	ciu
-瞥	pet	
-甑	zen
-燎	liau 
-燠	qau
-燠	juk
-燔	pan
-燔	fan
-燔	fun
-燧	cui
-燧	sui
-濑	lai
-濉	thui
-潞	lu
-澧	li
-澹	tam
-澹	dam
-澥	hai
-澶	sen
-澶	zen
-澶	tan
-濂	liam
-褰	ken
-寰	ven
-寰	van
-寰	fan
-窸	thit
-褶	zap
-褶	tiap
-褶	sip
-褶	thip
-禧	si
-嬖	pit
-犟	giong
-犟	giang
-隰	sip
-嬗	san
-颡	thong
-缱	ken
-缲	zau
-缳	van
-缳	ven
-璨	can
-璩	ki
-璐	lu
-璪	zau
-璪	cau
-螫	zit
-螫	cit
-螫	diau
-擤	then
-壕	hau
-觳	fuk
-觳	guk
-罄	kin
-擢	cok
-薹	toi
-鞡	la
-鞬	gen
-薷	nzio
-薷	nzu
-薷	nzi
-薷	ji
-薰	sun
-藓	then
-藁	gau
-檄	git
-檩	lin
-懋	meu
-懋	mau
-醢	hoi
-醢	hai
-翳	je
-翳	ji
-礅	dun
-磴	den
-鹩	liau
-龋	ki
-龋	gi
-龋	ku
-龌	qok
-龌	vuk
-龌	vo
-豳	bin
-壑	hok
-壑	kok
-黻	fut
-嚏	ti
-嚅	no
-嚅	nzu
-嚅	nzio
-嚅	ji
-蹑	niap
-蹑	nziap
-蹒	pan
-蹊	kai
-蟥	vong
-螬	cau
-螵	piau
-疃	ton
-螳	tong
-蟑	zong
-嚓	cat
-羁 	gi
-罽	gi
-罾	zen
-嶷	nzi
-黜	cut
-黝	jiu
-髁	ko
-髀	bi
-镡	cim
-镢	giok
-镢	gok
-镢	kok
-镣	liau
-镦	dui
-镦	dun
-镧	lan
-镩	con
-镪	kiong
-镫	den
-罅	la	
-黏	nziam
-黏	nem
-黏	ziam
-簌	thuk
-簌	suk
-篾	met
-篼	deu
-簖	ton
-簋	kui
-鼢	fun
-黛	toi
-黛	dai
-儡	lui
-鹪	ziau
-鼾	hon
-皤	po
-魍	mong
-龠	jok
-繇	jau
-貘	mak
-邈	miau
-邈	meu
-貔	pi
-臌	gu
-膻	tan
-臆	ji
-臃	jung
-鲼	fun
-鲽	tiap
-鳀	te
-鳀	tai
-鳃	thai
-鳅	ciu
-鳇	vong
-鳊	ben
-螽	zung
-燮	set
-燮	thiap
-鹫	ziu
-襄	thiong
-糜	mi
-縻	mi
-膺	jin
-癍	ban
-麋	mi
-懑	man
-濡	nziu
-濡	nzio
-濡	nzi
-濡	lu
-濡	ji
-濮	puk
-濞	pi
-濠	hau
-濯	cok
-蹇	gen
-蹇	gan
-謇	gan
-謇	gen
-邃	thui
-襁	kiong
-檗	biak
-檗	pit
-擘	pit
-擘	piak
-孺	nzu
-孺	nzio
-孺	nzi
-孺	ji
-隳	fui
-嬷	mo
-蟊	mau
-鹬	jut
-鹬	ji
-鍪	meu
-鏊	ngau
-鳌	ngau
-鳌	qau
-鬈	gen
-鬃	zung
-瞽	gu
-鞯	zen
-鞨	hot
-鞫	kiuk
-鞧	ciu
-鞣	nziu
-鞣	jiu
-藜	lai
-藜	li
-藠	kiau
-藠	giau
-藩	pan
-藩	fan
-醪	lau
-蹙	cuk
-礓	giong
-燹	then
-餮	tet
-瞿	ki
-瞿	ci
-曛	sun
-颢	hau
-曜	jau
-躇	cu
-躇	du
-蹚	tong
-鹭	lu
-蟛	pung
-蟪	fui
-蟠	fan
-蟠	pan
-蟮	sen
-鹮	jen
-鹮	van
-黠	get
-黠	git
-黟	ji
-髅	leu
-髂	ka
-镬	vok
-镭	lui
-镯	zok
-镯	zuk
-馥	fuk
-簟	diam
-簟	tam
-簪	zim
-簪	zam
-鼬	jiu
-雠	siu
-艟	tung
-艟	cung
-鳎	tap
-鳏	gon
-鳏	gan
-鳐	jau
-癞	lai
-癔	ji
-癜	den
-癖	pit
-癖	pi
-糨	giong
-糨	ziong
-蹩	pet
-鎏	liu
-懵	mung
-彝	ji
-邋	lap
-鬏	ciu
-攉	hok
-攒	zan
-鞲	geu
-鞴	pi
-藿	hok
-蘧	ki
-蘅	vang
-蘅	hang
-麓	luk
-醮	ziau
-醯	si
-酃	lin
-霪	jin
-霭	qoi
-霨	vui
-黼	pu
-嚯	hok
-嚯	ho
-蹰	cu
-蹶	ket
-蹶	kui
-蹽	liau	
-蹼	buk
-蹼	puk
-蹴	cuk
-蹴	cok
-蹾	dun
-蹿	con
-蠖	vok
-蠓	mung
-蟾	cam
-蠊	liam
-黢	cut
-髋	kon
-髌	bin
-镲	cat
-籀	ciu
-籀	ziu
-籁	lai
-齁	heu
-齁	ku
-魑	li
-魑	ci
-艨	mung
-鳓	let
-鳔	piau
-鳕	thet
-鳗	man
-鳙	jung
-麒	ki
-鏖	qau
-鏖	piau
-羸	lui
-㸆	kau
-瀚	hon
-瀚	han
-瀣	hai
-瀛	jin
-襦	nzu
-襦	nzio
-襦	nzi
-襦	ji
-谶	cim
-襞	piak
-骥	ki
-骥	gi
-缵	zan
-攘	nziong
-攘	jong
-蘩	fan
-蘖	nziet
-蘖	nget
-醴	li
-霰	than
-酆	fung
-矍	giok
-矍	kiok
-曦	si
-曦	hi
-躅	cuk
-鼍	to
-巉	cam
-黩	tuk
-黥	gin
-黥	giang
-黪	cam
-镳	biau
-镴	lap
-黧	li
-纂	con
-璺	mun
-鼯	ngu
-鼯	ngh
-臜	zan
-鳜	ket
-鳝	sen
-鳟	zun
-獾	gon
-孀	thong
-骧	thiong
-瓘	gon
-鼙	bi
-鼙	pi
-醺	sun
-礴	bok
-颦	pin
-曩	nong
-鳢	li
-癫	den
-麝	sa
-夔	kui
-爝	ziok
-灏	hau
-禳	jong
-禳	nziong
-禳	jong
-鐾	bi
-羼	can
-蠡	li
-耱	mo
-懿	ji
-蘸	ziam
-鹳	gon
-霾	mai
-氍	ki
-饕	tau
-躐	liap
-髑	tuk
-镵	ciam
-穰	jong
-穰	nziong
-饔	jung
-饔	qung
-鬻	cuk
-鬻	zuk
-鬟	van
-趱	zan
-攫	giok
-攫	giok
-攥	zap
-颧	gon
-躜	zan
-鼹	qen
-鼹	jen
-癯	ki
-癯	ku
-麟	lin
-蠲	gen
-蠹	du
-蠹	zu
-躞	sap
-衢	ki
-鑫	sim
-鑫	thim
-灞	ba
-襻	pan
-纛	tuk
-纛	tau
-鬣	liap
-攮	nong
-囔	nang
-囔	nziong
-馕	nong
-戆	qung	
-戆	ngong
-戆	gung
-爨	con
-齉	nung
-齉	nong
-尢	jiu
-尢	qong
-卬	ngong
-卬	ngang
-殳	su
-𠙶	qeu
-毌	gon
-邘	ji
-戋	zen
-圢	tang
-圢	tin
-氕	pet
-伋	kip
-仝	tung
-冮	gang
-氿	gui
-氿	giu
-汈	diau
-氾	fan
-忉	dau
-宄	gui
-𬣙	
+丽	li	934
+医	ji	938
+辰	sin	795
+励	li	760
+否	feu	910
+还	han	995
+还	van	995
+还	hai	995
+尬	ga	774
+尬	gai	774
+歼	ciam	662
+来	loi	999
+来	lai	999
+连	len	983
+轩	sen	827
+步	pu	960
+卤	lu	584
+坚	gen	900
+肖	thiau	818
+旱	hon	715
+盯	den	854
+盯	din	854
+盯	dang	854
+呈	cin	745
+呈	cang	745
+时	si	997
+吴	ngh	895
+吴	ngo	895
+吴	ngu	895
+助	cw	903
+县	jen	996
+县	qien	996
+里	li	996
+呆	ngoi	907
+呆	dai	907
+呆	ngong	907
+吱	zi	712
+吱	gi	712
+吠	poi	762
+呕	qeu	662
+园	jen	932
+旷	kong	776
+围	vui	935
+呀	ja	936
+吨	dun	624
+足	zuk	969
+邮	jiu	849
+男	nan	970
+困	kun	858
+吵	cau	799
+吵	cau	799
+串	con	765
+员	jen	967
+呐	nap	714
+呐	nut	714
+呐	na	714
+呐	not	714
+听	tang	983
+听	tang	983
+吟	nzim	820
+吩	pun	755
+吩	fun	755
+吹	cui	888
+呛	cong	634
+吻	vut	823
+吻	vun	823
+吻	mun	823
+吹	cui	888
+吭	kang	667
+吭	hang	667
+呜	qu	784
+呜	vu	784
+吼	hung	823
+吼	kung	823
+吧	ba	982
+邑	jip	648
+吼	hau	823
+吼	heu	823
+别	pet	980
+囤	tun	472
+囤	dun	472
+吮	sun	544
+吮	nziot	544
+岖	ki	496
+岗	gong	781
+帐	zong	821
+财	coi	934
+钉	dang	780
+针	zim	883
+牡	mo	635
+牡	meu	635
+牡	mu	635
+告	gau	959
+我	nga	1000
+乱	lon	937
+利	li	982
+秃	tut	683
+秀	thiu	922
+私	thu	919
+每	mui	957
+兵	bin	966
+估	gu	824
+体	ti	984
+何	ho	978
+佐	zo	719
+佑	jiu	703
+但	dan	996
+伸	sin	898
+伸	cun	898
+佃	ten	421
+佃	ten	421
+作	zok	989
+伯	bak	880
+伶	leng	655
+伶	lang	655
+伶	lin	655
+佣	jung	756
+低	dai	934
+你	ni	999
+住	cu	981
+住	zu	981
+位	vui	976
+伴	ban	843
+伴	pan	843
+身	sin	978
+皂	cau	705
+皂	zau	705
+伺	cw	661
+佛	but	914
+佛	fut	914
+囱	tung	460
+囱	cung	460
+近	kiun	952
+近	gin	952
+彻	cet	831
+役	jit	755
+返	fan	833
+余	ji	915
+希	si	931
+坐	co	962
+谷	guk	904
+妥	to	747
+含	ham	894
+邻	lin	795
+岔	ca	647
+肝	gon	877
+肛	gong	499
+肚	du	831
+肘	ziu	673
+肠	cong	909
+龟	gui	812
+甸	dem	646
+甸	tem	646
+免	men	925
+狂	kong	911
+犹	jiu	867
+狈	bui	680
+狈	boi	680
+角	gok	948
+删	than	962
+条	tiau	952
+彤	tung	605
+卵	lon	792
+灸	giu	543
+岛	dau	862
+刨	pau	584
+迎	nziang	877
+饭	fan	948
+饭	pan	948
+饮	nzim	897
+系	he	960
+系	hai	960
+系	hai	960
+言	nzien	990
+冻	dung	762
+状	cong	893
+亩	meu	598
+况	kong	935
+床	cong	916
+库	ku	897
+庇	bi	589
+庇	pi	589
+疗	liau	845
+吝	lin	617
+应	jin	977
+应	jin	977
+冷	lang	959
+这	zia	999
+这	ze	999
+庐	lu	680
+序	thi	843
+辛	sin	832
+辛	thin	832
+弃	ki	876
+弃	si	876
+冶	ja	687
+忘	mong	908
+闰	jun	473
+闲	han	883
+间	gan	987
+闷	mun	849
+判	pan	850
+判	pun	850
+兑	dui	616
+灶	zau	696
+灿	cam	753
+灼	ziok	676
+弟	ti	952
+弟	tai	952
+汪	vong	779
+灼	sok	676
+沐	muk	704
+沐	mu	704
+沛	pui	651
+沛	fui	651
+汪	vong	779
+汰	tai	601
+汰	toi	601
+沥	lit	715
+沥	lak	715
+沙	tha	936
+汽	si	923
+沃	vok	722
+沦	lun	662
+汹	sung	698
+泛	fan	778
+沟	geu	820
+没	mut	996
+沧	cong	745
+没	mo	996
+沪	fu	657
+沈	sim	856
+沉	cim	939
+沁	cim	680
+沁	sim	680
+怀	fai	900
+忧	jiu	859
+忧	jau	859
+忱	sim	507
+忱	zim	507
+快	kai	978
+完	ngan	975
+完	van	975
+完	von	975
+宋	thung	871
+宏	fen	790
+宏	qong	790
+宏	hung	790
+牢	lau	804
+究	giu	876
+穷	kiung	918
+灾	zai	829
+良	liong	911
+证	zin	946
+启	ki	822
+评	pin	887
+评	piang	887
+补	bu	917
+补	pu	917
+初	co	911
+社	sa	957
+祀	thu	623
+识	sit	946
+诈	za	740
+诉	su	935
+诉	thu	935
+罕	hon	705
+罕	han	705
+诊	zin	761
+词	cw	934
+译	jit	801
+君	giun	879
+灵	lin	949
+即	zit	950
+层	cen	901
+层	cang	901
+层	cin	901
+屁	pi	826
+尿	nziau	814
+尾	mui	902
+迟	ci	849
+迟	di	849
+局	kiuk	957
+改	goi	944
+张	zong	979
+忌	ki	912
+忌	gi	912
+际	zi	909
+陆	luk	907
+阿	qo	951
+阿	qa	951
+陈	cin	939
+陈	dang	939
+阻	zw	842
+阻	zo	842
+附	fu	892
+坠	cui	744
+妓	gi	708
+妙	miau	878
+妖	jau	877
+姊	zi	679
+妨	fong	712
+妒	du	713
+妒	tu	713
+努	nu	850
+努	no	850
+忍	nziun	917
+劲	gin	888
+矣	ji	749
+矣	qe	749
+鸡	gai	957
+鸡	ge	957
+纬	vui	697
+驱	ki	842
+驱	kia	842
+纯	cun	852
+纱	tha	763
+纲	gong	739
+纳	nap	917
+纵	zung	833
+驳	bok	710
+纷	fun	885
+纸	zi	930
+纹	vun	770
+纹	mun	770
+纺	fong	770
+驴	lu	769
+驴	li	769
+纽	nziu	701
+纽	niu	701
+奉	bung	814
+奉	fung	814
+玩	ngan	935
+玩	van	935
+环	van	933
+武	vu	957
+武	mu	957
+青	ciang	971
+责	zat	897
+责	zak	897
+现	sen	965
+表	biau	968
+錶	biau	216
+规	gui	918
+玫	moi	763
+抹	mat	796
+卦	ga	670
+卦	gak	670
+坷	ko	529
+坯	pui	552
+拓	tot	739
+坯	poi	552
+拓	tok	739
+拓	sak	739
+拢	lung	715
+拔	bat	895
+拔	pat	895
+坪	piang	707
+拣	gan	649
+坦	tan	824
+担	dan	909
+坤	kun	716
+押	qap	724
+抽	ciu	875
+拐	goi	750
+拖	to	913
+者	zia	980
+拍	pak	910
+顶	dang	897
+顶	din	897
+拆	cak	784
+拎	lin	673
+拎	len	673
+拥	jung	881
+抵	dai	832
+抵	di	832
+拘	geu	744
+势	si	942
+势	se	942
+抱	bau	922
+抱	pau	922
+拄	zu	518
+拄	cu	518
+垃	lap	710
+拉	lai	971
+拉	la	971
+拦	lan	796
+幸	hen	915
+拌	ban	592
+拧	nen	661
+拂	fut	711
+拂	fit	711
+拂	but	711
+拂	put	711
+拂	pat	711
+拂	pet	711
+拙	cut	748
+拙	zot	748
+拙	cot	748
+招	zau	940
+坡	po	762
+披	pi	848
+拨	bat	799
+拨	pat	799
+拨	but	799
+拨	put	799
+择	cak	870
+抬	toi	894
+择	tok	870
+抬	toi	894
+拇	mu	630
+拗	qau	564
+其	ki	982
+取	ci	948
+茉	mat	610
+茉	mo	610
+苦	ku	945
+苦	fu	945
+昔	thit	696
+昔	thiuk	696
+苛	ko	592
+若	nziok	952
+茂	mau	779
+茂	meu	779
+茂	miu	779
+苹	pin	689
+苗	miau	842
+英	jin	956
+英	qin	956
+苟	geu	747
+苑	von	698
+苑	van	698
+苞	bau	628
+范	fan	862
+直	cit	978
+茁	zot	438
+茄	kio	653
+茄	ke	653
+茎	gin	607
+苔	toi	569
+茅	mau	761
+枉	vong	774
+林	lim	972
+枝	gi	885
+枝	zi	885
+杯	bui	883
+枢	ku	692
+枢	ki	692
+柜	kui	794
+枚	moi	746
+析	thit	868
+析	thak	868
+煠	thap	160
+霅	thap	309
+霅碎	thap thui	1
+板	ban	955
+松	thung	911
+松	cung	911
+枪	ciong	906
+枫	fung	836
+构	geu	860
+杭	hong	692
+杰	ket	888
+述	sut	829
+枕	zim	856
+丧	thong	851
+丧	thong	851
+或	vet	998
+或	fet	998
+画	vak	951
+画	fa	951
+卧	mo	847
+事	thu	994
+刺	ci	902
+枣	zau	715
+雨	ji	972
+雨	qu	972
+卖	mai	920
+郁	juk	825
+矾	fan	351
+矿	kong	851
+码	ma	905
+厕	cet	709
+厕	cu	709
+奈	nai	862
+奔	bun	873
+奇	ki	956
+奋	fun	874
+奋	bun	874
+态	tai	915
+欧	qeu	870
+殴	qeu	591
+垄	lung	583
+補	bu	295
+補	pu	295
+妻	ci	866
+轰	hung	831
+顷	ken	632
+转	zon	967
+转	don	967
+斩	zam	787
+轮	lin	907
+轮	lun	907
+软	nzion	931
+到	dau	998
+非	fui	966
+非	bui	966
+叔	suk	884
+歧	ki	658
+肯	ken	922
+肯	hen	922
+齿	ci	896
+些	thia	991
+卓	zok	800
+卓	cok	800
+卓	diok	800
+虎	fu	972
+虏	lu	672
+肾	sin	766
+贤	hien	871
+贤	sen	871
+尚	song	885
+旺	vong	722
+具	ki	938
+具	gi	938
+具	gu	938
+味	vui	918
+味	mui	918
+果	go	981
+味	mi	918
+昆	kun	744
+国	get	998
+哎	qai	831
+咕	gu	764
+昌	cong	856
+畅	cong	763
+明	min	988
+呵	ga	927
+呵	go	927
+呵	ho	927
+呵	he	927
+畅	diong	763
+明	meng	988
+易	ji	970
+易	jit	970
+咙	lung	673
+昂	ngong	794
+迪	tit	858
+典	den	880
+固	gu	856
+固	go	856
+忠	zung	838
+忠	diung	838
+呻	sin	685
+咒	ziu	795
+咋	tha	783
+咋	za	783
+咐	fu	779
+咐	pu	779
+呼	fu	934
+鸣	min	894
+咏	qiun	675
+咏	jun	675
+呢	ni	936
+呢	ne	936
+咄	cut	679
+咄	cot	679
+咄	zot	679
+咄	dot	679
+咄	dut	679
+咖	ga	759
+岸	qon	808
+岸	ngan	808
+岩	ngam	801
+帖	tiap	765
+贴	diap	879
+罗	lo	944
+帜	zit	644
+帕	pak	759
+岭	liang	785
+凯	kai	836
+凯	koi	836
+败	pai	907
+账	diang	743
+账	zong	743
+贩	fan	710
+贬	ben	629
+购	geu	878
+贮	du	599
+贮	cu	599
+图	tu	975
+钓	diau	732
+制	ze	981
+知	di	993
+知	zi	993
+迭	det	771
+迭	diat	771
+氛	fun	780
+垂	cui	843
+牧	muk	785
+物	mut	987
+物	vut	987
+乖	goi	814
+刮	gat	735
+秆	gon	416
+和	fo	994
+和	vo	994
+季	gui	958
+委	vui	940
+秉	biang	718
+秉	bin	718
+佳	ga	866
+佳	gai	866
+侍	thu	812
+岳	ngok	809
+供	gung	858
+供	giung	858
+供	giung	858
+供	gung	858
+使	thu	971
+例	le	842
+侠	gap	803
+侠	hap	803
+侥	giau	616
+侥	nziau	616
+版	ban	957
+侄	cit	704
+侦	zin	727
+侣	li	694
+侣	lio	694
+侣	lu	694
+侧	zet	847
+侧	cet	847
+凭	pin	857
+凭	pang	857
+侨	kiau	674
+佩	pui	823
+货	fo	910
+侈	ci	660
+依	ji	937
+依	qe	937
+卑	be	796
+卑	bi	796
+卑	bui	796
+的	dit	1000
+啲	dit	624
+迫	pek	839
+迫	pok	839
+质	zit	941
+欣	sun	870
+征	zin	878
+征	zang	878
+往	vong	963
+往	vong	963
+往	qong	963
+爬	pa	840
+彼	pi	816
+彼	bi	816
+径	gin	794
+所	tho	989
+舍	sa	906
+金	gim	996
+刹	that	793
+命	miang	971
+肴	ngau	585
+肴	jau	585
+斧	bu	722
+斧	fu	722
+爸	ba	924
+采	cai	903
+觅	mi	686
+觅	mit	686
+觅	met	686
+受	siu	971
+乳	nziui	865
+贪	tam	837
+念	nziam	926
+念	nem	926
+贫	pin	866
+忿	fun	633
+肤	fu	815
+肺	pui	779
+肢	zi	707
+肢	gi	707
+肿	zung	753
+胀	zong	680
+朋	pen	853
+股	gu	931
+肮	qang	601
+肮	qong	601
+肪	fong	544
+肪	pong	544
+肥	pui	888
+服	fuk	968
+胁	sap	775
+周	ziu	955
+昏	fun	846
+鱼	ngh	971
+鱼	ngia	971
+兔	tu	842
+狐	fu	893
+忽	fut	928
+狗	geu	945
+狞	nen	669
+备	pi	946
+备	pui	946
+饰	si	884
+饱	bau	829
+饲	cw	678
+变	ben	971
+京	gin	935
+京	giang	935
+享	song	823
+庞	pang	804
+店	diam	928
+夜	ja	949
+庙	miau	740
+府	fu	909
+府	pu	909
+底	di	945
+底	dai	945
+疟	nziok	375
+疟	nziak	375
+疙	nget	617
+疙	get	617
+疚	giu	691
+剂	zi	901
+剂	zai	901
+卒	zut	730
+郊	gau	687
+庚	gang	610
+废	fui	852
+净	ciang	847
+盲	mang	768
+放	bong	996
+放	fong	996
+刻	ket	956
+育	juk	964
+氓	mang	700
+氓	min	700
+闸	cap	623
+闹	nau	881
+闹	nau	881
+郑	cang	845
+郑	cin	845
+郑	din	845
+券	ken	862
+卷	gen	906
+单	dan	953
+炬	ki	529
+炬	gio	529
+炬	gi	529
+炒	cau	693
+炊	cui	709
+炕	kang	620
+劥	kang	112
+炎	jam	878
+炉	lu	826
+沫	mat	689
+浅	cen	823
+法	fat	990
+泄	je	776
+泄	se	776
+泄	set	776
+沽	gu	651
+沽	go	651
+河	ho	972
+沾	nziam	742
+沾	zam	742
+泪	lu	908
+泪	lui	908
+沮	zo	672
+沮	zw	672
+油	jiu	963
+泊	pok	704
+泊	pak	704
+沿	jen	801
+泡	pau	835
+泡	pau	835
+注	zu	927
+泻	thia	676
+泣	lap	807
+泣	kip	807
+泞	nin	505
+泞	nen	505
+泌	bi	639
+泌	mi	639
+泳	jun	696
+泳	jung	696
+泥	nai	879
+沸	bui	791
+沸	fui	791
+沼	zau	623
+沼	zau	623
+波	bo	942
+泼	pat	718
+泽	cak	841
+治	di	965
+治	zi	965
+治	ci	965
+怖	bu	788
+怔	zin	785
+怔	zang	785
+怯	kiap	701
+怯	kiak	701
+性	thiang	992
+性	thin	992
+怕	pa	962
+怜	len	846
+怪	gai	958
+怡	ji	781
+学	hok	998
+宝	bau	941
+宗	zung	889
+定	tin	985
+宜	nzi	870
+宠	cung	780
+审	sin	863
+宙	ziu	738
+官	gon	943
+空	kung	976
+帘	liam	736
+宛	von	732
+宛	van	732
+实	sit	984
+试	ci	947
+试	si	947
+郎	long	839
+诗	si	891
+肩	gen	881
+房	fong	968
+诚	sang	856
+诚	sin	856
+衬	cun	719
+衫	tham	782
+视	si	969
+祈	ki	712
+祈	si	712
+话	va	990
+诞	dan	743
+诡	gui	755
+询	thun	825
+询	cun	825
+该	goi	970
+该	gai	970
+详	thiong	781
+建	gen	968
+建	ken	968
+肃	thuk	806
+肃	thu	806
+隶	li	703
+录	luk	910
+帚	ziu	650
+屉	ti	612
+居	gi	941
+居	gio	941
+届	gai	785
+刷	thot	820
+屈	kut	848
+屈	kuk	848
+屈(vut)	vut	1
+弧	gu	655
+弧	fu	655
+弥	ni	783
+弥	mi	783
+弥	nzi	783
+弦	sen	835
+承	sang	895
+承	sin	895
+孟	mang	829
+孟	men	829
+陋	leu	686
+陌	bak	782
+陌	mak	782
+陌	mo	782
+孤	gu	892
+陕	tham	626
+降	gong	880
+函	ham	717
+限	han	929
+妹	moi	924
+姑	gu	897
+姐	zia	963
+姐	ze	963
+姓	thiang	868
+妮	ne	721
+姆	mu	815
+姆	me	815
+妮	ni	721
+始	ci	966
+始	si	966
+迢	zau	581
+迢	tiau	581
+驾	ga	817
+叁	tham	515
+参	cam	900
+艰	gan	767
+艰	gen	767
+线	then	977
+练	len	918
+组	zw	938
+绅	sin	639
+细	the	931
+驶	thu	764
+织	zit	899
+驹	gi	643
+驹	ki	643
+驹	ku	643
+终	zung	952
+驻	zu	770
+驻	cu	770
+绊	ban	614
+绊	pan	614
+驼	to	661
+绍	sau	840
+绎	jit	598
+经	gin	991
+贯	gon	838
+契	ke	730
+贰	nzi	502
+奏	ceu	785
+奏	zeu	785
+春	cun	959
+帮	bong	951
+玷	zam	497
+玷	nziam	497
+珍	zin	843
+玲	lin	827
+玲	lang	827
+珊	than	739
+玻	bo	798
+毒	tuk	918
+型	sin	935
+挂	gak	880
+挂	ga	880
+拭	sit	649
+封	fung	895
+持	ci	933
+拷	kau	564
+拱	gung	733
+项	hong	883
+项	song	883
+垮	ka	646
+挎	ka	552
+城	sang	983
+城	sin	983
+挟	gap	655
+挟	giap	655
+挠	nau	697
+挠	nziau	697
+政	zin	966
+赴	pu	773
+赴	fu	773
+赵	zau	920
+挡	dong	852
+拽	jet	708
+拽	je	708
+哉	zai	660
+挺	tin	874
+括	gat	814
+括	ko	814
+垢	geu	790
+拴	thon	566
+拾	hap	812
+拾	gap	812
+拾	sip	812
+拾	zap	812
+挑	tiau	867
+挑	tiau	867
+垛	do	518
+指	zi	961
+垫	tiam	746
+挣	zang	824
+挤	ze	957
+挤	zi	957
+挤	ziam	957
+拼	piang	839
+拼	pin	839
+挖	vat	759
+挖	vet	759
+按	qon	991
+挥	kui	914
+挪	no	711
+拯	zin	629
+拯	sin	629
+某	meu	892
+甚	sim	927
+荆	gin	773
+併	bin	370
+茸	jung	576
+革	gak	889
+茬	zi	596
+荐	zen	737
+荐	cen	737
+巷	hong	793
+带	dai	973
+草	cau	957
+茧	giam	647
+茵	jin	689
+茶	ca	887
+荒	fong	823
+茫	mong	807
+荡	tong	865
+荣	jung	871
+荤	fun	526
+荧	jin	599
+荧	jang	599
+故	gu	938
+胡	fu	913
+荫	jim	677
+荔	lai	547
+南	nam	981
+药	jok	951
+标	biau	942
+栈	can	681
+柑	gam	555
+枯	ku	845
+柄	biang	760
+栋	dung	733
+相	thiong	989
+查	ca	931
+柏	bak	759
+栅	than	588
+柳	liu	896
+柱	cu	812
+柿	thu	555
+栏	lan	772
+柠	nen	546
+树	su	951
+勃	bot	767
+勃	put	767
+要	qoi	997
+要	jau	997
+柬	gan	547
+咸	ham	889
+威	vui	919
+歪	vai	762
+歪	jai	762
+研	ngen	919
+砖	zon	788
+厘	li	690
+厚	pun	864
+厚	heu	864
+砌	cet	667
+砂	tha	770
+泵	dem	784
+泵	bang	784
+砚	gan	595
+砚	gen	595
+砍	kam	789
+面	men	992
+耐	nai	830
+耐	ngai	830
+耍	tha	751
+牵	ken	814
+鸥	qeu	573
+残	can	887
+轴	cuk	804
+殃	jong	662
+轻	kiang	976
+鸦	qa	702
+皆	gai	807
+韭	giu	463
+背	boi	933
+背	bui	933
+背	poi	933
+背	bi	933
+战	zen	965
+战	zan	965
+摼	kiang	141
+摼	kan	141
+点	diam	991
+点	niam	991
+虐	nziok	746
+虐	nziak	746
+临	lin	911
+览	lam	824
+竖	su	752
+省	then	882
+削	thiok	741
+尝	song	807
+尝	cong	807
+昧	mui	745
+盹	dun	499
+是	si	1000
+是	ze	1000
+盼	pan	751
+眨	jap	781
+哇	va	954
+哄	hung	754
+哑	qa	743
+显	sen	943
+冒	mau	872
+映	jang	801
+映	jin	801
+星	thin	973
+昨	cam	864
+昨	cak	864
+昨	cok	864
+咧	le	733
+昭	zau	796
+畏	vui	757
+畏	voi	757
+趴	pa	743
+胃	vui	869
+贵	gui	914
+界	gai	951
+虹	fung	773
+虾	ha	698
+蚁	nzi	813
+蚁	ni	813
+思	thu	977
+蚂	ma	659
+虽	thui	966
+品	pin	985
+咽	jen	776
+咽	jen	776
+咽	jin	776
+骂	ma	883
+勋	sun	671
+哗	fa	748
+咱	zan	887
+响	song	940
+哈	ha	949
+哈	hap	949
+哈	hat	949
+哆	do	670
+哆	da	670
+咬	ngau	854
+咳	kem	773
+咳	ket	773
+咪	mi	676
+哪	na	956
+哪	nai	956
+哟	jo	733
+炭	tan	779
+峡	hap	691
+峡	gap	691
+罚	fat	793
+贱	cen	791
+贴	tiap	879
+贻	ji	654
+骨	gut	958
+幽	jiu	863
+钙	koi	642
+钝	dun	678
+钞	cau	642
+钟	zung	908
+钢	gong	919
+钠	na	678
+钠	nap	678
+钥	jok	707
+钦	kim	688
+钧	jun	676
+钧	giun	676
+钩	geu	768
+钩	ngeu	768
+钮	niu	582
+钮	neu	582
+卸	thia	687
+缸	gong	673
+拜	bai	866
+看	kon	997
+矩	ki	789
+毡	zam	619
+氢	kin	667
+怎	zin	983
+牲	thang	749
+选	then	918
+适	sit	881
+适	gat	881
+秒	miau	776
+香	song	952
+种	zung	985
+种	zung	985
+秋	ciu	930
+科	ko	978
+重	cung	982
+重	cung	982
+复	fuk	939
+复	puk	939
+竿	gon	734
+段	ton	926
+便	pen	977
+俩	liong	666
+货	fo	910
+贷	toi	788
+贷	dai	788
+顺	sun	921
+修	thiu	940
+俏	ciau	720
+俏	thiau	720
+保	bau	969
+促	cuk	797
+侮	vu	653
+俄	ngo	769
+俐	li	583
+侮	vu	653
+歕	pun	266
+侮	mu	653
+俭	giam	717
+俭	kiam	717
+俗	cuk	914
+俘	feu	706
+俘	fu	706
+信	thin	988
+皇	vong	933
+皇	fong	933
+泉	can	873
+鬼	gui	940
+侵	cim	788
+禹	ji	629
+侯	heu	817
+刁	diau	645
+追	zui	919
+俊	zun	866
+盾	dun	797
+待	toi	935
+待	tai	935
+署	cu	710
+署	su	710
+徊	fai	619
+徊	fui	619
+衍	jen	679
+律	lut	902
+很	han	992
+须	thi	902
+叙	thi	721
+剑	giam	963
+逃	tau	901
+食	sit	975
+盆	pun	765
+胚	poi	499
+胚	pui	499
+胧	lung	697
+胆	dan	924
+胜	sin	934
+胜	thang	934
+焯	cok	332
+焯	dok	332
+擆	dok	26
+胞	bau	766
+胞	pau	766
+胖	pan	836
+脉	mak	811
+胎	toi	813
+勉	men	780
+狭	hap	697
+狮	thu	763
+独	tuk	928
+狰	zang	631
+狡	gau	699
+狱	nziuk	811
+狠	han	899
+贸	mau	860
+怨	jen	857
+急	gip	957
+饵	nzi	545
+饶	nziau	771
+蚀	sit	664
+蚀	set	664
+饺	gau	583
+饼	biang	732
+峦	lon	610
+弯	van	809
+将	ziong	984
+将	ziong	984
+奖	ziong	884
+哀	qoi	832
+亭	tin	805
+亮	liong	938
+度	tu	975
+迹	ziak	898
+迹	zit	898
+庭	tin	856
+疮	cong	736
+疯	fung	866
+疫	jit	742
+疤	ba	672
+咨	zw	738
+姿	zw	818
+亲	cin	971
+音	jim	974
+帝	di	933
+施	si	905
+闺	gui	653
+闻	vun	950
+闻	mun	950
+闽	min	600
+阀	fat	769
+阁	gok	811
+阁	gak	811
+差	ca	927
+差	cai	927
+养	jong	958
+美	mui	986
+姜	giong	763
+叛	pan	782
+送	thung	936
+类	lui	940
+迷	mui	911
+迷	mi	911
+籽	ze	598
+娄	leu	574
+娄	liu	574
+前	cen	991
+首	siu	955
+逆	nziak	840
+兹	zw	695
+总	zung	967
+炼	len	841
+炸	za	840
+烁	sok	729
+烁	lok	729
+炮	pau	836
+炫	sen	659
+烂	lan	834
+剃	tai	576
+剃	ti	576
+洼	va	570
+洁	git	839
+洁	get	839
+洪	fung	826
+洒	tha	781
+洒	sa	781
+柒	cit	379
+浇	ziau	692
+浊	zuk	718
+洞	tung	881
+测	cet	918
+测	cak	918
+洗	the	981
+活	fat	969
+派	pai	924
+派	pai	924
+洽	hap	722
+染	nzian	870
+染	nzian	870
+洽	gap	722
+洛	lok	868
+浏	liu	688
+济	zi	951
+济	ce	951
+济	ze	951
+洋	jong	918
+洲	ziu	852
+浑	fun	835
+浑	vun	835
+浓	nung	822
+津	zin	816
+恃	thu	594
+恃	cw	594
+恃	thi	594
+恒	vang	789
+恒	hang	789
+恢	foi	830
+恢	fui	830
+恍	gong	761
+恍	fong	761
+恬	tiam	656
+恤	set	721
+恰	hap	666
+恰	gap	666
+恼	nau	808
+恨	han	888
+举	gi	938
+举	gio	938
+觉	gok	982
+觉	gau	982
+宣	sen	854
+宦	fon	587
+宦	von	587
+室	sit	947
+宫	giung	907
+宫	gung	907
+宪	sen	688
+突	tuk	962
+突	tut	962
+穿	con	932
+窃	cet	770
+客	kak	955
+客	hak	955
+诫	gai	603
+诫	hai	603
+冠	gon	899
+诬	vu	568
+诬	mu	568
+语	nzio	977
+语	nzi	977
+语	ni	977
+扁	pen	690
+扁	ben	690
+袄	qau	558
+祖	zw	859
+神	sin	994
+祝	zuk	819
+祠	cw	574
+误	ngu	866
+误	mu	866
+误	ngo	866
+诱	jiu	784
+诲	kui	677
+诲	fui	677
+说	sot	999
+诵	thung	698
+垦	ken	585
+退	tui	921
+既	gai	947
+既	gi	947
+屋	quk	910
+昼	ziu	760
+屏	pin	866
+屎	si	970
+费	fui	966
+陡	deu	693
+逊	sun	729
+眉	mi	929
+眉	mui	929
+眉	moi	929
+孩	hoi	967
+陨	jun	577
+除	cu	929
+险	sem	906
+险	sam	906
+院	jen	966
+娃	vai	792
+娃	va	792
+姥	lau	710
+姥	mu	710
+姨	ji	798
+姻	jin	754
+娇	giau	847
+姚	tiau	765
+姚	jau	765
+娜	na	879
+怒	no	913
+怒	nu	913
+架	ga	888
+贺	ho	774
+盈	jin	850
+勇	jung	873
+怠	dai	637
+怠	toi	637
+癸	kui	567
+蚤	zau	458
+柔	jiu	839
+垒	loi	699
+垒	lui	699
+绑	ben	731
+绑	bong	731
+绒	jung	737
+结	get	962
+绕	nziau	821
+绕	nziau	821
+骄	giau	764
+绘	fui	735
+给	gip	986
+绚	sun	597
+绚	sen	597
+络	lok	877
+骆	lok	695
+绝	cet	954
+绞	gau	653
+骇	hai	767
+骇	hoi	767
+统	tung	937
+耕	gang	786
+耘	jun	598
+耗	hau	781
+耙	pa	515
+艳	jen	831
+秦	cin	899
+秦	sin	899
+泰	tai	905
+珠	zu	931
+班	ban	941
+素	thu	938
+匿	nit	690
+匿	nziak	690
+蚕	cam	694
+顽	ngan	720
+顽	van	720
+盏	zan	668
+匪	fui	755
+捞	lau	733
+栽	zai	683
+捕	bu	773
+捕	pu	773
+埂	gang	436
+捂	ngh	738
+捂	qen	738
+振	zin	861
+载	zai	949
+赶	gon	928
+起	si	994
+起	ki	994
+盐	jam	844
+捎	thiau	543
+捎	thau	543
+捍	hon	533
+捏	net	765
+埋	mai	815
+捉	zuk	789
+捆	kun	660
+捐	gen	749
+损	thun	827
+袁	jen	793
+捌	bat	313
+都	du	972
+哲	zet	808
+逝	si	749
+捡	giam	719
+挫	co	676
+挫	co	676
+换	von	956
+挽	men	749
+挚	zip	616
+热	nziet	962
+恐	kung	917
+恐	kiung	917
+捣	dau	676
+壶	fu	778
+挨	qoi	769
+挨	qe	769
+挨	qai	769
+捅	tung	709
+埃	qoi	768
+埃	qai	768
+挨	ngai	769
+捱	ngai	526
+耻	ci	788
+耿	gang	726
+耽	dam	694
+聂	niap	686
+恭	giung	807
+恭	gung	807
+莽	mong	678
+莱	loi	845
+莱	lai	845
+莲	len	833
+莽	mang	678
+莫	muk	916
+莫	mak	916
+莫	mok	916
+莉	li	838
+荷	ho	764
+获	vok	867
+晋	zin	760
+啱	ngam	444
+晋	gin	760
+恶	qok	945
+莹	jin	790
+莺	jin	755
+真	zin	988
+框	kong	696
+梆	bong	507
+桂	gui	820
+桔	git	542
+栖	ci	736
+档	dong	805
+桐	tung	692
+株	zu	715
+桥	kiau	901
+桦	fa	594
+栓	thon	595
+桃	tau	890
+格	gak	964
+桩	zong	666
+校	gau	947
+校	gau	947
+核	hak	885
+核	hat	885
+核	fut	885
+核	vut	885
+样	nziong	958
+样	jong	958
+根	gin	950
+索	thok	922
+哥	go	964
+速	cuk	931
+逗	teu	744
+䚵	teu	1
+逗	deu	744
+栗	lit	692
+贾	ga	800
+酌	ziok	648
+配	pui	909
+翅	ci	741
+辱	nziuk	804
+唇	sun	856
+夏	ha	886
+砸	zat	716
+砰	bang	726
+砰	biang	726
+砰	pin	726
+砰	piang	726
+砾	lit	567
+础	cu	757
+础	co	757
+破	po	947
+原	nzien	972
+原	jen	972
+套	tau	915
+逐	cuk	871
+逐	tuk	871
+烈	let	840
+殊	su	795
+殉	sun	611
+顾	gu	922
+轿	kiau	712
+轿	giau	712
+较	gau	905
+顿	dun	925
+毙	bi	677
+致	di	897
+致	zi	897
+柴	cai	791
+桌	dok	892
+桌	zok	892
+虑	li	854
+虑	lu	854
+虑	lio	854
+监	gam	895
+紧	gin	961
+党	dong	932
+逞	cin	729
+逞	sin	729
+晒	thai	987
+眠	min	775
+眠	men	775
+晓	nziau	901
+晓	ngau	901
+晓	sau	901
+哮	hau	657
+唠	lau	630
+鸭	qap	751
+晃	gong	852
+晃	long	852
+哺	bu	691
+哺	pu	691
+晌	song	720
+剔	tit	660
+剔	tiak	660
+剔	ti	660
+晕	fun	827
+晕	jun	827
+蚌	bung	668
+蚌	bang	668
+畔	ban	648
+畔	pan	648
+蚣	gung	502
+蚊	mun	645
+蚪	deu	392
+蚓	jin	547
+哨	thau	717
+哩	li	732
+圃	pu	506
+圃	bu	506
+哭	kuk	909
+哦	qo	989
+恩	qen	914
+鸯	jong	570
+鸯	qiong	570
+嗯	qen	998
+摁	qen	550
+唤	von	813
+唁	ngen	399
+唁	nzien	399
+唁	jen	399
+哼	hng	871
+唧	zit	641
+啊	qa	993
+唉	hai	814
+唉	qai	814
+唆	tho	534
+罢	ba	865
+峭	ciau	610
+峨	ngo	633
+峰	fung	867
+圆	jen	899
+峻	zun	696
+贼	cet	828
+贿	fui	682
+贿	kui	682
+赂	lok	548
+赃	zong	712
+钱	cen	958
+钳	kiam	654
+钻	zon	821
+钾	gap	571
+铁	tet	961
+铃	lang	864
+铃	leng	864
+铅	jen	713
+缺	ket	850
+氧	jong	808
+氨	qon	680
+特	tit	975
+特	tet	975
+牺	thi	726
+造	cau	925
+造	zau	925
+乘	sang	873
+乘	sin	873
+敌	tit	923
+秤	piang	700
+秤	pin	700
+租	zw	837
+积	zit	921
+秧	jong	517
+秩	cit	648
+称	cin	915
+称	cang	915
+秘	bi	899
+秘	mit	899
+透	teu	890
+笔	bit	937
+笑	thiau	990
+笋	thun	606
+债	zai	788
+借	zia	880
+值	cit	952
+倚	ji	801
+俺	ngam	741
+倾	kin	854
+倾	ken	854
+倒	dau	961
+倒	dau	961
+倘	tong	681
+俱	ki	834
+俱	gi	834
+倶	gu	2
+倡	cong	649
+倡	cong	649
+候	heu	980
+赁	lin	607
+俯	pu	758
+俯	fu	758
+倍	pui	805
+倍	boi	805
+倦	gen	711
+健	ken	912
+臭	ciu	816
+射	sa	900
+躬	giung	762
+躬	gung	762
+息	thit	967
+倔	kut	626
+倔	kuk	626
+徒	tu	859
+徐	ci	879
+徐	cu	879
+殷	jin	734
+舰	lam	862
+舰	gen	862
+舱	cong	705
+般	ban	953
+航	hong	905
+途	tu	861
+拿	na	954
+耸	thung	757
+爹	dia	819
+舀	jau	490
+爱	qoi	981
+豺	coi	669
+豹	bau	750
+颁	ban	604
+颁	bun	604
+颂	thung	669
+翁	jung	766
+翁	vung	766
+翁	qung	766
+翁	qang	766
+胰	ji	499
+脆	cui	818
+脂	zi	828
+胸	sung	885
+胳	lok	759
+脏	zong	805
+脐	ci	598
+脐	ce	598
+胶	gau	893
+脑	nau	940
+脓	nung	532
+逛	gong	748
+狸	li	721
+狼	long	912
+卿	kin	745
+逢	fung	842
+逢	pung	842
+鸵	to	423
+留	liu	943
+鸳	jen	601
+皱	nziu	841
+皱	ziu	841
+皱	zeu	841
+饿	ngo	930
+馁	lui	512
+馁	nui	512
+凌	lin	890
+凄	ci	758
+恋	len	866
+桨	ziong	525
+浆	ziong	798
+衰	thoi	753
+衷	zung	723
+高	gau	994
+郭	gok	817
+席	cit	880
+席	ciak	880
+准	zun	945
+座	co	901
+症	zin	829
+病	piang	961
+疾	cit	891
+斋	zai	653
+疹	zin	556
+疼	tung	853
+疲	pi	791
+脊	zit	681
+效	ngau	889
+离	li	966
+紊	vun	561
+紊	min	561
+紊	mun	561
+紊	vin	561
+唐	tong	836
+瓷	cw	783
+资	zw	969
+凉	liong	856
+凉	long	856
+択	tak	136
+站	cam	960
+剖	pau	730
+剖	peu	730
+竞	gin	807
+部	bu	979
+部	pu	979
+旁	pong	930
+旅	li	929
+旅	lio	929
+畜	cuk	734
+阅	jet	766
+羞	thiu	820
+羞	ciu	820
+羔	gau	552
+瓶	piang	841
+拳	ken	873
+粉	fun	924
+料	liau	956
+益	jit	882
+兼	kiam	844
+兼	giam	844
+烤	kau	728
+烘	hung	652
+烦	fan	893
+烧	sau	866
+烛	zuk	786
+烟	jen	917
+烙	lok	601
+烙	lau	601
+递	ti	829
+涛	tau	790
+浙	zet	742
+涝	lau	473
+浦	pu	755
+浦	bu	755
+酒	ziu	963
+涉	sap	764
+消	thiau	944
+涡	vo	644
+浩	hau	837
+海	hoi	992
+海	hai	992
+涂	tu	867
+浴	juk	804
+浮	feu	887
+涣	fon	588
+涣	von	588
+涤	di	692
+涤	dit	692
+涤	tit	692
+流	liu	987
+流	leu	987
+润	jun	819
+涧	gan	577
+涕	ti	736
+浪	nong	939
+浪	long	939
+浸	zim	724
+涨	zong	737
+烫	tong	699
+涩	thip	738
+涩	giap	738
+涩	thep	738
+涌	jung	839
+悖	but	604
+悖	bot	604
+悖	put	604
+悟	ngh	825
+悟	ngu	825
+悄	thiau	861
+悄	ciau	861
+悍	hon	699
+悔	fui	818
+悔	kui	818
+悯	min	630
+悯	min	630
+悦	jet	804
+害	hoi	941
+宽	kon	852
+家	ga	997
+家	ka	997
+宵	thiau	744
+宴	jen	750
+宾	bin	844
+窍	kiau	663
+窄	kiap	682
+窄	zat	682
+窄	zak	682
+容	jung	959
+宰	zai	732
+案	qon	940
+请	ciang	997
+请	cin	997
+朗	long	827
+诸	zia	853
+诸	zu	853
+诺	nziok	857
+诺	nok	857
+读	tuk	896
+扇	sen	774
+诽	bui	534
+诽	fui	534
+袜	mat	706
+袖	ciu	803
+袍	pau	775
+被	pi	987
+祥	thiong	821
+课	ko	926
+冥	min	799
+冥	miang	799
+谁	sui	959
+调	tiau	954
+调	diau	954
+冤	jen	802
+谅	liong	765
+谆	dun	665
+谈	tam	926
+谊	nzi	698
+剥	bok	746
+剥	bak	746
+恳	ken	687
+恳	kin	687
+展	zen	945
+展	zan	945
+剧	git	874
+剧	gi	874
+屑	thet	738
+弱	nziok	884
+陵	lin	838
+祟	thui	610
+陶	tau	812
+陷	ham	846
+陪	pui	874
+娱	mu	783
+娱	ngu	783
+娱	ngh	783
+娟	gen	755
+恕	su	671
+娥	ngo	641
+娘	nziong	929
+通	tung	987
+能	nen	982
+难	nan	976
+预	ji	886
+桑	thong	869
+绢	gen	611
+绣	thiu	810
+验	nziam	882
+继	gi	919
+骏	zun	660
+球	kiu	959
+琐	tho	643
+理	li	993
+琉	liu	652
+琅	long	640
+捧	bung	748
+堵	du	735
+措	cw	807
+措	co	807
+描	miau	773
+域	vet	820
+域	quet	820
+捺	na	567
+捺	nai	567
+捺	nap	567
+掩	jam	827
+捷	ciak	802
+排	pai	921
+焉	jen	685
+掉	diau	928
+捶	cui	625
+赦	sa	610
+堆	doi	835
+堆	dui	835
+推	tui	918
+埠	bu	552
+掀	sin	713
+掀	sun	713
+掀	jen	713
+授	siu	811
+捻	nem	587
+教	gau	985
+教	gau	985
+掏	tau	787
+掐	gap	526
+掐	hap	526
+掠	liok	766
+掂	tiam	588
+掂	diam	588
+培	pui	840
+接	ziap	976
+掷	cit	703
+控	kung	888
+探	tam	875
+据	ki	904
+据	gi	904
+据	gio	904
+掘	kut	700
+掘	kuk	700
+掺	cam	588
+职	cit	923
+职	zit	923
+基	gi	962
+著	zu	892
+著	zok	892
+著	cok	892
+聆	lang	599
+聆	lin	599
+勘	kam	637
+聊	liau	873
+娶	ci	739
+著	zu	892
+著	zok	892
+菱	lin	625
+勒	let	844
+黄	vong	970
+菲	fui	869
+菲	bui	869
+萌	min	682
+萌	men	682
+萝	lo	723
+菌	kiun	809
+萎	vui	628
+菜	coi	915
+萄	tau	668
+菊	kiuk	703
+菩	pu	665
+菩	po	665
+萍	pin	770
+菠	bo	533
+萤	jin	686
+萤	jang	686
+营	jang	939
+营	jin	939
+乾	ken	746
+乾	gon	746
+萧	thiau	891
+萨	that	854
+菇	ku	613
+械	hai	852
+彬	bin	735
+梦	mung	934
+婪	lam	628
+梗	gang	733
+梧	ngu	646
+梧	ngh	646
+梧	ngo	646
+梢	thiau	628
+梅	moi	890
+检	giam	885
+梳	tho	694
+梯	toi	792
+桶	tung	741
+梭	tho	673
+救	giu	907
+曹	cau	712
+副	fu	902
+票	piau	933
+酝	jun	547
+酗	sung	474
+酗	si	474
+厢	thiong	716
+戚	cit	731
+硅	gai	734
+硅	goi	734
+硕	sak	776
+硕	thok	776
+奢	sa	691
+盔	kui	706
+爽	thong	806
+聋	lung	697
+袭	thip	843
+袭	thip	843
+盛	sin	872
+匾	ben	540
+雪	thet	946
+辅	pu	764
+辅	fu	764
+辆	liong	825
+颅	lu	639
+虚	si	913
+彪	biau	700
+雀	ziok	851
+堂	tang	925
+堂	tong	925
+常	song	975
+眶	kong	675
+匙	si	715
+晨	sin	853
+睁	zang	842
+眯	mi	755
+眼	ngan	989
+悬	sen	873
+野	ja	919
+啪	pa	759
+啪	pak	759
+啦	la	990
+曼	man	831
+晦	fui	722
+晚	man	951
+晚	van	951
+啄	diok	563
+啄	ziok	563
+啡	fui	758
+啡	bui	758
+距	ki	845
+距	gi	845
+距	gio	845
+趾	zi	659
+啃	ken	629
+跃	jok	833
+略	liok	890
+蚯	ciu	471
+蚯	kiu	471
+蛀	zu	440
+蛇	sa	887
+唬	fu	644
+累	lui	885
+累	lui	885
+鄂	ngok	630
+鄂	ngak	630
+唱	cong	882
+患	von	853
+患	fon	853
+啰	lo	578
+唾	tui	670
+唾	to	670
+唯	vui	855
+唯	vi	855
+啤	be	699
+啤	pi	699
+啥	sa	955
+啸	thiau	798
+崖	ngai	740
+崖	nga	740
+崎	ki	584
+崭	cam	589
+逻	lo	700
+崭	zam	589
+恇	kong	418
+崔	cui	753
+帷	vi	670
+帷	vui	670
+崩	ben	790
+崇	cung	792
+跺	dem	633
+跺	do	633
+蹬	dem	647
+蹬	den	647
+蹬	dang	647
+圈	ken	860
+婴	jin	760
+铐	kau	571
+铛	dong	594
+铝	lu	762
+铝	li	762
+铜	tung	859
+铭	min	747
+铭	miang	747
+铲	can	632
+银	nziun	916
+矫	giau	742
+甜	tiam	825
+秸	git	417
+梨	li	943
+犁	lai	663
+秽	thoi	685
+秽	ve	685
+移	ji	933
+笨	bun	785
+笼	lung	778
+笛	tak	705
+笙	thang	623
+符	pu	802
+符	fu	802
+第	ti	983
+敏	men	846
+敏	man	846
+敏	min	846
+做	zo	988
+袋	toi	884
+悠	jiu	826
+偿	song	756
+偶	ngau	822
+偶	ngeu	822
+偶	qeu	822
+偎	vui	620
+偎	voi	620
+偷	teu	895
+您	nin	922
+售	ciu	878
+售	ciu	878
+售	siu	878
+停	tin	939
+偏	pen	863
+躯	ku	778
+躯	ki	778
+兜	deu	706
+假	ga	916
+衅	thin	619
+徘	pai	616
+徘	fui	616
+徙	si	638
+徙	thai	638
+徙	sai	638
+得	det	995
+衔	ham	735
+盘	pan	946
+舶	pak	516
+船	son	899
+舵	to	621
+斜	cia	793
+盒	hap	795
+鸽	gap	624
+敛	liam	754
+悉	thit	834
+欲	juk	903
+彩	cai	949
+彩	coi	949
+领	liang	945
+脚	giok	941
+脖	bok	801
+脯	pu	635
+豚	tun	648
+脸	liam	978
+脱	tot	897
+象	thiong	959
+够	geu	943
+逸	jat	842
+猜	cai	841
+猪	zu	860
+猎	liap	792
+猫	miau	821
+凰	vong	748
+猖	cong	556
+猛	mang	904
+祭	zi	775
+馅	ham	567
+馆	gon	872
+凑	ceu	782
+减	gam	850
+毫	hau	905
+烹	pang	704
+庶	su	609
+麻	ma	898
+庵	qam	593
+痊	con	550
+痒	jong	757
+痕	han	818
+痕	hun	818
+廊	long	752
+康	kong	914
+庸	jung	769
+鹿	luk	827
+盗	dau	872
+章	zong	939
+竟	gin	963
+商	song	973
+族	cuk	950
+旋	sen	834
+望	mong	975
+望	vong	975
+率	thut	932
+率	lut	932
+率	thai	932
+阎	jam	695
+阐	can	591
+阐	san	591
+阐	cen	591
+着	cok	975
+羚	lin	526
+羚	lang	526
+盖	goi	873
+盖	gai	873
+眷	gen	658
+粘	nziam	739
+粘	zam	739
+粘	nep	739
+粗	cw	832
+粒	lap	798
+粒	nap	798
+断	ton	952
+断	don	952
+剪	zen	795
+兽	ciu	886
+兽	siu	886
+焊	hon	734
+焕	von	675
+焕	fon	675
+清	cin	976
+添	tiam	786
+鸿	fung	874
+淋	lim	786
+涯	ngai	772
+涯	nga	772
+淹	jam	777
+渠	ki	781
+渐	ciam	919
+淑	suk	725
+淌	tong	679
+混	fun	891
+混	gun	891
+混	kun	891
+淮	fai	734
+淆	ngau	566
+渊	jen	787
+淫	jin	846
+渔	ngh	781
+淘	tau	789
+淳	dun	625
+淳	zun	625
+液	jet	885
+液	je	885
+淤	ji	577
+淡	tam	922
+淀	dian	634
+淀	ten	634
+深	cim	994
+涮	thot	523
+涵	ham	737
+婆	po	888
+梁	liong	864
+渗	zam	684
+渗	cam	684
+情	cin	989
+惜	thit	875
+惜	thiak	875
+惭	ciam	660
+悼	dau	567
+惧	ki	830
+惧	gi	830
+惧	gu	830
+惕	tit	661
+惕	ti	661
+惟	vi	777
+惟	vui	777
+惟	qui	777
+惊	giang	964
+惦	diam	594
+惦	tiam	594
+惨	cam	857
+惋	von	597
+惋	van	597
+悴	cui	627
+悴	zut	627
+惯	gon	855
+惯	gan	855
+寇	keu	708
+寅	jin	611
+寄	gi	916
+寂	zit	818
+寂	suk	818
+宿	thuk	858
+窒	zit	642
+窑	jau	658
+密	mit	926
+密	met	926
+谋	meu	893
+谍	tiap	623
+谎	fong	734
+谐	gai	719
+谐	hai	719
+袱	puk	611
+袱	fuk	611
+祷	dau	678
+祸	fo	890
+谓	vui	862
+谜	mui	659
+谚	ngan	502
+谜	mi	659
+逮	dai	663
+敢	gam	944
+尉	vui	738
+屠	tu	757
+弹	tan	909
+隋	cui	657
+隋	sui	657
+随	cui	958
+堕	to	708
+堕	do	708
+随	sui	958
+蛋	cun	871
+蛋	dan	871
+蛋	tan	871
+隅	ngeu	699
+隅	ngu	699
+隅	nzi	699
+隆	lung	828
+隐	jun	913
+隐	jin	913
+婚	fun	897
+婶	sin	681
+婉	van	764
+婉	von	764
+颇	po	807
+颈	giang	758
+绩	zit	784
+绪	thi	836
+续	cuk	928
+骑	ki	904
+绰	zok	668
+绰	cok	668
+绳	sun	825
+维	vui	928
+绵	men	799
+绷	ben	666
+绸	ciu	648
+综	zung	789
+绽	ten	707
+绿	luk	913
+缀	zot	604
+缀	zui	604
+巢	cau	809
+琴	kim	852
+琳	lim	825
+琢	ziok	688
+琢	diok	688
+琼	liong	763
+斑	ban	808
+替	te	856
+揍	zeu	652
+款	kan	896
+款	kon	896
+堪	kam	800
+塔	tap	880
+搭	dap	811
+堰	jen	488
+揩	kai	504
+揩	gai	504
+越	jet	960
+趁	cim	805
+趋	ci	783
+趋	cu	783
+超	cau	946
+揽	lam	711
+提	ti	958
+堤	ti	691
+堤	bi	691
+堤	di	691
+博	bok	944
+揭	get	738
+揭	gat	738
+喜	si	960
+彭	pang	686
+揣	cui	662
+插	cap	831
+揪	ziu	674
+搜	theu	923
+搜	thau	923
+煮	zu	742
+援	jen	796
+搀	cem	636
+搀	cam	636
+裁	cai	815
+裁	coi	815
+搁	gok	690
+搓	co	663
+搓	cai	663
+搂	leu	771
+搅	gau	702
+壹	jit	585
+握	qak	891
+握	qok	891
+握	vok	891
+搔	thau	650
+揉	jiu	747
+斯	thu	981
+期	ki	952
+欺	ki	811
+联	len	948
+葫	fu	693
+散	than	913
+惹	nzia	806
+葬	zong	729
+募	mu	593
+葛	got	793
+董	dung	815
+葡	pu	670
+敬	gin	871
+葱	cung	649
+蒋	ziong	814
+蒂	di	817
+蒂	ni	817
+落	lok	965
+韩	hon	875
+朝	zau	943
+朝	cau	943
+朝	diau	943
+辜	gu	715
+葵	kui	647
+棒	bang	789
+棱	lin	639
+棋	ki	824
+椰	ja	577
+植	cit	829
+森	them	867
+焚	fun	830
+椅	ji	815
+椒	ziau	708
+棵	ko	733
+棵	po	733
+棍	gun	752
+椎	zui	739
+棉	men	829
+棚	pen	671
+棚	pang	671
+棕	zung	599
+棺	gon	673
+榔	long	438
+惠	jui	859
+椭	to	487
+惠	fui	859
+惑	vok	855
+逼	bit	845
+粟	lit	755
+棘	git	684
+酣	gam	654
+酣	ham	654
+酥	thu	622
+厨	cu	775
+厦	ha	684
+硬	ngang	876
+硬	nziang	876
+硝	thiau	653
+确	kok	940
+硫	liu	726
+雁	ngan	812
+雁	ngen	812
+殖	cit	722
+裂	let	836
+雄	sung	893
+颊	gap	722
+颊	hap	722
+雳	lit	621
+暂	ciam	828
+雅	nga	903
+翘	kiau	689
+辈	bui	878
+辈	pui	878
+悲	bui	863
+悲	bi	863
+紫	zi	890
+紫	zw	890
+紫	cw	890
+凿	cok	782
+辉	kui	830
+辉	fui	830
+敞	cong	677
+棠	tong	673
+赏	song	844
+掌	zong	920
+晴	ciang	819
+睐	loi	520
+睐	lai	520
+暑	cu	700
+暑	su	700
+最	zui	984
+晰	thit	754
+量	liong	968
+鼎	dang	876
+鼎	din	876
+鼎	den	876
+喷	pun	834
+喷	pun	834
+喳	za	636
+晶	zin	847
+喇	la	674
+遇	ngu	904
+遇	nzi	904
+喊	hem	901
+喊	ham	901
+遏	qat	630
+遏	qot	630
+晾	liong	557
+晾	long	557
+景	gin	920
+畴	ciu	583
+践	zen	703
+践	cen	703
+践	cen	703
+跋	bat	698
+跋	pat	698
+跌	det	797
+跑	pau	943
+跛	bai	534
+跛	bo	534
+遗	ji	918
+遗	qui	918
+蛙	va	706
+蛛	zu	669
+蜓	tin	533
+蜒	jen	555
+蛤	gep	590
+蛤	gap	590
+喝	hot	939
+鹃	gen	599
+喂	voi	820
+喂	vui	820
+喘	con	800
+喉	heu	748
+喻	lu	699
+喻	ji	699
+啼	ti	731
+啼	tai	731
+喧	sen	691
+嵌	kiam	628
+幅	fuk	781
+帽	mau	774
+赋	fu	740
+赌	du	802
+赎	suk	622
+赐	thi	765
+赐	cw	765
+赔	poi	737
+黑	het	968
+铸	zu	785
+铺	pu	823
+链	len	777
+销	thiau	924
+锁	tho	830
+锄	cw	623
+锄	co	623
+锅	go	836
+锈	thiu	727
+锋	fung	861
+锌	thin	630
+锐	jui	796
+甥	thang	536
+掰	bai	576
+掰	mak	576
+短	don	943
+智	zi	921
+氮	dam	596
+毯	tam	655
+氯	luk	734
+鹅	ngo	754
+剩	sin	854
+稍	thiau	854
+稍	thau	854
+程	cin	965
+程	cang	965
+程	sin	965
+程	sang	965
+稀	si	798
+税	soi	903
+筐	kong	587
+等	den	980
+筑	cuk	828
+策	cak	889
+筛	thi	944
+筛	thai	944
+筒	tung	759
+筏	fat	536
+答	dap	944
+筋	gin	782
+筝	zang	632
+傲	ngau	843
+傲	qau	843
+傅	fu	836
+牌	pai	909
+堡	bau	785
+集	thip	993
+㗱	zip	370
+焦	ziau	836
+傍	pong	707
+傍	bong	707
+储	cu	797
+皓	gau	672
+皓	hau	672
+皖	von	497
+皖	van	497
+皖	fon	497
+粤	jet	620
+奥	qau	901
+街	gai	906
+惩	cin	711
+御	ji	831
+禹	ji	629
+渝	ji	696
+瑜	ji	690
+翌	jit	534
+煜	juk	623
+馨	kin	746
+馨	thin	746
+鑫	thin	596
+歆	thin	645
+歆	thim	645
+忻	sun	560
+莘	thin	527
+焮	sun	159
+俞	ji	656
+虞	ji	671
+挜(ja,抓取)	ja	1
+捼(ja,抓挠)	ja	1
+搤(jak,招手)	jak	1
+昱	juk	520
+循	sun	771
+循	thun	771
+艇	tin	723
+舒	su	871
+逾	ji	737
+番	pan	858
+番	fan	858
+释	thit	881
+禽	kim	752
+腊	lap	693
+脾	pi	758
+脾	pi	758
+腋	je	621
+腋	jet	621
+腔	kiong	770
+腕	von	734
+腕	van	734
+鲁	lu	870
+猩	thiang	658
+猩	thin	658
+猬	vui	500
+猾	vat	642
+猴	heu	756
+惫	bui	696
+惫	pi	696
+然	nzien	996
+然	jen	996
+馈	kui	637
+馋	can	561
+装	zong	972
+蛮	man	790
+就	ziu	998
+敦	dun	721
+斌	fu	714
+痘	teu	597
+痢	li	413
+痪	von	524
+痛	tung	934
+童	tung	886
+竣	zun	493
+竣	zun	493
+阔	fat	761
+善	sen	936
+翔	thiong	817
+羡	sen	735
+普	pu	913
+粪	bun	658
+尊	zun	872
+奠	ten	592
+道	tau	997
+道	dau	997
+遂	cui	726
+遂	sui	726
+曾	zen	931
+曾	cen	931
+焰	jam	799
+港	gong	908
+滞	ce	681
+湖	fu	916
+湘	thiong	745
+渣	za	671
+渤	but	512
+渺	miau	707
+湿	sip	962
+温	vun	909
+惗	nem	379
+渴	hot	791
+溃	kui	728
+溅	cen	705
+滑	vat	854
+湃	bai	586
+渝	ji	696
+湾	van	829
+渡	tu	775
+游	jiu	971
+滋	zw	790
+渲	sen	522
+溉	goi	435
+溉	gai	435
+溉	goi	435
+愤	fun	846
+慌	fong	846
+惰	to	539
+愕	ngok	721
+愕	ngak	721
+愣	lin	847
+愣	lang	847
+惶	fong	725
+惶	vong	725
+愧	kui	786
+愉	ji	736
+慨	koi	750
+慨	kai	750
+割	got	822
+寒	hon	915
+富	fu	927
+寓	ngu	702
+寓	ngi	702
+寓	nzi	702
+窜	con	743
+窝	vo	783
+窖	gau	554
+窗	cong	882
+窗	cung	882
+窘	kiun	628
+遍	pen	868
+雇	gu	695
+裕	ji	719
+裤	ku	799
+裤	fu	799
+裙	kiun	766
+禅	sem	712
+禅	sam	712
+禄	luk	736
+谢	cia	931
+谣	jau	649
+谤	bong	614
+谦	kiam	742
+犀	thai	696
+犀	thi	696
+属	suk	902
+屡	lui	669
+强	kiong	970
+粥	zuk	716
+疏	tho	802
+隔	gak	849
+隙	kiak	777
+隘	qai	551
+媒	moi	839
+絮	thi	681
+嫂	thau	751
+媚	mui	794
+媚	mi	794
+婿	the	641
+登	den	919
+缅	men	595
+缆	lam	621
+缉	thip	619
+缉	zip	619
+缎	ton	595
+缓	von	910
+缓	fon	910
+缔	ti	547
+缔	di	547
+缕	liu	704
+缕	leu	704
+缕	lu	704
+骗	pen	837
+骗	cot	837
+编	pen	886
+编	ben	886
+骚	thau	754
+缘	jen	856
+瑟	thit	765
+瑟	thet	765
+鹉	vu	521
+瑞	jui	855
+瑰	gui	731
+瑙	nau	488
+魂	fun	900
+肆	thi	746
+摄	sap	823
+摸	mo	892
+填	ten	813
+搏	bok	718
+缚	bok	697
+脯	pu	635
+攫	giok	554
+厥	get	645
+蕨	get	419
+矍	giok	412
+彏	guk	21
+崛	guk	575
+崛	kut	575
+噱	giok	394
+噱	kiok	394
+塌	tap	722
+鼓	gu	909
+摆	bai	893
+携	kui	698
+搬	bin	791
+搬	ban	791
+摇	jau	934
+搞	gau	882
+塘	tong	764
+摊	tan	747
+聘	pin	801
+斟	zim	618
+蒜	thon	599
+勤	kin	822
+勤	kiun	822
+螔	je	75
+㨠	miang	1
+登	dang	919
+直	tit	978
+弟	te	952
+穰	nzio	545
+篌	geu	292
+腹	pak	886
+欣	hiun	870
+摺	zap	332
+粅	mut	59
+熚	bit	42
+婩	ngok	15
+掁	cang	25
+惇	sun	469
+尅	kat	17
+騃	ngoi	366
+獃	ngoi	45
+㧗	ci	1
+抸	zep	24
+聉	tui	64
+制	zai	981
+掣	zai	680
+扽	dui	202
+卬	nziang	320
+靴	tho	666
+靶	ba	581
+鹊	thiak	702
+蓝	lam	907
+墓	mu	753
+幕	mu	841
+蓬	pung	803
+蓄	cuk	719
+蒲	pu	694
+蓉	jung	757
+蒙	mung	880
+蒸	zin	753
+献	sen	815
+椿	cun	472
+禁	gim	902
+楚	cw	940
+楚	co	940
+楷	kai	577
+榄	lam	566
+想	thiong	994
+槐	fai	662
+榆	ji	703
+楼	leu	934
+概	koi	859
+概	gai	859
+赖	lai	800
+酪	lok	519
+酬	ciu	690
+感	gam	983
+碍	qoi	763
+碍	qai	763
+碍	ngoi	763
+碘	dian	476
+碘	den	476
+碑	bui	709
+碑	bi	709
+碎	thui	862
+碰	pung	864
+碰	cung	864
+碗	von	799
+碌	luk	715
+尴	gam	774
+雷	lui	929
+零	lin	879
+零	lang	879
+雾	mu	857
+雾	vu	857
+雹	bau	458
+雹	pok	458
+辐	fuk	636
+辐	puk	636
+辑	zip	775
+辑	thip	775
+输	su	891
+督	duk	818
+频	pin	881
+龄	lin	798
+龄	lang	798
+鉴	gam	804
+睛	zin	940
+睹	du	716
+睦	muk	549
+睡	soi	948
+睬	cai	624
+睬	coi	624
+瞄	miau	698
+睫	ciak	658
+嗜	si	639
+鄙	pi	728
+嗦	tho	495
+嗦	thok	495
+愚	nzi	776
+愚	ngu	776
+暖	non	835
+盟	min	876
+盟	men	876
+歇	ket	752
+暗	qam	950
+媕	qam	15
+谙	qam	519
+黯	qam	702
+唵	qam	322
+唵	qan	322
+冉	nziam	684
+冉	jam	684
+彳亍	cit cuk	1
+彳	cit	242
+亍	cuk	281
+亍	cok	281
+娿	qo	15
+鹌	qam	386
+鹑	cun	561
+暇	ha	684
+暇	qa	684
+照	zau	937
+畸	ki	578
+跨	ka	773
+跷	kiau	586
+跳	tiau	923
+跳	tiau	923
+跺	do	633
+跪	kui	803
+路	lu	987
+跤	gau	550
+跟	gen	973
+遣	ken	720
+蜈	ngu	512
+蜈	ngh	512
+蜗	vo	641
+蛾	ngo	673
+蜂	fung	855
+蜕	soi	513
+蜕	tui	513
+嗅	siu	655
+嗡	qung	691
+嗡	vung	691
+嗓	thong	745
+署	cu	710
+署	su	710
+置	zi	899
+置	di	899
+罪	zui	912
+罪	cui	912
+罩	zau	802
+蜀	zuk	681
+幌	gong	525
+幌	fong	525
+错	co	947
+锚	miau	504
+袂	me	664
+锡	thiak	720
+锣	lo	707
+锤	cui	686
+锥	zui	720
+锦	gin	879
+键	ken	920
+锯	gi	694
+锯	gio	694
+锰	mang	519
+矮	qai	766
+䂐	dut	237
+㾑	dep	237
+腞	dun	65
+揜	qem	381
+盫	qem	278
+盫仆	qem puk	1
+䠋	bai	1
+㩧	bak	1
+㩧	bok	1
+敀	bak	26
+倗	pen	108
+辞	cw	899
+稚	ci	678
+稚	zi	678
+稠	neu	597
+颓	tui	687
+愁	theu	863
+愁	ciu	863
+筹	ciu	826
+签	ciam	806
+简	gan	919
+筷	kai	674
+毁	kui	831
+毁	fui	831
+舅	kiu	756
+鼠	cu	910
+催	cui	772
+傻	so	868
+像	ciong	978
+像	thiong	978
+躲	biang	869
+魁	kui	694
+躲	do	869
+衙	nga	678
+衙	ngo	678
+微	mi	960
+微	vui	960
+微	mui	960
+愈	lo	788
+愈	ji	788
+遥	jau	842
+腻	ni	701
+腰	jau	865
+腥	thiang	720
+腮	thai	677
+腮	thoi	677
+腹	pat	886
+腹	fuk	886
+腺	then	747
+腾	ten	847
+鹏	pang	763
+腿	tui	878
+腿	bi	878
+鲍	bau	646
+猿	jen	726
+颖	jin	739
+触	cuk	853
+解	gai	969
+煞	that	751
+𧊅	gai	1
+雏	cu	678
+雏	ci	678
+馍	mok	485
+馏	liu	439
+酱	ziong	713
+禀	lin	683
+禀	bin	683
+痹	bi	566
+廓	kok	606
+廓	gok	606
+痴	ci	815
+痰	tam	537
+廉	liam	816
+靖	cin	711
+新	thin	997
+韵	jun	780
+意	ji	991
+誊	ten	395
+粮	liong	819
+数	thu	975
+煎	zen	689
+塑	thok	862
+塑	cuk	862
+慈	cw	778
+煤	moi	816
+煌	vong	697
+满	man	966
+漠	mok	801
+滇	den	506
+滇	ten	506
+滇	din	506
+源	nzien	957
+源	jen	957
+滤	li	742
+滤	lio	742
+滥	lam	704
+滔	tau	690
+溪	kai	826
+溜	liu	804
+漓	li	644
+滚	gun	849
+溢	jit	713
+溯	suk	657
+溯	thok	657
+滨	bin	715
+溶	jung	712
+溺	niok	709
+溺	nziok	709
+粱	liong	579
+滩	tan	718
+慎	sin	774
+誉	ji	795
+塞	thet	905
+塞	thai	905
+寞	mok	747
+窥	kui	772
+窟	fut	652
+寝	cim	754
+谨	giun	739
+谨	gun	739
+谨	gin	739
+谨	kiun	739
+褂	ga	558
+裸	lo	757
+福	buk	945
+福	fuk	945
+谬	miu	690
+谬	meu	690
+群	kiun	935
+殿	ten	858
+殿	den	858
+殿	ten	858
+辟	pit	667
+辟	pet	667
+障	zong	803
+媳	thit	716
+嫉	cit	692
+嫉	zi	692
+嫌	sam	759
+嫁	ga	803
+叠	tiap	792
+缚	bak	697
+缚	bok	697
+缝	fung	791
+缠	can	818
+缠	cen	818
+缤	bin	536
+剿	giau	648
+静	cin	955
+碧	bit	809
+璃	li	800
+赘	ngau	607
+赘	qau	607
+熬	qau	710
+熬	ngau	710
+墙	thiong	893
+墟	si	596
+嘉	ga	818
+摧	cui	754
+赫	hak	804
+赫	hok	804
+截	zet	789
+誓	si	772
+誓	se	772
+境	gin	902
+摘	zak	781
+摔	thai	793
+撇	pet	712
+聚	ci	886
+聚	cu	886
+慕	mu	842
+暮	muk	864
+暮	ma	864
+暮	mu	864
+落暮	la ma	1
+夜暮	la ma	1
+摹	mu	493
+蔓	man	686
+蔑	met	667
+蔡	cai	772
+蔗	za	500
+蔽	bi	748
+蔼	hoi	599
+蔼	qoi	599
+蔼	qai	599
+熙	si	774
+蔚	vui	641
+兢	gin	660
+模	mu	905
+模	mu	905
+模	mo	905
+槛	kiam	556
+槛	kam	556
+榴	liu	608
+榜	bong	819
+榨	za	555
+榕	jung	579
+歌	go	957
+遭	zau	835
+酵	hau	484
+酷	kuk	849
+酿	nziong	643
+酸	thon	925
+碟	tiap	723
+磁	sak	824
+磁	cw	824
+碱	giam	700
+碱	gam	700
+碳	tan	752
+愿	nzien	929
+需	thi	925
+辖	got	629
+裳	cong	695
+辗	len	577
+辗	nen	577
+雌	ci	682
+雌	cw	682
+裳	song	695
+颗	ko	838
+瞅	ciu	696
+墅	ja	694
+墅	su	694
+嗽	theu	666
+踊	jung	461
+蜻	cin	532
+蜡	lap	723
+蝇	jin	766
+蜘	zi	614
+蝉	can	723
+蝉	san	723
+嘛	ma	890
+嘀	dit	701
+赚	cam	774
+锹	ciau	483
+锻	ton	688
+镀	tu	642
+舞	mu	929
+舞	vu	929
+舔	tiam	658
+稳	vun	848
+熏	sun	704
+箕	gi	697
+算	thon	967
+箩	lo	470
+管	gon	984
+箫	thiau	639
+舆	ji	681
+僚	liau	630
+僧	zen	768
+鼻	pi	849
+魄	pok	830
+魅	mui	763
+魅	mi	763
+貌	mau	847
+膜	mong	837
+膜	mok	837
+膊	bok	757
+膊	bak	757
+膀	bong	829
+鲜	then	876
+疑	nzi	925
+疑	ngi	925
+孵	fu	553
+孵	pu	553
+馒	man	602
+裹	go	752
+敲	kau	820
+豪	hau	857
+膏	gau	810
+遮	za	793
+腐	fu	828
+腐	fu	828
+瘩	dap	617
+瘟	vun	589
+瘦	theu	816
+辣	lat	777
+彰	zong	714
+竭	get	818
+端	don	892
+旗	ki	895
+精	zin	964
+粹	cui	688
+粹	thui	688
+歉	kiam	785
+弊	bi	796
+熄	thit	656
+熔	jung	652
+煽	sen	586
+潇	thiau	731
+漆	cit	807
+漱	thu	607
+漂	piau	867
+漫	man	887
+滴	dit	827
+漾	jong	635
+演	jin	892
+演	jen	892
+漏	leu	845
+慢	man	946
+慷	kong	671
+寨	cai	714
+赛	thai	930
+寡	ga	875
+察	cat	905
+蜜	met	761
+寥	liau	635
+谭	tam	715
+肇	diau	606
+肇	cau	606
+肇	zau	606
+褐	hat	665
+褐	hot	665
+褪	tui	596
+谱	pu	764
+隧	sui	557
+隧	cui	557
+嫩	nun	732
+翠	cui	804
+熊	jung	815
+凳	den	686
+骡	lo	538
+缩	thuk	863
+慧	jui	834
+慧	fui	834
+撵	len	529
+撵	liang	529
+撵	nen	529
+撕	thu	772
+撕	thi	772
+撒	that	816
+撩	liau	684
+趣	ci	877
+趟	tong	727
+趟	tang	727
+撑	cang	789
+撑	cang	789
+撮	zot	633
+撮	cot	633
+撬	kiau	527
+播	bo	907
+擒	kim	694
+墩	dun	548
+撞	cung	860
+撞	cong	860
+撞	zung	860
+撤	cet	794
+增	zen	885
+撰	zon	598
+聪	tung	813
+聪	cung	813
+鞋	hai	873
+鞍	qon	694
+蕉	ziau	569
+蕊	jui	704
+蔬	tho	689
+蕴	vun	684
+蕴	jun	684
+横	vang	923
+槽	cau	684
+㨫	gam	1
+㨫	lam	1
+樱	jin	748
+橡	thiong	765
+樟	zong	528
+橄	gam	528
+敷	fu	637
+豌	von	403
+豌	van	403
+飘	piau	887
+醋	cw	753
+醋	thu	753
+醇	cun	732
+醉	zui	847
+搉	gok	139
+磕	kat	683
+磕	kap	683
+擖	kat	26
+搕	kap	421
+磊	lui	698
+磅	bong	597
+碾	len	557
+震	zin	891
+霄	thiau	735
+霉	moi	727
+谏	gan	665
+踦	kia	101
+徛	ki	329
+蹸	lin	301
+戛	gat	610
+戛(ga)	ga	1
+嘎	gat	679
+嘎	ga	679
+苓	lin	487
+泠	lin	464
+聆	lin	599
+聆	lang	599
+柃	lin	194
+柃	lang	194
+拎	len	673
+瞒	mun	751
+瞒	man	751
+题	ti	955
+暴	bau	894
+暴	pau	894
+瞎	hat	742
+嘻	si	821
+嘶	thu	716
+嘲	cau	746
+嘹	liau	474
+影	jang	976
+影	qiang	976
+踢	tiak	798
+踏	tap	814
+踩	cai	743
+踪	zung	828
+蝶	tiap	775
+蝴	fu	678
+蝠	fuk	642
+蝎	get	620
+蝎	hot	620
+蝌	ko	409
+蝗	vong	528
+蝙	ben	609
+嘿	he	887
+嘿	het	887
+嘱	zuk	717
+嘱	suk	717
+幢	tung	650
+幢	cong	650
+墨	met	871
+镇	zin	995
+镇	zin	995
+镐	gau	512
+镑	bong	495
+靠	kau	916
+稽	kai	705
+稽	gai	705
+稽	gi	705
+稻	dau	653
+黎	lai	783
+黎	li	783
+稿	gau	791
+稼	ga	575
+箱	thiong	883
+篓	leu	527
+箭	zen	870
+篇	pen	860
+僵	giong	779
+躺	tong	857
+僻	pit	664
+僻	pet	664
+德	det	978
+艘	theu	768
+膝	cit	740
+膛	tong	691
+鲤	li	573
+鲫	zit	440
+熟	suk	899
+摩	mo	862
+褒	bau	636
+瘪	bet	579
+瘤	liu	716
+瘫	tan	663
+凛	lin	706
+颜	ngan	867
+毅	nzi	756
+糊	fu	862
+遵	zun	719
+憋	bet	700
+潜	ciam	832
+澎	pung	614
+潮	cau	837
+潭	tam	734
+鲨	tha	562
+澳	qau	742
+潘	pan	739
+澈	cet	675
+澜	lan	676
+澄	cen	652
+澄	den	652
+澄	cin	652
+懂	dung	878
+憔	ziau	624
+懊	qau	634
+憎	zen	614
+额	ngak	865
+额	nziat	865
+翩	pen	716
+褥	nziuk	549
+谴	ken	585
+鹤	hok	891
+憨	ham	630
+慰	vui	828
+𤗈(thiap,垫)	thiap	1
+劈	piak	775
+履	li	848
+豫	ji	816
+缭	liau	612
+撼	ham	704
+擂	lui	644
+操	cau	872
+擅	san	697
+擅	sen	697
+燕	jen	903
+燕	jen	903
+蕾	lui	769
+薯	cu	654
+薯	su	654
+薛	thet	737
+薇	mui	788
+薇	vui	788
+擎	kin	645
+擎	kiang	645
+擎	giang	645
+薪	thin	837
+薄	pok	897
+颠	den	815
+翰	han	735
+翰	hon	735
+噩	ngak	662
+噩	ngok	662
+噩	qok	662
+橱	cu	611
+橙	cang	634
+橘	git	625
+整	zang	951
+整	zin	951
+融	jung	859
+瓢	piau	612
+醒	thiang	922
+霍	hok	777
+霍	kok	777
+霎	thap	639
+霎	thak	639
+辙	cet	764
+冀	ki	626
+餐	con	877
+嘴	zoi	943
+嘴	zui	943
+踱	tu	631
+蹄	tai	706
+蹄	te	706
+蹂	nau	537
+蹂	jiu	537
+蟆	ma	560
+螃	bong	528
+器	ki	986
+器	si	986
+噪	zau	609
+鹦	jin	522
+赠	zen	713
+默	met	911
+黔	gim	655
+镜	giang	879
+赞	zan	836
+穆	muk	758
+篮	lam	777
+篡	con	530
+篷	pung	699
+篱	li	620
+儒	nzu	756
+儒	ji	756
+邀	jau	754
+衡	vang	807
+衡	hang	807
+膨	pung	619
+雕	diau	864
+鲸	gin	674
+磨	mo	897
+瘾	jin	671
+凝	nzin	851
+凝	ken	851
+瘸	ke	582
+瘸	kio	582
+凝	nen	851
+凝	ngin	851
+凝	ngen	851
+辨	ben	766
+辩	pen	810
+糙	cau	591
+糖	tong	850
+糕	gau	735
+燃	nzien	808
+燃	jen	808
+濒	bin	528
+濒	pin	528
+澡	cau	731
+激	git	923
+懒	lan	801
+憾	ham	732
+懈	hai	633
+窿	lung	557
+壁	biak	894
+避	bi	874
+缰	giong	585
+缰	kiong	585
+缴	giau	685
+戴	dai	846
+擦	cat	834
+藉	zit	710
+藉	cit	710
+鞠	giuk	645
+鞠	kiuk	645
+藏	cong	933
+藐	miau	569
+檬	mung	554
+檐	jam	621
+檀	tan	589
+礁	ziau	558
+磷	lin	723
+霜	thong	851
+霞	ha	811
+瞭	liau	446
+瞧	ciau	838
+瞬	sun	860
+瞳	tung	693
+瞩	zuk	544
+瞩	suk	544
+抌	dem	258
+瞪	cang	842
+曙	su	567
+蹋	tap	555
+蹋	tep	555
+蹈	tau	786
+螺	lo	770
+蟋	thit	491
+蟀	thai	493
+嚎	hau	683
+赡	sam	502
+赡	sem	502
+穗	fui	598
+穗	jui	598
+簧	vong	685
+魏	ngui	802
+魏	vui	802
+魏	kui	802
+穗	jui	598
+簧	fong	685
+簧	vong	685
+簇	cuk	627
+繁	fan	824
+徽	fui	683
+爵	ziok	784
+朦	mung	701
+臊	thau	514
+鳄	ngok	567
+癌	ngam	749
+辫	ben	615
+赢	jang	803
+糟	zau	787
+糠	hong	667
+糠	kong	667
+燥	zau	716
+燥	cau	716
+懦	no	622
+豁	hot	701
+臀	tun	624
+臂	bi	844
+翼	jit	848
+骤	zeu	711
+骤	zeu	711
+藕	ngau	514
+鞭	ben	784
+鞭	bin	784
+藤	ten	736
+覆	fuk	855
+瞻	zam	680
+蹦	ben	717
+蹦	bang	717
+嚣	thiau	705
+镰	liam	588
+翻	fan	971
+鳍	ki	506
+鹰	jin	829
+瀑	pau	615
+襟	gim	716
+璧	biak	794
+戳	cok	634
+孽	nziak	691
+孽	ngek	691
+孽	ngak	691
+孽	ngik	691
+警	gin	907
+蘑	mo	543
+藻	zau	668
+攀	pan	772
+曝	bau	656
+曝	pau	656
+蹲	dun	744
+蹭	zen	657
+蹬	dang	647
+蹬	den	647
+巅	den	568
+簸	bo	566
+簿	pok	663
+蟹	hai	664
+颤	tan	845
+靡	mi	800
+癣	then	567
+瓣	ban	646
+羹	gang	739
+冇	mau	784
+鳖	bet	601
+爆	bau	847
+疆	giong	761
+疆	kiong	761
+鬓	bin	717
+壤	nziong	731
+馨	kin	746
+耀	jau	816
+躁	zau	727
+蠕	thai	576
+蠕	nziam	576
+蠕	nzion	576
+嚼	nziai	711
+嚼	ziok	711
+嚼	ziau	711
+嚷	nziong	750
+巍	ngui	650
+籍	cit	786
+鳞	lin	811
+魔	mo	964
+糯	no	498
+灌	gon	765
+譬	bi	583
+蠢	cun	740
+霸	ba	821
+露	lu	930
+霹	pit	630
+躏	lin	533
+躏	lun	533
+黯	qam	702
+髓	cui	758
+赣	gung	505
+囊	nong	838
+镶	nziong	635
+镶	thiong	635
+瓤	nong	362
+罐	gon	759
+矗	cuk	541
+矗	dung	541
+乂	ngui	313
+乂	ngi	313
+乄	ngh	1
+乜	mia	425
+乜	nia	425
+乜	mak	425
+兀	ngut	665
+弋	jit	507
+孑	get	563
+孓	gut	303
+幺	jau	619
+亓	ki	394
+韦	vui	761
+廿	nzip	460
+丏	men	235
+卅	thap	376
+卅	tha	376
+仄	zet	422
+厄	qak	622
+厄	ngo	622
+仃	den	507
+仃	din	507
+仉	gi	171
+仂	lit	124
+兮	hi	730
+兮	he	730
+兮	si	730
+刈	nzi	311
+刈	nge	311
+爻	qau	469
+爻	ngau	469
+卞	pen	520
+闩	thon	485
+闩	con	485
+讣	fu	348
+讣	pu	348
+尹	jun	742
+夬	gai	184
+爿	ben	377
+爿	ciong	377
+毋	mh	577
+毋	vu	577
+毋	mu	577
+邗	hon	267
+邗	gon	267
+邛	kiung	373
+艽	kiu	387
+艿	jin	294
+札	zap	568
+叵	po	467
+叵	bo	467
+匝	zap	475
+丕	pi	500
+丕	poi	500
+丕	pui	500
+匜	je	88
+匜	ji	88
+劢	mai	274
+劢	ma	274
+卟	gai	435
+卟	gi	435
+叱	fa	626
+叱	cit	626
+叻	liak	327
+仨	tham	512
+仕	thu	664
+仟	cen	397
+仡	ngat	317
+仡	hat	317
+仫	mo	239
+仞	nziun	443
+卮	zi	372
+氐	di	432
+犰	kiu	332
+刍	cu	616
+刍	co	616
+邝	gong	415
+邙	mong	428
+汀	ten	604
+讦	get	351
+讧	gung	430
+讧	fung	430
+讧	qung	430
+讪	than	641
+讪	than	641
+讫	ket	408
+讫	kat	408
+尻	kau	417
+阡	cen	485
+尕	ga	420
+弁	pen	405
+驭	nzi	581
+驭	ngio	581
+匡	kong	721
+耒	loi	329
+耒	lui	329
+玎	den	359
+玎	dang	359
+玑	gi	574
+邢	sin	614
+圩	si	415
+圬	qu	232
+圬	vu	232
+圭	gui	695
+扦	cen	317
+扦	ciam	317
+圪	gat	310
+圪	ngat	310
+圪	nget	310
+圳	zun	759
+圹	kong	226
+扪	mun	618
+圮	pi	293
+圯	ji	240
+芊	cen	633
+芍	sok	456
+芄	van	225
+芄	jen	225
+芨	kip	386
+芨	gip	386
+芑	ki	442
+芎	giung	350
+芗	song	252
+亘	then	616
+亘	gen	616
+厍	sa	179
+夼	kong	175
+戍	su	504
+尥	liau	275
+乩	gi	346
+旯	la	457
+曳	je	657
+岌	kip	517
+屺	ki	222
+凼	tong	304
+囡	ngap	473
+钇	jet	144
+缶	feu	348
+氘	do	210
+氘	dau	210
+氖	nai	350
+牝	bin	513
+伎	gi	571
+伛	qu	317
+伛	ku	317
+伢	nga	444
+佤	va	370
+仵	ngu	385
+仵	ngh	385
+伥	diong	375
+伥	cong	375
+伧	cong	345
+伉	kong	466
+伫	du	541
+伫	cu	541
+囟	sin	248
+汆	con	255
+刖	nziet	281
+夙	thuk	585
+旮	ga	462
+刎	vun	437
+刎	vut	437
+犷	gong	486
+犸	ma	412
+舛	con	369
+凫	pu	682
+凫	fu	682
+邬	qu	506
+邬	vu	506
+饧	tong	311
+汕	than	473
+汔	hat	279
+汐	cit	574
+汲	gip	684
+汲	kip	684
+汜	thu	447
+汊	ca	306
+忖	cun	654
+忏	ciam	552
+忏	cen	552
+讴	qeu	355
+讵	ki	318
+讵	ku	318
+祁	ki	655
+讷	nap	581
+聿	lut	496
+艮	gen	470
+艮	gan	470
+艮	gin	470
+厾	duk	168
+阱	cin	659
+阱	ziang	659
+阮	ngen	682
+阮	ngan	682
+阪	ban	536
+丞	sin	674
+妁	sok	347
+牟	meu	598
+纡	ji	598
+纣	ciu	512
+纥	qat	408
+纥	hat	408
+纨	van	589
+纨	jen	589
+玕	gon	369
+玙	ji	214
+抟	ton	471
+抔	peu	268
+圻	ki	352
+坂	ban	524
+坍	tan	508
+坞	qu	568
+坞	vu	568
+抃	pen	331
+抉	get	618
+㧐	thung	2
+芫	nzien	382
+邯	ham	591
+芸	jun	734
+芾	bui	341
+芾	fui	341
+苈	lit	182
+苣	ki	341
+芷	zi	625
+㧍	bang	1
+芮	biang	569
+苋	gen	433
+苋	han	433
+芼	mau	157
+苌	diang	364
+苌	cong	364
+苁	cung	345
+芩	gim	331
+芪	ki	357
+芡	kiam	331
+芟	than	249
+苄	pen	288
+苎	du	360
+苎	cu	360
+苡	ji	480
+杌	ngut	355
+杓	sok	333
+杞	ki	587
+杈	ca	451
+忑	tet	607
+忑	tit	607
+孛	but	464
+邴	biang	327
+邳	pi	401
+邳	pui	401
+矶	gi	542
+奁	liam	351
+豕	di	678
+豕	si	678
+忒	tet	566
+忒	tit	566
+欤	ji	363
+轫	nziun	361
+迓	nga	279
+邶	pui	380
+忐	tan	607
+卣	jiu	209
+邺	nziap	497
+旰	gon	595
+呋	pu	321
+呋	fu	321
+呒	mo	10
+呒	mu	10
+呓	nzi	518
+呔	tai	408
+呖	lit	379
+呃	qak	923
+旸	jong	376
+吡	bit	349
+吡	pi	349
+町	tang	477
+町	den	477
+虬	kiu	538
+呗	bai	887
+呗	bui	887
+吽	hung	300
+吣	thim	230
+吲	jin	181
+帏	vui	383
+岐	ki	525
+岈	ha	342
+岈	nga	342
+岘	han	321
+岑	kim	572
+岑	cem	572
+岚	lam	750
+兕	thi	358
+囵	lun	418
+囫	fut	415
+钊	zau	527
+钋	pok	203
+钌	liau	181
+迕	ngu	175
+迕	ngh	175
+氙	than	336
+氚	con	234
+牤	mong	228
+佞	nin	522
+邱	kiu	690
+攸	jiu	561
+佚	jit	537
+佝	geu	454
+佟	dung	630
+佗	to	515
+伽	ga	621
+彷	pong	638
+彷	fong	638
+佘	sa	539
+佥	ciam	420
+孚	fu	510
+孚	pu	510
+豸	ci	368
+坌	bun	249
+肟	vo	200
+邸	di	608
+邸	de	608
+奂	fon	435
+劬	ki	320
+狄	tit	733
+狁	jun	255
+鸠	geu	707
+鸠	giu	707
+邹	ziu	628
+饨	dun	457
+饨	tun	457
+饩	si	226
+饪	nzim	464
+饫	ji	438
+饬	cit	437
+亨	hang	659
+亨	pang	659
+庑	mu	324
+庑	vu	324
+庋	gui	268
+疔	dang	232
+疖	zet	279
+肓	fong	499
+闱	vui	420
+闳	fen	615
+闵	mun	615
+闵	min	615
+羌	kiong	542
+炀	jong	502
+沣	fung	467
+沅	nzien	596
+沔	men	341
+沤	qeu	424
+沌	tun	643
+沏	cet	486
+沚	zi	276
+汨	mit	404
+汩	jit	563
+汩	qet	563
+沂	ngi	605
+沂	ji	605
+汾	fun	543
+沨	pung	390
+沨	fung	390
+汴	pen	511
+汶	mun	549
+汶	vun	549
+汶	vun	549
+沆	kong	354
+沆	hong	354
+迒	hong	599
+忼	kong	22
+匟	kong	5
+沩	vui	221
+泐	let	155
+泐	lit	155
+怃	vu	243
+怃	mu	243
+怄	qeu	410
+忡	cung	605
+忤	ngu	455
+忤	ngh	455
+忾	si	423
+怅	cong	629
+忻	sun	560
+忪	cung	489
+怆	cong	529
+忭	pen	197
+忸	niu	438
+忸	nziuk	438
+忸	nziu	438
+诂	gu	321
+诃	ho	489
+诅	zw	650
+诋	di	518
+诌	ciau	482
+诏	diau	647
+诏	zau	647
+诒	ji	365
+孜	zw	738
+陇	lung	592
+陀	to	670
+陂	po	408
+陉	gin	350
+妍	ngen	708
+妩	vu	620
+妪	ji	468
+妣	bi	376
+妊	nzim	412
+妗	gim	434
+妫	vui	445
+妞	nziu	695
+妞	niu	695
+姒	thi	471
+妤	ji	530
+邵	sau	682
+劭	diau	562
+刭	giang	202
+刭	gin	202
+甬	jung	531
+邰	toi	259
+纭	jun	568
+纰	pi	446
+纴	nzim	85
+纶	lun	672
+纾	su	415
+玮	vui	571
+玡	nga	246
+玭	pin	148
+玠	gai	384
+玢	bin	338
+玢	fun	338
+玥	nziet	502
+玦	ket	321
+盂	ji	557
+㩉	lap	1
+忝	tiam	390
+匦	gui	230
+坩	gam	288
+抨	biang	467
+抨	piang	467
+抨	pang	467
+抨	pin	467
+拤	cia	63
+坫	zam	185
+拈	nziam	666
+拈	zam	666
+垆	lu	325
+抻	sin	439
+抻	cun	439
+劼	git	207
+拃	zan	174
+拊	fu	554
+拊	pu	554
+坼	cak	415
+坻	di	314
+坻	dai	314
+㧟	fui	359
+坨	to	467
+坭	ni	180
+坭	nai	180
+抿	min	638
+抿	mun	638
+坳	qau	468
+耶	ja	784
+苷	gam	397
+苯	bun	664
+苤	pui	202
+苤	pi	202
+苤	poi	202
+茏	lung	376
+苫	zam	480
+苫	tiam	480
+苜	muk	376
+苴	ca	397
+苴	cia	397
+苴	cw	397
+苒	ngiam	478
+苒	nziam	478
+苒	jam	478
+苘	ken	190
+苘	kang	190
+茌	ci	232
+苻	fu	493
+苓	lin	487
+苓	len	487
+茚	jang	86
+茚	jin	86
+茆	mau	216
+茑	diau	307
+茓	set	128
+茔	jen	388
+茔	jin	388
+茔	jang	388
+茕	kiang	532
+茕	kin	532
+茀	but	410
+茀	fut	410
+苕	diau	384
+枥	lit	296
+枇	pi	423
+杪	miau	238
+杳	jau	661
+杳	nziau	661
+杳	miau	661
+枧	gen	263
+枧	gan	263
+杵	cu	587
+枨	dang	165
+枨	cang	165
+枞	cung	340
+枋	biang	383
+枋	fong	383
+杻	ciu	29
+杷	pa	472
+杼	cu	625
+杼	zu	625
+矸	gon	318
+砀	tong	343
+刳	ku	551
+奄	jam	598
+瓯	qeu	495
+殁	mut	408
+郏	gap	320
+轭	qak	269
+郅	cit	379
+郅	zit	379
+鸢	jon	573
+鸢	jen	573
+盱	si	345
+盱	hi	345
+昊	hau	718
+昊	qau	718
+昙	tam	508
+杲	gau	403
+昃	zet	542
+咂	zap	552
+呸	pui	633
+呸	pe	633
+呸	poi	633
+昕	sun	623
+昀	jun	468
+旻	min	387
+旻	mun	387
+昉	fong	298
+炅	gin	429
+炅	giun	429
+炅	gui	429
+咔	ka	600
+畀	bi	275
+虮	gi	353
+咀	zw	638
+呷	hap	479
+呷	qap	479
+黾	men	235
+呱	ga	602
+呤	len	490
+呤	lin	490
+咚	dung	704
+噹	diong	523
+咆	pau	647
+咛	nen	514
+呶	nau	437
+呶	na	437
+呣	mh	6
+呦	jo	579
+呦	jiu	579
+咝	thi	487
+岢	ko	304
+岿	kui	446
+岬	gap	389
+岫	jiu	445
+帙	cit	417
+岣	geu	187
+峁	mau	307
+刿	gui	574
+迥	fang	560
+迥	gang	560
+岷	min	433
+剀	koi	309
+帔	pi	451
+峄	jit	349
+沓	tap	566
+囹	len	375
+囹	lin	375
+罔	vong	635
+罔	mong	635
+钍	tu	217
+钎	cen	363
+钏	con	450
+钒	fan	306
+钕	na	217
+钗	cai	669
+邾	zu	207
+迮	zak	154
+迮	zok	154
+牦	mau	416
+竺	zuk	580
+迤	je	454
+迤	ji	454
+佶	git	464
+佶	get	464
+佬	lau	702
+佰	bak	466
+侑	jiu	319
+侉	ka	466
+侉	qu	466
+臾	kui	487
+臾	ji	487
+岱	toi	540
+侗	tung	507
+侃	kon	687
+侃	kan	687
+侏	zu	508
+侩	koi	398
+佻	tiau	459
+佻	tau	459
+佾	jit	274
+佾	qit	274
+侪	cai	466
+佼	gau	574
+佼	gau	574
+佯	jong	575
+侬	nung	494
+帛	pak	633
+帛	bet	633
+阜	feu	694
+阜	fu	694
+侔	meu	240
+徂	cw	334
+刽	kui	469
+刽	koi	469
+郄	kiak	214
+怂	thung	640
+籴	tak	239
+籴	tap	239
+瓮	qung	709
+瓮	qang	709
+瓮	vung	709
+戗	cong	429
+肼	ziang	184
+䏝	zon	6
+肽	tai	430
+肱	gung	589
+肫	kin	254
+剁	do	546
+剁	dok	546
+迩	nzi	665
+郇	sun	262
+郇	thun	262
+狙	zw	615
+狎	qap	399
+狍	pau	385
+狒	pui	426
+狒	fui	426
+咎	giu	649
+炙	zak	652
+枭	giau	611
+饯	cen	448
+饴	ji	550
+冽	let	578
+冼	then	431
+庖	bau	510
+疠	le	262
+疝	than	266
+疡	jong	475
+兖	jen	459
+妾	ziap	679
+劾	het	499
+劾	hai	499
+炜	vui	572
+𬉼	qeu	110
+炖	dun	543
+炘	sun	393
+炝	cong	279
+炔	ket	339
+泔	gam	334
+沭	sut	385
+泷	lung	404
+泸	lu	543
+泱	jong	465
+泅	siu	393
+泗	thi	605
+泠	lang	464
+泠	lin	464
+泺	luk	184
+泺	lok	184
+泺	puk	184
+泖	mau	244
+泫	sen	450
+泮	pan	337
+沱	to	555
+泯	min	550
+泓	fen	526
+泾	gin	657
+怙	fu	490
+怙	ku	490
+怵	cut	525
+怦	pang	598
+怦	pin	598
+怵	tut	525
+怛	dat	418
+怛	dan	418
+怏	jong	525
+怍	cok	329
+怍	zok	329
+㑜	zet	103
+㤘	cau	2
+怩	ni	439
+怩	ne	439
+怫	pui	378
+怫	put	378
+怫	fut	378
+怿	jit	333
+宕	tong	553
+穹	kiung	612
+穹	giung	612
+宓	met	489
+宓	mit	489
+诓	kong	390
+诓	gong	390
+诔	lui	315
+诖	gai	233
+诘	kit	622
+戾	le	554
+戾	lit	554
+诙	foi	447
+戽	fu	190
+郓	jun	419
+衩	ca	476
+衩	cai	476
+祆	qau	325
+祎	vui	496
+祉	zi	402
+祇	ki	405
+祇	zi	405
+诛	zu	727
+诜	then	298
+诟	keu	433
+诟	geu	433
+诠	con	494
+诣	zi	539
+诤	zang	433
+诤	zin	433
+诧	ca	738
+诨	ngun	433
+诨	fun	433
+诩	qu	554
+诩	ji	554
+戕	ciong	436
+孢	bau	539
+亟	git	507
+亟	kit	507
+亟	ki	507
+陔	gai	256
+陔	goi	256
+妲	dat	390
+妲	dan	390
+妯	cuk	350
+姗	than	676
+帑	nu	344
+帑	tong	344
+弩	nu	678
+孥	nu	290
+孥	no	290
+驽	nu	615
+虱	thit	580
+虱	thet	580
+迦	ga	670
+迨	dai	332
+绀	gam	284
+绁	thet	285
+绂	but	347
+绂	fut	347
+驷	thi	659
+驸	fu	507
+绉	nziu	467
+绉	ziu	467
+绌	zut	568
+驿	jit	600
+骀	toi	312
+甾	zai	224
+甾	zi	224
+珏	nziuk	582
+珐	fat	365
+珂	ko	613
+珑	lung	682
+玳	toi	453
+珀	pak	573
+顸	hon	284
+顸	han	284
+珉	min	558
+珈	ga	483
+拮	git	425
+拮	get	425
+垭	qa	345
+挝	ga	428
+挝	go	428
+挝	vo	428
+垣	jen	687
+挞	tat	450
+垤	det	155
+赳	giu	503
+贲	pun	492
+贲	pui	492
+垱	dong	222
+垌	tung	197
+郝	hok	689
+垧	song	230
+垓	goi	352
+垓	gai	352
+挦	cim	420
+垠	nziun	515
+垠	ngin	515
+垠	jin	515
+茜	cen	709
+荚	gap	369
+荑	ji	417
+贳	se	358
+荜	bit	398
+莒	lu	398
+莒	li	398
+莒	gi	398
+茼	tung	306
+茴	fui	398
+茱	zu	464
+莛	tin	398
+荞	kiau	431
+荞	giau	431
+茯	puk	378
+茯	fuk	378
+荏	nzim	457
+荇	hen	337
+荃	cen	488
+荃	con	488
+荟	qoi	533
+荟	zen	533
+荟	fui	533
+荀	sun	580
+荀	thun	580
+茗	miang	645
+茗	men	645
+荠	ci	457
+茭	gau	298
+茨	cw	647
+茨	ci	647
+垩	qok	415
+荥	jin	419
+荦	lok	590
+荨	tam	328
+荨	cim	328
+荩	zin	353
+剋	ket	259
+荪	thun	424
+茹	nzio	717
+茹	nzia	717
+荬	mai	156
+荮	ciu	69
+柰	nai	286
+柰	noi	286
+栉	zit	646
+栉	zet	646
+柯	ka	753
+柯	ko	753
+柘	za	383
+栊	lung	320
+柩	giu	448
+枰	pin	348
+栌	lu	261
+柙	qap	472
+柙	gap	472
+枵	thiau	222
+枵	hau	222
+柚	jiu	565
+枳	zi	472
+枳	zit	472
+柞	zok	334
+柞	cok	334
+柝	tok	449
+栀	gi	445
+栀	zi	445
+柢	di	450
+栎	lit	426
+枸	geu	383
+柈	pan	135
+柁	to	397
+枷	ga	554
+柽	cin	233
+剌	lat	567
+酊	dang	462
+酊	den	462
+酊	din	462
+郦	li	453
+甭	bung	569
+砗	ca	272
+砘	dun	178
+砒	pi	380
+斫	dok	587
+砭	ben	391
+砜	fung	174
+奎	kui	648
+耷	jung	547
+虺	fui	431
+殂	cw	277
+殇	song	498
+殄	ten	423
+殆	tai	585
+轱	gu	409
+轲	ko	545
+轳	lu	322
+轶	jit	629
+轸	zin	435
+虿	cai	400
+毖	bi	424
+觇	cam	250
+尜	ga	260
+哐	kong	532
+哐	kang	532
+眄	men	343
+𠳐	bong	98
+郢	jang	519
+郢	jin	519
+眇	miau	322
+眊	mau	156
+眈	dam	590
+眈	cim	590
+眈	sim	590
+禺	nzi	510
+哂	sin	457
+咴	foi	372
+曷	qat	315
+曷	hot	315
+昴	mau	352
+昱	juk	520
+昵	ne	579
+昵	ni	579
+昵	nit	579
+咦	ji	709
+哓	kiau	412
+哓	hiau	412
+哔	bit	488
+哔	bi	488
+畎	ken	236
+毗	pi	480
+呲	ce	521
+呲	ci	521
+胄	ciu	526
+畋	ten	254
+畈	fan	295
+畈	pan	295
+虼	gat	290
+虻	mong	364
+盅	zung	518
+咣	gong	562
+哕	qiak	235
+哕	qiat	235
+哕	fui	235
+剐	ga	501
+郧	jun	341
+咻	siu	533
+囿	jiu	384
+咿	ji	505
+咿	ngi	505
+軋	ngat	82
+奊	fe	14
+焫	nat	41
+爇	nat	160
+哌	pai	199
+哙	qai	431
+哙	koi	431
+哚	do	314
+咯	lok	467
+咯	gok	467
+咩	me	395
+咩	mi	395
+咤	za	507
+咤	za	507
+咤	ca	507
+哝	nung	569
+哏	gen	372
+哏	han	372
+哏	qen	372
+哞	meu	410
+峙	ci	619
+峙	zi	619
+峣	gau	252
+峣	ngau	252
+罘	feu	267
+帧	zin	638
+峒	tung	500
+峤	kiau	326
+峋	thun	461
+峋	sun	461
+峥	zang	509
+峥	zin	509
+贶	song	185
+贶	thung	185
+钚	but	303
+钛	tai	582
+钡	bui	406
+钣	ban	306
+钤	lang	344
+钤	lin	344
+钤	len	344
+钨	qu	484
+钨	vu	484
+钫	fong	170
+钯	ba	364
+氡	dung	189
+氟	fut	639
+牯	gu	426
+郜	gau	306
+秕	pi	346
+秭	zi	307
+竽	ji	372
+竽	jo	372
+笈	gip	507
+笈	kip	507
+笃	duk	685
+俦	ciu	562
+俨	nziam	586
+俅	kiu	452
+俪	li	487
+叟	theu	566
+垡	fat	201
+垡	pet	201
+牮	zen	115
+俣	ngu	304
+俣	ngh	304
+俚	li	411
+皈	gui	442
+俑	jung	508
+俟	thu	523
+逅	qeu	516
+逅	geu	516
+逅	heu	516
+徇	cun	656
+徇	sun	656
+徇	thun	656
+徉	jong	436
+舢	than	389
+俞	ji	656
+郗	ci	368
+俎	zw	592
+郤	kiak	405
+爰	jen	447
+郛	fu	263
+郛	pu	263
+瓴	lin	474
+胨	dung	185
+胪	lu	358
+胛	gap	435
+胂	sin	185
+胙	cu	349
+胙	cok	349
+胍	ga	193
+胗	kin	223
+胗	zin	223
+胝	ci	456
+朐	gu	287
+朐	gi	287
+胫	gin	568
+胫	sin	568
+鸨	bau	534
+匍	pu	496
+狨	jung	247
+狯	goi	246
+狯	gai	246
+飑	pau	247
+飑	bau	247
+狩	siu	563
+狲	thun	426
+訇	hung	362
+逄	pong	328
+逄	pang	328
+昝	zam	264
+饷	song	564
+饸	gap	175
+饹	lok	181
+胤	jin	648
+孪	lon	464
+娈	lon	328
+弈	jit	582
+奕	jit	659
+庥	thiu	335
+疬	lit	182
+疣	jiu	544
+疥	gai	453
+疭	zung	51
+疭	cung	51
+庠	cong	330
+庠	song	330
+竑	hung	285
+彦	ngan	706
+彦	ngen	706
+飒	thap	585
+闼	tat	355
+闾	lu	582
+闾	li	582
+闿	koi	352
+阂	ngoi	491
+阂	het	491
+羑	jiu	241
+迸	bang	618
+迸	bin	618
+籼	then	283
+酋	kiu	559
+炳	biang	635
+炻	sak	280
+炽	ci	660
+炯	gin	638
+炯	gang	638
+炯	gen	638
+烀	fu	192
+炷	zu	413
+烃	gin	425
+烃	tin	425
+洱	nzi	457
+洹	jen	337
+洧	jui	230
+洌	let	379
+浃	gap	605
+洇	jin	366
+洄	fui	320
+洙	zu	454
+涎	cen	652
+涎	jen	652
+洎	ki	210
+洫	sit	270
+洫	set	270
+浍	goi	209
+浍	qoi	209
+洮	tau	386
+洵	thun	494
+洵	sun	494
+浒	fu	491
+浔	cim	406
+浕	zin	74
+洳	ji	260
+恸	tung	502
+恓	thi	163
+恹	jam	465
+恫	tung	418
+恺	koi	540
+恻	zet	564
+恂	thun	353
+恂	sun	353
+恪	kok	513
+恽	jun	392
+宥	jiu	368
+扃	giang	331
+扃	gin	331
+扃	gen	331
+衲	nap	540
+衽	nzim	459
+衿	gim	401
+袂	me	664
+祛	ki	568
+祛	ku	568
+祜	gu	404
+祓	but	241
+祓	fut	241
+祚	cu	426
+祚	co	426
+祚	zok	426
+诮	ziau	407
+诮	ciau	407
+祗	zi	454
+祢	nzi	478
+祢	ni	478
+祢	ne	478
+诰	gau	418
+诰	gau	418
+诳	kong	482
+鸩	cim	465
+鸩	dim	465
+鸩	dam	465
+昶	cong	441
+郡	kiun	731
+郡	kun	731
+郡	giun	731
+咫	zit	603
+咫	zi	603
+咫	ze	603
+弭	mi	413
+弭	me	413
+牁	go	160
+牁	ga	160
+胥	the	507
+陛	bi	760
+陟	zit	520
+娅	qa	727
+娅	ja	727
+姮	hen	398
+娆	nziau	532
+姝	zu	605
+姣	gau	492
+姘	pin	393
+姹	ca	466
+怼	dui	356
+羿	nge	541
+羿	ji	541
+炱	toi	207
+火炱	fo tam	1
+矜	gim	705
+绔	ku	458
+骁	gau	529
+骁	giau	529
+骅	fa	443
+绗	hang	285
+绛	gong	551
+骈	pen	660
+骈	pin	660
+骈	piang	660
+耖	cau	153
+挈	ke	541
+挈	get	541
+珥	nzi	474
+珙	kiung	374
+顼	suk	456
+珰	dong	328
+珩	hang	475
+珧	jau	181
+珣	sun	434
+珣	thun	434
+珞	lok	540
+琤	zin	285
+琤	zang	285
+琤	zen	285
+珲	fun	396
+敖	ngau	660
+敖	qau	660
+恚	fui	345
+埔	bu	609
+埔	pu	609
+埕	tang	603
+埘	si	241
+埙	sun	468
+埚	go	302
+挹	jip	491
+耆	ki	546
+耄	mau	350
+埒	lot	416
+捋	lot	563
+贽	zi	364
+垸	van	284
+捃	giun	164
+盍	hap	298
+盍	qap	298
+荸	put	269
+莆	pu	440
+莳	si	357
+莴	vo	339
+莪	ngo	300
+莠	jiu	559
+莓	moi	521
+莜	jiu	338
+莅	li	395
+荼	tu	524
+莩	piau	351
+莩	pu	351
+荽	thui	290
+莸	jiu	500
+荻	tit	525
+莘	thin	527
+莎	tha	792
+莞	gon	580
+莞	van	580
+莨	long	351
+莨	liong	351
+鸪	gu	406
+莼	cun	480
+栲	kau	250
+栳	lau	209
+郴	cim	362
+桓	van	666
+桓	fan	666
+桡	nziau	383
+桡	nau	383
+桎	zi	402
+桢	zin	511
+桤	ki	188
+梃	tin	282
+栝	gat	215
+栝	tiam	215
+桕	giu	229
+桕	gau	229
+桁	hang	363
+桧	goi	473
+桧	kui	473
+桅	ngui	510
+桅	gui	510
+栟	bin	64
+桉	qon	380
+栩	si	596
+栩	hi	596
+逑	kiu	371
+逋	bu	483
+彧	juk	449
+鬲	gak	311
+鬲	lit	311
+豇	gong	231
+酐	gan	362
+逦	le	388
+逦	li	388
+厝	cw	522
+厝	co	522
+孬	nau	476
+孬	fai	476
+砝	fat	416
+砹	qai	178
+砺	le	722
+砺	li	722
+砧	zem	407
+砷	sin	310
+砟	za	199
+砼	tung	240
+砥	di	689
+砣	to	476
+剞	gi	264
+剞	ge	264
+砻	lung	428
+轼	sit	474
+轾	zi	404
+辂	lu	377
+鸫	dung	267
+趸	dun	341
+龀	cun	225
+龀	tun	225
+鸬	lu	295
+虔	ken	608
+逍	thiau	744
+眬	lung	363
+唛	mak	246
+晟	sin	608
+眩	sen	660
+眙	ci	329
+眙	ji	329
+哧	ci	673
+哽	kang	641
+哽	gang	641
+唔	ngh	650
+晁	cau	528
+晏	jen	634
+晏	ngan	634
+晏	qan	634
+鸮	jau	487
+趵	bok	296
+趿	thap	406
+畛	zin	276
+蚨	fu	367
+蚨	pu	367
+蚜	nga	270
+蚍	pi	458
+蚋	nziui	343
+蚋	jui	343
+蚋	nut	343
+蚬	han	257
+蚝	mau	337
+蚧	gai	286
+唢	tho	377
+圄	ngu	378
+圄	ngh	378
+唣	cau	258
+唏	si	543
+盎	qong	589
+盎	qang	589
+唑	co	523
+崂	lau	399
+崃	loi	331
+崃	lai	331
+罡	gong	623
+罟	gu	218
+峪	juk	482
+觊	gi	500
+赅	goi	434
+钰	nziuk	581
+钲	zang	370
+钲	zin	370
+钴	gu	330
+钵	bat	600
+钹	pat	399
+钺	vat	504
+钽	tan	218
+钼	muk	436
+钿	ten	378
+铀	jiu	428
+铂	pak	407
+铂	pok	407
+铂	bok	407
+铄	sok	591
+铆	liu	535
+铈	si	109
+铉	sen	439
+铊	to	260
+铋	bit	169
+铌	ni	130
+铍	pi	268
+䥽	pat	8
+铎	tok	541
+铎	dok	541
+氩	ja	336
+氤	jin	484
+氦	hoi	293
+毪	meu	210
+舐	se	607
+秣	mat	620
+秫	sut	325
+盉	fo	283
+笄	gi	326
+笕	gen	275
+笊	zau	295
+笏	fut	392
+笆	ba	467
+俸	pung	508
+俸	fung	508
+倩	cen	796
+俵	biau	246
+偌	nzia	590
+若	nziok	952
+若	nzia	952
+俳	pai	327
+佇	nen	240
+咷	diau	443
+咷	tau	443
+咷	tau	443
+䚇	then	238
+覘	then	201
+覗	thu	355
+覗	thin	355
+䚇	thin	238
+㧙	met	104
+靡	me	800
+弥	me	783
+扞	gan	380
+擁	qung	142
+儭	cin	242
+親	cin	628
+逐	diak	871
+膎	hai	499
+閪	hai	220
+膦	lin	457
+跍	keu	208
+踎	meu	209
+趺	bu	331
+搦	net	471
+簕	net	477
+䁙	qen	237
+㰽	qen	105
+吂	men	609
+覗	thi	355
+俶	suk	249
+倬	zok	381
+倏	suk	664
+㜷	me	236
+恁	nim	480
+恁	nzim	480
+倭	qo	651
+倭	vo	651
+倪	nzi	676
+倪	ne	676
+俾	bi	478
+倜	tit	531
+倜	ti	531
+隼	thun	500
+隽	zun	502
+倌	gon	484
+倥	kung	331
+臬	nget	430
+蓧	tiau	71
+皋	gau	519
+郫	pi	304
+倨	gi	466
+倨	gio	466
+倨	gio	466
+衄	nuk	168
+颀	ki	487
+徕	loi	413
+舫	fong	505
+舫	pong	505
+釜	bu	727
+釜	fu	727
+奚	kai	553
+奚	hai	553
+衾	kim	559
+胯	ka	562
+胱	gong	479
+胴	tung	492
+胭	jen	558
+胭	jin	558
+脍	koi	499
+胼	pin	456
+朕	zim	728
+脒	mi	112
+胺	qon	681
+鸱	ci	623
+玺	si	590
+玺	sai	590
+鸲	gu	233
+鸲	geu	233
+狷	gen	302
+猁	li	374
+狳	ji	314
+猃	liam	224
+狺	nziun	271
+狺	jen	271
+逖	tit	427
+桀	ket	611
+袅	niau	677
+袅	nziau	677
+饽	put	420
+凇	cung	277
+栾	lon	459
+挛	len	515
+挛	lon	515
+亳	pok	362
+疳	gam	276
+疴	ko	389
+疴	ko	389
+袔	ko	76
+袔	ho	76
+胢	ka	64
+疸	dan	293
+疽	zu	453
+痈	jung	544
+疱	pau	427
+痂	ga	400
+痉	gin	513
+衮	gun	585
+凋	diau	584
+颃	hong	229
+恣	zw	645
+恣	zi	645
+旆	pui	251
+旄	mau	306
+旃	zen	410
+阃	kun	271
+阄	geu	369
+阄	giu	369
+訚	nziun	402
+訚	nzin	402
+阆	long	407
+恙	jong	581
+粑	ba	414
+朔	thok	639
+郸	dan	571
+烜	se	409
+烜	van	409
+烨	jap	578
+烩	fui	426
+烊	jong	422
+剡	jam	272
+郯	tam	305
+烬	cin	579
+涑	cuk	305
+涑	thuk	305
+浯	ngh	229
+浯	ngu	229
+涞	loi	386
+涟	len	617
+娑	tha	501
+娑	tho	501
+涅	net	612
+涠	vui	182
+浞	thok	299
+浞	zuk	299
+涓	gen	605
+浥	jip	175
+涔	cim	511
+浜	bang	386
+浜	bin	386
+浠	si	316
+浣	fan	524
+浣	van	524
+浚	zun	473
+悚	thung	607
+悭	gan	510
+悭	gen	510
+悭	qan	510
+悭	han	510
+悝	li	223
+悒	jip	368
+悌	ti	395
+悛	zun	540
+宸	sin	526
+窈	jau	512
+剜	ven	538
+剜	von	538
+诹	zeu	299
+诹	zu	299
+冢	zung	574
+冢	cung	574
+诼	ziok	237
+诼	diok	237
+袒	tan	580
+袢	pan	264
+袢	fan	264
+祯	zin	595
+诿	vui	401
+谀	ji	560
+谂	sim	216
+谄	ham	628
+谇	zut	403
+屐	kiak	445
+屙	qo	468
+陬	zeu	364
+勐	mang	522
+奘	zong	457
+奘	cong	457
+牂	zong	198
+蚩	ci	643
+陲	cui	441
+姬	gi	786
+娠	sin	401
+娌	li	343
+娉	pin	545
+娲	ga	573
+娲	va	573
+娩	men	438
+娴	qan	638
+娴	han	638
+娣	tai	499
+娣	ti	499
+娓	mui	585
+娓	vui	585
+婀	qo	509
+畚	bun	275
+逡	zun	419
+逡	cun	419
+绠	gen	478
+绠	gang	478
+骊	li	505
+绡	thiau	446
+骋	cin	615
+绥	thui	621
+绦	tiau	392
+绨	tai	348
+绨	ti	348
+骎	cim	173
+邕	jung	449
+鸶	thu	362
+鸶	thi	362
+彗	jui	454
+彗	thui	454
+彗	fui	454
+耜	thi	261
+耜	si	261
+焘	tau	551
+舂	zung	397
+琏	len	535
+琇	thiu	247
+麸	pu	369
+麸	fu	369
+揶	ja	483
+埴	sit	416
+埴	cit	416
+埯	jam	177
+捯	dau	193
+掳	lu	556
+掴	gok	425
+埸	jit	284
+埵	cui	208
+赧	nan	454
+埤	bi	325
+捭	pai	420
+逵	kui	504
+埝	diam	217
+埝	nziap	217
+堋	pen	195
+堋	pang	195
+堍	tu	176
+掬	kiuk	521
+鸷	zip	388
+掖	jit	509
+捽	cut	259
+捽	zut	259
+掊	peu	331
+堉	juk	169
+掸	tan	497
+捩	lit	526
+掮	gen	342
+悫	kok	220
+埭	tai	211
+埽	thau	250
+掇	zot	576
+掇	dot	576
+掼	gan	405
+掼	gon	405
+聃	dam	334
+菁	cin	689
+菁	ciang	689
+萁	ki	547
+菘	thung	290
+堇	giun	387
+萘	nai	305
+萋	ci	451
+萋	ce	451
+菽	suk	547
+菖	cong	364
+萜	tiap	137
+萸	ji	398
+萑	fan	286
+萑	zui	286
+棻	fun	213
+棻	pun	213
+菔	pet	251
+菔	puk	251
+菟	tu	350
+萏	tam	291
+萃	cui	686
+菏	ho	458
+菹	zw	215
+菪	tong	191
+菅	gan	389
+菀	von	430
+菀	van	430
+萦	jin	581
+萦	jang	581
+菰	gu	294
+菡	ham	509
+梵	pam	617
+梵	fam	617
+梿	len	211
+梏	kuk	404
+梏	guk	404
+觋	qet	206
+觋	qat	206
+桴	feu	264
+桴	pu	264
+桷	gok	263
+梓	thin	597
+棁	cet	165
+棁	zot	165
+桫	tho	392
+棂	lin	439
+啬	thet	414
+郾	jan	371
+郾	jen	371
+匮	kui	584
+敕	cit	483
+豉	si	357
+鄄	gen	305
+酞	tai	331
+酚	fun	535
+戛	kat	610
+戛	gat	610
+硎	sin	454
+硭	mong	216
+硒	thi	279
+硖	gap	291
+硗	kiau	245
+硐	tung	192
+硇	nau	176
+硌	lok	394
+鸸	nzi	179
+鸸	ji	179
+瓠	fu	389
+瓠	pu	389
+匏	pau	271
+厩	giu	451
+龚	giung	637
+殒	jen	577
+殒	jun	577
+殓	liam	424
+殍	piau	473
+赉	loi	358
+赉	lai	358
+雩	ji	237
+辄	zap	513
+堑	ciam	632
+眭	gui	289
+眦	zi	567
+眦	cw	567
+眦	cia	567
+啧	zak	663
+晡	bu	225
+晤	ngu	530
+晤	ngh	530
+眺	tiau	590
+眵	ci	181
+眸	meu	734
+圊	cin	174
+喏	nzia	548
+喏	nak	548
+喵	miau	549
+啉	lim	322
+勖	suk	397
+晞	si	354
+唵	qam	322
+晗	ham	524
+冕	men	593
+啭	zon	318
+畦	kui	363
+趺	bu	331
+趺	fu	331
+啮	ngat	649
+跄	cong	633
+蚶	gam	240
+蚶	ham	240
+蛄	gu	278
+蛎	li	377
+蛎	le	377
+蛆	cw	486
+蛆	zw	486
+蚰	jiu	227
+蛊	gu	623
+圉	nzi	328
+蚱	za	480
+蚱	zak	480
+蛉	lin	317
+蛏	sin	220
+蚴	jiu	248
+啁	zau	339
+啁	diau	339
+啕	tau	519
+唿	fut	398
+啐	cut	531
+唼	ziap	193
+唷	juk	246
+啖	tam	488
+啵	bo	441
+啶	tin	373
+啷	long	539
+唳	lit	574
+唳	li	574
+唰	thot	609
+唰	sot	609
+啜	zot	584
+啜	dot	584
+帻	zak	282
+崚	lin	158
+崦	qam	253
+崦	jam	253
+帼	gok	490
+崮	gu	321
+崤	ngau	326
+崆	kung	570
+赇	kiu	207
+赈	zin	462
+赊	ca	461
+铑	lau	144
+铒	nzi	186
+铗	giap	407
+铗	gap	407
+铙	nziau	314
+铟	jin	132
+铠	koi	655
+铡	zet	392
+铢	zu	706
+铣	then	519
+铤	tin	432
+铧	fa	371
+铨	con	387
+铩	that	484
+铪	hap	185
+铫	jau	219
+铫	ciau	219
+铫	tau	219
+铬	gok	484
+铮	zang	668
+铮	zin	668
+铯	thet	231
+铰	gau	363
+铱	ji	327
+铳	cung	460
+铵	qon	485
+铷	ji	101
+阞	lak	463
+氪	ket	683
+牾	ngu	239
+牾	ngh	239
+鸹	gat	331
+秾	nung	280
+逶	vui	386
+笺	ciam	526
+笺	cen	526
+筇	kiung	357
+笸	bo	293
+笪	dat	222
+笮	zak	310
+笠	lip	640
+笥	thu	266
+笤	zau	377
+笳	ga	399
+笾	ben	218
+笞	ci	385
+偾	pun	265
+偾	fun	265
+偃	jen	711
+偕	gai	537
+偕	hai	537
+偈	ket	401
+傀	kui	581
+偬	cung	307
+偻	leu	460
+皑	ngoi	523
+皑	qoi	523
+皎	gau	554
+鸻	hang	110
+徜	song	431
+舸	ko	296
+舻	lu	263
+舴	cok	184
+舷	sen	541
+舷	hen	541
+龛	kam	448
+翎	lin	597
+脬	pau	236
+脘	van	262
+脲	niau	185
+匐	puk	492
+匐	pet	492
+猗	ji	367
+猡	lo	349
+猞	sa	357
+猝	zut	585
+猝	cut	585
+斛	fuk	422
+斛	fu	422
+猕	mi	380
+馗	kui	484
+馃	go	146
+馄	fun	457
+鸾	lon	815
+孰	suk	559
+庹	tu	211
+庾	ji	421
+痔	ci	496
+痍	ji	453
+疵	pi	588
+疵	ci	588
+翊	jit	516
+旌	zin	587
+旎	ni	470
+袤	meu	459
+袤	mau	459
+阇	du	312
+阈	jit	256
+阈	jet	256
+阈	vet	256
+阉	jam	524
+阊	cong	295
+阋	sit	520
+阍	fun	408
+阏	qat	477
+羟	kang	286
+羟	kiang	286
+粝	li	531
+粕	pak	367
+敝	pet	738
+焐	ngu	338
+烯	si	663
+焓	ham	251
+烽	fung	612
+焖	mun	402
+烷	van	597
+焗	kiuk	452
+焗	kuk	452
+焗	guk	452
+渍	zi	555
+渚	du	427
+渚	zu	427
+淇	ki	611
+淅	thit	517
+淅	si	517
+淞	thung	456
+淞	cung	456
+渎	duk	549
+渎	tuk	549
+涿	duk	432
+涿	diok	432
+淖	nau	473
+挲	tho	216
+淠	pi	174
+涸	qok	605
+涸	kok	605
+涸	gok	605
+涸	hok	605
+渑	men	325
+淦	gam	337
+淝	pui	362
+淬	cui	466
+涪	 feu	382
+涪	 pu	382
+淙	zung	465
+淙	cung	465
+涫	gan	360
+涫	gon	360
+渌	luk	301
+淄	zi	493
+淄	ci	493
+惬	gap	588
+惬	kap	588
+惬	hap	588
+悻	hen	610
+悱	pui	470
+悱	fui	470
+惝	cong	379
+惘	mong	606
+悸	gui	612
+悸	gi	612
+惆	cu	564
+惆	ciu	564
+惚	fut	666
+惇	dun	469
+惮	san	613
+惮	don	613
+惮	tan	613
+惮	dan	613
+窕	tiau	506
+谌	sim	420
+谏	gan	665
+扈	fu	576
+皲	gun	343
+皲	giun	343
+谑	nziok	531
+谑	hiok	531
+裆	dong	529
+裆	nong	529
+袷	gap	295
+裉	gen	262
+谒	qet	490
+谒	qat	490
+谔	ngok	460
+谕	lu	603
+谕	ji	603
+谖	hen	299
+谖	jen	299
+谖	van	299
+谗	cam	534
+谙	qam	519
+谛	ti	539
+谛	di	539
+谝	pen	311
+逯	luk	299
+郿	mi	324
+隈	voi	244
+隈	qoi	244
+粜	tiau	347
+隍	vong	419
+隗	ngui	485
+隗	gui	485
+婧	ziang	585
+婧	ciang	585
+婊	biau	568
+婕	ciak	629
+娼	cong	571
+婢	bi	649
+婵	can	613
+婵	san	613
+胬	nu	167
+袈	ga	477
+翌	jit	534
+恿	jung	507
+欸	qe	473
+绫	lin	573
+骐	ki	506
+绮	ki	648
+绯	fui	646
+绱	song	242
+绱	ziong	242
+骒	ko	208
+绲	kun	233
+骓	cui	375
+骓	zui	375
+绶	siu	532
+绺	liu	460
+绻	gen	409
+绻	ken	409
+绾	van	490
+骖	cam	464
+缁	ci	532
+缁	zi	532
+巢	cau	809
+琳	lim	825
+琢	ziok	688
+琼	kiung	763
+琪	ki	768
+瑛	jin	576
+琦	ki	656
+琥	fu	510
+琨	kun	439
+靓	liang	618
+靓	ziang	618
+琰	jam	515
+琮	zung	466
+琯	gon	176
+琬	von	519
+琬	van	519
+琛	cim	608
+琚	gi	378
+辇	len	444
+鼋	ngen	345
+鼋	jen	345
+揳	set	127
+揳	ket	127
+揳	het	127
+堞	tiap	334
+搽	ca	439
+揸	za	208
+揠	jat	259
+堙	jin	375
+趄	ci	497
+揖	thip	619
+揖	zip	619
+咠	zip	6
+葺	zip	391
+葺	cip	391
+颉	git	466
+塄	lin	322
+揿	kim	353
+耋	det	327
+揄	ji	486
+蛩	kiung	296
+蛰	cit	489
+蛰	cet	489
+塆	van	116
+摒	bin	482
+揆	kui	527
+掾	jen	325
+聒	gat	444
+葑	fung	458
+葚	sim	315
+靰	ngut	113
+靸	thap	251
+葳	vui	445
+葺	jung	391
+葸	si	291
+萼	ngok	431
+葆	bau	470
+葩	pa	569
+葶	tin	367
+蒌	leu	399
+萱	sen	651
+戟	git	645
+葭	ga	559
+楮	cu	494
+楮	du	494
+棼	fun	334
+棼	pun	334
+椟	tuk	542
+棹	cau	336
+棹	zok	336
+椤	lo	393
+棰	cui	310
+赍	zi	434
+赍	zai	434
+椋	liong	331
+椁	gok	398
+椪	bin	103
+棣	ti	548
+椐	gi	272
+鹁	but	217
+鹁	put	217
+覃	tam	508
+覃	cim	508
+酤	gu	164
+酢	cu	305
+酢	co	305
+酢	cok	305
+酡	to	381
+鹂	li	436
+厥	ket	645
+殚	dan	662
+殛	git	424
+雯	vun	730
+雱	pong	323
+辊	gun	461
+辋	mong	196
+椠	ciam	492
+辍	zot	503
+辎	zi	486
+斐	fui	603
+睄	thiau	127
+睑	giam	468
+睇	ti	366
+睃	zun	336
+戢	cip	554
+戢	zip	554
+戢	sip	554
+喋	tiap	591
+喋	diap	591
+嗒	dep	613
+嗒	dap	613
+嗒	tap	613
+喃	nam	810
+喱	li	418
+喹	kui	247
+晷	gui	511
+喈	gai	326
+跖	zak	560
+跖	dak	560
+跗	fu	359
+跞	lit	163
+跚	than	525
+跎	to	570
+跏	ga	267
+跆	toi	461
+蛱	gap	219
+蛲	nziau	198
+蛲	nzau	198
+蛭	zit	396
+蛭	det	396
+蛳	thu	333
+蛳	thi	333
+蛐	kiuk	491
+蛔	fui	402
+蛔	thai	402
+蛞	gat	229
+蛞	kat	229
+蛴	ce	293
+蛟	gau	633
+蛘	jong	203
+喁	jung	370
+喁	ngeu	370
+喟	vui	460
+喟	kui	460
+啾	ciu	482
+啾	ziu	482
+嗖	theu	631
+喑	jim	393
+嗟	zia	593
+喽	leu	666
+嗞	zi	373
+嗞	zw	373
+喀	kak	661
+喔	qok	667
+喔	vo	667
+喙	zoi	603
+喙	cui	603
+嵘	jung	471
+赋	fu	740
+崴	vui	496
+遄	con	286
+詈	li	502
+嵎	ji	127
+嵎	ngu	127
+崽	ze	613
+嵬	ngui	502
+嵛	ji	198
+嵯	ca	333
+嵯	co	333
+嵝	lu	179
+嵝	leu	179
+嵫	zw	243
+幄	quk	509
+嵋	mi	534
+嵋	mui	534
+赕	tam	96
+铻	ngo	89
+铻	ngh	89
+铼	loi	219
+铿	gen	549
+锃	cang	447
+锂	li	485
+锆	gau	364
+锇	ngo	200
+锉	co	402
+锏	gan	485
+锑	ti	307
+锒	long	365
+锔	kuk	267
+锕	qo	240
+掣	ce	680
+矬	co	344
+氰	ciang	512
+毳	cui	266
+毽	gen	424
+犊	tuk	657
+犄	ji	445
+犋	gu	138
+犋	ki	138
+鹄	hok	724
+鹄	gok	724
+鹄(qok)	qok	1
+犍	gen	161
+嵇	qe	490
+嵇	gi	490
+黍	su	630
+稃	fu	107
+稂	long	391
+睥	pe	431
+筚	bit	545
+筵	jen	499
+筌	con	374
+傣	dai	441
+傣	tai	441
+傈	lit	318
+舄	thit	480
+牍	duk	626
+傥	tong	477
+傧	bin	295
+遑	fong	571
+遑	vong	571
+傩	no	374
+遁	dun	755
+徨	fong	532
+徨	vong	532
+媭	thi	163
+畲	sa	366
+弑	sit	492
+颌	gap	499
+颌	qap	499
+翕	sip	443
+釉	jiu	503
+鹆	juk	237
+舜	sun	636
+貂	diau	665
+腈	zin	396
+腌	jap	480
+腓	fui	416
+腆	den	559
+腴	ji	499
+腑	fu	613
+腚	tin	422
+腱	ken	356
+鱿	jiu	478
+鲀	dun	226
+鲂	fong	285
+颍	jin	464
+猢	fu	474
+猹	ca	149
+猥	voi	555
+猥	vui	555
+飓	gu	563
+飓	gi	563
+觞	song	433
+觚	gu	481
+猱	nau	342
+颎	gin	365
+飧	thun	536
+馇	za	215
+馊	theu	463
+亵	thet	577
+脔	lon	430
+裒	feu	258
+裒	peu	258
+裒	bau	258
+痣	zi	492
+痨	lau	392
+痦	ngu	264
+痦	ngh	264
+痞	pi	602
+痤	co	299
+痫	han	351
+痫	qan	351
+痧	tha	303
+赓	gang	459
+竦	thung	428
+瓿	bu	198
+瓿	piau	198
+瓿	pu	198
+啻	si	483
+啻	ci	483
+啻	di	483
+颏	hai	381
+颏	hoi	381
+颏	goi	381
+鹇	han	183
+阑	lan	655
+阒	ket	437
+阕	ket	432
+粞	thi	134
+遒	ciu	392
+遒	siu	392
+孳	zw	575
+焯	cok	332
+焯	zok	332
+焜	kun	227
+焙	bui	388
+焱	jam	587
+鹈	ti	336
+湛	zam	614
+湛	cam	614
+湛	tam	614
+渫	thet	269
+渫	tiap	269
+湮	jin	522
+湮	jen	522
+湎	men	405
+湜	cit	254
+渭	vui	663
+湍	ton	481
+湍	con	481
+湫	ciu	370
+溲	thau	494
+湟	vong	387
+溆	ci	224
+溆	thi	224
+溆	cu	224
+湲	jen	186
+湔	zen	225
+湉	tiam	340
+渥	qok	491
+渥	vok	491
+渥	vo	491
+湄	mi	514
+湄	mui	514
+滁	cu	370
+愠	vun	491
+惺	thin	645
+愦	gui	270
+惴	cui	562
+惴	zui	562
+惴	con	562
+愀	ziu	330
+愎	bit	400
+愔	jim	260
+喾	kok	272
+喾	kuk	272
+寐	mi	610
+寐	mui	610
+谟	mu	482
+扉	fui	568
+裢	len	340
+裎	cin	354
+裥	gan	223
+祾	lin	76
+祺	ki	542
+谠	dong	433
+幂	met	346
+幂	mit	346
+谡	suk	428
+谥	jit	445
+谧	mit	540
+遐	ha	654
+孱	can	449
+孱	zan	449
+弼	pet	547
+弼	pit	547
+巽	sun	436
+骘	cit	347
+媪	vun	368
+媛	jen	687
+婷	tin	804
+巯	ciu	161
+翚	gui	286
+皴	zun	290
+婺	vu	384
+婺	mu	384
+骛	mu	537
+骛	vu	537
+缂	gak	201
+缃	thiong	329
+缄	gam	613
+㜣	nen	522
+彘	ci	540
+彘	ce	540
+喫	ke	117
+缇	ti	527
+缈	miau	547
+缌	thu	339
+缑	geu	270
+缒	cui	281
+缒	dui	281
+缗	min	325
+缗	fun	325
+飨	song	409
+耢	lau	130
+瑚	fu	588
+瑁	mau	452
+瑜	ji	690
+瑗	jen	417
+瑄	sen	437
+瑕	ha	781
+遨	ngau	483
+遨	qau	483
+骜	ngau	537
+骜	qau	537
+韫	vun	438
+髡	kun	292
+塬	nzien	381
+塬	jen	381
+鄢	jen	451
+趔	let	498
+趑	cw	215
+趑	zw	215
+摅	lu	177
+摅	su	177
+摁	qen	550
+蜇	zet	407
+搋	cai	298
+搪	tong	519
+搐	cuk	599
+搛	liam	254
+搛	giam	254
+搠	thok	355
+摈	bin	367
+彀	geu	378
+毂	guk	596
+搦	nak	471
+搦	nit	471
+搡	thung	494
+搡	thong	494
+蓁	zin	451
+戡	kam	395
+蓍	si	352
+鄞	giun	362
+鄞	nziun	362
+靳	giun	569
+靳	gin	569
+蓐	juk	262
+蓐	nziuk	262
+蓦	mak	689
+蓦	mok	689
+蓦	mu	689
+鹋	miau	166
+蒽	qen	235
+蓓	poi	589
+蓓	pui	589
+蓖	bi	352
+蓊	qang	307
+蓊	jung	307
+蒯	kai	454
+蓟	gi	482
+蓟	ge	482
+蓑	tho	547
+蓑	thoi	547
+蒿	gau	547
+蒺	cit	391
+蓠	li	326
+蒟	gi	163
+蒡	pong	193
+蒹	giam	500
+蒴	thok	193
+蒗	long	291
+蓥	qang	291
+蓥	jin	291
+蓥	jang	291
+颐	ji	690
+楔	thiap	492
+楔	thet	492
+楠	nam	745
+楂	za	372
+楝	len	336
+楫	thip	492
+楫	ziap	492
+楫	zip	492
+楸	ciu	336
+椴	ton	313
+槌	cui	527
+楯	dun	236
+皙	thit	603
+榈	li	492
+榈	lu	492
+槎	ca	314
+榉	gi	337
+楦	sen	217
+楣	mi	485
+楹	jin	384
+椽	jen	588
+椽	con	588
+裘	giu	775
+裘	kiu	775
+剽	piau	476
+甄	zin	657
+酮	tung	642
+酰	then	549
+酯	zi	582
+酩	miang	438
+蜃	sin	484
+碛	zak	291
+碓	doi	304
+硼	pen	391
+碉	diau	488
+碚	pui	244
+碇	tin	305
+碇	dang	305
+碜	cam	429
+碜	cap	429
+鹌	qap	386
+鹌	qam	386
+辏	ceu	435
+龃	zw	342
+龃	cia	342
+龃	co	342
+龅	pau	358
+龅	bau	358
+訾	zi	291
+訾	zw	291
+粲	can	477
+虞	ngu	671
+虞	ji	671
+虞	ngi	671
+虞	nzi	671
+睚	ngai	426
+睚	nga	426
+嗪	zin	323
+嗪	sin	323
+嗪	cin	323
+韪	vui	408
+韪	qui	408
+嗷	ngau	615
+嗷	qau	615
+嗉	thio	277
+睨	nzi	612
+睢	hui	454
+睢	sui	454
+雎	zio	427
+雎	cio	427
+雎	zi	427
+雎	ci	427
+雎	cw	427
+睥	pe	431
+嘟	du	737
+嗑	hap	674
+嗑	gap	674
+嗫	nziap	518
+嗫	nziap	518
+嗬	ho	543
+嗔	cin	672
+嗔	ten	672
+嗝	gak	505
+戥	cin	240
+戥	din	240
+嗄	qat	376
+嗄	sap	376
+嗄	ha	376
+煦	si	534
+煦	hi	534
+暄	sen	595
+遢	tap	488
+暌	kui	252
+跬	gui	404
+跬	ka	404
+跬	gai	404
+跶	tat	332
+跸	bit	342
+跐	ci	178
+跣	then	434
+跹	cen	386
+跻	zi	434
+跻	ze	434
+跻	ce	434
+蛸	thau	197
+蜊	li	314
+蜍	su	407
+蜍	cu	407
+蜉	feu	517
+蜣	kong	199
+蜣	kiong	199
+畹	van	384
+蛹	jung	453
+嗣	thu	621
+嗣	cw	621
+嗯	nh	998
+嗥	hau	471
+嗲	dia	444
+嗳	qoi	464
+嗌	jit	11
+嗌	qiak	11
+嗍	sok	560
+嗨	hai	640
+嗐	hoi	319
+嗐	hai	319
+嗤	ce	657
+嗵	tung	487
+罨	jang	165
+罨	jam	165
+嵊	sin	275
+嵩	thung	610
+嵩	cung	610
+嵩	siung	610
+嵩	sung	610
+嵴	zit	183
+骰	teu	524
+骰	thai	524
+锗	zia	264
+锛	bun	323
+锜	ki	262
+锝	det	257
+锞	go	289
+锟	kun	414
+锢	gu	528
+锨	sun	409
+锩	gen	241
+锭	ten	535
+锭	tin	535
+锱	zi	536
+雉	cui	561
+雉	ci	561
+氲	jun	481
+氲	vun	481
+犏	pen	171
+歃	cap	385
+稞	ko	369
+稗	pai	391
+稗	pi	391
+稔	nzim	620
+稔	nem	620
+筠	giun	605
+筠	jun	605
+筢	pa	335
+筮	se	324
+筮	ci	324
+筲	thau	429
+筲	thiau	429
+筱	thiau	626
+牒	tiap	470
+牒	kiap	470
+煲	bau	513
+敫	giau	219
+敫	git	219
+徭	jau	386
+愆	gen	490
+愆	ken	490
+艄	thiau	375
+觎	ji	473
+毹	ji	201
+貊	mak	374
+貅	siu	377
+貉	hok	403
+貉	mok	403
+颔	ham	592
+腠	ceu	195
+腩	nam	497
+腼	men	536
+腭	ngok	396
+腧	ji	221
+塍	sun	294
+媵	jin	283
+媵	jang	283
+詹	zam	625
+鲅	bat	314
+鲆	pin	246
+鲇	nziam	439
+鲈	lu	440
+稣	su	566
+鲋	fu	314
+鲐	toi	229
+肄	ji	395
+肄	thi	395
+鹐	giam	113
+鹐	kiam	113
+飕	thiu	555
+飕	theu	555
+觥	gong	481
+遛	liu	484
+馐	thiu	366
+鹑	sun	561
+鹑	cun	561
+亶	dan	297
+瘃	diok	104
+痱	fui	342
+痼	gu	427
+痿	vui	442
+瘐	ji	282
+瘁	zut	567
+瘆	cam	322
+麂	gi	342
+裔	ji	595
+裔	je	595
+歆	him	645
+歆	sim	645
+旒	liu	330
+雍	jung	673
+雍	qung	673
+阖	hap	520
+阗	ten	463
+阙	ket	737
+羧	tho	286
+豢	fan	409
+豢	van	409
+粳	gang	297
+猷	jiu	410
+煳	fu	275
+煜	juk	623
+煨	voi	403
+煅	ton	391
+煊	sen	450
+煸	ben	344
+煸	pen	344
+煺	tui	198
+滟	jen	415
+溱	zin	289
+溘	hap	425
+溘	kap	425
+漭	mang	264
+漭	mong	264
+滢	jin	506
+溥	pu	497
+溧	lit	290
+溽	nziuk	265
+溽	juk	265
+裟	tha	478
+溻	tap	220
+溷	fun	528
+滗	bit	172
+滫	thiu	39
+滫	theu	39
+溴	ciu	337
+滏	pu	263
+滃	qung	107
+滃	vung	107
+滦	lon	451
+溏	tong	265
+滂	pang	543
+滂	pong	543
+滓	za	451
+溟	min	500
+滪	ji	122
+愫	tho	498
+愫	thu	498
+慑	sap	633
+慊	kiam	257
+慊	kiap	257
+鲎	heu	258
+骞	kian	427
+骞	kan	427
+窦	deu	627
+窠	ko	428
+窣	cut	397
+裱	biau	417
+褚	du	614
+裨	bi	437
+裨	be	437
+裨	pi	437
+裾	gi	580
+裰	dot	308
+禊	he	232
+谩	man	622
+谪	zak	397
+媾	geu	421
+嫫	mu	429
+媲	pe	514
+媲	pi	514
+嫒	qoi	420
+嫔	bin	550
+媸	ci	323
+缙	zin	413
+缜	cin	469
+缛	nziuk	456
+辔	pui	591
+辔	bi	591
+骝	leu	360
+缟	gau	515
+缡	li	308
+缢	jit	411
+缣	giam	429
+骟	sen	313
+耥	tong	125
+璈	ngau	317
+璈	qau	317
+瑶	jau	765
+瑭	tong	387
+獒	ngau	513
+獒	qau	513
+觏	geu	188
+慝	nit	204
+慝	tit	204
+嫠	li	260
+韬	tau	730
+叆	qoi	302
+髦	mau	563
+摽	biau	261
+摽	piau	261
+墁	man	260
+撂	liok	545
+摞	lo	520
+撄	jin	311
+翥	zu	647
+踅	ce	386
+踅	cet	386
+摭	zak	305
+摭	zat	305
+墉	jung	411
+墒	song	312
+榖	guk	175
+綦	ki	377
+蔫	jen	503
+蔷	thit	603
+蔷	thet	603
+蔷	ciong	603
+蔷	ciang	603
+蔷	thiong	603
+靺	mat	335
+靼	dan	482
+鞅	jong	458
+靿	jau	182
+甍	men	389
+甍	mang	389
+蔸	deu	299
+蔟	cuk	259
+蔺	lin	469
+戬	zen	515
+蕖	ki	303
+蔻	keu	479
+蓿	thuk	360
+斡	qat	475
+斡	gon	475
+鹕	fu	273
+蓼	liau	404
+蓼	luk	404
+榛	zin	465
+榛	cin	465
+榧	fui	270
+榻	tap	611
+榫	thun	334
+榭	cia	577
+槔	gau	197
+榱	thoi	492
+槁	gau	596
+槟	bin	490
+槠	zu	284
+榷	kok	421
+僰	pet	207
+僰	bo	207
+酽	nziam	347
+酶	moi	630
+酹	 loi	253
+酹	 lui	253
+酹	 lot	253
+酹	 lai	253
+厮	thu	687
+碡	tuk	250
+碴	za	472
+碣	get	371
+碲	di	179
+磋	co	572
+臧	zong	517
+豨	si	358
+殡	bin	480
+霆	tin	667
+霁	ze	554
+霁	zi	554
+霁	ce	554
+辕	jen	764
+蜚	fui	533
+蜚	bui	533
+裴	fui	668
+翡	fui	571
+龇	cai	498
+龇	cw	498
+龇	ce	498
+龈	nziun	506
+睿	jui	650
+䁖	leu	5
+睽	kui	573
+嘞	let	807
+嘞	le	807
+嘈	cau	604
+嘌	piau	236
+嘁	cit	449
+嘁	ci	449
+嘎	gat	679
+嘎	kat	679
+嘎	ga	679
+暧	qoi	640
+暝	min	385
+暝	men	385
+踌	diu	579
+踌	ciu	579
+踉	long	631
+踉	liong	631
+蜞	ki	425
+蜥	thit	562
+蜮	vet	501
+蝈	gok	495
+蝈	get	495
+蜴	jit	510
+蜱	bi	293
+蜩	tiau	293
+蜩	diu	293
+蜷	ken	604
+蜿	van	548
+螂	long	589
+蜢	mang	400
+嘘	si	676
+嘘	hi	676
+嘡	diong	286
+嘡	dong	286
+噹	dang	523
+鹗	ngok	440
+嘣	bung	490
+嘣	bang	490
+嘤	jin	539
+嘚	det	299
+嗾	theu	234
+嗾	cuk	234
+嘧	mit	248
+罴	pi	456
+罱	lam	243
+幔	man	496
+嶂	zong	603
+幛	zong	307
+赙	fu	210
+罂	qang	478
+骷	gu	695
+骶	di	227
+鹘	gut	506
+锲	ket	431
+锲	ke	431
+锲(异读kak)	kak	1
+锴	kai	462
+锶	thu	300
+锷	ngak	469
+锷	ngok	469
+锸	cap	219
+锵	ziong	550
+锵	ciang	550
+镁	mui	582
+镂	leu	753
+犒	gau	464
+犒	kau	464
+箐	ziang	529
+箐	zin	529
+箦	zak	177
+箦	ciak	177
+箧	kap	545
+箍	ku	544
+箍	keu	544
+箸	zu	579
+箸	cu	579
+箬	nziok	343
+箬	jok	343
+箅	bi	217
+箪	dan	589
+箔	pok	568
+箔	pak	568
+箜	kung	354
+箢	von	191
+箓	luk	372
+毓	juk	540
+僖	si	435
+儆	gin	538
+儆	kiang	538
+僳	thuk	319
+僭	ziam	413
+僭	zem	413
+劁	ziau	253
+僮	tung	453
+魃	pat	433
+魆	sut	338
+睾	gau	514
+睾	cak	514
+艋	mang	262
+鄱	po	429
+膈	gak	396
+膑	bin	419
+鲑	gui	337
+鲔	jiu	323
+鲚	ce	175
+鲛	gau	431
+鲟	cim	314
+獐	zong	430
+觫	thuk	247
+雒	lok	495
+夤	jin	338
+馑	kiun	366
+馑	gin	366
+銮	lon	465
+塾	suk	476
+麽	mo	235
+瘌	lat	406
+瘊	heu	261
+瘘	leu	277
+瘙	thau	351
+廖	liau	672
+韶	sau	595
+旖	ji	499
+膂	li	350
+阚	gam	509
+鄯	sen	362
+鄯	san	362
+鲞	thiang	249
+粿	ko	165
+粼	lin	532
+粽	zung	477
+糁	tham	290
+槊	thok	417
+鹚	zw	281
+鹚	cw	281
+熘	liu	273
+熥	tung	107
+潢	vong	566
+漕	cau	494
+滹	fu	268
+漯	lui	313
+漶	von	235
+潋	liam	440
+潴	zu	223
+漪	ji	652
+漉	luk	606
+漳	zong	529
+漩	sen	600
+澉	gam	167
+潍	vui	387
+慵	jung	525
+搴	ken	381
+窨	jim	308
+寤	ngu	327
+寤	mu	327
+寤	ngh	327
+綮	ki	370
+谮	zim	434
+褡	dap	371
+褙	boi	275
+褓	bau	430
+褛	lu	481
+褛	leu	481
+褛	li	481
+褊	ben	282
+谯	ciau	423
+谰	lan	303
+谲	get	622
+暨	gi	565
+屣	thai	563
+屣	thi	563
+鹛	mi	166
+嫣	jen	724
+嫱	ciong	377
+嫱	thiong	377
+嫖	piau	592
+嫦	song	557
+嫚	man	302
+嫘	lui	313
+嫡	dit	558
+鼐	nai	373
+翟	tit	577
+翟	cak	577
+翟	cet	577
+瞀	meu	225
+鹜	mu	573
+鹜	vu	573
+骠	piau	462
+骠	biau	462
+缥	piau	549
+缦	man	383
+缧	lui	286
+缨	jin	568
+骢	cung	379
+缪	liau	603
+缫	thau	278
+耦	ngeu	430
+耦	ngau	430
+耦	qeu	430
+耧	leu	330
+瑾	kiun	601
+瑾	giun	601
+瑾	gin	601
+璜	vong	444
+璀	cui	544
+璎	jin	474
+璁	cung	325
+璋	zong	693
+璇	sen	673
+奭	sit	256
+奭	sak	256
+髯	nziam	545
+髯	jam	545
+髫	tiau	367
+脁	tiau	65
+髫	diau	367
+撷	ket	422
+撷	het	422
+撅	ket	586
+赭	za	403
+撸	lu	829
+鋆	giun	380
+撙	zun	206
+撺	con	422
+墀	ci	333
+聩	ngai	558
+聩	gui	558
+觐	gin	450
+觐	giun	450
+鞑	tat	526
+蕙	jui	546
+蕙	fui	546
+鞒	kiau	204
+蕈	cim	296
+蕨	ket	419
+蕤	jui	352
+蕤	nziui	352
+蕞	zui	236
+蕺	zip	172
+蕺	sip	172
+瞢	mung	239
+蕃	pan	564
+蕃	fan	564
+蕲	ki	369
+赜	zak	358
+赜	cak	358
+槿	giun	423
+槿	kiun	423
+槿	gin	423
+樯	ciong	342
+樯	thiong	342
+槭	cit	248
+樗	hu	361
+樗	su	361
+樗	cu	361
+樘	tong	317
+樘	dang	317
+樘	cang	317
+樊	fan	665
+樊	pan	665
+槲	fuk	302
+醌	kun	215
+醅	poi	213
+醅	pui	213
+靥	jap	516
+靥	jam	516
+魇	jam	549
+餍	jam	438
+磔	zak	345
+磙	gun	269
+霈	pai	303
+霈	pui	303
+辘	luk	535
+龉	ngh	335
+龉	ngu	335
+龊	cok	535
+觑	thio	641
+觑	cu	641
+觑	ci	641
+㞘(duk,坨)	duk	1
+瞌	kap	535
+瞌	hap	535
+瞋	zin	390
+瞋	cin	390
+瞑	men	523
+瞑	min	523
+嘭	bung	580
+嘭	pung	580
+噎	jit	624
+噎	qet	624
+噶	got	509
+噶	ga	509
+颙	ngiung	343
+颙	nziung	343
+颙	jung	343
+暹	thiam	454
+噘	ket	521
+踔	zok	560
+踔	dok	560
+踔	diau	560
+踝	ka	517
+踝	fai	517
+踟	ci	435
+踟	di	435
+踒	voi	80
+踒	vo	80
+踒	vai	80
+踒	qo	80
+踬	zit	301
+踬	zi	301
+踮	diam	486
+踯	cit	366
+踯	cak	366
+踺	ken	153
+踞	gio	669
+踞	gi	669
+蝽	cun	126
+蝾	jung	270
+蝻	nam	156
+蝰	kui	254
+蝮	fuk	354
+蝮	buk	354
+螋	theu	96
+蝓	ji	252
+蝣	jiu	353
+蝼	leu	548
+噗	puk	650
+噗	pok	650
+噗	buk	650
+嘬	zot	403
+嘬	cui	403
+颚	ngok	455
+噍	ziau	206
+噢	qo	918
+噙	kim	490
+噜	lu	650
+噌	cen	498
+噔	den	581
+噔	dang	581
+颛	zon	379
+幞	puk	246
+幡	fan	534
+幡	pan	534
+嶙	lin	509
+嶝	den	180
+骺	heu	189
+骼	gok	542
+骼	gak	542
+骸	hoi	637
+骸	hai	637
+镊	nziap	407
+镊	niap	407
+镉	gak	233
+镌	zon	504
+镍	net	536
+镏	liu	338
+镒	jit	437
+镓	ga	148
+镔	bin	529
+稷	zit	531
+箴	gam	471
+箴	zim	471
+篑	kui	531
+篁	vong	311
+篁	fong	311
+篌	heu	292
+篆	zon	579
+篆	con	579
+牖	jiu	556
+儋	dam	413
+儋	zam	413
+徵	din	540
+徵	zin	540
+徵	zi	540
+徵	di	540
+磐	pan	597
+虢	gak	517
+虢	ngut	517
+鹞	jau	487
+膘	piau	438
+膘	biau	438
+滕	ten	561
+滕	tin	561
+鲠	gang	550
+鲡	li	230
+鲢	len	271
+鲣	gen	186
+鲥	si	275
+鲧	gun	350
+鲩	van	274
+鲩	fun	274
+獗	ket	458
+獗	get	458
+獠	liau	536
+觯	zi	255
+馓	than	244
+馔	zon	550
+馔	pan	550
+麾	fui	555
+廛	cen	235
+瘛	ce	198
+瘛	cet	198
+瘼	mok	277
+瘢	ban	496
+瘠	zit	589
+齑	ze	583
+齑	zi	583
+羯	get	479
+羰	tong	183
+羰	tang	183
+𥻗	za	81
+遴	lin	369
+糌	zan	297
+糍	zi	309
+糍	zw	309
+糅	jiu	400
+糅	nziu	400
+熜	cung	287
+熜	tung	287
+熵	song	322
+熠	jip	564
+澍	su	398
+澌	thu	318
+潸	than	461
+潦	liau	556
+潦	lau	556
+潲	thau	265
+鋈	vok	290
+潟	thit	111
+潼	tung	492
+潺	can	536
+潺	zan	536
+憬	gin	593
+憧	cung	587
+憧	tung	587
+憧	diong	587
+寮	liau	539
+窳	jiu	333
+窳	ji	333
+谳	nget	274
+谳	jen	274
+褴	lam	480
+褟	dap	169
+褫	ti	355
+褫	ci	355
+谵	zam	434
+熨	qut	450
+熨	jun	450
+屦	gu	618
+屦	lu	618
+嬉	si	657
+嬉	hi	657
+勰	hap	266
+勰	sap	266
+戮	luk	645
+蝥	mau	198
+缬	het	236
+缬	ket	236
+缮	sen	449
+缯	zen	430
+骣	can	141
+畿	gi	459
+耩	geu	144
+耨	neu	479
+耪	pong	238
+璞	pok	597
+璟	gin	447
+靛	ten	438
+璠	fan	390
+璘	lin	294
+聱	ngau	558
+螯	ngau	401
+髻	gi	535
+髭	zi	367
+髹	siu	212
+髹	thiu	212
+擀	gon	409
+熹	si	504
+甏	pang	190
+擞	theu	522
+縠	guk	172
+磬	kin	476
+颞	nziap	250
+蕻	fung	228
+蕻	giung	228
+鞘	ciau	651
+鞘	thiau	651
+颟	man	259
+薤	hai	199
+薤	he	199
+薨	hung	362
+檠	kin	248
+檠	kiang	248
+薏	ji	533
+薮	theu	533
+薜	pit	432
+薅	hau	333
+薅	gau	333
+樾	jet	330
+橛	ket	384
+橇	kiau	413
+樵	ziau	552
+檎	kim	191
+橹	lu	418
+樽	zun	543
+樨	thi	305
+橼	jen	237
+墼	git	287
+橐	tok	378
+翮	gak	315
+醛	con	503
+醐	fu	406
+醍	ti	436
+醚	mi	436
+醚	mui	436
+磲	ki	254
+赝	ngen	400
+赝	ngan	400
+赝	jen	400
+飙	biau	586
+殪	je	194
+殪	ji	194
+霖	lim	661
+霏	fui	584
+霓	nzi	653
+霓	ni	653
+霓	ji	653
+錾	zam	310
+錾	cam	310
+辚	lin	375
+臻	zin	550
+遽	gi	463
+氅	cong	414
+瞟	piau	652
+瞠	cang	530
+瞠	cin	530
+瞠	tong	530
+瞰	kam	495
+嚄	vok	188
+嚄	hok	188
+嚄	qok	188
+嚆	hau	137
+噤	gim	525
+暾	dun	291
+蹀	tiap	359
+蹀	diap	359
+踹	ton	644
+踹	don	644
+踹	coi	644
+踹	cai	644
+踵	zung	792
+踽	gi	599
+踽	ki	599
+蹉	co	570
+蹁	pen	326
+螨	man	294
+蟒	mang	607
+螈	nzien	269
+螅	thit	285
+螭	li	452
+螠	jit	77
+螟	min	401
+噱	giok	394
+噱	kiak	394
+噱	giak	394
+噬	se	705
+噬	si	705
+噫	ji	468
+噻	thai	447
+噼	pit	577
+噼	bit	577
+罹	li	417
+圜	ven	412
+圜	jen	412
+䦃	ziok	72
+镖	biau	740
+镗	dang	361
+镗	tong	361
+镗	tang	361
+镘	man	194
+镚	ben	225
+镛	jung	350
+镝	dit	383
+镞	zuk	437
+镠	liu	300
+氇	lo	206
+氇	lu	206
+氆	pu	219
+憩	ke	479
+穑	thet	455
+穑	thit	455
+篝	geu	555
+篥	lit	243
+篦	bin	393
+篦	bi	393
+篦	pi	393
+篪	ci	497
+篙	gau	419
+盥	gon	426
+劓	ngi	320
+劓	nzi	320
+翱	ngau	516
+翱	qau	516
+魉	liong	412
+魈	thiau	458
+徼	giau	292
+歙	hap	347
+膳	sen	568
+膦	lin	457
+膙	giong	115
+鲮	lin	320
+鲱	fui	265
+鲲	kun	463
+鲳	cong	231
+鲴	gu	100
+鲵	nge	322
+鲷	diau	249
+鲷	diu	249
+鲻	zi	164
+獴	mung	196
+獭	tat	426
+獭	cat	426
+獬	hai	319
+邂	hai	514
+邂	gai	514
+鹧	za	405
+廨	gai	263
+赟	jin	406
+赟	jun	406
+瘰	lo	199
+廪	lim	352
+瘿	jin	279
+瘵	zai	155
+瘴	zong	530
+癃	lung	131
+瘳	liau	252
+瘳	ciu	252
+斓	lan	516
+麇	giun	368
+麇	kun	368
+麈	cin	315
+嬴	jang	611
+壅	qung	508
+羲	si	542
+羲	ji	542
+糗	ciu	503
+瞥	pet	693
+甑	zen	496
+燎	liau 	672
+燠	qau	295
+燠	juk	295
+燔	pan	340
+燔	fan	340
+燔	fun	340
+燧	cui	449
+燧	sui	449
+濑	lai	479
+濉	thui	339
+潞	lu	432
+澧	li	529
+澹	tam	527
+澹	dam	527
+澥	hai	271
+澶	sen	319
+澶	zen	319
+澶	tan	319
+濂	liam	456
+褰	ken	215
+寰	ven	561
+寰	van	561
+寰	fan	561
+窸	thit	391
+褶	zap	502
+褶	tiap	502
+褶	sip	502
+褶	thip	502
+禧	si	608
+嬖	pit	288
+犟	giong	476
+犟	giang	476
+隰	sip	288
+嬗	san	355
+颡	thong	310
+缱	ken	381
+缲	zau	123
+缳	van	291
+缳	ven	291
+璨	can	551
+璩	ki	276
+璐	lu	665
+璪	zau	142
+璪	cau	142
+螫	zit	459
+螫	cit	459
+螫	diau	459
+擤	then	372
+壕	hau	574
+觳	fuk	263
+觳	guk	263
+罄	kin	479
+擢	cok	449
+薹	toi	371
+鞡	la	113
+鞬	gen	249
+薷	nzio	228
+薷	nzu	228
+薷	nzi	228
+薷	ji	228
+薰	sun	628
+藓	then	411
+藁	gau	239
+檄	git	441
+檩	lin	299
+懋	meu	422
+懋	mau	422
+醢	hoi	242
+醢	hai	242
+翳	je	408
+翳	ji	408
+礅	dun	282
+磴	den	280
+鹩	liau	410
+龋	ki	317
+龋	gi	317
+龋	ku	317
+龌	qok	537
+龌	vuk	537
+龌	vo	537
+豳	bin	270
+壑	hok	717
+壑	kok	717
+黻	fut	506
+嚏	ti	531
+嚅	no	530
+嚅	nzu	530
+嚅	nzio	530
+嚅	ji	530
+蹑	niap	669
+蹑	nziap	669
+蹒	pan	521
+蹊	kai	629
+蟥	vong	333
+螬	cau	146
+螵	piau	199
+疃	ton	247
+螳	tong	570
+蟑	zong	543
+嚓	cat	613
+羁 	gi	1
+罽	gi	162
+罾	zen	220
+嶷	nzi	389
+黜	cut	643
+黝	jiu	611
+髁	ko	272
+髀	bi	486
+镡	cim	239
+镢	giok	321
+镢	gok	321
+镢	kok	321
+镣	liau	476
+镦	dui	144
+镦	dun	144
+镧	lan	172
+镩	con	128
+镪	kiong	308
+镫	den	437
+罅	la	579
+黏	nziam	631
+黏	nem	631
+黏	ziam	631
+簌	thuk	590
+簌	suk	590
+篾	met	380
+篼	deu	243
+簖	ton	104
+簋	kui	282
+鼢	fun	121
+黛	toi	721
+黛	dai	721
+儡	lui	579
+鹪	ziau	410
+鼾	hon	533
+皤	po	266
+魍	mong	402
+龠	jok	197
+繇	jau	459
+貘	mak	326
+邈	miau	503
+邈	meu	503
+貔	pi	356
+臌	gu	429
+膻	tan	480
+臆	ji	499
+臃	jung	474
+鲼	fun	222
+鲽	tiap	315
+鳀	te	121
+鳀	tai	121
+鳃	thai	410
+鳅	ciu	486
+鳇	vong	200
+鳊	ben	231
+螽	zung	295
+燮	set	481
+燮	thiap	481
+鹫	ziu	574
+襄	thiong	661
+糜	mi	621
+縻	mi	338
+膺	jin	598
+癍	ban	211
+麋	mi	415
+懑	man	449
+濡	nziu	612
+濡	nzio	612
+濡	nzi	612
+濡	lu	612
+濡	ji	612
+濮	puk	520
+濞	pi	271
+濠	hau	494
+濯	cok	578
+蹇	gen	665
+蹇	gan	665
+謇	gan	340
+謇	gen	340
+邃	thui	594
+襁	kiong	428
+檗	biak	512
+檗	pit	512
+擘	pit	472
+擘	piak	472
+孺	nzu	558
+孺	nzio	558
+孺	nzi	558
+孺	ji	558
+隳	fui	485
+嬷	mo	566
+蟊	mau	346
+鹬	jut	573
+鹬	ji	573
+鍪	meu	289
+鏊	ngau	307
+鳌	ngau	601
+鳌	qau	601
+鬈	gen	357
+鬃	zung	478
+瞽	gu	496
+鞯	zen	278
+鞨	hot	334
+鞫	kiuk	289
+鞧	ciu	116
+鞣	nziu	318
+鞣	jiu	318
+藜	lai	446
+藜	li	446
+藠	kiau	128
+藠	giau	128
+藩	pan	658
+藩	fan	658
+醪	lau	325
+蹙	cuk	608
+礓	giong	169
+燹	then	278
+餮	tet	448
+瞿	ki	543
+瞿	ci	543
+曛	sun	217
+颢	hau	446
+曜	jau	556
+躇	cu	579
+躇	du	579
+蹚	tong	312
+鹭	lu	583
+蟛	pung	196
+蟪	fui	182
+蟠	fan	664
+蟠	pan	664
+蟮	sen	305
+鹮	jen	113
+鹮	van	113
+黠	get	539
+黠	git	539
+黟	ji	351
+髅	leu	693
+髂	ka	228
+镬	vok	560
+镭	lui	421
+镯	zok	616
+镯	zuk	616
+馥	fuk	583
+簟	diam	289
+簟	tam	289
+簪	zim	672
+簪	zam	672
+鼬	jiu	376
+雠	siu	549
+艟	tung	333
+艟	cung	333
+鳎	tap	264
+鳏	gon	550
+鳏	gan	550
+鳐	jau	256
+癞	lai	513
+癔	ji	300
+癜	den	277
+癖	pit	544
+癖	pi	544
+糨	giong	384
+糨	ziong	384
+蹩	pet	472
+鎏	liu	368
+懵	mung	603
+彝	ji	675
+邋	lap	493
+鬏	ciu	238
+攉	hok	201
+攒	zan	700
+鞲	geu	212
+鞴	pi	194
+藿	hok	501
+蘧	ki	289
+蘅	vang	478
+蘅	hang	478
+麓	luk	522
+醮	ziau	366
+醯	si	363
+酃	lin	389
+霪	jin	298
+霭	qoi	518
+霨	vui	200
+黼	pu	551
+嚯	hok	438
+嚯	ho	438
+蹰	cu	404
+蹶	ket	548
+蹶	kui	548
+蹽	liau	168
+蹼	buk	308
+蹼	puk	308
+蹴	cuk	503
+蹴	cok	503
+蹾	dun	270
+蹿	con	590
+蠖	vok	534
+蠓	mung	261
+蟾	cam	504
+蠊	liam	173
+黢	cut	423
+髋	kon	314
+髌	bin	221
+镲	cat	257
+籀	ciu	199
+籀	ziu	199
+籁	lai	563
+齁	heu	213
+齁	ku	213
+魑	li	444
+魑	ci	444
+艨	mung	336
+鳓	let	139
+鳔	piau	367
+鳕	thet	308
+鳗	man	442
+鳙	jung	146
+麒	ki	667
+鏖	qau	446
+鏖	piau	446
+羸	lui	429
+㸆	kau	148
+瀚	hon	673
+瀚	han	673
+瀣	hai	451
+瀛	jin	540
+襦	nzu	296
+襦	nzio	296
+襦	nzi	296
+襦	ji	296
+谶	cim	416
+襞	piak	203
+骥	ki	737
+骥	gi	737
+缵	zan	282
+攘	nziong	708
+攘	jong	708
+蘩	fan	425
+蘖	nziet	352
+蘖	nget	352
+醴	li	484
+霰	than	406
+酆	fung	366
+矍	giok	412
+矍	kiok	412
+曦	si	627
+曦	hi	627
+躅	cuk	364
+鼍	to	316
+巉	cam	226
+黩	tuk	410
+黥	gin	369
+黥	giang	369
+黪	cam	202
+镳	biau	536
+镴	lap	220
+黧	li	315
+纂	con	451
+璺	mun	318
+鼯	ngu	236
+鼯	ngh	236
+臜	zan	257
+鳜	ket	286
+鳝	sen	395
+鳟	zun	316
+獾	gon	373
+孀	thong	422
+骧	thiong	601
+瓘	gon	313
+鼙	bi	316
+鼙	pi	316
+醺	sun	537
+礴	bok	514
+颦	pin	536
+曩	nong	272
+鳢	li	147
+癫	den	580
+麝	sa	455
+夔	kui	449
+爝	ziok	219
+灏	hau	424
+禳	jong	339
+禳	nziong	339
+禳	jong	339
+鐾	bi	173
+羼	can	236
+蠡	li	559
+耱	mo	104
+懿	ji	580
+蘸	ziam	709
+鹳	gon	345
+霾	mai	504
+氍	ki	192
+饕	tau	521
+躐	liap	302
+髑	tuk	228
+镵	ciam	113
+穰	jong	545
+穰	nziong	545
+饔	jung	486
+饔	qung	486
+鬻	cuk	623
+鬻	zuk	623
+鬟	van	596
+趱	zan	285
+攫	giok	554
+攫	giok	554
+攥	zap	601
+颧	gon	447
+躜	zan	185
+鼹	qen	410
+鼹	jen	410
+癯	ki	353
+癯	ku	353
+麟	lin	767
+蠲	gen	311
+蠹	du	668
+蠹	zu	668
+躞	sap	435
+衢	ki	614
+鑫	sim	596
+鑫	thim	596
+灞	ba	364
+襻	pan	234
+纛	tuk	394
+纛	tau	394
+鬣	liap	373
+攮	nong	294
+囔	nang	624
+囔	nziong	624
+馕	nong	348
+戆	qung	135
+戆	ngong	135
+戆	gung	135
+爨	con	566
+齉	nung	171
+齉	nong	171
+尢	jiu	252
+尢	qong	252
+卬	ngong	320
+卬	ngang	320
+殳	su	316
+𠙶	qeu	42
+毌	gon	171
+邘	ji	83
+戋	zen	315
+圢	tang	11
+圢	tin	11
+氕	pet	89
+伋	kip	237
+仝	tung	359
+冮	gang	93
+氿	gui	74
+氿	giu	74
+汈	diau	89
+氾	fan	194
+忉	dau	219
+宄	gui	260
+𬣙		55
 讱
 扞
 圲
@@ -8896,9 +8896,9 @@ import_tables:   #导入拓展词典
 朸
 𨙸
 邨
-吒	za
-吖	qa
-屼	ngut
+吒	za	513
+吖	qa	827
+屼	ngut	62
 屾
 辿
 钆
@@ -8926,9 +8926,9 @@ import_tables:   #导入拓展词典
 玚
 刬
 𫭟
-坜	lak
-坉	tun
-扽	
+坜	lak	468
+坉	tun	130
+扽		202
 𫭢
 坋
 扺
@@ -8948,13 +8948,13 @@ import_tables:   #导入拓展词典
 杄
 杧
 杩
-尪	qang
+尪	qang	143
 尨
 轪
 𫐄
 坒
-芈	mi
-芈	me
+芈	mi	415
+芈	me	415
 旴
 旵
 呙
@@ -9013,7 +9013,7 @@ import_tables:   #导入拓展词典
 纼
 玤
 玞
-徥	ti
+徥	ti	21
 玱
 玟
 邽
@@ -9088,9 +9088,9 @@ import_tables:   #导入拓展词典
 炆
 泙
 沺
-泂	gen
-泂	giung
-泂	giang
+泂	gen	138
+泂	giung	138
+泂	giang	138
 泜
 泃
 泇
@@ -9196,8 +9196,8 @@ import_tables:   #导入拓展词典
 咺
 昳
 昣
-哒	da
-哒	tat
+哒	da	636
+哒	tat	636
 昤
 昫
 昡
@@ -9238,7 +9238,7 @@ import_tables:   #导入拓展词典
 䏡
 胠
 𦙶
-胈	pat
+胈	pat	287
 胩
 胣
 朏
@@ -9402,11 +9402,11 @@ import_tables:   #导入拓展词典
 鸰
 脎
 朓
-胲	hoi
+胲	hoi	192
 虓
 鱽
-狴	bi
-峱	nau
+狴	bi	330
+峱	nau	18
 狻
 眢
 𫗧
@@ -9450,7 +9450,7 @@ import_tables:   #导入拓展词典
 袪
 袗
 袯
-祧	tiau
+祧	tiau	360
 隺
 堲
 疍
@@ -9471,7 +9471,7 @@ import_tables:   #导入拓展词典
 䂮
 琎
 珸
-珵	tang
+珵	tang	166
 琄
 琈
 琀
@@ -9689,7 +9689,7 @@ import_tables:   #导入拓展词典
 鄑
 蒎
 葖
-蒄	gon
+蒄	gon	104
 萹
 棤
 棽
@@ -9727,7 +9727,7 @@ import_tables:   #导入拓展词典
 𧿹
 蛑
 畯
-斝	ga
+斝	ga	332
 喤
 崶
 嵁
@@ -9741,7 +9741,7 @@ import_tables:   #导入拓展词典
 圌
 圐
 赑
-淼	miau
+淼	miau	551
 赒
 鿏
 铹
@@ -9768,11 +9768,11 @@ import_tables:   #导入拓展词典
 傒
 傕
 舾
-畬	sa
+畬	sa	140
 𫖯
 脿
 腘
-䐃	kin
+䐃	kin	237
 腙
 腒
 𬱟
@@ -9796,8 +9796,8 @@ import_tables:   #导入拓展词典
 𬊤
 欻
 𣸣
-溚	dap
-酘	diu
+溚	dap	270
+酘	diu	305
 溁
 湝
 渰
@@ -9817,7 +9817,7 @@ import_tables:   #导入拓展词典
 棨
 扊
 裣
-祼	gon
+祼	gon	287
 婻
 媆
 媞
@@ -9916,7 +9916,7 @@ import_tables:   #导入拓展词典
 筻
 筼
 筶
-筦	gon
+筦	gon	176
 筤
 傺
 鹎
@@ -9940,12 +9940,12 @@ import_tables:   #导入拓展词典
 飔
 觟
 𦝼
-䏢	be
-䏟	bet
-膎	hai
-朘	zoi
-腬	neu	
-𤌴	ket
+䏢	be	537
+䏟	bet	551
+膎	hai	499
+朘	zoi	422
+腬	neu	287
+𤌴	ket	1
 馌
 裛
 廒
@@ -9976,9 +9976,9 @@ import_tables:   #导入拓展词典
 滘
 滍
 愭
-慥	cau
+慥	cau	119
 慆
-彊	kiong
+彊	kiong	254
 塱
 𫌀
 裼
@@ -9993,7 +9993,7 @@ import_tables:   #导入拓展词典
 嫄
 媱
 戤
-勠	luk
+勠	luk	82
 戣
 𫘪
 𫘬
@@ -10034,13 +10034,13 @@ import_tables:   #导入拓展词典
 疐
 𬸘
 酺
-酾	thi
+酾	thi	305
 酲
 酴
 碶
 䃎
 𬒗
-碨	voi
+碨	voi	138
 𥔲
 碹
 碥
@@ -10126,11 +10126,11 @@ import_tables:   #导入拓展词典
 嫪
 𬙂
 㻬
-麹	kiuk
+麹	kiuk	235
 璆
-漦	li
-叇	tai
-叇	toi
+漦	li	270
+叇	tai	294
+叇	toi	294
 墣
 墦
 墡
@@ -10220,12 +10220,12 @@ import_tables:   #导入拓展词典
 薳
 鞔
 黇
-𬞟	pin
-蕗	lu
+𬞟	pin	81
+蕗	lu	268
 薢
 蕹
 橞
-橑	liau
+橑	liau	150
 橦
 醑
 觱
@@ -10261,7 +10261,7 @@ import_tables:   #导入拓展词典
 簉
 鼽
 衠
-盦	qem
+盦	qem	140
 螣
 縢
 鲭
@@ -10277,7 +10277,7 @@ import_tables:   #导入拓展词典
 羱
 糒
 燋
-熻	
+熻		28
 燊
 燚
 燏
@@ -10356,10 +10356,10 @@ import_tables:   #导入拓展词典
 𬶨
 螱
 甓
-嬬	ji
-嬬	nzio
-嬬	nzu
-嬥	tiau
+嬬	ji	119
+嬬	nzio	119
+嬬	nzu	119
+嬥	tiau	16
 𦈡
 𫄸
 瓀
@@ -10387,11 +10387,11 @@ import_tables:   #导入拓展词典
 镮
 镱
 酂
-噈	cuk
-馧	vut
+噈	cuk	118
+馧	vut	312
 簠
-攰	kioi
-诼	duk
+攰	kioi	26
+诼	duk	237
 簝
 簰
 鼫
@@ -10479,8 +10479,8 @@ import_tables:   #导入拓展词典
 鹴
 躔
 皭
-龢	vo
-龢	ho
+龢	vo	348
+龢	ho	348
 鳤
 亹
 籥
@@ -10491,55 +10491,55 @@ import_tables:   #导入拓展词典
 齇
 觿
 蠼
-巘	jen
+巘	jen	253
 #
 #语气词，语气词声调用x表示，不标字母，即表示声调可变化
-哦	qo  
-噢	qo 
+哦	qo  	989
+噢	qo 	918
 #
-㖞	vo
-唩	vo 
-喔	vo 
-喔	vo  
+㖞	vo	1
+唩	vo 	7
+喔	vo 	667
+喔	vo  	667
 #
-ヰ	ve  
-哕	ve
-ヱ	ve  
+ヰ	ve  	1
+哕	ve	235
+ヱ	ve  	1
 #
-わ	va
-哇	va
+わ	va	1
+哇	va	954
 #
-呭	se   
-セ	se
-せ	se  
+呭	se   	321
+セ	se	1
+せ	se  	1
 #
-ゼ	ze  
-ぜ	ze 
+ゼ	ze  	1
+ぜ	ze 	1
 #
-啦	la  
-ら	la  
+啦	la  	990
+ら	la  	1
 #
-也	ja  
-耶	ja  
-呀	ja
-吖	ja
+也	ja  	998
+耶	ja  	784
+呀	ja	936
+吖	ja	827
 #
-噜	lu  
-ル	lu 
+噜	lu  	650
+ル	lu 	1
 #
-哟	jo  
-唷	jo  
+哟	jo  	733
+唷	jo  	246
 #
-咯	lo  
-ろ	lo
-啰	lo  
+咯	lo  	467
+ろ	lo	1
+啰	lo  	578
 #
-㖨	luk 
-咯	lok
+㖨	luk 	236
+咯	lok	467
 #
-呜	vu  
-吁	qu 
-う	qu 
-そ	so
-哼	hng
-唶	zia
+呜	vu  	784
+吁	qu 	713
+う	qu 	1
+そ	so	1
+哼	hng	871
+唶	zia	7

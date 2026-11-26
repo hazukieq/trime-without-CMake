@@ -391,9 +391,6 @@ public class Trime extends LifecycleInputMethodService {
   @Override
   public void onCreate() {
     com.hazukieq.hkrime.core.TwelveKeyPreedit.INSTANCE.init(this);
-    com.hazukieq.hkrime.core.twelvekey.SegmentMemory.INSTANCE.init(this);
-    com.hazukieq.hkrime.core.twelvekey.SelectionMemory.INSTANCE.init(this);
-    com.hazukieq.hkrime.core.twelvekey.PhraseMemory.INSTANCE.init(this);
 
     StrictMode.setVmPolicy(
         new StrictMode.VmPolicy.Builder(StrictMode.getVmPolicy())
@@ -1251,7 +1248,7 @@ public class Trime extends LifecycleInputMethodService {
    * 12 鍵已經有候選條 + 展開面板，所以這個方案直接停用懸浮窗。
    */
   private boolean isTwelveKeySchema() {
-    return "hakka_jiugong".equals(Rime.getSchemaId());
+    return Rime.isTwelveKeySchema();
   }
 
   /** 更新Rime的中西文狀態、編輯區文本 */

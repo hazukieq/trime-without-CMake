@@ -39,52 +39,65 @@
     <string name="pref_credits">贡献代码</string>
     <string name="about__product_prime">微软平台PRIME输入法</string>
     <string name="about__privacy_policy">隐私策略</string>
-    <string name="settings__configuration_title">输入配置</string>
+    <string name="settings__configuration_title">数据与同步</string>
     <string name="pref_enable">启用</string>
-    <string name="pref_enable_summary">启用同文输入法</string>
+    <string name="pref_enable_summary">启用客语输入法</string>
     <string name="pref_select">选取软键盘</string>
-    <string name="pref_select_summary">选取同文输入法</string>
+    <string name="pref_select_summary">选取客语输入法</string>
     <string name="looks__selected_theme_title">主题</string>
-    <string name="looks__selected_theme_summary">选取主题</string>
-    <string name="pref_schemas">方案</string>
-    <string name="pref_schemas_summary">从已安装的方案中选择方案</string>
+    <string name="looks__selected_theme_summary">选择键盘主题风格</string>
+    <string name="pref_schemas">输入方案</string>
+    <string name="pref_schemas_summary">启用或切换已安装的输入方案</string>
     <string name="looks__selected_color_title">配色</string>
-    <string name="looks__selected_color_summary">选取键盘配色</string>
-    <string name="conf__reset_title">恢复默认设置</string>
-    <string name="conf__reset_summary">使用默认设置覆盖共享文件夹下同名文件</string>
-    <string name="settings__keyboard_preferences_title">偏好设置</string>
-    <string name="keyboard__key_sound_title">按键声音</string>
+    <string name="looks__selected_color_summary">选择键盘颜色方案</string>
+    <string name="looks__selected_keyboard_layout_title">键盘布局</string>
+    <string name="looks__symbol_tabs_title">符号与表情分类</string>
+    <string name="looks__symbol_tabs_summary">调整底部标签次序、显示隐藏或新增分类</string>
+    <string name="looks__symbol_tabs_dialog_hint">勾选控制显示，点箭头调整顺序；也可新增自定义 .txt 分类。</string>
+    <string name="looks__symbol_tabs_add">新增分类</string>
+    <string name="looks__symbol_tabs_add_name_hint">分类名称（如：热词）</string>
+    <string name="looks__symbol_tabs_add_content_hint">输入符号或表情，用空格或换行分隔</string>
+    <string name="looks__symbol_tabs_add_invalid">请填写分类名称和至少一个符号</string>
+    <string name="looks__symbol_tabs_keep_one">至少保留一个分类</string>
+    <string name="looks__selected_keyboard_layout_summary">仅展示当前方案支持的布局</string>
+    <string name="looks__selected_keyboard_layout_dialog_title">键盘布局 · %1$s（%2$s）</string>
+    <string name="looks__keyboard_layout_follow_theme">跟随主题默认</string>
+    <string name="conf__reset_title">恢复默认配置</string>
+    <string name="conf__reset_summary">用内置文件覆盖默认方案与主题</string>
+    <string name="settings__keyboard_preferences_title">输入与按键</string>
+    <string name="keyboard__key_sound_title">按键音</string>
     <string name="keyboard__key_sound_volume_title">按键音量</string>
-    <string name="keyboard__key_vibration_title">按键时振动</string>
+    <string name="keyboard__key_vibration_title">按键振动</string>
     <string name="keyboard__key_vibration_duration_title">按键振动时长</string>
     <string name="keyboard__key_vibration_amplitude_title">按键振动强度</string>
-    <string name="unit__time_ms">"  毫秒"</string>
+    <string name="unit__time_ms">" 毫秒"</string>
     <string name="keyboard__speak_key_press_title">按键时朗读字符</string>
     <string name="keyboard__speak_key_commit_title">上屏时朗读字符</string>
-    <string name="keyboard__long_press_timeout_title">长按按键的延迟时间</string>
+    <string name="keyboard__long_press_timeout_title">长按延迟</string>
     <string name="keyboard__key_repeat_interval_title">重复按键的重复间隔</string>
     <string name="keyboard__delete_candidate_timeout_title">长按删除候选词的延迟时间</string>
     <string name="keyboard__long_click_delete_candidate_title">长按删除候选词</string>
     <string name="keyboard__show_switches_title">在候选栏中显示状态</string>
     <string name="keyboard__show_key_popup_title">按键时弹出显示字符</string>
-    <string name="keyboard__show_window_title">显示悬浮窗</string>
-    <string name="keyboard__inline_preedit_title">嵌入式编辑模式</string>
+    <string name="keyboard__show_window_title">悬浮编码条</string>
+    <string name="keyboard__show_window_summary">在键盘上方显示正在输入的拼音</string>
+    <string name="keyboard__inline_preedit_title">输入框内显示</string>
     <string-array name="keyboard__inline_entries">
-        <item>首选</item>
-        <item>编码</item>
-        <item>输入码</item>
-        <item>无</item>
+        <item>首选词</item>
+        <item>拼音</item>
+        <item>原始编码</item>
+        <item>不显示</item>
     </string-array>
     <string-array name="other__ui_mode_entries" >
-        <item name="auto">系统默认</item>
-        <item name="light">亮色</item>
-        <item name="dark">暗色</item>
+        <item name="auto">跟随系统</item>
+        <item name="light">浅色</item>
+        <item name="dark">深色</item>
     </string-array>
     <string name="keyboard__soft_cursor_title">悬浮窗编码区使用插入符号(^)</string>
     <string name="pref_deploy">部署</string>
     <string name="pref_deploy_summary">修改设置后需要再次部署同文输入法平台</string>
-    <string name="conf__synchronize_title">同步</string>
-    <string name="conf__synchronize_summary">同步用户字典至sync文件夹</string>
+    <string name="conf__synchronize_title">同步词库</string>
+    <string name="conf__synchronize_summary">备份和合并个人词库到 sync 目录</string>
     <string name="reset_success">重置成功</string>
     <string name="reset_failure">重置失败</string>
     <string name="deploy_progress">正在部署…</string>
@@ -94,25 +107,25 @@
     <string name="set_ime">设置</string>
     <string name="no_schemas">请在用户文件夹中放入default.yaml、输入法方案！</string>
     <string name="other_ime">其他输入法</string>
-    <string name="other__ui_mode_title">夜间模式</string>
-    <string name="pref_other">其他设置</string>
+    <string name="other__ui_mode_title">界面外观</string>
+    <string name="pref_other">通用</string>
     <string name="other__show_status_bar_icon_title">显示通知栏图标</string>
-    <string name="other__destroy_on_quit_title">退出时清除缓存</string>
+    <string name="other__destroy_on_quit_title">退出时释放内存</string>
     <string name="pref_themes_name_tongwenfeng">同文风</string>
     <string name="pref_themes_name_trime">默认</string>
     <string name="conf__shared_data_dir_title">共享文件夹</string>
-    <string name="conf__user_data_dir_title">用户文件夹</string>
-    <string name="conf__synchronize_background_title">后台同步</string>
+    <string name="conf__user_data_dir_title">数据目录</string>
+    <string name="conf__synchronize_background_title">自动后台同步</string>
     <string name="pref_sync_bg_success">上次同步于 %s，成功</string>
     <string name="pref_sync_bg_failure">上次同步于 %s，失败</string>
-    <string name="pref_sync_bg_never">后台同步未运行</string>
-    <string name="conf__synchronize_background_summary">点击以开启后台同步</string>
+    <string name="pref_sync_bg_never">尚未运行后台同步</string>
+    <string name="conf__synchronize_background_summary">定期在后台自动同步词库</string>
     <string name="pref_help__marketplace">应用市场</string>
     <string name="pref_help__user_community">用户社区</string>
-    <string name="pref_keyboard__effect">按键效果</string>
+    <string name="pref_keyboard__effect">按键反馈</string>
     <string name="pref__draw_overlays_tip_title">显示在其他应用上方</string>
-    <string name="pref_keyboard_appearance">键盘外观</string>
-    <string name="pref_keyboard__function">视图</string>
+    <string name="pref_keyboard_appearance">外观与布局</string>
+    <string name="pref_keyboard__function">输入显示</string>
     <string name="other__show_app_icon_title">在启动器中显示图标</string>
     <string name="other__show_app_icon_on_summary">此选项仅对部分 ROM 有效</string>
     <string name="other__show_app_icon_off_summary">在某些 ROM 中，您仍会看到图标显示，并可能在点击它后转到系统的应用信息页</string>
@@ -170,7 +183,7 @@
     <string name="setup__skip_hint">您确定要跳过向导吗？</string>
     <string name="setup__skip_hint_yes">好的，谢谢</string>
     <string name="setup__skip_hint_no">不，我想留在这儿</string>
-    <string name="keyboard__auto_dark_title">自动切换暗黑/明亮配色方案</string>
+    <string name="keyboard__auto_dark_title">跟随系统深色</string>
     <string name="pref_keyboard__hook">拦截事件</string>
     <string name="keyboard__hook_ctrl_a">拦截 Ctrl+A</string>
     <string name="keyboard__hook_ctrl_cv">拦截 Ctrl+C/V/X</string>
@@ -183,7 +196,8 @@
     <string name="keyboard__key_swipe_time_hi_title">判定为连续击键的时间间隔</string>
     <string name="keyboard__hook_fast_input">拦截字母键的快速输入</string>
     <string name="keyboard__hook_fast_input_summary">合并多次按键输入为一次，从而缩减出候选的时间，但交互的反馈感会变差(暂未实现此功能)</string>
-    <string name="keyboard__swipe_enabled">允许触发按键的滑动手势</string>
+    <string name="keyboard__swipe_enabled">按键滑动</string>
+    <string name="keyboard__swipe_enabled_summary">滑动按键快速输入扩展符号</string>
     <string name="keyboard__key_swipe_velocity">触发按键滑动手势的速度（距离/速度满足其一即可）</string>
     <string name="keyboard__key_swipe_velocity_hi">连续击键时触发滑动手势的速度</string>
     <string name="about__buildinfo">编译信息</string>

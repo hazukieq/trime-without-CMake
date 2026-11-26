@@ -61,4 +61,21 @@ class LongCodeSynthTest {
         assertEquals("看心的", snap.barItems.firstOrNull()?.text)
         assertTrue(snap.barItems.none { it.segment == SYNTHETIC_SEGMENT })
     }
+
+    @Test
+    fun synthIsNotInsertedForFullSyllableLongSentence() {
+        // 全拼長句（zung het nzin min kiung fo get）可完整切分為音節，不得造 23 字假詞劫持 preedit。
+        val code = "834iie9yi44i45i34ie4ie9"
+        val prefix = CandidateItem(text = "中", comment = "zung", index = 0,
+            engineSpan = EngineCandidateSpan(0, 4, "zung"))
+        val snap = TwelveKeySnapshotBuilder.build(
+            TwelveKeySnapshotBuilder.Local(code, 0, code, "", code),
+            applyLearning = false,
+            candidatesOverride = listOf(prefix),
+            wantGroups = false,
+            mapFallbackLetters = true,
+        )
+        assertEquals("中", snap.barItems.firstOrNull()?.text)
+        assertTrue(snap.barItems.none { it.segment == SYNTHETIC_SEGMENT })
+    }
 }

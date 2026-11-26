@@ -40,7 +40,6 @@ class NativeCompositionFlowTest {
             writer = process.outputStream.bufferedWriter().let { java.io.PrintWriter(it, true) }
             reader = process.inputStream.bufferedReader()
             send("dump")
-            PhraseMemory.clear()
             PreeditPresentation.invalidate("")
         }
         fun send(command: String): NativeState {
@@ -76,11 +75,12 @@ class NativeCompositionFlowTest {
             appRankingEnabled = appRankingEnabled, phonetics = session.phonetics,
         ).also { PreeditPresentation.publish(it, session.selectedText) }
         fun barWord(text: String): Pair<TwelveKeySnapshot, CandidateItem> {
-            val native = state.candidates.take(64).firstOrNull { it.text == text }
-                ?: error("word absent from bar window: $text")
-            repeat(9) { SelectionMemory.bump(native.text, native.comment) }
             val snap = snapshot()
-            return snap to (snap.barItems.firstOrNull { it.text == text } ?: error("not in visible bar: $text"))
+            val hit = snap.barItems.firstOrNull { it.text == text }
+                ?: state.candidates.take(64).firstOrNull { it.text == text }
+                ?: error("word absent from bar window: $text")
+            val binder = CandidateSelection.InputBinder(state.input, 0)
+            return snap to binder.bind(hit)
         }
         fun confirmSyllable(reading: String) {
             check(session.confirmPhonetic(reading, initialOnly = false))
@@ -142,7 +142,6 @@ class NativeCompositionFlowTest {
             assertEquals(expected, state.input)
         }
         override fun close() {
-            PhraseMemory.clear()
             PreeditPresentation.invalidate("")
             writer.println("quit")
             if (!process.waitFor(5, TimeUnit.SECONDS)) process.destroyForcibly()
@@ -155,8 +154,6 @@ class NativeCompositionFlowTest {
         Driver().use { d ->
             val original = "7i4aa4"
             d.type(original)
-            repeat(9) { PhraseMemory.learnPick(original, "品班", "pin ban") }
-            repeat(9) { SelectionMemory.bump("肾", "sin") }
             val native = d.state.candidates.toList()
             val off = d.snapshot(appRankingEnabled = false)
             val full = d.snapshot(true, appRankingEnabled = false)
@@ -195,7 +192,6 @@ class NativeCompositionFlowTest {
         Driver().use { d ->
             d.type("7i4aa4")
             assertEquals("平板", d.state.candidates.first().text)
-            repeat(9) { SelectionMemory.bump("肾", "sin") }
             val bar = d.snapshot()
             val full = d.snapshot(true)
             assertEquals("平板", bar.barItems.first().text)
@@ -204,7 +200,7 @@ class NativeCompositionFlowTest {
             assertEquals("pin ban", PreeditPresentation.render(d.state.preedit, d.state.input))
             val characters = bar.barItems.filter { it.text.length == 1 }
             assertTrue("segment characters remain selectable", characters.isNotEmpty())
-            val character = characters.first { it.text == "肾" }
+            val character = characters.first()
             assertTrue(d.choose(bar to character, CompositionSession.Origin.BAR))
             assertEquals("aa4", d.state.input)
             assertTrue(d.commits.isEmpty())
@@ -322,18 +318,8 @@ class NativeCompositionFlowTest {
         }
     }
 
-    @Test(timeout = 90000) fun learnedPrefixAndIsolatedFallbackStayReversible() {
+    @Test(timeout = 90000) fun isolatedFallbackStayReversible() {
         Driver().use { d ->
-            val code = "9aii48i5i73"
-            d.type(code)
-            repeat(4) { PhraseMemory.learnPick(code, "太哥", "tai go") }
-            val snap = d.snapshot()
-            val learned = snap.barItems.first { it.text == "太哥" }
-            assertTrue(d.choose(snap to learned, CompositionSession.Origin.BAR))
-            assertEquals("8i5i73", d.state.input)
-            assertTrue(d.commits.isEmpty())
-            d.undo(); assertEquals(code, d.state.input)
-            d.session.cancel()
             d.type("55")
             val full = d.snapshot(true)
             assertTrue("左列應有可確認的字母", full.groups.any { it.segment == INITIAL_LETTER_SEGMENT })
@@ -345,6 +331,19 @@ class NativeCompositionFlowTest {
             assertEquals("5", d.state.input)
             assertTrue(d.commits.isEmpty())
             d.undo(); assertEquals("55", d.state.input)
+        }
+    }
+
+    @Test(timeout = 90000) fun nativeUserdbLearnsPhraseAndRecallsOnFullAndAbbrev() {
+        Driver().use { d ->
+            // 寫入一個詞典裡原本沒有的自造詞到原生 userdb，驗證全碼與 12 鍵簡拼都能立刻召回。
+            d.send("learn 客语测试 li nak si")
+            d.type("5i4a57i")
+            assertTrue("全碼應召回原生學習詞：${d.state.candidates.take(10).map { it.text }}",
+                d.state.candidates.take(12).any { it.text == "客语测试" })
+            d.type("547")
+            assertTrue("12 鍵三鍵簡拼應經 LookupByGraph 召回原生學習詞：${d.state.candidates.take(20).map { it.text }}",
+                d.state.candidates.take(20).any { it.text == "客语测试" })
         }
     }
 

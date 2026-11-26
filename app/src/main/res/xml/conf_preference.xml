@@ -4,17 +4,6 @@
     android:key="settings__configuration_title"
     android:title="@string/settings__configuration_title">
 
-    <com.hazukieq.hkrime.settings.components.ModernEditTextPreference android:key="conf__shared_data_dir"
-        app:iconSpaceReserved="false"
-        android:title="@string/conf__shared_data_dir_title"
-        app:useSimpleSummaryProvider="true"/>
-
-    <com.hazukieq.hkrime.settings.components.ModernEditTextPreference android:key="conf__user_data_dir"
-        app:iconSpaceReserved="false"
-        android:title="@string/conf__user_data_dir_title"
-        android:defaultValue="@string/conf__default_user_data_dir"
-        app:useSimpleSummaryProvider="true"/>
-
     <Preference android:key="conf__synchronize"
         app:iconSpaceReserved="false"
         android:title="@string/conf__synchronize_title"
@@ -25,6 +14,12 @@
         android:title="@string/conf__synchronize_background_title"
         android:summary="@string/conf__synchronize_background_summary"
         android:persistent="true" />
+
+    <com.hazukieq.hkrime.settings.components.ModernEditTextPreference android:key="conf__user_data_dir"
+        app:iconSpaceReserved="false"
+        android:title="@string/conf__user_data_dir_title"
+        android:defaultValue="@string/conf__default_user_data_dir"
+        app:useSimpleSummaryProvider="true"/>
 
     <Preference android:key="conf__reset"
         app:iconSpaceReserved="false"

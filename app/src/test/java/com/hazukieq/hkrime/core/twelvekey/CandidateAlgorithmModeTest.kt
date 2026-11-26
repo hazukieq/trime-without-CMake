@@ -11,27 +11,21 @@ class CandidateAlgorithmModeTest {
     private fun candidate(text: String, reading: String, index: Int, end: Int) =
         CandidateItem(text, reading, index, engineSpan = EngineCandidateSpan(0, end, reading))
 
-    @Test fun disabledModePreservesEngineOrderDuplicatesAndNativeSpansDespiteLearning() {
-        PhraseMemory.clear()
-        try {
-            repeat(9) { PhraseMemory.learnPick(code, "品班", "pin ban") }
-            repeat(9) { SelectionMemory.bump("平板", "pin ban") }
-            val native = listOf(candidate("肾", "sin", 4, 3), candidate("平板", "pin ban", 7, 6),
-                candidate("平板", "sin ban", 9, 6))
-            val off = TwelveKeySnapshotBuilder.build(local, candidatesOverride = native, appRankingEnabled = false)
-            assertEquals(native.map { it.index }, off.barItems.map { it.index })
-            assertEquals(listOf("肾", "平板", "平板"), off.barItems.map { it.text })
-            assertEquals(native.map { it.engineSpan }, off.barItems.map { it.engineSpan })
-            assertEquals(listOf(3, 6, 6), off.barItems.map { it.inputSpan?.end })
-            assertEquals(off.barItems, off.recommend)
-            assertTrue(off.groups.flatMap { it.items }.all { it.index >= 0 })
-            assertEquals("肾", off.previewText)
-            PreeditPresentation.publish(off, "")
-            assertEquals("sin aa4", PreeditPresentation.render(local.rawPreedit, code))
-            val on = TwelveKeySnapshotBuilder.build(local, candidatesOverride = native)
-            assertTrue(on.barItems.any { it.text == "品班" })
-            assertTrue(PhraseMemory.candidatesFor(code).any { it.text == "品班" })
-        } finally { PhraseMemory.clear() }
+    @Test fun disabledModePreservesEngineOrderDuplicatesAndNativeSpans() {
+        val native = listOf(candidate("肾", "sin", 4, 3), candidate("平板", "pin ban", 7, 6),
+            candidate("平板", "sin ban", 9, 6))
+        val off = TwelveKeySnapshotBuilder.build(local, candidatesOverride = native, appRankingEnabled = false)
+        assertEquals(native.map { it.index }, off.barItems.map { it.index })
+        assertEquals(listOf("肾", "平板", "平板"), off.barItems.map { it.text })
+        assertEquals(native.map { it.engineSpan }, off.barItems.map { it.engineSpan })
+        assertEquals(listOf(3, 6, 6), off.barItems.map { it.inputSpan?.end })
+        assertEquals(off.barItems, off.recommend)
+        assertTrue(off.groups.flatMap { it.items }.all { it.index >= 0 })
+        assertEquals("肾", off.previewText)
+        PreeditPresentation.publish(off, "")
+        assertEquals("sin aa4", PreeditPresentation.render(local.rawPreedit, code))
+        val on = TwelveKeySnapshotBuilder.build(local, candidatesOverride = native)
+        assertEquals("平板", on.barItems.first().text)
     }
 
     @Test fun disabledModeNeverFillsAnEmptyEngineWithDictionaryOrRawCandidates() {

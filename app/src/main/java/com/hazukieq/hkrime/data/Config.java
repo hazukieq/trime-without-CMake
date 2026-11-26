@@ -37,6 +37,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.hazukieq.hkrime.core.Rime;
 import com.hazukieq.hkrime.ime.enums.PositionType;
+import com.hazukieq.hkrime.ime.keyboard.BuiltinKeyboards;
 import com.hazukieq.hkrime.ime.keyboard.Key;
 import com.hazukieq.hkrime.ime.keyboard.Sound;
 import com.hazukieq.hkrime.util.AppVersionUtils;
@@ -77,12 +78,13 @@ public class Config {
 
   private Map<?, ?> mStyle, mDefaultStyle;
   private String themeName, soundPackageName, currentSound;
-  private static final String defaultName = "hakka_theme.trime";
+  private static final String defaultName = "hakka.trime";
   private String schema_id, colorID;
 
   private Map<?, ?> fallbackColors;
   private Map<String, Map<String, String>> presetColorSchemes;
   private Map<String, Map<String, ?>> presetKeyboards;
+  private Map<?, ?> utilityKeyboards;
 
 
 
@@ -96,7 +98,11 @@ public class Config {
     Timber.d(methodName);
     self = this;
     assetManager = context.getAssets();
-    themeName = appPrefs.getLooks().getSelectedTheme();
+    // 固定使用內置默認主題 hakka.trime，不再提供顯示主題切換（同時平滑覆蓋舊偏好中的 hakka_theme.trime）。
+    themeName = defaultName;
+    if (!defaultName.equals(appPrefs.getLooks().getSelectedTheme())) {
+      appPrefs.getLooks().setSelectedTheme(defaultName);
+    }
     soundPackageName = appPrefs.getKeyboard().getSoundPackage();
 
     Timber.d("%sprepareRime", methodName);
@@ -129,7 +135,7 @@ public class Config {
     Timber.d(methodName);
     boolean isExist = new File(sharedDataDir).exists();
     boolean isOverwrite = AppVersionUtils.INSTANCE.isDifferentVersion(appPrefs);
-    String defaultFile = "hakka_theme.trime.yaml";
+    String defaultFile = "hakka.trime.yaml";
     Timber.d("%scopy", methodName);
     if (isOverwrite) {
       copyFileOrDir("", true);
@@ -383,10 +389,17 @@ public class Config {
       Timber.d("init() load_map done");
       mDefaultStyle = (Map<?, ?>) globalThemeConfig.get("style");
       fallbackColors = (Map<?, ?>) globalThemeConfig.get("fallback_colors");
-      Key.presetKeys = (Map<String, Map<String, String>>) globalThemeConfig.get("preset_keys");
+      Map<String, Map<String, String>> rawPresetKeys =
+          (Map<String, Map<String, String>>) globalThemeConfig.get("preset_keys");
+      Map<String, Map<String, String>> mergedPresetKeys =
+          rawPresetKeys != null ? new HashMap<>(rawPresetKeys) : new HashMap<>();
+      BuiltinKeyboards.registerPresetKeys(mergedPresetKeys);
+      Key.presetKeys = mergedPresetKeys;
       presetColorSchemes =
           (Map<String, Map<String, String>>) globalThemeConfig.get("preset_color_schemes");
       presetKeyboards = (Map<String, Map<String, ?>>) globalThemeConfig.get("preset_keyboards");
+      Object rawUtility = globalThemeConfig.get("utility_keyboards");
+      utilityKeyboards = rawUtility instanceof Map ? (Map<?, ?>) rawUtility : null;
       Rime.setShowSwitches(false);
       reset();
       Timber.d("init() reset done");
@@ -465,45 +478,88 @@ public class Config {
 
   private String getKeyboardName(@NonNull String name) {
     if (name.contentEquals(".default")) {
-      if (presetKeyboards.containsKey(schema_id)) name = schema_id; // 匹配方案名
-      else {
-        if (schema_id.contains("_")) name = schema_id.split("_")[0];
-        if (!presetKeyboards.containsKey(name)) { // 匹配“_”前的方案名
-          Object o = Rime.schema_get_value(schema_id, "speller/alphabet");
-          name = "qwerty"; // 26
-          if (o != null) {
-            final String alphabet = o.toString();
-            if (presetKeyboards.containsKey(alphabet)) name = alphabet; // 匹配字母表
-            else {
-              if (alphabet.contains(",") || alphabet.contains(";")) name += "_";
-              if (alphabet.contains("0") || alphabet.contains("1")) name += "0";
-            }
-          }
-        }
+      return getResolvedDefaultLayoutId();
+    }
+    if (presetKeyboards != null && presetKeyboards.containsKey(name)) {
+      @Nullable final Map<?, ?> m = (Map<?, ?>) presetKeyboards.get(name);
+      if (m != null && m.containsKey("import_preset")) {
+        return Objects.requireNonNull(m.get("import_preset")).toString();
       }
+      return name;
     }
-    if (!presetKeyboards.containsKey(name)) name = "default";
-    @Nullable final Map<?, ?> m = (Map<?, ?>) presetKeyboards.get(name);
-    assert m != null;
-    if (m.containsKey("import_preset")) {
-      name = Objects.requireNonNull(m.get("import_preset")).toString();
+    if (BuiltinKeyboards.isBuiltin(name)) {
+      return BuiltinKeyboards.canonicalName(name);
     }
-    return name;
+    return "default";
+  }
+
+  /** 當前方案聲明的鍵盤類型（缺省 qwerty）。 */
+  public String getCurrentSchemaKeyboardType() {
+    return Rime.getSchemaKeyboardType(schema_id);
+  }
+
+  /** 按「用戶覆蓋 → 方案推薦 → 主題 keyboard_defaults → 同類型首項」強類型解析當前方案默認布局。 */
+  public String getResolvedDefaultLayoutId() {
+    final String schemaType = getCurrentSchemaKeyboardType();
+    final Object schemaDefObj =
+        schema_id != null ? Rime.schema_get_value(schema_id, "keyboard/default") : null;
+    final String schemaDef = schemaDefObj != null ? schemaDefObj.toString() : null;
+    final String userSelected = appPrefs.getLooks().selectedKeyboardLayout(schema_id);
+    final Object themeDefsObj = getValue("keyboard_defaults");
+    final Map<?, ?> themeDefs = themeDefsObj instanceof Map ? (Map<?, ?>) themeDefsObj : null;
+    final Object alphaObj =
+        schema_id != null ? Rime.schema_get_value(schema_id, "speller/alphabet") : null;
+    final String alphabet = alphaObj != null ? alphaObj.toString() : null;
+    return KeyboardLayoutResolver.resolveDefaultLayout(
+        schema_id,
+        schemaType,
+        schemaDef,
+        userSelected,
+        themeDefs,
+        presetKeyboards,
+        alphabet);
+  }
+
+  /** 列出當前主題中與當前方案 keyboard/type 嚴格匹配的所有可選主鍵盤布局。 */
+  public List<KeyboardLayoutResolver.LayoutInfo> getAvailableLayoutsForCurrentSchema() {
+    return KeyboardLayoutResolver.availableLayouts(getCurrentSchemaKeyboardType(), presetKeyboards);
+  }
+
+  /** 判斷指定布局是否屬於給定鍵盤類型（未聲明 type 的舊主題按歷史名稱兜底）。 */
+  public boolean isKeyboardLayoutOfType(String layoutId, String type) {
+    if (layoutId == null || layoutId.isEmpty()) return false;
+    if (KeyboardLayoutResolver.isTypedTheme(presetKeyboards)) {
+      return KeyboardLayoutResolver.isCompatible(layoutId, type, presetKeyboards);
+    }
+    if (KeyboardLayoutResolver.TYPE_12KEY.equals(type)) {
+      return "hakka_jiugong".equals(layoutId) || "jiugong_simp".equals(layoutId);
+    }
+    return true;
   }
 
   public List<String> getKeyboardNames() {
     final List<?> names = (List<?>) getValue("keyboards");
     final List<String> keyboards = new ArrayList<>();
-    for (Object s : names) {
-      s = getKeyboardName((String) s);
-      if (!keyboards.contains(s)) keyboards.add((String) s);
+    if (names != null) {
+      for (Object s : names) {
+        String resolved = getKeyboardName((String) s);
+        if (!keyboards.contains(resolved)) keyboards.add(resolved);
+      }
+    }
+    for (String builtin : BuiltinKeyboards.allNames()) {
+      if (!keyboards.contains(builtin)) keyboards.add(builtin);
     }
     return keyboards;
   }
 
   public Map<String, ?> getKeyboard(String name) {
-    if (!presetKeyboards.containsKey(name)) name = "default";
-    return (Map<String, ?>) presetKeyboards.get(name);
+    if (presetKeyboards != null && presetKeyboards.containsKey(name)) {
+      return (Map<String, ?>) presetKeyboards.get(name);
+    }
+    if (BuiltinKeyboards.isBuiltin(name)) {
+      return BuiltinKeyboards.build(name, utilityKeyboards);
+    }
+    return (Map<String, ?>) presetKeyboards.get("default");
   }
 
   public void destroy() {

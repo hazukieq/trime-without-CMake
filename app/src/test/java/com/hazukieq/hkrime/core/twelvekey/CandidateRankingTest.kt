@@ -201,10 +201,9 @@ class CandidateRankingTest {
         val out = ArrayList<String>()
         File(assetDir, "hakka.dict.yaml").forEachLine { raw ->
             if (raw.isBlank() || raw.startsWith("#")) return@forEachLine
-            val tab = raw.indexOf('\t')
-            if (tab < 0) return@forEachLine
-            val ch = raw.substring(0, tab).trim()
-            if (ch.length == 1 && raw.substring(tab + 1).trim() == syllable && !out.contains(ch)) out.add(ch)
+            val parts = raw.split('\t')
+            val ch = parts[0].trim()
+            if (ch.length == 1 && parts.getOrNull(1)?.trim() == syllable && !out.contains(ch)) out.add(ch)
         }
         return out
     }

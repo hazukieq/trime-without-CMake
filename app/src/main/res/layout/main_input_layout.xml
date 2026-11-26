@@ -75,6 +75,11 @@
                     android:textSize="22sp" />
             </LinearLayout>
         </LinearLayout>
+
+        <!-- 原生符号/表情面板（布局固定不接受主题编辑，词库来自 /sdcard/hkrime/symbols/*.txt） -->
+        <include
+            android:id="@+id/symbol_panel"
+            layout="@layout/symbol_panel" />
     </FrameLayout>
 
 </LinearLayout>

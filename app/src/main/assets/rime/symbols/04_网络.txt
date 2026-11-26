@@ -1,0 +1,8 @@
+# 常用网络与邮箱后缀
+.com .cn .net .org
+.io .edu .gov .vip
+https:// http:// www. @
+@qq.com @163.com @gmail.com @outlook.com
+.pdf .jpg .png .mp4
+.zip .txt .md .apk
+100% 666 +1 #
