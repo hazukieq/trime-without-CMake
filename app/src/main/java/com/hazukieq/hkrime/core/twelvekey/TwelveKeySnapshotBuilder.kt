@@ -222,7 +222,7 @@ object TwelveKeySnapshotBuilder {
         } else {
             barOrdered
         }
-        val barEntries = if (ordered.isEmpty() && panelRows.isNotEmpty()) {
+        val barEntries0 = if (ordered.isEmpty() && panelRows.isNotEmpty()) {
             // 字典兜底：取「第一待選段」的音節組候選（與面板左列第 0 組同源），最多候選條格數。
             dictionaryRows
                 .flatMap { g -> g.items }
@@ -231,18 +231,36 @@ object TwelveKeySnapshotBuilder {
         } else {
             withFirstSegmentChars(barList(barCandidates), barCandidates, remaining, initial)
         }
+        val barEntries = barEntries0
         // 推薦組最多 30 詞與 10 單字；詞來自聯想/組合/整串與引擎詞，單字可用段組補位。
         val recommend = recommendWords(ordered, panelRows, local.remaining)
+        // 過長編碼：候選條/字典都沒有覆蓋全碼的詞時，按「每鍵第一個給拼音聲母」造一個組詞，
+        // 放在條首與推薦首位，避免 preedit/預覽裸露原碼。
+        // 「盡力找」只在**候選條固定窗口**裡找：bar/full 必須用同一窗口判定，
+        // 否則窗口外的完整詞會讓兩條路徑一個造詞、一個不造（bar drift）。
+        val fullCodeCovered = barCandidates.any { it.inputSpan?.end == remaining.length } ||
+            barEntries.any { it.inputSpan?.end == remaining.length } ||
+            dictionaryRows.any { it.restCode.isEmpty() }
+        val synthesized = if (mapFallbackLetters && !fullCodeCovered && remaining.length >= 2) {
+            synthesizeLongCode(remaining, initial)
+        } else {
+            null
+        }
+        if (synthesized != null) {
+            DiagLog.d("snapshot", "synth code=$remaining text=${synthesized.text} reading=${synthesized.comment}")
+        }
+        val barWithSynth = if (synthesized != null) listOf(synthesized) + barEntries else barEntries
+        val recommendWithSynth = if (synthesized != null) listOf(synthesized) + recommend else recommend
         // 推薦組固定排左列第一（reading 為空 + [RECOMMEND_SEGMENT] 標記）；空的就不插，
         // 這樣「候選全上了條」時段組自然回到第 0 組。
-        val recommendRow = if (recommend.isEmpty()) {
+        val recommendRow = if (recommendWithSynth.isEmpty()) {
             emptyList()
         } else {
             listOf(
                 SyllableGroup(
                     reading = "",
                     syllables = emptyList(),
-                    items = recommend,
+                    items = recommendWithSynth,
                     segment = RECOMMEND_SEGMENT,
                 ),
             )
@@ -255,7 +273,7 @@ object TwelveKeySnapshotBuilder {
             recommendRow + panelRows.map { it.toSyllableGroup() }
         }
         // 預覽文字與候選條第 0 條同源：一次算好，隨快照發佈。
-        val previewText = barEntries.firstOrNull { it.text.isNotEmpty() }?.text ?: ""
+        val previewText = barWithSynth.firstOrNull { it.text.isNotEmpty() }?.text ?: ""
         // 已選前綴（librime context 裡尚未 commit 的字）+ 第一條候選 = 嵌入式預覽全文
         // App 側暫存的字（兜底逐段選字）也要算進嵌入式預覽，否則選中的字在輸入框裡看不到。
         val inlineText = runCatching { Rime.getCompositionPrefix() }.getOrDefault("") + previewText
@@ -273,8 +291,8 @@ object TwelveKeySnapshotBuilder {
             Timber.w("twelvekey: enumerate native missing, degraded to single page (%d)", flat.size)
         }
         val boundGroups = groupsWithRecommend.map { group -> group.copy(items = group.items.map(inputBinder::bind)) }
-        val boundBar = barEntries.map(inputBinder::bind)
-        val boundRecommend = recommend.map(inputBinder::bind)
+        val boundBar = barWithSynth.map(inputBinder::bind)
+        val boundRecommend = recommendWithSynth.map(inputBinder::bind)
         DiagLog.d(
             "snapshot",
             "build code=${input} mode=app wantGroups=$wantGroups groups=${groupsWithRecommend.size}" +
@@ -1179,6 +1197,42 @@ object TwelveKeySnapshotBuilder {
      * 把 App 側學到的組詞（[PhraseMemory]）與引擎候選混排；沒有學到任何詞就原樣返回。
      *
      * 「純」的構造 + 混排都放在這裡，方便單測（不碰引擎，只吃 ranked 與記憶）。
+     */
+    /**
+     * 過長編碼無完整候選時的「創造組詞」：每個碼鍵取**第一個首拼單元**（kl→k、th/ng/nz 整段），
+     * 每個單元取該單元下最常用的漢字，拼成一個合成候選（reading=單元串，text=字串）。
+     *
+     * 只作為「找不到覆蓋全碼的詞」的兜底；有完整詞時絕不插入。
+     */
+    internal fun synthesizeLongCode(code: String, initial: String? = null): CandidateItem? {
+        if (code.isEmpty()) return null
+        val units = ArrayList<String>(code.length)
+        for ((index, ch) in code.withIndex()) {
+            // 末鍵也不取後綴 r：組詞取的是聲母，r 只作兒化尾。
+            val unit = TwelveKeyPreedit.keyInitialUnits(ch, isLast = false).firstOrNull() ?: return null
+            units.add(unit)
+        }
+        if (initial != null && units.firstOrNull() != initial) return null
+        val chars = ArrayList<String>(units.size)
+        for (unit in units) {
+            val best = TwelveKeyPreedit.syllablesByInitials(listOf(unit)).asSequence()
+                .flatMap { TwelveKeyPreedit.charsForSyllable(it, 2).asSequence() }
+                .maxByOrNull { TwelveKeyPreedit.generalScore(it) } ?: return null
+            chars.add(best)
+        }
+        val text = chars.joinToString("")
+        if (text.isEmpty()) return null
+        return CandidateItem(
+            text = text,
+            comment = units.joinToString(" "),
+            index = -1,
+            segment = SYNTHETIC_SEGMENT,
+            restCode = code,
+        )
+    }
+
+    /**
+     * 學習詞（PhraseMemory 合成候選）混排：與引擎同文項去重，保留引擎項並按學習分抬升。
      */
     internal fun mergeLearnedPhrases(
         ranked: List<CandidateItem>,

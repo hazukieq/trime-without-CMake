@@ -234,7 +234,8 @@ class InitialDisambiguationTest {
         val local = TwelveKeySnapshotBuilder.Local(code, 0, code, "")
         val bar = TwelveKeySnapshotBuilder.build(local, 64, applyLearning = false, wantGroups = false, candidatesOverride = all)
         val full = TwelveKeySnapshotBuilder.build(local, applyLearning = false, candidatesOverride = all)
-        assertEquals("候0", bar.barItems.first().text)
+        // 窗口外的「平板」不能把條首改成它；窗口內沒有整串詞 → 兩條路徑都先給「造的組詞」。
+        assertEquals(SYNTHETIC_SEGMENT, bar.barItems.first().segment)
         assertEquals(bar.barItems, full.barItems)
     }
 

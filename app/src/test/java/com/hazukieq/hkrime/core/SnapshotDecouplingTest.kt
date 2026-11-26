@@ -2,6 +2,7 @@ package com.hazukieq.hkrime.core
 
 import com.hazukieq.hkrime.core.twelvekey.CandidateItem
 import com.hazukieq.hkrime.core.twelvekey.PhraseMemory
+import com.hazukieq.hkrime.core.twelvekey.SYNTHETIC_SEGMENT
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeySnapshotBuilder
 import com.hazukieq.hkrime.core.twelvekey.TwelveKeyTuning
 import org.junit.Assert.assertEquals
@@ -112,7 +113,9 @@ class SnapshotDecouplingTest {
         assertNull("有字典候選就不該顯示字母兜底", snap.fallback)
         assertTrue("hasCandidates 要為真（bar 模式 groups 本來是空的）", snap.hasCandidates)
         val first = snap.barEntries.first()
-        assertEquals("de 5", preedit.rewrite("ee5\u2038", first.text, first.comment))
+        // 引擎沒整串詞 → 條首是「每鍵第一個聲母」造的組詞，preedit 不再裸露原碼。
+        assertEquals(SYNTHETIC_SEGMENT, first.segment)
+        assertEquals("d d k", preedit.rewrite("ee5\u2038", first.text, first.comment))
     }
 
     @Test
@@ -138,7 +141,7 @@ class SnapshotDecouplingTest {
         )
         val first = bar.barItems.first()
         val rendered = preedit.rewrite("ee5\u2038", first.text, first.comment)
-        assertEquals("de 5", rendered)
+        assertEquals("d d k", rendered)
         // 面板開關不改變首條 → 渲染結果必須一樣
         val fullFirst = full.barItems.first()
         assertEquals(rendered, preedit.rewrite("ee5\u2038", fullFirst.text, fullFirst.comment))
