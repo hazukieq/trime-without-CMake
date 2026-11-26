@@ -54,6 +54,11 @@ object CandidateSelection {
             return code.indexOfFirst { it != '\'' && !it.isWhitespace() }.takeIf { it >= 0 }?.plus(1)
         }
         if (item.segment == ISOLATED_SEGMENT || item.segment == ISOLATED_BACK_SEGMENT) return null
+        if (item.segment == INITIAL_CHAR_SEGMENT) {
+            // 首段漢字只消費已確認首段：跨度由剩餘碼反推，且剩餘碼必須是真後綴。
+            if (!code.endsWith(item.restCode)) return null
+            return (code.length - item.restCode.length).takeIf { it > 0 }
+        }
         if (item.index < 0 && item.segment == 0) {
             // 字典段組保留明確切法；不可改用另一條引擎候選的邊界。
             return (code.length - item.restCode.length).takeIf { end ->

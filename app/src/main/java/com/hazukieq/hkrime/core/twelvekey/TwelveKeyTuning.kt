@@ -23,6 +23,27 @@ object TwelveKeyTuning {
     /** 固定候選條一頁顯示幾條（`barItems` 的截斷長度）。 */
     const val BAR_ITEMS = 12
 
+    /** 多音節條內缺單字時，末尾最多補入的第一待選段單字數；首候選必須保留。 */
+    const val FIRST_SEGMENT_CHARS = 4
+
+    /**
+     * 已確認簡拼時「首段漢字」的候選上限：引擎菜單只給整串詞，首段單字由 App 字表補。
+     * 調大覆蓋更全但右列更長；調小更快、更容易只看常用字。
+     */
+    const val INITIAL_CHARS_LIMIT = 120
+
+    /**
+     * 已確認拼音序列後，右列（推薦組）最多放多少個引擎詞。
+     * 引擎在 600 窗口內已按確認序列過濾；這裡只限制首屏，滾動仍可看長尾。
+     */
+    const val CONFIRM_RECOMMEND_LIMIT = 200
+
+    /**
+     * 已確認拼音序列時，首段漢字插在多少個引擎詞之後（面板一頁約 3 列 × 4 行）。
+     * 保持引擎詞順序不變，只把「首段可上屏的字」放到第一頁末尾，避免要翻幾十屏才選得到。
+     */
+    const val CONFIRM_CHARS_AFTER_WORDS = 6
+
 
 
     /**

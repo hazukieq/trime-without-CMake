@@ -52,3 +52,8 @@ PhraseMemory 的读音索引也并入面板，运行时不解析 sync userdb 快
 
 代码定位见 [01](01-architecture.md)，preedit 细节见 [14](14-preedit.md)，
 面板规则见 [17](17-candidate-panel.md)，验证见 [16](16-librime-coverage-test.md)。
+
+左栏字母行与音节组同列，逐段确认拼音：字母确认/细化首拼，普通音节行确认完整音节；
+CompositionSession 记录确认段及原码跨度，推进待确认尾码但保留整串原码用于选字校验。
+非空 `hkrime_initial` 让引擎保留简拼分支（0006），JNI 在窗口前过滤；首段汉字由 App 字表补。
+确认拼音不获得提交许可，DEL 按操作顺序撤销。

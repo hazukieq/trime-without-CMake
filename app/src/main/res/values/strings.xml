@@ -192,6 +192,8 @@
     <string name="pref_trime_custom_qq_summary" translatable="false"> </string>
     <string name="pref_trime_custom_qq_data" translatable="false"> </string>
     <string name="pref_keyboard__candidate">Candidate</string>
+    <string name="keyboard__candidate_algorithm_title">Candidate ranking</string>
+    <string name="keyboard__candidate_algorithm_summary">Turn off to use only engine candidates in their original order. Engine learning remains enabled.</string>
     <string name="keyboard__candidate_page_size">Candidate item count for each page</string>
     <string name="copy_done">Copied to clipboard!</string>
     <string-array name="keyboard__candidate_page_size_entries">

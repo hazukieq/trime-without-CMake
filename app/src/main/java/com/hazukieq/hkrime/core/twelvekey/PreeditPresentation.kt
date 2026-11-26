@@ -14,7 +14,8 @@ object PreeditPresentation {
         fun matches(code: String, raw: String): Boolean = input == code && rawPreedit == raw
     }
 
-    private data class State(val selected: String = "", val frame: Frame? = null)
+    private data class State(val selected: String = "", val frame: Frame? = null,
+        val phonetics: List<PhoneticSelection> = emptyList())
     @Volatile private var state = State()
     private data class RenderKey(val state: State, val raw: String, val input: String,
         val engineText: String?, val engineComment: String?)
@@ -25,15 +26,18 @@ object PreeditPresentation {
     fun publish(snapshot: TwelveKeySnapshot, selected: String): Boolean {
         val first = snapshot.barItems.firstOrNull()
         val next = State(selected, if (snapshot.isEmpty) null else Frame(
-            snapshot.input, snapshot.rawPreedit, first?.text.orEmpty(), first?.comment.orEmpty(), snapshot.inlineText,
-        ))
+            snapshot.input, snapshot.rawPreedit, first?.text.orEmpty(), (first?.inputSpan?.reading?.takeIf { it.isNotEmpty() }
+                ?: first?.engineSpan?.sourceComment ?: first?.comment).orEmpty(), snapshot.inlineText,
+        ), snapshot.phonetics)
         val changed = next != state
         state = next
         return changed
     }
 
     @Synchronized
-    fun invalidate(selected: String) { state = State(selected) }
+    fun invalidate(selected: String, phonetics: List<PhoneticSelection> = emptyList()) {
+        state = State(selected, phonetics = phonetics)
+    }
 
     fun render(raw: String?, input: String, engineText: String? = null, engineComment: String? = null): String? {
         val current = state
@@ -41,8 +45,16 @@ object PreeditPresentation {
         val key = RenderKey(current, raw, input, engineText, engineComment)
         cached?.takeIf { it.key == key }?.let { return it.text }
         val frame = current.frame?.takeIf { it.matches(input, raw) }
-        val rewritten = TwelveKeyPreedit.rewrite(raw, frame?.text ?: engineText, frame?.comment ?: engineComment)
-        val text = rewritten ?: raw.replace("\u2038", "")
+        val text = if (current.phonetics.isEmpty()) {
+            TwelveKeyPreedit.rewrite(raw, frame?.text ?: engineText, frame?.comment ?: engineComment)
+                ?: raw.replace("\u2038", "")
+        } else {
+            val pending = PhoneticSelection.pending(input, current.phonetics)
+            val tailReading = TwelveKeyPreedit.parseComment(frame?.comment ?: engineComment.orEmpty())
+                ?.drop(current.phonetics.size)?.joinToString(" ")
+            val tail = if (pending.isEmpty()) "" else TwelveKeyPreedit.rewrite(pending, null, tailReading) ?: pending
+            (current.phonetics.map { it.reading } + listOf(tail).filter { it.isNotEmpty() }).joinToString("'")
+        }
         val rendered = (current.selected + text).takeIf { it.isNotEmpty() }
         cached = Cached(key, rendered)
         return rendered

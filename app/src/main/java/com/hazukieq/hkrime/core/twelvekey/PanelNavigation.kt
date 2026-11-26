@@ -8,17 +8,19 @@ internal class PanelNavigation {
         private set
     private var lastRemaining: String? = null
     private var contextKey: String = ""
+    private var phonetics: List<PhoneticSelection> = emptyList()
 
     fun submit(snapshot: TwelveKeySnapshot, preserveReading: Boolean = false) {
         val previous = groups.getOrNull(activeIndex)?.reading?.takeIf { it.isNotEmpty() }
-        val changed = snapshot.remaining != lastRemaining
-        groups = foldGroupsForDisplay(snapshot.groups)
+        val changed = snapshot.remaining != lastRemaining || snapshot.phonetics != phonetics
+        groups = foldGroupsForDisplay(snapshot.groups, snapshot.engineOrderOnly)
         activeIndex = if (changed && !preserveReading) 0 else {
             groups.indexOfFirst { it.reading == previous && it.segment != RECOMMEND_SEGMENT }
                 .coerceAtLeast(0)
         }
         contextKey = snapshot.contextKey
         lastRemaining = snapshot.remaining
+        phonetics = snapshot.phonetics
     }
 
     fun select(index: Int, reading: String, key: String): Boolean {

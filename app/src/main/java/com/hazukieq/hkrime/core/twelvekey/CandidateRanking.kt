@@ -2,9 +2,18 @@ package com.hazukieq.hkrime.core.twelvekey
 
 /**
  * 候選條與面板排序純函數；裝配與 UI 不在此處。
- * 候選條維持引擎/學習混排順序，面板行最終合併與分檔由 PanelRow 負責。
+ * 候選條以引擎/學習混排為基礎，首位優先完整原碼匹配；面板行最終合併與分檔由 PanelRow 負責。
  */
 object CandidateRanking {
+
+    /** 首位優先取已證實覆蓋全部剩餘原碼的候選；其餘保序，不按顯示讀音或文字長度分區。 */
+    fun preferCompleteFirst(ranked: List<CandidateItem>, code: String): List<CandidateItem> {
+        val position = ranked.indexOfFirst { item ->
+            item.inputSpan?.let { it.matches(code) && it.end == code.length } == true
+        }
+        if (position <= 0) return ranked
+        return listOf(ranked[position]) + ranked.filterIndexed { index, _ -> index != position }
+    }
 
     /** 漢字詞組：≥2 個漢字（含擴展 A）。顏文字、ASCII、單字都不算。 */
     fun isCjkWord(text: String): Boolean =

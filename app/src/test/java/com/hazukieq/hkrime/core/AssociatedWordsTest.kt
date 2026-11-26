@@ -210,10 +210,10 @@ class AssociatedWordsTest {
 
     // ---- preedit 讀音對齊（docs/14）----
 
-    /** 候選條第一條有 comment 時，preedit 必須用它的精確讀音（`kiung than` 不是 `kiung the`）。 */
+    /** 首選讀音只具體化已輸入碼位，未輸入的 an 不補全。 */
     @Test
     fun rewriteUsesFirstCandidateReading() {
-        assertEquals("kiung than", preedit.rewrite("5i34i w\u2038", "共产", "kiung than"))
+        assertEquals("kiung th", preedit.rewrite("5i34i w\u2038", "共产", "kiung than"))
     }
 
     /** 詞候選 comment 優先決定 preedit 顯示讀音。 */
@@ -234,10 +234,10 @@ class AssociatedWordsTest {
         assertEquals("kiung", preedit.rewrite("5i34i\u2038", "共", "kiung"))
     }
 
-    /** 首條是 3 字詞、讀音 3 段（共產黨 = kiung than dong 正好吃完 5i34iwe）。 */
+    /** 首條三音節：未輸入的韻母不顯示。 */
     @Test
     fun rewriteUsesThreeSyllableWordReading() {
-        assertEquals("kiung than dong", preedit.rewrite("5i34iwe", "共產黨", "kiung than dong"))
+        assertEquals("kiung th d", preedit.rewrite("5i34iwe", "共產黨", "kiung than dong"))
     }
 
     /** librime 的 `‸`(U+2038) 光標標記不能被當成「已選前綴」，要剝掉再切碼段。 */
@@ -252,15 +252,9 @@ class AssociatedWordsTest {
         assertEquals("kiung th", preedit.rewrite("5i34i w", "共产", null))
     }
 
-    /**
-     * 12 鍵多對多、沒有唯一解碼：comment 一律優先（它與候選條同源，是「用戶看到的第一條」的讀音）。
-     * 這裡用一串「本地解碼完全對不上」的 comment 釘住契約：不做本地校驗，直接顯示。
-     *
-     * 尾端的半截鍵（`w`）仍要顯示：comment 只承諾了 `5i`+`34i` 六個碼位裡的五個，
-     * 剩下的按「按下的鍵必須全部顯示」原樣補上（與 `5i4a57` 的 `7` 同一條規則）。
-     */
+    /** 首選只改寫能與原碼匹配的部分，其餘原碼保留。 */
     @Test
-    fun rewriteTrustsFirstCandidateCommentAsIs() {
+    fun rewriteConcretizesOnlyMatchingCandidatePrefixes() {
         assertEquals("li voi w", preedit.rewrite("5i34iw", "理會", "li voi"))
     }
 
@@ -285,22 +279,22 @@ class AssociatedWordsTest {
     @Test
     fun rewriteConsumesWholeEncodedSyllableForDerivedSpellingAlias() {
         // 顯示仍用 comment（所見即所讀），但整個 a3 都被吃掉，不能再補一個 `3`。
-        assertEquals("cw", preedit.rewrite("a3", "次", "cw"))
-        assertEquals("ha cw", preedit.rewrite("iaa3", "下次", "ha cw"))
+        assertEquals("cu", preedit.rewrite("a3", "次", "cw"))
+        assertEquals("ha cu", preedit.rewrite("iaa3", "下次", "ha cw"))
     }
 
     /** 簡拼引申（一個鍵代表一個音節）仍然只吃一個碼位，不能誤吃後面。 */
     @Test
     fun rewriteKeepsSingleKeyForAbbreviatedSyllable() {
-        assertEquals("ha", preedit.rewrite("i", "下", "ha"))
-        assertEquals("ha cu", preedit.rewrite("ia3", "下厨", "ha cu"))
+        assertEquals("h", preedit.rewrite("i", "下", "ha"))
+        assertEquals("h cu", preedit.rewrite("ia3", "下厨", "ha cu"))
     }
 
     @Test
     fun rewriteKeepsExtraKeysWhenCommentOnlyCoversPrefixByAbbreviation() {
         val comment = List(6) { "qa" }.joinToString(" ")
-        assertEquals("qa qa qa qa qa qa 9", preedit.rewrite("9999999\u2038", "哈哈", comment))
-        assertEquals("qa qa qa qa qa qa", preedit.rewrite("999999\u2038", "哈哈", comment))
+        assertEquals("q q q q q q 9", preedit.rewrite("9999999\u2038", "哈哈", comment))
+        assertEquals("q q q q q q", preedit.rewrite("999999\u2038", "哈哈", comment))
     }
 
     /** 帶權重詞條僅第二欄作讀音。 */
@@ -342,8 +336,8 @@ class AssociatedWordsTest {
     /** 用戶只按了一聲母鍵時（簡拼），comment 的每一節只吃一個碼位。 */
     @Test
     fun rewriteConsumesOneCodePerSyllableForAbbreviation() {
-        // 8 8 = 两个首字母键，首条候选读 ji jen → 全部吃完，不补尾码
-        assertEquals("ji jen", preedit.rewrite("8 8\u2038", "医院", "ji jen"))
+        // 8 8 只有两个首字母键，显示 j j，不补 i/en。
+        assertEquals("j j", preedit.rewrite("8 8\u2038", "医院", "ji jen"))
     }
 
     /** 引擎沒給 comment（方案沒開 spelling_hints）時退回本地解碼。 */
@@ -355,7 +349,7 @@ class AssociatedWordsTest {
     /** comment 可能被包成 `［…］`（comment_format 的 xform），要剝掉再顯示。 */
     @Test
     fun rewriteStripsBracketWrappedComment() {
-        assertEquals("kiung than", preedit.rewrite("5i34i w\u2038", "共产", "［kiung than］"))
+        assertEquals("kiung th", preedit.rewrite("5i34i w\u2038", "共产", "［kiung than］"))
     }
 
     /** 已選中的前綴（咧）必須保留，只改寫尾部碼段。 */
@@ -405,14 +399,14 @@ class AssociatedWordsTest {
         val raw = "5i34i w\u2038"
         PreeditPresentation.publish(TwelveKeySnapshot("5i34iw", 0, "5i34iw", emptyList(), null,
             barEntries = listOf(CandidateItem("共產", "kiung than", 0)), rawPreedit = raw), "")
-        assertEquals("kiung than", PreeditPresentation.render(raw, "5i34iw", "其它", "ki biet"))
+        assertEquals("kiung th", PreeditPresentation.render(raw, "5i34iw", "其它", "ki biet"))
         PreeditPresentation.invalidate("")
     }
 
     @Test
     fun `render falls back to engine hint when bar snapshot is absent`() {
         PreeditPresentation.invalidate("")
-        assertEquals("kiung than", PreeditPresentation.render("5i34i w\u2038", "5i34iw", "共產", "kiung than"))
+        assertEquals("kiung th", PreeditPresentation.render("5i34i w\u2038", "5i34iw", "共產", "kiung than"))
     }
 
     @Test

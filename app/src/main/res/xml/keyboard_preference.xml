@@ -30,6 +30,12 @@
         app:title="@string/pref_keyboard__candidate">
         <SwitchPreferenceCompat
             android:defaultValue="true"
+            android:key="keyboard__candidate_algorithm"
+            android:title="@string/keyboard__candidate_algorithm_title"
+            android:summary="@string/keyboard__candidate_algorithm_summary"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
             android:key="keyboard__show_window"
             android:title="@string/keyboard__show_window_title"
             app:iconSpaceReserved="false" />

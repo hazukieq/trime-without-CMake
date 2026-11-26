@@ -121,4 +121,21 @@ class PanelGoldenTest {
             }
         }
     }
+    @Test
+    fun disambiguatedSourcesMatchScriptBeforeQuotaAndMerge() {
+        val golden = JsonParser.parseString(File("src/test/resources/panel-initial-golden.json").readText()).asJsonObject
+        for ((initial, cases) in golden.entrySet()) {
+            for ((code, entry) in cases.asJsonObject.entrySet()) {
+                val sources = entry.asJsonObject.getAsJsonObject("sources")
+                val actual = TwelveKeySnapshotBuilder.debugPanelSources(code, initial.single())
+                for ((name, rows) in listOf("isolated" to actual.isolated, "synth" to actual.synth,
+                    "split" to actual.split, "assoc" to actual.assoc, "combo" to actual.combo,
+                    "whole_word" to actual.wholeWord)) {
+                    checkSource("$code/$initial", name, rowsOf(sources.getAsJsonArray(name)), rows)
+                }
+                checkSource("$code/$initial", "merged", rowsOf(entry.asJsonObject.getAsJsonArray("merged")), actual.merged)
+            }
+        }
+    }
+
 }

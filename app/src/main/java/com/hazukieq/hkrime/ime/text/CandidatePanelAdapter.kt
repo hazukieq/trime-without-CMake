@@ -46,6 +46,7 @@ class CandidatePanelAdapter(
         val restCode: String = "",
         val contextKey: String = "",
         val inputSpan: InputCodeSpan? = null,
+        val engineSpan: com.hazukieq.hkrime.core.twelvekey.EngineCandidateSpan? = null,
     )
 
     private val density = context.resources.displayMetrics.density

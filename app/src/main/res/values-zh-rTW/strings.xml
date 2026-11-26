@@ -191,6 +191,8 @@
     <string name="keyboard__use_mini_keyboard_title">連接實體鍵盤時，顯示迷你軟鍵盤</string>
     <string name="pref_trime_custom_qq">修改版QQ羣</string>
     <string name="pref_keyboard__candidate">候選欄</string>
+    <string name="keyboard__candidate_algorithm_title">候選演算法排序</string>
+    <string name="keyboard__candidate_algorithm_summary">關閉後僅顯示引擎候選，保持引擎原始順序；引擎本身的學習不受影響。</string>
     <string name="keyboard__candidate_page_size">每頁顯示候選詞數量</string>
     <string name="copy_done">已複製</string>
     <string-array name="keyboard__candidate_page_size_entries" >

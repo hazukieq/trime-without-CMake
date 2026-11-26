@@ -1,7 +1,13 @@
 # 面板实现与维护约定
 
-当前实现采用六个 App 来源加引擎来源，最终只经过一条合并流水线。
+候选算法开启时采用六个 App 来源加引擎来源，最终只经过一条合并流水线；关闭时直接发布引擎源。
 具体产品规则和配额见 [17](17-candidate-panel.md)；本篇规定修改边界和一致性验证。
+
+“候选算法排序”关闭时，SnapshotBuilder 直接发布引擎候选与其读音分组，跳过 App 来源和排序流水线。
+推荐组保持全量引擎顺序，折叠组按引擎全局下标排列并保留重复项。
+模式进入快照缓存键；切换增加 options 版本，拒绝旧候选点击，不清除 CompositionSession。
+验证必须同时覆盖启用、停用、切回及部分选字后切换；不能用 `applyLearning=false` 代替关闭模式，
+该参数仅关闭学习混排，不会停用完整匹配置顶、补位和字典补充。
 
 ## 文件边界
 
@@ -14,8 +20,14 @@
 | PanelRow | 行模型、唯一合并、前缀收敛、分档、总行数截断 |
 | CandidateRanking | 候选条与组内排序纯函数 |
 | TwelveKeyTuning | 配额和策略常量及其影响说明 |
+| CompositionSession / PhoneticSelection | 完整原码、已确认拼音段、选字、按操作顺序撤销及提交许可 |
 | TextInputManager | 点击、部分选择、撤销、提交与学习 |
 | CandidatePanelController / adapters | 展示、开合、活跃组与点击回调 |
+
+确认过拼音后由 `phoneticSnapshot` 发布引擎词（0006 保留简拼分支）与 App 首段汉字，
+`PhoneticSelection` 依据记录的原码段核对剩余边界；左列字母行是同一份 groups 的
+`INITIAL_LETTER_SEGMENT` 行，点击回输入层确认/细化，PanelNavigation 本身仍只读。
+首段汉字 `INITIAL_CHAR_SEGMENT` 的跨度由 restCode 反推，只消费首段。
 
 新增来源必须进入 `mergeRows → collapsePrefixRows → tierAndSort → capRows`。
 源内仅允许本源查词与选行轮转，不允许再创建跨源合并点。RowSource 不进入 UI。
@@ -40,11 +52,15 @@ python3 tools/panel_probe.py --data app/src/main/assets/rime \
   > app/src/test/resources/panel-golden.json
 ```
 
+逐段确认的回归覆盖：`InitialDisambiguationTest`（确认/细化/撤销/首段汉字/引擎词+App字）、
+`NativeCompositionFlowTest`（真实引擎属性+重喂菜单+首段汉字消费 1 键）；
+PC 流程模拟器只验证底层单段属性探针，不镜像 Android 的字母行细化交互。
+
 ## 验收边界
 
 1. 语义改动先写文档并向用户确认；实现和脚本一起修改。
 2. selftest、PanelGoldenTest、排序与快照单测通过；真实语料重新生成并确认 RealCorpusTest 无跳过。
-   `CandidateSelectionTest` 覆盖原码跨度与同长度异码；`PanelNavigationTest` 覆盖切组和渲染不消费编码；
+   `CandidateSelectionTest` 覆盖原码跨度与同长度异码；`PanelNavigationTest` 仅覆盖只读导航模型，不能代替逐段拼音确认的交互验收；
    `NativeCompositionFlowTest` 在真实 PC 引擎上验证显示 comment 改变不影响扣码及跨界面撤销。
 3. 安装后确认实际 IME，检查真实词表加载、diag 的各源与最终行、部分选词及撤销行为。
 4. 性能门禁和首次开面板/连续输入验收通过，候选条开合前后不漂移。
@@ -66,3 +82,31 @@ python3 tools/panel_probe.py --data app/src/main/assets/rime coverage --max-keys
 
 这是有限穷举，不覆盖任意长度所有简拼，不代替设备快照、用户词库、Android UI 和性能门禁。
 修改 preedit/分组后仍须按 docs/16 重新拉设备并生成真实语料；无设备时应明确记录未验收项。
+
+底层单段过滤探针（不代表新版逐段确认交互）：`panel_probe.py panel 5i5i --initial l` 或 `json … --initial l`，
+匹配来源在配额之前约束首音节，不能从已截断的 UI 行中二次筛选。
+`InitialDisambiguationTest` 覆盖每个运行时音节的所有输入前缀、窗口外候选召回与交错撤销；
+`NativeCompositionFlowTest` 使用实际引擎验证原始全局下标选择及码串还原。
+
+`panel-initial-golden.json` 用同一脚本 API 生成 16 组首码受限快照（k/l/g/h）；
+PanelGoldenTest 比较各来源文字、行序及 merged，不能手改预期掩盖差异。
+
+单段过滤 golden 生成命令（不读取用户词库）：
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 - <<'PYGOLDEN'
+import json, sys
+from pathlib import Path
+sys.path.insert(0, "tools")
+from panel_probe import Data, build_json_payload
+data = Data("app/src/main/assets/rime")
+cases = {key: ["5", "55", "5i", "5i5i", "5i4a57"] for key in ("k", "l")}
+cases.update({key: ["i", "ia", "ia8"] for key in ("g", "h")})
+out = {}
+for initial, codes in cases.items():
+    data.initial = initial
+    out[initial] = build_json_payload(data, codes)
+Path("app/src/test/resources/panel-initial-golden.json").write_text(
+    json.dumps(out, ensure_ascii=False, indent=2) + "\n")
+PYGOLDEN
+```

@@ -40,6 +40,11 @@ class CandidatePanelController(
     /** 面板右下角的退格鍵（面板展開時鍵盤被蓋住，不收起面板也能刪）。 */
     var onBackspace: (() -> Unit)? = null
 
+    var onConfirmPhonetic: ((String, Boolean, String) -> Unit)? = null
+
+    /** 左列字母行：確認下一段首拼或細化最後一段（同一鍵的另一個字母）。 */
+    var onInitialLetter: ((String) -> Unit)? = null
+
     private val groupList = groupListView
     private var snapshot: TwelveKeySnapshot = TwelveKeySnapshot.EMPTY
     private val navigation = PanelNavigation()
@@ -78,7 +83,7 @@ class CandidatePanelController(
             hide()
             return
         }
-        val hasSomething = snapshot.hasCandidates || snapshot.fallback != null
+        val hasSomething = snapshot.hasCandidates || snapshot.fallback != null || snapshot.phonetics.isNotEmpty()
         if (!hasSomething) {
             onHideKeyboard?.invoke()
             return
@@ -115,18 +120,36 @@ class CandidatePanelController(
 
     /** 每次按鍵/上屏後由上層調用：整個面板只讀這一份快照。 */
     fun submit(next: TwelveKeySnapshot, preserveReading: Boolean = false) {
+        val advanced = next.phonetics != snapshot.phonetics
         navigation.submit(next, preserveReading)
         snapshot = next
-        if (!next.hasCandidates && next.fallback == null) {
+        if (!next.hasCandidates && next.fallback == null && next.phonetics.isEmpty()) {
             if (isShown) hide()
             return
         }
         if (!isShown) return
-        // 不 scroll：DiffUtil 原地更新，保持用戶當前滾動位置。
-        render(scrollGrid = false, scrollGroups = false)
+        // 右列內容變了就回頂；左列只在原碼真的變了才回頂，否則點底部字母會把字母行滾出視野。
+        render(scrollGrid = advanced, scrollGroups = next.input != snapshot.input)
     }
 
     private fun pickGroup(group: CandidateGroupAdapter.GroupItem) {
+        val target = navigation.groups.getOrNull(group.index) ?: return
+        if (!CandidateSelection.isCurrent(group.contextKey, snapshot.contextKey)) {
+            navigation.select(group.index, group.reading, group.contextKey)
+            return
+        }
+        // 字母行與音節組同一份左列，但語義不同：字母確認/細化首拼，不改右列分組。
+        if (target.segment == INITIAL_LETTER_SEGMENT) {
+            onInitialLetter?.invoke(target.reading)
+            return
+        }
+        if (snapshot.phoneticNavigation && target.segment > ISOLATED_SEGMENT &&
+            target.segment != RECOMMEND_SEGMENT && target.reading.isNotBlank() &&
+            com.hazukieq.hkrime.core.TwelveKeyPreedit.isKnownSyllable(target.reading) &&
+            PhoneticSelection.pending(snapshot.remaining, snapshot.phonetics).isNotEmpty()) {
+            onConfirmPhonetic?.invoke(target.reading, false, group.contextKey)
+            return
+        }
         if (!navigation.select(group.index, group.reading, group.contextKey)) return
         // 切組：只把右格滾到頂，左列保持當前滾動位置。
         render(scrollGrid = true, scrollGroups = false)
@@ -135,7 +158,11 @@ class CandidatePanelController(
     private fun render(scrollGrid: Boolean, scrollGroups: Boolean) {
         val groups = snapshot.groups
         if (groups.isEmpty()) {
-            val fallback = snapshot.fallback ?: return
+            val fallback = snapshot.fallback ?: run {
+                groupAdapter.clear()
+                gridAdapter.clear()
+                return
+            }
             groupAdapter.submit(
                 listOf(CandidateGroupAdapter.GroupItem(0, "〔${fallback.rawCode}〕…", true)),
             )
@@ -154,7 +181,9 @@ class CandidatePanelController(
                 CandidateGroupAdapter.GroupItem(
                     index = index,
                     reading = group.reading,
-                    selected = index == activeDisplay,
+                    selected = index == activeDisplay ||
+                        (group.segment == INITIAL_LETTER_SEGMENT &&
+                            group.reading.firstOrNull() == snapshot.initial),
                     count = group.items.size,
                     contextKey = snapshot.contextKey,
                 )
@@ -171,6 +200,7 @@ class CandidatePanelController(
                     restCode = it.restCode,
                     contextKey = snapshot.contextKey,
                     inputSpan = it.inputSpan,
+                    engineSpan = it.engineSpan,
                 )
             },
         )

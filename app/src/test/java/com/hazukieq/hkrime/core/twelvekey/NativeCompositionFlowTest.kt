@@ -59,7 +59,8 @@ class NativeCompositionFlowTest {
                         TwelveKeySnapshotBuilder.cleanCommentForSelection(parts.getOrNull(3)), parts[1].toInt()))
                     "M" -> {
                         val index = parts[1].toInt()
-                        next.candidates[index] = next.candidates[index].copy(engineSpan =
+                        val position = next.candidates.indexOfFirst { it.index == index }
+                        next.candidates[position] = next.candidates[position].copy(engineSpan =
                             EngineCandidateSpan(parts[2].toInt(), parts[3].toInt(), parts.getOrElse(4) { "" }))
                     }
                 }
@@ -69,8 +70,10 @@ class NativeCompositionFlowTest {
         private fun local() = TwelveKeySnapshotBuilder.Local(
             state.input, 0, state.input, state.segments.joinToString("|"), state.preedit,
         )
-        fun snapshot(full: Boolean = false): TwelveKeySnapshot = TwelveKeySnapshotBuilder.build(
-            local(), applyLearning = true, wantGroups = full, candidatesOverride = state.candidates,
+        fun snapshot(full: Boolean = false, learning: Boolean = true, appRankingEnabled: Boolean = true): TwelveKeySnapshot = TwelveKeySnapshotBuilder.build(
+            local(), maxCandidates = if (full) 600 else 64, applyLearning = learning, wantGroups = full,
+            candidatesOverride = state.candidates, initial = session.initial,
+            appRankingEnabled = appRankingEnabled, phonetics = session.phonetics,
         ).also { PreeditPresentation.publish(it, session.selectedText) }
         fun barWord(text: String): Pair<TwelveKeySnapshot, CandidateItem> {
             val native = state.candidates.take(64).firstOrNull { it.text == text }
@@ -107,7 +110,19 @@ class NativeCompositionFlowTest {
                 if (failWrite) false else { commits.add(final.text); true }
             }
         }
-        fun restore(code: String) { send("clear"); if (code.isNotEmpty()) send("type $code") }
+        fun restore(code: String) {
+            // 屬性在重建菜單前寫入（翻譯器建菜單時讀它決定是否保留簡拼分支）。
+            send("initial " + PhoneticSelection.constraint(session.phonetics))
+            send("clear"); if (code.isNotEmpty()) send("type $code")
+        }
+        fun confirmLetter(letter: Char) {
+            check(session.onInitialLetter(letter))
+            send("initial " + PhoneticSelection.constraint(session.phonetics))
+            send("clear")
+            if (session.remaining.isNotEmpty()) send("type " + session.remaining)
+            assertEquals(session.remaining, state.input)
+            assertTrue(state.commit.isEmpty())
+        }
         fun undo() { restore(session.undo() ?: error("no undo record")) }
         fun forcePrematureNativeCommit() {
             val expected = session.remaining
@@ -124,6 +139,73 @@ class NativeCompositionFlowTest {
             if (!process.waitFor(5, TimeUnit.SECONDS)) process.destroyForcibly()
             writer.close(); reader.close()
             ProcessBuilder("trash", work.absolutePath).start().waitFor()
+        }
+    }
+
+    @Test(timeout = 90000) fun engineModeCanBeSwitchedWithoutLosingPartialSelectionOrUndo() {
+        Driver().use { d ->
+            val original = "7i4aa4"
+            d.type(original)
+            repeat(9) { PhraseMemory.learnPick(original, "品班", "pin ban") }
+            repeat(9) { SelectionMemory.bump("肾", "sin") }
+            val native = d.state.candidates.toList()
+            val off = d.snapshot(appRankingEnabled = false)
+            val full = d.snapshot(true, appRankingEnabled = false)
+            assertEquals(native.take(12).map { it.index }, off.barItems.map { it.index })
+            assertEquals(off.barItems, full.barItems)
+            assertEquals(native.map { it.index }, full.recommend.map { it.index })
+            assertTrue(full.groups.flatMap { it.items }.all { it.index >= 0 })
+            d.confirmLetter('s')
+            assertTrue(d.state.candidates.isNotEmpty())
+            assertTrue(d.state.candidates.all { it.engineSpan!!.sourceComment.startsWith('s') })
+            val confirmedBar = d.snapshot(appRankingEnabled = false).barItems
+            assertTrue(confirmedBar.isNotEmpty())
+            assertTrue("確認後仍用引擎全局下標", confirmedBar.all { it.index >= 0 })
+            assertEquals(confirmedBar, d.snapshot(true, appRankingEnabled = false).barItems)
+            d.undo()
+            val restored = d.snapshot(true, appRankingEnabled = false)
+            val partial = restored.recommend.first { it.text == "肾" }
+            assertTrue(d.choose(restored to partial, CompositionSession.Origin.PANEL))
+            assertEquals("aa4", d.state.input)
+            assertEquals("肾", d.session.selectedText)
+            val picks = d.session.picks
+            d.snapshot(true)
+            d.snapshot(appRankingEnabled = false)
+            assertEquals(picks, d.session.picks)
+            assertEquals("aa4", d.session.remaining)
+            assertTrue(d.commits.isEmpty())
+            d.undo()
+            assertEquals(original, d.state.input)
+            val final = d.snapshot(appRankingEnabled = false)
+            assertTrue(d.choose(final to final.barItems.first(), CompositionSession.Origin.BAR))
+            assertEquals(listOf(native.first().text), d.commits)
+        }
+    }
+
+    @Test(timeout = 90000) fun matchingWordRemainsFirstDespiteLearningOfPartialCharacters() {
+        Driver().use { d ->
+            d.type("7i4aa4")
+            assertEquals("平板", d.state.candidates.first().text)
+            repeat(9) { SelectionMemory.bump("肾", "sin") }
+            val bar = d.snapshot()
+            val full = d.snapshot(true)
+            assertEquals("平板", bar.barItems.first().text)
+            assertEquals("平板", bar.previewText)
+            assertEquals(bar.barItems, full.barItems)
+            assertEquals("pin ban", PreeditPresentation.render(d.state.preedit, d.state.input))
+            val characters = bar.barItems.filter { it.text.length == 1 }
+            assertTrue("segment characters remain selectable", characters.isNotEmpty())
+            val character = characters.first { it.text == "肾" }
+            assertTrue(d.choose(bar to character, CompositionSession.Origin.BAR))
+            assertEquals("aa4", d.state.input)
+            assertTrue(d.commits.isEmpty())
+            d.undo()
+            assertEquals("7i4aa4", d.state.input)
+            val restored = d.snapshot()
+            assertEquals("平板", restored.barItems.first().text)
+            assertEquals("pin ban", PreeditPresentation.render(d.state.preedit, d.state.input))
+            assertTrue(d.choose(restored to restored.barItems.first(), CompositionSession.Origin.BAR))
+            assertEquals(listOf("平板"), d.commits)
         }
     }
 
@@ -153,6 +235,48 @@ class NativeCompositionFlowTest {
             }
             assertEquals(listOf(expected.toString()), d.commits)
             assertFalse(d.session.active)
+        }
+    }
+
+    @Test(timeout = 90000) fun letterConfirmUsesRealMenuAndFirstSegmentCharConsumesOnlyItsSpan() {
+        Driver().use { d ->
+            val original = "5i5i"
+            d.type(original)
+            val originalItems = d.state.candidates.toList()
+            d.confirmLetter('l')
+            assertTrue(d.state.candidates.isNotEmpty())
+            assertTrue(d.state.candidates.all { it.engineSpan!!.sourceComment.startsWith('l') })
+            assertEquals("5i5i", d.state.input)
+            assertTrue(d.commits.isEmpty())
+            val snap = d.snapshot(true)
+            val firstChar = snap.groups.flatMap { it.items }.first { it.segment == INITIAL_CHAR_SEGMENT }
+            assertEquals(1, firstChar.inputSpan?.end)
+            assertTrue(d.choose(snap to firstChar, CompositionSession.Origin.PANEL))
+            assertEquals("i5i", d.state.input)
+            assertEquals(emptyList<PhoneticSelection>(), d.session.phonetics)
+            assertTrue(d.commits.isEmpty())
+            d.undo()
+            assertEquals(original, d.state.input)
+            assertEquals('l', d.session.initial)
+            d.undo()
+            assertNull(d.session.initial)
+            assertEquals(originalItems, d.state.candidates)
+            assertTrue(d.commits.isEmpty())
+        }
+    }
+
+    @Test(timeout = 90000) fun actualFilteredNativeGlobalIndexSelectsTheDisplayedWordExactlyOnce() {
+        Driver().use { d ->
+            d.type("5i")
+            d.confirmLetter('l')
+            val snap = d.snapshot()
+            val selected = snap.barItems.first { it.index > 0 && it.engineSpan != null }
+            assertTrue(selected.engineSpan!!.sourceComment.startsWith('l'))
+            assertTrue(d.choose(snap to selected, CompositionSession.Origin.BAR))
+            assertEquals(listOf(selected.text), d.commits)
+            assertFalse(d.session.active)
+            d.writeCompleted()
+            assertEquals(1, d.commits.size)
         }
     }
 

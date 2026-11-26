@@ -171,6 +171,7 @@ class AppPrefs(
             const val SOFT_CURSOR_ENABLED = "keyboard__soft_cursor"
             const val FLOATING_WINDOW_ENABLED = "keyboard__show_window"
             const val FULLSCREEN_MODE = "keyboard__fullscreen_mode"
+            const val CANDIDATE_ALGORITHM_ENABLED = "keyboard__candidate_algorithm"
 
 
             const val SOUND_ENABLED = "keyboard__key_sound"
@@ -195,6 +196,8 @@ class AppPrefs(
         var inlinePreedit: InlineModeType
             get() = InlineModeType.fromString(prefs.getPref(INLINE_PREEDIT_MODE, "none"))
             set(v) = prefs.setPref(INLINE_PREEDIT_MODE, v)
+        val candidateAlgorithmEnabled: Boolean
+            get() = prefs.getPref(CANDIDATE_ALGORITHM_ENABLED, true)
         var fullscreenMode: LandscapeInputUIMode
             get() = LandscapeInputUIMode.fromString(prefs.getPref(FULLSCREEN_MODE, "auto_show"))
             set(v) = prefs.setPref(FULLSCREEN_MODE, v)

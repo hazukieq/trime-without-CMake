@@ -242,7 +242,7 @@ class BarItem:
     index: int
     segment: int = -1
     rest: str = ""
-    context: tuple[str, str] = ("", "")
+    context: tuple[str, str, str | None] = ("", "", None)
     span: CodeSpan | None = None
 
 
@@ -264,6 +264,8 @@ class EngineState:
     preedit: str = ""
     segs: list[Seg] = field(default_factory=list)
     cands: list[tuple[str, str]] = field(default_factory=list)
+    indices: list[int] = field(default_factory=list)
+    metadata: dict[int, tuple[int, int, str]] = field(default_factory=dict)
 
 
 class Engine:
@@ -312,6 +314,11 @@ class Engine:
                 parts = line.split("\t")
                 if len(parts) >= 4:
                     st.cands.append((parts[2], parts[3]))
+                    st.indices.append(int(parts[1]))
+            elif line.startswith("M\t"):
+                parts = line.split("\t", 4)
+                if len(parts) >= 4:
+                    st.metadata[int(parts[1])] = (int(parts[2]), int(parts[3]), parts[4] if len(parts) > 4 else "")
         raise RuntimeError(f"引擎在 END 前退出，returncode={self.proc.poll()}")
 
     def send(self, cmd: str) -> EngineState:
@@ -339,8 +346,9 @@ class Sim:
     """App 側狀態機：pendingPick / heldPicks / unconsumedCode / 上屏折疊。"""
 
     def __init__(self, engine: Engine, prefs_dir: str | None = None,
-                 apply_learning: bool = True):
+                 apply_learning: bool = True, engine_order: bool = False):
         self.engine = engine
+        self.engine_order = engine_order
         self.apply_learning = apply_learning
         self.phrase = PhraseMemory(prefs_dir) if apply_learning else PhraseMemory(None)
         self.sel = SelectionMemory(prefs_dir) if apply_learning else SelectionMemory(None)
@@ -358,6 +366,8 @@ class Sim:
         self.saved_item = None
         # (text, reading, before code, consumed code)，與生產日誌同樣逐次撤銷。
         self.held: list[tuple[str, str, str, str]] = []
+        self.initial: str | None = None
+        self.undo_actions: list[tuple[bool, str | None]] = []
         self._reset_from(self.state)
 
     # ---------- 引擎狀態同步 ----------
@@ -394,6 +404,8 @@ class Sim:
             self._restore(self.expected_code)
 
     def _restore(self, code: str) -> None:
+        self._reset_from(self.engine.send("initial " + (self.initial or "")))
+        data().initial = self.initial
         self._reset_from(self.engine.send("clear"))
         if code:
             self._reset_from(self.engine.send("type " + code))
@@ -413,15 +425,20 @@ class Sim:
                                    " ".join(p[1] for p in self.held))
         self.pending = ""
         self.held.clear()
+        self.undo_actions.clear()
+        self.initial = None
+        data().initial = None
+        self._reset_from(self.engine.send("initial"))
         self.ready = False
 
     # ---------- 候選條（引擎 + SelectionMemory + PhraseMemory） ----------
     def _engine_items(self) -> list[BarItem]:
-        return [BarItem(t, c, i) for i, (t, c) in enumerate(self.state.cands)]
+        return [BarItem(t, c, self.state.indices[i]) for i, (t, c) in enumerate(self.state.cands)]
 
     def _merge_learned(self, ranked: list[BarItem], code: str) -> list[BarItem]:
         now = int(time.time() * 1000)
-        phrases = self.phrase.candidates_for(code, now)
+        phrases = [e for e in self.phrase.candidates_for(code, now)
+                   if self.initial is None or e.readings.startswith(self.initial)]
         if not phrases:
             return ranked
         score_by_text = {e.text: self.phrase.score(e, now) for e in phrases}
@@ -441,8 +458,9 @@ class Sim:
 
     BAR_WINDOW = 64
     BAR_ITEMS = 12
+    FIRST_SEGMENT_CHARS = 4
 
-    def _ordered(self, flat: list[BarItem]) -> list[BarItem]:
+    def _ordered(self, flat: list[BarItem], deduplicate: bool = True) -> list[BarItem]:
         ranked = flat
         if self.apply_learning and self.sel.has_any():
             ranked = sorted(
@@ -450,6 +468,8 @@ class Sim:
                 key=lambda it: (-self.sel.score(it.text, it.comment), it.index),
             )
         ordered = self._merge_learned(ranked, self.state.input) if self.apply_learning else ranked
+        if not deduplicate:
+            return ordered
         seen: set[str] = set()
         out: list[BarItem] = []
         for it in ordered:
@@ -463,12 +483,18 @@ class Sim:
         from panel_probe import selected_input_end
 
         code = self.unconsumed()
-        cache: dict[tuple[str, int, str], CodeSpan | None] = {}
+        cache: dict[tuple[int, str, int, str], CodeSpan | None] = {}
         out: list[BarItem] = []
         for it in items:
-            key = (it.comment, it.segment, it.rest)
+            key = (it.index, it.comment, it.segment, it.rest)
             if key not in cache:
-                if it.segment == -5:
+                metadata = self.state.metadata.get(it.index) if it.index >= 0 else None
+                reading = it.comment
+                if metadata is not None:
+                    start, end, reading = metadata
+                    if start != 0 or not 1 <= end <= len(code):
+                        end = None
+                elif it.segment == -5:
                     end = next((i + 1 for i, ch in enumerate(code) if ch != "'" and not ch.isspace()), None)
                 elif it.segment == -4:
                     end = None  # 音節導航不授予選字消費權。
@@ -476,17 +502,56 @@ class Sim:
                     end = len(code) - len(it.rest) if code.endswith(it.rest) else None
                 else:
                     end = selected_input_end(data(), it.comment, code)
-                cache[key] = CodeSpan(code, end, it.comment) if end is not None and 1 <= end <= len(code) else None
-            out.append(replace(it, context=(self.state.input, self.state.preedit), span=cache[key]))
+                cache[key] = CodeSpan(code, end, reading) if end is not None and 1 <= end <= len(code) else None
+            out.append(replace(it, context=(self.state.input, self.state.preedit, self.initial), span=cache[key]))
         return out
 
     def bar_items(self) -> list[BarItem]:
         """App 候選條：永遠只取前 64 條引擎候選做學習排序+學習詞混排，展示 12 項。"""
         flat = self._engine_items()[: self.BAR_WINDOW]
-        items = self._ordered(flat)[: self.BAR_ITEMS]
+        if self.engine_order:
+            return self._bind_items(flat[: self.BAR_ITEMS])
+        ordered = self._bind_items(self._ordered(flat, deduplicate=False))
+        code = self.unconsumed()
+        complete = next((i for i, it in enumerate(ordered)
+                         if it.span is not None and it.span.code == code and it.span.end == len(code)), None)
+        if complete is not None and complete > 0:
+            ordered.insert(0, ordered.pop(complete))
+        seen: set[str] = set()
+        items = []
+        for it in ordered:
+            if it.text and it.text not in seen:
+                seen.add(it.text)
+                items.append(it)
+        items = items[: self.BAR_ITEMS]
+        if items and not any(len(it.text) == 1 for it in items):
+            dictionary = data()
+            code = self.unconsumed()
+            splits = ([(code, "")] if dictionary.is_single_syllable(code) else []) + dictionary.split_heads(code)
+            if splits and splits[0][1]:
+                from panel_probe import SEGMENT_SYLLABLE_LIMIT, SEGMENT_SYLLABLE_LIMIT_RICH, RICH_SYLLABLE_THRESHOLD
+                head, _ = splits[0]
+                quota = (SEGMENT_SYLLABLE_LIMIT_RICH if dictionary.syllable_count_for_code(head) >= RICH_SYLLABLE_THRESHOLD
+                         else SEGMENT_SYLLABLE_LIMIT)
+                syllables = dictionary.syllables_for_segment(head, quota, dictionary.is_single_syllable(head),
+                                                            False, initial=self.initial)
+                if not syllables:
+                    syllables = dictionary.syllables_for_segment(head, quota, False, False, initial=self.initial)
+                allowed = set(syllables[: self.FIRST_SEGMENT_CHARS])
+                seen.clear()
+                chars = []
+                for it in ordered:
+                    if len(it.text) == 1 and it.comment.strip().split(" ")[0] in allowed and it.text not in seen:
+                        seen.add(it.text)
+                        chars.append(it)
+                chars = chars[: self.FIRST_SEGMENT_CHARS]
+                if chars:
+                    items = items[: max(1, self.BAR_ITEMS - len(chars))] + chars
         return self._bind_items(items)
 
     def panel_items(self) -> list[BarItem]:
+        if self.engine_order:
+            return self._bind_items(self._engine_items())
         if self.drill:
             items = [BarItem(ch, self.drill, -1, -5) for ch in data().syllable_chars.get(self.drill, ())]
         else:
@@ -521,7 +586,7 @@ class Sim:
         return False
 
     def _pick_item(self, it: BarItem) -> None:
-        if it.context != (self.state.input, self.state.preedit) or not self.state.input:
+        if it.context != (self.state.input, self.state.preedit, self.initial) or not self.state.input:
             print("  ignored stale candidate")
             return
         if it.segment == -4:
@@ -536,6 +601,9 @@ class Sim:
         consumed = span.end
         while consumed < len(code) and (code[consumed] == "'" or code[consumed].isspace()):
             consumed += 1
+        self.undo_actions.append((True, self.initial))
+        self.initial = None
+        data().initial = None
         self.held.append((it.text, span.reading, code, code[:consumed]))
         self.pending += it.text
         self.expected_code = code[consumed:]
@@ -549,6 +617,20 @@ class Sim:
                 self._reset_from(self.engine.send(f"select {it.index}"))
             self._reset_from(self.engine.send("clear"))
             self._commit_completed()
+
+    def disambiguate(self, initial: str | None) -> None:
+        code = self.unconsumed()
+        choices = data().key_initial_letters(code[0], is_last=len(code) == 1) if code else []
+        if initial == self.initial:
+            return
+        if not code or (initial is not None and initial not in choices):
+            raise ValueError(f"invalid initial {initial!r} for {code!r}")
+        self.undo_actions.append((False, self.initial))
+        self.initial = initial
+        data().initial = initial
+        self._reset_from(self.engine.send("initial " + (initial or "")))
+        self.left_reading = ""
+        self.drill = ""
 
     # ---------- 面板 ----------
     def left(self, reading: str) -> None:
@@ -570,13 +652,16 @@ class Sim:
 
     # ---------- 退格 / 上屏 ----------
     def back(self) -> None:
-        if self.held:
-            _, _, before, _ = self.held.pop()
-            self.pending = "".join(p[0] for p in self.held)
-            self.expected_code = before
+        if self.undo_actions:
+            is_pick, self.initial = self.undo_actions.pop()
+            data().initial = self.initial
+            if is_pick:
+                _, _, before, _ = self.held.pop()
+                self.pending = "".join(p[0] for p in self.held)
+                self.expected_code = before
             self.ready = False
             self.drill = ""
-            self._restore(before)
+            self._restore(self.expected_code)
         else:
             self.expected_code = self.state.input[:-1]
             st = self.engine.send("key 65288")
@@ -592,6 +677,10 @@ class Sim:
             self._pick_item(first)
 
     def clear(self) -> None:
+        self.initial = None
+        data().initial = None
+        self.undo_actions.clear()
+        self._reset_from(self.engine.send("initial"))
         self._reset_from(self.engine.send("clear"))
         self.pending = ""
         self.held.clear()
@@ -656,6 +745,8 @@ class Sim:
             want = ""
         if key == "committed":
             got = self.committed
+        elif key == "initial":
+            got = self.initial or ""
         elif key == "pending":
             got = self.pending
         elif key == "input":
@@ -669,15 +760,23 @@ class Sim:
         elif key == "remaining":
             got = self.unconsumed()
         elif key == "panel_has":
-            rows = data().panel(self.unconsumed())
-            got = want if any(row["reading"] == want for row in rows) else "(missing)"
+            if self.engine_order:
+                got = want if any(it.comment.split(" ")[0] == want for it in self.panel_items()) else "(missing)"
+            else:
+                rows = data().panel(self.unconsumed())
+                got = want if any(row["reading"] == want for row in rows) else "(missing)"
         elif key == "no_isolated":
-            got = "1" if not data().isolated_syllables(self.unconsumed()) else "0"
+            got = "1" if self.engine_order or not data().isolated_syllables(self.unconsumed()) else "0"
         elif key == "composing":
             got = "1" if self.state.composing else "0"
         elif key in ("bar0", "bar_first"):
             items = self.bar_items()
             got = items[0].text if items else ""
+        elif key in ("bar_engine_order", "panel_engine_order"):
+            actual = self.bar_items() if key == "bar_engine_order" else self.panel_items()
+            expected = self._engine_items()[: self.BAR_ITEMS] if key == "bar_engine_order" else self._engine_items()
+            signature = lambda items: [(it.index, it.text, it.comment) for it in items]
+            got = "1" if signature(actual) == signature(expected) else "0"
         else:
             self.failures += 1
             print(f"  ASSERT FAILED: 未知斷言 {key}")
@@ -708,7 +807,12 @@ class Sim:
         elif cmd in ("pick", "sel"):
             self.pick(arg)
         elif cmd == "panel":
-            print("  面板字典行: " + ", ".join(row["reading"] for row in data().panel(self.unconsumed())))
+            if self.engine_order:
+                print("  引擎分组: " + ", ".join(dict.fromkeys(it.comment.split(" ")[0] for it in self.panel_items())))
+            else:
+                print("  面板字典行: " + ", ".join(row["reading"] for row in data().panel(self.unconsumed())))
+        elif cmd == "initial":
+            self.disambiguate(arg or None)
         elif cmd == "left":
             self.left(arg)
         elif cmd == "right":
@@ -766,7 +870,9 @@ def main() -> int:
     ap.add_argument("--prefs-dir", default=os.environ.get(
         "HKRIME_FLOW_PREFS", DEFAULT_PREFS))
     ap.add_argument("--no-learning", action="store_true",
-                    help="不載入 PhraseMemory/SelectionMemory（純引擎順序）")
+                    help="不載入 App 學習記憶；仍啟用完整匹配優先與單字補位")
+    ap.add_argument("--engine-order", action="store_true",
+                    help="僅使用引擎候選和原始順序，對應關閉候選算法排序")
     ap.add_argument("--pull-prefs", metavar="SERIAL",
                     help="先從裝置拉 twelvekey_phrases/selection.xml 到 --prefs-dir")
     ap.add_argument("--no-save", action="store_true",
@@ -805,7 +911,7 @@ def main() -> int:
         lines = [x for x in DEMO.splitlines()]
 
     engine = Engine(args.host_runner)
-    sim = Sim(engine, args.prefs_dir, not args.no_learning)
+    sim = Sim(engine, args.prefs_dir, not args.no_learning, args.engine_order)
     learn = "off" if args.no_learning else "on"
     print(f"== 資料源 {_DATA_DIR}；引擎就緒（host-test --script）；學習記憶 {learn}")
     if not args.no_learning:

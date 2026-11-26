@@ -587,13 +587,14 @@ object TwelveKeyPreedit {
         codes: String,
         maxReadings: Int = 4,
         perReading: Int = 6,
+        initial: Char? = null,
     ): List<Pair<String, List<String>>> {
         val prefix = codes.replace("'", "").replace(" ", "")
         val entries = wordCodeIndex
         if (prefix.isEmpty() || entries.isEmpty()) return emptyList()
         val rows = LinkedHashMap<String, LinkedHashSet<String>>()
         for (entry in entries) {
-            if (entry.tokens.size < 2) continue
+            if (entry.tokens.size < 2 || (initial != null && entry.tokens[0].firstOrNull() != initial)) continue
             // 整串前綴詞查詢要求第一音節完整編碼已包含在輸入中。
             val firstCode = codeOf(entry.tokens[0])
             if (firstCode.isEmpty() || !prefix.startsWith(firstCode)) continue
@@ -789,12 +790,13 @@ object TwelveKeyPreedit {
      * `5i4a57` 6 鍵恰好 64 組仍生成，7 鍵以上通常超限 → 整組不生成。
      * 任一鍵沒有任何可用首字母（純元音鍵、`0` 等）也整組不生成。
      */
-    internal fun initialCombos(codes: String): List<List<Char>> {
+    internal fun initialCombos(codes: String, initial: Char? = null): List<List<Char>> {
         val clean = codes.replace("'", "")
         if (clean.isEmpty()) return emptyList()
         var combos: List<List<Char>> = listOf(emptyList())
         for ((index, ch) in clean.withIndex()) {
             val letters = keyInitialLetters(ch, isLast = index == clean.lastIndex)
+                .filter { index != 0 || initial == null || it == initial }
             if (letters.isEmpty()) return emptyList()
             combos = combos.flatMap { prefix -> letters.map { prefix + it } }
             if (combos.size > TwelveKeyTuning.INITIAL_COMBO_PATTERN_LIMIT) return emptyList()
@@ -812,7 +814,7 @@ object TwelveKeyPreedit {
      * 前段各鍵提供一個音節首字母，最後碼段必須是完整音節。
      * 枚舉各切法，完整性由 isSingleSyllable / exact 音節集合判定。
      */
-    internal fun initialHybridPatterns(codes: String): List<InitialPattern> {
+    internal fun initialHybridPatterns(codes: String, initial: Char? = null): List<InitialPattern> {
         val clean = codes.replace("'", "")
         if (clean.length < 2) return emptyList()
         val out = ArrayList<InitialPattern>()
@@ -823,6 +825,7 @@ object TwelveKeyPreedit {
             var ok = true
             for (i in 0 until k) {
                 val letters = keyInitialLetters(clean[i], isLast = false)
+                    .filter { i != 0 || initial == null || it == initial }
                 if (letters.isEmpty()) { ok = false; break }
                 prefixes = prefixes.flatMap { p -> letters.map { p + it } }
                 if (prefixes.size > TwelveKeyTuning.INITIAL_COMBO_PATTERN_LIMIT) { ok = false; break }
@@ -849,9 +852,9 @@ object TwelveKeyPreedit {
      * 若把它們排滿 [TwelveKeyTuning.INITIAL_COMBO_MAX_ROWS] 行，簡拼+完整音節（如 `b|cam`）
      * 就永遠輪不到，學習詞/長音節聯想會被吞掉。
      */
-    internal fun initialPatterns(codes: String): List<InitialPattern> {
-        val pure = initialCombos(codes).map { InitialPattern(it) }
-        val hybrids = initialHybridPatterns(codes)
+    internal fun initialPatterns(codes: String, initial: Char? = null): List<InitialPattern> {
+        val pure = initialCombos(codes, initial).map { InitialPattern(it) }
+        val hybrids = initialHybridPatterns(codes, initial)
         val all = ArrayList<InitialPattern>(pure.size + hybrids.size)
         val max = maxOf(pure.size, hybrids.size)
         for (i in 0 until max) {
@@ -1051,10 +1054,12 @@ object TwelveKeyPreedit {
         exactOnly: Boolean = false,
         totalLimit: Int = MAX_SYLLABLES_TOTAL,
         allowSuffixOnly: Boolean = false,
+        initial: Char? = null,
     ): List<String> {
         if (code.isEmpty()) return emptyList()
         // 後綴音節（`r`）只在「這一段就是輸入的結尾」時才允許；見 [SUFFIX_ONLY_SYLLABLES]。
-        fun allowed(e: Entry): Boolean = allowSuffixOnly || !isSuffixOnlySyllable(e.syllable)
+        fun allowed(e: Entry): Boolean = (allowSuffixOnly || !isSuffixOnlySyllable(e.syllable)) &&
+            (initial == null || e.syllable.firstOrNull() == initial)
         val exact = ArrayList<Entry>()
         // 前綴命中記住「code 之後的下一個碼位」：分桶時用它，`w`（th 鍵）才能同時給出
         // than（下一個 a）與 the（下一個 e）；只按音節首字母分桶時 th* 全是 t、the 系列會擠掉 than。
@@ -1349,79 +1354,53 @@ object TwelveKeyPreedit {
         val codes = clean.substring(split)
         // 去掉 librime 的分段分隔符（`5i34i wa4`、`5i34i'w`）：那些不是用戶按下的鍵。
         val cleanCodes = codes.replace(CODE_SEPARATORS, "")
-        // 本地解碼：逐段 decode，半截碼（只剩聲母，如 `w`=th）翻成鍵盤字母。
-        // 它的音節數 = 這串碼「能讀出幾節」，用來判斷「首條候選的讀音夠不夠長」。
-        val own = decodeWithPartialTail(codes, hint)
-            ?.split(' ')?.filter { it.isNotEmpty() }
-            ?.map { if (it.all { ch -> ch in CODE_LETTERS }) codeLetters(it) else it }
-            ?.takeIf { it.isNotEmpty() }
         val engine = parseComment(preferred)
-        // 本地 spans 僅用於計算碼位覆蓋；顯示優先使用首選 comment。
-        // comment 逐節覆蓋輸入碼，失配時使用跨度或碼長兜底，未覆蓋尾碼原樣保留。
-        val commentCodeLen = engine?.sumOf { syl ->
-            runCatching { codeOf(syl).length }.getOrDefault(0)
-        } ?: 0
-        // 優先按 comment 音節逐節匹配輸入前綴；簡拼只消耗對應首碼。
-        // 第一節失配時回退碼長之和，未覆蓋尾碼保持原始字元。
-        val coverage = resolveCovered(cleanCodes, engine)
-        val consumed = when {
-            engine == null -> cleanCodes.length
-            coverage != null -> coverage.first.coerceIn(0, cleanCodes.length)
-            commentCodeLen in 1..cleanCodes.length -> commentCodeLen
-            else -> cleanCodes.length
+        if (engine != null) {
+            val coverage = resolveCovered(cleanCodes, engine)
+            if (coverage != null) {
+                val tail = cleanCodes.substring(coverage.first)
+                return prefix + (coverage.second + listOfNotNull(tail.takeIf { it.isNotEmpty() })).joinToString(" ")
+            }
+            return prefix + cleanCodes
         }
-        val rawTail = if (consumed in 1 until cleanCodes.length) {
-            cleanCodes.substring(consumed)
-        } else {
-            ""
-        }
-        val shownBase = coverage?.second ?: engine
-        val shown = when {
-            engine == null -> own
-            shownBase == null -> own
-            rawTail.isEmpty() -> shownBase
-            else -> shownBase + rawTail
-        } ?: return null
-        return prefix + shown.joinToString(" ")
+        return decodeWithPartialTail(codes, hint)?.split(' ')?.joinToString(" ") {
+            if (it.isNotEmpty() && it.all { ch -> ch in CODE_LETTERS }) codeLetters(it) else it
+        }?.let { prefix + it }
     }
 
-    /**
-     * 依次計算 comment 音節覆蓋的輸入碼位與顯示讀音。
-     * 完整碼匹配時整節消耗；合法別名按本地完整音節消耗；簡拼消耗一碼。
-     * 第一節無法匹配時返回 null，由調用方採用長度兜底。
-     */
+    /** 對齊已輸入碼位；簡拼和半截拼音只展示已匹配部分，未輸入的音節不補全。 */
     private fun resolveCovered(codes: String, engine: List<String>?): Pair<Int, List<String>>? {
         if (engine.isNullOrEmpty() || codes.isEmpty()) return null
-        var pos = 0
-        val shown = ArrayList<String>(engine.size)
-        for ((index, syllable) in engine.withIndex()) {
-            if (pos >= codes.length) {
-                // 簡拼：comment 的後半段是引擎按 abbrev 補出來的（一個鍵對多個音節），
-                // 沒有對應輸入碼可吃；整段照抄，不能把 comment 截短。
-                shown.addAll(engine.subList(index, engine.size))
-                break
+        data class Match(val end: Int, val shown: List<String>, val complete: Int)
+        val memo = HashMap<Pair<Int, Int>, Match>()
+        fun align(index: Int, pos: Int): Match {
+            if (index >= engine.size || pos >= codes.length) return Match(pos, emptyList(), 0)
+            return memo.getOrPut(index to pos) {
+                val syllable = engine[index]
+                val full = codeOf(syllable)
+                val letters = Regex("^(ng|th|nz)|.").findAll(syllable).map { it.value }.toList()
+                var best = Match(pos, emptyList(), 0)
+                fun consider(length: Int, text: String, complete: Boolean) {
+                    val next = align(index + 1, pos + length)
+                    val result = Match(next.end, listOf(text) + next.shown, next.complete + if (complete) 1 else 0)
+                    if (compareValuesBy(result, best, { it.end }, { it.shown.size }, { it.complete }) > 0) best = result
+                }
+                if (letters.size == full.length) {
+                    var length = 0
+                    while (length < full.length && pos + length < codes.length && codes[pos + length] == full[length]) {
+                        length++
+                        consider(length, letters.take(length).joinToString(""), length == full.length)
+                    }
+                }
+                val alias = decodeSpans(codes.substring(pos))?.firstOrNull()
+                if (alias != null && alias.first.length > 1 && isSpellingAlias(syllable, alias.second)) {
+                    consider(alias.first.length, alias.second, true)
+                }
+                best
             }
-            val full = runCatching { codeOf(syllable) }.getOrNull().orEmpty()
-            if (full.isNotEmpty() && codes.startsWith(full, pos)) {
-                shown += syllable
-                pos += full.length
-                continue
-            }
-            val span = decodeSpans(codes.substring(pos))?.firstOrNull()
-            if (span != null && span.first.length > 1 &&
-                isSpellingAlias(syllable, span.second)
-            ) {
-                // 顯示仍用 comment（所見即所讀），但按輸入碼整節消耗，不把尾巴留成 `3`。
-                shown += syllable
-                pos += span.first.length
-            } else {
-                shown += syllable
-                pos += 1
-            }
-            if (pos > codes.length) return codes.length to shown
         }
-        if (pos == 0) return null
-        return pos.coerceAtMost(codes.length) to shown
+        val matched = align(0, 0)
+        return matched.takeIf { it.end > 0 }?.let { it.end to it.shown }
     }
 
     /** 單測用：comment 覆蓋的碼位長度（走真正的 [resolveCovered] 規則）。 */

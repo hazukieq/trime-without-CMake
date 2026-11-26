@@ -27,7 +27,7 @@
             android:orientation="horizontal"
             android:visibility="gone">
 
-            <!-- 左側：拼音音節組（自切音節，僅顯示/導航），高度貫通到底 -->
+            <!-- 左側：拼音音節組 + 字母行（同一份列表，字母在底部） -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/candidate_group_list"
                 android:layout_width="88dp"

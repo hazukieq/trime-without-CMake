@@ -216,7 +216,7 @@ internal data class PanelDisplayGroup(
  * 而是並進第一個音節（`man`）的組；孤立音節行（`d`/`f`）與推薦組不受影響。
  * 只改展示，不改快照分組、點擊語義與推薦來源。
  */
-internal fun foldGroupsForDisplay(groups: List<SyllableGroup>): List<PanelDisplayGroup> {
+internal fun foldGroupsForDisplay(groups: List<SyllableGroup>, engineOrderOnly: Boolean = false): List<PanelDisplayGroup> {
     val order = LinkedHashMap<String, MutableList<CandidateItem>>()
     val segments = HashMap<String, Int>()
     groups.forEach { group ->
@@ -230,6 +230,9 @@ internal fun foldGroupsForDisplay(groups: List<SyllableGroup>): List<PanelDispla
         bucket.addAll(group.items)
     }
     return order.map { (reading, items) ->
+        if (engineOrderOnly) return@map PanelDisplayGroup(
+            reading, items.sortedBy { it.index }, segments[reading] ?: -1,
+        )
         val seen = HashSet<String>()
         val unique = items.filter { seen.add(it.text) }
         // 單字在前、折進來的詞在後：三音節碼時第一音節組會併入上百個詞行，

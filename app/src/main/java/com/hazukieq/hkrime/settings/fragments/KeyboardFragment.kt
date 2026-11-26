@@ -45,6 +45,9 @@ class KeyboardFragment :
         val prefs = AppPrefs.defaultInstance()
         prefs.sync()
         when (key) {
+            AppPrefs.Keyboard.CANDIDATE_ALGORITHM_ENABLED -> {
+                trime?.textInputManager?.onCandidateAlgorithmChanged()
+            }
             "keyboard__key_long_press_timeout",
             "keyboard__key_repeat_interval" -> {
                 trime?.resetKeyboard()

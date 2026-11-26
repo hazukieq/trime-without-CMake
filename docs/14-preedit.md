@@ -5,6 +5,8 @@
 统一入口为 `PreeditPresentation`：`publish` 绑定当前快照，`render`/`preview` 以实际输入码、
 原始 preedit、候选 comment 与本地解码结果计算显示，`TwelveKeyPreedit` 只负责解码与改写。
 候选条首选、快照预览和待选拼音要保持同源。
+关闭“候选算法排序”后，同源首选直接取引擎第一个候选；不应用 App 学习重排、完整匹配置顶或单字补位。
+切换设置只更新候选显示，不消费原码、不提交、不丢失已选前缀或撤销记录。
 已选文字（`CompositionSession.selectedText`）与引擎已选前缀只能各带一次，不能把光标标记当成已选文字。
 
 十二键待选内容仅在输入法自己的 preedit 中显示，不调用宿主的 `setComposingText`，
@@ -13,9 +15,21 @@
 悬浮 preedit 在 Android 6+ 使用屏幕绝对坐标，与候选条的 `getLocationOnScreen` 一致，
 不再手工扣状态栏高度，避免刘海 inset 使窗口盖住候选条。
 
-候选读音可能使用别名拼写。`canonicalSpelling` 规范化 w/u、入声尾与鼻音尾等别名；
-覆盖长度按本地解码的整节输入消耗。对不同音节不能套用别名规则。
-半截尾码保持原始输入，不用猜出的拼音掩盖未完成按键。
+preedit 按首候选的原始读音逐码位具体化已输入内容，不补齐没有输入的拼音。
+例如首候选读音为 `sin ki`：输入 `7i45` 显示 `sin k`，输入 `7i45i` 才显示 `sin ki`。
+完整音节、简拼及最后一节前缀均须实际匹配原码；失配部分保留原码，不按读音长度猜覆盖范围。
+`ng/th/nz` 各占一个键位，显示时保留完整声母。合法别名按实际输入拼写显示。
+表情说明不是读音，使用候选的原始读音元数据；所有显示匹配均不参与消费码位。
+开启“候选算法排序”时，候选条首位优先取实际跨度覆盖全部剩余原码的候选，匹配候选内部仍按引擎/学习混排顺序。
+仅覆盖首段的候选不能因学习记录抢占完整匹配的首位；其余项保序，不按文字长度或音节数分区。
+第一段单字兜底仅在条尾补位，不能替换此首选。
+如 `7i4aa4` 首选「平板」时显示 `pin ban`，不能因单字补位变成 `sin aa4`。
+
+左栏确认首拼或音节会推进待确认码位，preedit 显示已确认拼音与后续未确认拼音，
+例如 `l'h'…`；待确认段的末尾按首候选读音具体化（`k'c`），不补未输入的字母。
+细化首拼（`b ↔ c`）只改已确认段读音，不改变原码与 preedit 的码位。
+这一步尚未选字，不获得提交许可；完整原码仍用于候选跨度验证。
+DEL 按操作顺序撤销最近一次拼音确认/细化或选字，并恢复当时的确认序列与原码。
 
 ## 剩余输入
 
@@ -72,6 +86,8 @@ python3 tools/preedit_flow.py --exec "type 5a4i5i; left lang; right 冷; left ki
 python3 tools/preedit_flow.py --scenario tools/flow-scenarios/lang-ki.flow
 python3 tools/preedit_flow.py --scenario tools/flow-scenarios/lingji-partial.flow
 python3 tools/preedit_flow.py --scenario tools/flow-scenarios/backspace-reselect.flow
+python3 tools/preedit_flow.py --no-learning --no-save --scenario tools/flow-scenarios/preedit-first-word.flow
+python3 tools/preedit_flow.py --engine-order --no-save --scenario tools/flow-scenarios/engine-order.flow
 python3 tools/preedit_flow.py --prefs-dir tools/flow-scenarios/prefs-demo \
     --scenario tools/flow-scenarios/learned-word.flow
 python3 tools/preedit_flow.py --prefs-dir tools/flow-scenarios/prefs-selection \
@@ -80,10 +96,12 @@ python3 tools/preedit_flow.py --scenario tools/flow-scenarios/userdb-learned.flo
 ```
 
 命令：`type <码>`、`bar <n>`、`pick <文字>`、`left <音節>`、`right <文字>`、
-`back`/`del`、`commit`、`clear`、`state`、
+`initial k` / `initial l` / `initial`（解除）、`back`/`del`、`commit`、`clear`、`state`、
 `panel`、`assert committed|pending|input|remaining|composing|bar_first <值>`、
 `assert panel_has <音节>`、`assert no_isolated 1`；`bar` 无参数时打印当前候选条。
 `left` 只切换展示组，不选字、不改选择记录；`right` 才选择该组的字词。
+PC 工具的 `initial` 是底层单段过滤探针；Android 的逐段拼音确认尚未镜像到此模拟器，
+不能用该命令验证新版首拼推进和撤销交互。
 
 学习记忆（与 Kotlin 同口径）：
 
@@ -96,7 +114,8 @@ python3 tools/preedit_flow.py --scenario tools/flow-scenarios/userdb-learned.flo
   `tools/flow-data/`，已 gitignore），作为本地模擬的初始记忆。
 - 学习写入默认落盘：每次运行结束把 PhraseMemory/SelectionMemory 写回 `--prefs-dir`，
   下一次模拟直接续用（不需要灌回装置）；`--no-save` 关闭。
-- `--no-learning`：完全按引擎顺序（对照用）。
+- `--no-learning`：不加载 App 学习记忆，仍使用完整匹配首位优先与单字补位。
+- `--engine-order`：对应关闭“候选算法排序”，候选条和面板仅使用原始引擎候选，保留顺序与重复项。
 
 候选条与面板窗口：`bar`/`pick` 只在前 64 条引擎候选中做学习排序与学习词混排、展示 12 项；
 `left`/`right` 合并 App 字典行与全量引擎候选（host-test 最多印 600 条），对应展开面板路径。

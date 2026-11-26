@@ -1,0 +1,25 @@
+type 7i4aa4
+assert bar_first 平板
+assert bar_engine_order 1
+assert panel_engine_order 1
+assert commit_count 0
+left sin
+right 肾
+assert pending 肾
+assert remaining aa4
+assert commit_count 0
+back
+assert input 7i4aa4
+assert pending ""
+assert bar_engine_order 1
+initial s
+assert initial s
+assert bar_engine_order 1
+assert panel_engine_order 1
+assert no_isolated 1
+back
+assert initial ""
+assert input 7i4aa4
+pick 平板
+assert committed 平板
+assert commit_count 1

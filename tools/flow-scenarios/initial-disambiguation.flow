@@ -1,0 +1,37 @@
+# 首码消歧保留尾码，和选字按操作顺序撤销。
+type 5i5i
+initial l
+assert initial l
+assert remaining 5i5i
+assert held 0
+assert committed ""
+left li
+right 里
+assert remaining 5i
+assert pending 里
+assert initial ""
+assert commit_count 0
+back
+assert remaining 5i5i
+assert initial l
+assert pending ""
+initial k
+assert initial k
+assert remaining 5i5i
+back
+assert initial l
+initial
+assert initial ""
+back
+assert initial l
+back
+assert initial ""
+assert remaining 5i5i
+clear
+type 5i
+initial l
+pick 里
+assert committed 里
+assert remaining ""
+assert commit_count 1
+assert held 0

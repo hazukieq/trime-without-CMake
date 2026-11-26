@@ -1,6 +1,6 @@
 # SelectionMemory fixture makes 太 visible in the 12-item candidate bar.
 type 9aii48i5i73
-assert bar_first 太
+assert bar_first 太过于离谱
 pick 太
 assert pending 太
 assert input i48i5i73

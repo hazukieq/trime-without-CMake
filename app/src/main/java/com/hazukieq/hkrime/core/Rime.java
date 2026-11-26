@@ -949,8 +949,8 @@ public class Rime {
   }
 
   /**
-   * 使用 packed native 返回 text/comment/start/end/sourceComment，保留全局候選下標。
-   * 兼容舊庫 text/comment 兩字段記錄。
+   * 使用 packed native 返回 text/comment/start/end/sourceComment/index，保留篩選前全局下標。
+   * 兼容舊庫兩字段與五字段記錄。
    * packed 符號不可用時回退逐項枚舉。
    */
   public static List<String[]> candidatesSnapshot(int maxCount) {

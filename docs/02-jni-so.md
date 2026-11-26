@@ -7,8 +7,8 @@
 | App 库 | `app/libs/arm64-v8a/librime_jni.so` |
 | 构建入口 | `../rime-jni/script/build.sh`，默认 Release |
 | 引擎 | librime 1.17.0，Lua/charcode/octagram 合并插件 |
-| 大小 | 6,422,288 字节 |
-| SHA-256 | `ba170db07e751582ff017a4dd2bde1fdb915720640d81b63735b498070241817` |
+| 大小 | 6,425,848 字节 |
+| SHA-256 | `67b143a93c5fe06600e16a1503f511c98a9e9adaab58a202607715ca01cd4934` |
 | JNI 契约 | 源码声明 77，导出 77，缺失/额外/`Java_com_osfans_trime_` 残留均为 0 |
 | ELF LOAD 对齐 | 当前三个 LOAD 段均为 `0x1000`（4 KB） |
 
@@ -22,8 +22,12 @@ JNI 胶水在 `../rime-jni/glue/`，`rime_api_compat.h` 将全局包装函数转
 `rime_compat.cc` 提供 composition segments 兼容实现。
 
 `candidatesSnapshot` 优先使用 packed 枚举，每项以 `\u0002` 结束，字段以 `\u0001` 分隔：
-`text / comment / start / end / sourceComment`。start/end 是引擎候选在原始输入中的真实范围，
+`text / comment / start / end / sourceComment / index`。start/end 是引擎候选在原始输入中的真实范围，
 sourceComment 来自穿透 Shadow/Uniquified 包装后的候选，用于读音与学习；显示 comment 独立保留。
+index 是筛选前 menu 的全局下标；`hkrime_initial` 属性保存已确认拼音序列：`~l ~h =man` 中 `~` 按首拼匹配、`=` 按完整音节匹配；
+单字母值兼容底层单段探针；非空属性同时让 librime 保留简拼分支（0006），因此它既是过滤器
+也是「确认态」开关。先匹配再截取窗口，
+仍按原 menu 下标选择；部分选字可以覆盖确认序列的前几段，App 再校验原码边界。空属性解除约束。两字段、五字段记录继续兼容。
 旧库的两字段记录仍可解析；没有元数据时只允许原有的可证明读音边界，不把未知说明当成全码选择。
 该协议增加字段但不增加 JNI 符号。packed 符号不可用时回退逐条接口。
 调用方必须持引擎锁。debug 枚举信息入口不能视为词典级诊断探针。

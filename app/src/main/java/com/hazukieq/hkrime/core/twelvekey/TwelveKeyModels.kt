@@ -34,6 +34,22 @@ const val ISOLATED_CHAR_SEGMENT = -5
 /** 孤單聯想鑽取層的「返回」項 [CandidateItem.segment] 標記。 */
 const val ISOLATED_BACK_SEGMENT = -6
 
+/**
+ * 展開面板左列「字母行」的 [SyllableGroup.segment] 標記。
+ *
+ * 已確認拼音序列後，待確認/可切換的原碼鍵列出其合法首拼（`b`/`c`）；它與音節組同一份左列，
+ * 只承擔「細化/確認聲母」，右列內容不動。
+ */
+const val INITIAL_LETTER_SEGMENT = -7
+
+/**
+ * 「首段漢字」[CandidateItem.segment] 標記。
+ *
+ * 已確認段是簡拼時，首段可選字來自 App 音節→字表（引擎菜單沒有只覆蓋首段的單字）；
+ * 跨度由 restCode 證實（`code.length - restCode.length`），只消費首段。
+ */
+const val INITIAL_CHAR_SEGMENT = -8
+
 data class CandidateItem(
     val text: String,
     val comment: String,
@@ -111,6 +127,11 @@ data class TwelveKeySnapshot(
     val inlineText: String = "",
     val contextKey: String = "",
     val rawPreedit: String = "",
+    val initialChoices: List<Char> = emptyList(),
+    val initial: Char? = null,
+    val engineOrderOnly: Boolean = false,
+    val phonetics: List<PhoneticSelection> = emptyList(),
+    val phoneticNavigation: Boolean = false,
 ) {
     val isEmpty: Boolean get() = input.isEmpty()
     /**

@@ -1,0 +1,15 @@
+type 7i4aa4
+assert bar_first 平板
+assert input 7i4aa4
+assert commit_count 0
+pick 成
+assert pending 成
+assert remaining aa4
+assert commit_count 0
+back
+assert pending ""
+assert input 7i4aa4
+assert bar_first 平板
+pick 平板
+assert committed 平板
+assert commit_count 1

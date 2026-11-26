@@ -23,6 +23,20 @@ class TwelveKeyController(
     var snapshot: TwelveKeySnapshot = TwelveKeySnapshot.EMPTY
         private set
 
+    @Volatile var appRankingEnabled: Boolean = true
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidateForOptions()
+        }
+
+    @Volatile var phonetics: List<PhoneticSelection> = emptyList()
+        set(value) {
+            if (field == value) return
+            field = value.toList()
+            invalidateForEngine()
+        }
+
     /**
      * 「按段選字」剛上屏的前一個字：分詞輸入時，下一段候選條要按與它的關聯度排序
      * （例如打完「區」，下一段「域」排最前）。由 TextInputManager 在選字後設置/清空。
@@ -84,6 +98,7 @@ class TwelveKeyController(
      * [immediate] 用於「點候選/開面板」這類需要盡快更新的場景（仍不阻塞 UI 線程）。
      */
     fun refresh(immediate: Boolean = false, full: Boolean = false) {
+        val rankingEnabled = appRankingEnabled
         val gen = ++generation
         refreshJob?.cancel()
         // 直接派到 Default：避免「先排到 Main 佇列、再 withContext(Default)」多一次主線程來回，
@@ -93,6 +108,12 @@ class TwelveKeyController(
             val result = run {
                 synchronized(ENGINE_LOCK) {
                     runCatching {
+                        val confirmed = phonetics
+                        // 已確認段（含簡拼首段）是引擎過濾與「保留簡拼分支」的唯一依據。
+                        val constraint = PhoneticSelection.constraint(confirmed)
+                        if (Rime.getProperty(InitialDisambiguation.PROPERTY).orEmpty() != constraint) {
+                            Rime.setProperty(InitialDisambiguation.PROPERTY, constraint)
+                        }
                         val local = TwelveKeySnapshotBuilder.local()
                         if (local.isEmpty) {
                             Triple(local, TwelveKeySnapshot.EMPTY, false)
@@ -102,7 +123,8 @@ class TwelveKeyController(
                                 full,
                                 segmentAnchor,
                                 segmentMode,
-                            ) + "|o" + optionsVersion + "|e" + engineVersion +
+                                rankingEnabled,
+                            ) + "|h" + constraint + "|o" + optionsVersion + "|e" + engineVersion +
                                 "|a" + TwelveKeyPreedit.assocGeneration
                             val cached = cacheLookup(key) { it }
                             val t0 = System.nanoTime()
@@ -112,6 +134,9 @@ class TwelveKeyController(
                                 segmentAnchor = segmentAnchor,
                                 segmented = segmentMode,
                                 wantGroups = full,
+                                initial = null,
+                                appRankingEnabled = rankingEnabled,
+                                phonetics = confirmed,
                             )
                             // 性能排查用：INFO 级别，真機 logcat 可直接統計每鍵快照耗時
                             Timber.i(
@@ -133,7 +158,7 @@ class TwelveKeyController(
             withContext(Dispatchers.Main.immediate) {
                 if (gen != generation) return@withContext
                 // 面板（全量 600）打開時，候選條前 12 條必須和限流快照一致，否則會「跳」。
-                if (full && built.barEntries.isNotEmpty()) {
+                if (full && built.barEntries.isNotEmpty() && snapshot.contextKey == contextKey(local)) {
                     val prev = snapshot.barEntries.take(12).map { it.text }
                     val now = built.barEntries.take(12).map { it.text }
                     if (prev != now) {

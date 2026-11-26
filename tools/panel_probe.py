@@ -99,6 +99,7 @@ class Data:
 
     def __init__(self, data_dir: str):
         self.dir = data_dir
+        self.initial: str | None = None
         self.syllable_freq: dict[str, int] = {}
         self.syllable_chars: dict[str, list[str]] = defaultdict(list)
         self.code_to_syllables: dict[str, list[str]] = defaultdict(list)
@@ -410,13 +411,14 @@ class Data:
         exact_only: bool = False,
         allow_suffix_only: bool = False,
         total_limit: int = MAX_SYLLABLES_TOTAL,
+        initial: str | None = None,
     ) -> list[str]:
         """首段音節按 exact/前綴規則產生，r 僅允許沒有剩餘碼的末段。"""
         if not code:
             return []
 
         def allowed(syl: str) -> bool:
-            return allow_suffix_only or syl not in SUFFIX_ONLY_SYLLABLES
+            return (allow_suffix_only or syl not in SUFFIX_ONLY_SYLLABLES) and (initial is None or syl.startswith(initial))
 
         exact: list[str] = []
         prefix: list[tuple[str, str]] = []
@@ -498,9 +500,9 @@ class Data:
             quota = base if index == 0 else base // SECONDARY_SPLIT_DIVISOR
             head_complete = self.is_single_syllable(head)
             allow_suffix_only = not rest
-            syllables = self.syllables_for_segment(head, quota, head_complete, allow_suffix_only)
+            syllables = self.syllables_for_segment(head, quota, head_complete, allow_suffix_only, initial=self.initial)
             if not syllables:
-                syllables = self.syllables_for_segment(head, quota, False, allow_suffix_only)
+                syllables = self.syllables_for_segment(head, quota, False, allow_suffix_only, initial=self.initial)
             source = "exact" if head_complete else "prefix"
             # 這一行來自哪個切法（json 子命令的六源劃分用）：
             # synth = 整串碼本身就是一個完整音節（split 0、rest 空）；其餘切法的單字組 = split。
@@ -533,7 +535,7 @@ class Data:
                     # 否則 `vu zet t`（338e99）會丟掉 `vu zet` 這一行（含 武则天）。
                     assoc_first = (
                         self.syllables_for_segment(
-                            head, huge, True, allow_suffix_only, total_limit=huge
+                            head, huge, True, allow_suffix_only, total_limit=huge, initial=self.initial
                         )
                         if self.is_single_syllable(head)
                         else self.syllables_by_initials(
@@ -550,9 +552,10 @@ class Data:
                     )
             else:
                 assoc_first = self.syllables_for_segment(
-                    head, huge, False, allow_suffix_only, total_limit=huge
+                    head, huge, False, allow_suffix_only, total_limit=huge, initial=self.initial
                 )
                 second_candidates = None
+            assoc_first = [x for x in assoc_first if self.initial is None or x.startswith(self.initial)]
             for key, rows in self.assoc_buckets(assoc_first, second_candidates).items():
                 assoc_buckets.setdefault(key, []).extend(rows)
         for reading, words in self.pick_bucket_rows(assoc_buckets):
@@ -671,6 +674,8 @@ class Data:
         combos: list[tuple[str, ...]] = [()]
         for index, ch in enumerate(codes):
             letters = self.key_initial_letters(ch, is_last=index == len(codes) - 1)
+            if index == 0 and self.initial is not None:
+                letters = [x for x in letters if x == self.initial]
             if not letters:
                 return []
             combos = [pre + (x,) for pre in combos for x in letters]
@@ -690,8 +695,10 @@ class Data:
                 continue
             prefix_combos: list[tuple[str, ...]] = [()]
             ok = True
-            for ch in clean[:k]:
+            for index, ch in enumerate(clean[:k]):
                 letters = self.key_initial_letters(ch, is_last=False)
+                if index == 0 and self.initial is not None:
+                    letters = [x for x in letters if x == self.initial]
                 if not letters:
                     ok = False
                     break
@@ -926,6 +933,8 @@ class Data:
         rows: OrderedDict[str, list[str]] = OrderedDict()
         seen_words: dict[str, set[str]] = defaultdict(set)
         for tokens, word, code in self.word_codes:
+            if self.initial is not None and not tokens[0].startswith(self.initial):
+                continue
             # 第一個音節必須打全（與 App `wordsByCodePrefix` 同口徑）：
             # 打 `ia`（= ga）時不該列出 `gam se`（= ia4|7e，第一段還沒打完）。
             first_code = code_of(tokens[0])
@@ -1021,7 +1030,7 @@ class Data:
             )
             if not readings:
                 readings = self.syllables_for_segment(
-                    head, huge, False, allow_suffix_only, total_limit=huge
+                    head, huge, False, allow_suffix_only, total_limit=huge, initial=self.initial
                 )
             out.append(
                 {
@@ -1106,7 +1115,7 @@ class Data:
     def isolated_syllables(self, codes: str) -> list[tuple[str, list[str]]]:
         """多鍵且整串無完整切分時，通配列出首鍵字母下的全部音節。"""
         clean = codes.replace("'", "")
-        if len(clean) < 2 or self.has_full_syllable(clean):
+        if self.initial is not None or len(clean) < 2 or self.has_full_syllable(clean):
             return []
         letters = self.key_initial_letters(clean[0], is_last=len(clean) == 1)
         universe = set(self.syllable_freq) | set(self.standard_syllables)
@@ -2006,6 +2015,16 @@ def cmd_selftest(args, data: Data) -> None:
         "切不出完整音节的简拼码串：不猜剩余",
     )
 
+    saved_initial = data.initial
+    for code in ("5", "55", "5i", "5i5i", "i", "ia8", "aa4", "5i4a57"):
+        for initial in data.key_initial_letters(code[0], is_last=len(code) == 1):
+            data.initial = initial
+            rows = data.panel(code)
+            expect(all(row["reading"].startswith(initial) for row in rows),
+                   f"首码消歧 {code}/{initial} 不得混入其它首字母")
+            expect(not data.isolated_syllables(code), "消歧后不走孤单通配浏览")
+    data.initial = saved_initial
+
     print(f"[selftest] {len(failures)} 条失败")
     if failures:
         sys.exit(1)
@@ -2041,10 +2060,12 @@ def main() -> None:
 
     p_panel = sub.add_parser("panel", help="整个左列（含联想/词行/收敛/排序）")
     p_panel.add_argument("codes")
+    p_panel.add_argument("--initial", help="固定剩余原码首键的解释，保留后续码")
     p_panel.set_defaults(func=cmd_panel)
 
     p_json = sub.add_parser("json", help="结构化输出六源 + merged（App 侧 golden 单测对拍）")
     p_json.add_argument("codes", nargs="+", help="一个或多个码串/键名，如 5i4a57 'kl ghi mno abc ps'")
+    p_json.add_argument("--initial")
     p_json.set_defaults(func=cmd_json)
 
     p_pre = sub.add_parser("preedit", help="复现 preedit 切分与「选词后剩余输入」（App CandidateInputBoundary）")
@@ -2094,6 +2115,7 @@ def main() -> None:
         args.func(args)
         return
     data = Data(args.data)
+    data.initial = getattr(args, "initial", None)
     args.func(args, data)
 
 

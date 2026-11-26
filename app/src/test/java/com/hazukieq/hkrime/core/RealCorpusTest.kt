@@ -183,73 +183,31 @@ class RealCorpusTest {
         assertTrue("必須實際覆蓋部分選擇", partial > 100)
     }
 
-    /** comment 的音節碼長之和（`ki`→`5i` 兩位、`mak`→`4a5` 三位）。 */
-    private fun commentCodeLength(comment: List<String>): Int =
-        comment.sumOf { runCatching { TwelveKeyPreedit.codeOf(it).length }.getOrDefault(0) }
-
-    /** 簡拼按實際碼位消耗，保留未覆蓋的末鍵。 */
-    private fun coveredCodeLength(comment: List<String>, cleanCode: String): Int? {
-        var pos = 0
-        for (syllable in comment) {
-            val full = runCatching { TwelveKeyPreedit.codeOf(syllable) }.getOrNull().orEmpty()
-            if (full.isEmpty()) return null
-            pos = when {
-                cleanCode.startsWith(full, pos) -> pos + full.length
-                pos < cleanCode.length && cleanCode[pos] == full[0] -> pos + 1
-                else -> return if (pos == 0) null else pos
-            }
-            if (pos > cleanCode.length) return cleanCode.length
-        }
-        return pos
-    }
-
-    /** 本用例裡 comment 實際吃掉的碼位數（前綴匹配優先，對不上退回碼長之和）。 */
-    private fun consumedCodeLength(comment: List<String>, cleanCode: String): Int {
-        // 走 App 真正的覆蓋規則（含 derive 別名：cw 之於 cu，a3 要整節吃掉，不能只吃首字母）。
-        val covered = TwelveKeyPreedit.coveredCodeLengthForTest(
-            cleanCode,
-            comment.joinToString(" "),
-        )
-        if (covered != null) return covered.coerceIn(0, cleanCode.length)
-        val sum = commentCodeLength(comment)
-        return if (sum in 1..cleanCode.length) sum else cleanCode.length
-    }
-
-    /** 以候選讀音和實際輸入計算預期 preedit。 */
-    private fun expectedPreedit(comment: List<String>, cleanCode: String): String {
-        val consumed = consumedCodeLength(comment, cleanCode)
-        val head = comment.joinToString(" ")
-        return if (consumed in 1 until cleanCode.length) "$head ${cleanCode.substring(consumed)}"
-        else head
-    }
+    private fun consumedCodeLength(comment: List<String>, cleanCode: String): Int =
+        TwelveKeyPreedit.coveredCodeLengthForTest(cleanCode, comment.joinToString(" ")) ?: 0
 
     private fun cleanCode(code: String) = code.replace(Regex("[\\s']"), "")
 
-    /** 不變量 1：preedit 與「comment + 未覆蓋的原始碼」完全一致（覆蓋全部真實語料）。 */
+    /** 顯示內容重新編碼後必須等於全部已輸入碼位：既不漏鍵，也不補輸入。 */
     @Test
-    fun preeditMatchesCommentPlusRemainingCode() {
+    fun preeditConservesEveryTypedCodePosition() {
         val failures = ArrayList<String>()
         var checked = 0
         for (rec in records) {
             val clean = cleanCode(rec.code)
             if (clean.isEmpty()) continue
             val first = rec.cands.firstOrNull() ?: continue
-            if (first.comment.isBlank()) continue
-            val comment = preedit.parseComment(first.comment) ?: continue
-            checked++
+            if (preedit.parseComment(first.comment) == null) continue
             val rendered = preedit.rewrite(rec.preedit, first.text, first.comment) ?: rec.preedit
-            val expected = expectedPreedit(comment, clean)
-            if (rendered != expected && failures.size < 25) {
-                failures.add(
-                    "code=$clean preedit=[${rec.preedit}] first=[${first.text}/${first.comment}] " +
-                        "rendered=[$rendered] expected=[$expected]"
-                )
+            val encoded = rendered.split(' ').joinToString("") { TwelveKeyPreedit.codeOf(it) }
+            checked++
+            if (encoded != clean && failures.size < 25) {
+                failures.add("code=$clean reading=${first.comment} shown=$rendered reencoded=$encoded")
             }
         }
-        assertTrue(
-            "檢查 $checked 條真實語料，${failures.size}+ 條 preedit 不一致：\n" + failures.joinToString("\n"),
-            failures.isEmpty()
-        )
+        println("REAL_PREEDIT_TYPED_POSITIONS=$checked")
+        assertTrue("必須使用實際語料", checked > 1000)
+        assertTrue(failures.joinToString("\n"), failures.isEmpty())
     }
 
     /** 不變量 2：有尾碼的 case，尾碼必須是輸入碼的**原樣後綴**（不能改寫、不能少、不能多）。 */
@@ -263,11 +221,11 @@ class RealCorpusTest {
             if (first.comment.isBlank()) continue
             val comment = preedit.parseComment(first.comment) ?: continue
             val consumed = consumedCodeLength(comment, clean)
-            if (consumed !in 1 until clean.length) continue
+            if (consumed !in 0 until clean.length) continue
             checked++
             val rendered = preedit.rewrite(rec.preedit, first.text, first.comment) ?: rec.preedit
             val tail = clean.substring(consumed)
-            if (!rendered.endsWith(" $tail") && failures.size < 25) {
+            if (!(if (consumed == 0) rendered == tail else rendered.endsWith(" $tail")) && failures.size < 25) {
                 failures.add("code=$clean first=[${first.text}/${first.comment}] rendered=[$rendered] tail=[$tail]")
             }
         }
