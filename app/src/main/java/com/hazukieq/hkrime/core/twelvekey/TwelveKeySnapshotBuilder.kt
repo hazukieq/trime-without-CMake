@@ -204,26 +204,9 @@ object TwelveKeySnapshotBuilder {
         } else {
             withFirstSegmentChars(barList(barCandidates), barCandidates, remaining, initial)
         }
-        // 單鍵且含單字精確音節（如 4=mno 的 m/n、3=vur 的 r/兒）時，librime 在 hkrime_initial 為空下
-        // 會剪掉簡拼分支，導致候選條只剩 1~2 項；這裡按同鍵首字母補齊常用字（bar 與 recommend 同源保序）。
-        val singleKeyExtra = if (mapFallbackLetters && remaining.length == 1 && barEntries0.size < TwelveKeyTuning.BAR_ITEMS) {
-            singleKeyInitialChars(remaining, barEntries0)
-        } else {
-            emptyList()
-        }
-        val barEntries = if (singleKeyExtra.isEmpty()) {
-            barEntries0
-        } else {
-            (barEntries0 + singleKeyExtra).take(TwelveKeyTuning.BAR_ITEMS)
-        }
+        val barEntries = barEntries0
         // 推薦組最多 30 詞與 10 單字；詞來自聯想/組合/整串與引擎詞，單字可用段組補位。
-        val recommend0 = recommendWords(ordered, panelRows, local.remaining)
-        val recommend = if (singleKeyExtra.isEmpty()) {
-            recommend0
-        } else {
-            val seen = recommend0.mapTo(HashSet()) { it.text }
-            recommend0 + singleKeyExtra.filter { seen.add(it.text) }
-        }
+        val recommend = recommendWords(ordered, panelRows, local.remaining)
         // 過長編碼：候選條/字典都沒有覆蓋全碼的詞時，按「每鍵第一個給拼音聲母」造一個組詞，
         // 放在條首與推薦首位，避免 preedit/預覽裸露原碼。
         // 「盡力找」只在**候選條固定窗口**裡找：bar/full 必須用同一窗口判定，
@@ -598,39 +581,6 @@ object TwelveKeySnapshotBuilder {
             engineOrderOnly = true,
             phoneticNavigation = mapFallbackLetters,
         )
-    }
-
-    /**
-     * 單鍵輸入（如 `4`=mno、`3`=vur）被 librime 精確單字音節（m/n/r）剪掉簡拼分支時，
-     * 從本地字表按該鍵全部合法首字母單元補齊高頻單字（僅在候選條不足 12 項時觸發）。
-     */
-    private fun singleKeyInitialChars(
-        remaining: String,
-        existing: List<CandidateItem>,
-        limit: Int = 60,
-    ): List<CandidateItem> {
-        val units = InitialDisambiguation.choices(remaining)
-        if (units.isEmpty()) return emptyList()
-        val syllables = TwelveKeyPreedit.syllablesByInitials(units)
-        if (syllables.isEmpty()) return emptyList()
-        val seen = existing.mapTo(HashSet()) { it.text }
-        val scored = ArrayList<Triple<String, String, Int>>()
-        for (syllable in syllables) {
-            for (ch in TwelveKeyPreedit.charsForSyllable(syllable, limit = 16)) {
-                if (!seen.add(ch)) continue
-                scored.add(Triple(syllable, ch, TwelveKeyPreedit.generalScore(ch)))
-            }
-        }
-        scored.sortByDescending { it.third }
-        return scored.take(limit).map { (syllable, ch, _) ->
-            CandidateItem(
-                text = ch,
-                comment = syllable,
-                index = -1,
-                segment = 0,
-                restCode = "",
-            )
-        }
     }
 
     /**
