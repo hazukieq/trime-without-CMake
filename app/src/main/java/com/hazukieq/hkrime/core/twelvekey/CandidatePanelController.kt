@@ -253,7 +253,7 @@ class CandidatePanelController(
                 target.segment == INITIAL_LETTER_SEGMENT -> onInitialLetter?.invoke(target.reading)
                 target.segment == RECOMMEND_SEGMENT -> Unit
                 target.reading.isNotBlank() &&
-                    com.hazukieq.hkrime.core.TwelveKeyPreedit.isKnownSyllable(target.reading) ->
+                    MultiKeyProfile.active.isKnownSyllable(target.reading) ->
                     onConfirmPhonetic?.invoke(target.reading, false, group.contextKey)
             }
             return

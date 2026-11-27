@@ -37,23 +37,24 @@ data class PhoneticSelection(val reading: String, val code: String, val initialO
                 return if (end <= confirmedEnd) true
                 else code.substring(confirmedEnd, end).all { it == '\'' || it.isWhitespace() }
             }
+            val profile = MultiKeyProfile.active
             val tail = code.drop(confirmedEnd)
             val offsets = tail.indices.filter { tail[it] != '\'' && !tail[it].isWhitespace() }
             val raw = offsets.map { tail[it] }.joinToString("")
             var position = 0
             for (token in tokens.drop(selections.size)) {
                 if (position == raw.length) break
-                val full = TwelveKeyPreedit.codeOf(token)
+                val full = profile.codeOf(token)
                 val aliasLength = (minOf(6, raw.length - position) downTo 1).firstOrNull { length ->
-                    TwelveKeyPreedit.exactSyllables(raw.substring(position, position + length)).any {
-                        TwelveKeyPreedit.isSpellingAlias(token, it)
+                    profile.exactSyllables(raw.substring(position, position + length)).any {
+                        profile.isSpellingAlias(token, it)
                     }
                 }
                 when {
-                    raw.startsWith(full, position) -> position += full.length
+                    full.isNotEmpty() && raw.startsWith(full, position) -> position += full.length
                     aliasLength != null -> position += aliasLength
-                    token.first() in TwelveKeyPreedit.keyLetters(raw[position]) && token.first() !in "aeiou" -> position++
-                    full.startsWith(raw.substring(position)) -> position = raw.length
+                    token.first() in profile.keyLetters(raw[position]) && profile.allowsAbbrevInitial(token.first()) -> position++
+                    full.isNotEmpty() && full.startsWith(raw.substring(position)) -> position = raw.length
                     else -> return false
                 }
             }
@@ -68,13 +69,12 @@ data class PhoneticSelection(val reading: String, val code: String, val initialO
             if (lead < 0) return null
             val effective = code.substring(lead)
             val end = if (initialOnly) {
-                // th/ng/nz 是組合聲母單元，按整段匹配，不拆字母。
+                // 12 鍵 th/ng/nz 整段匹配，9 鍵為合法首字母。
                 if (reading.isEmpty() || reading !in InitialDisambiguation.choices(effective)) return null
                 1
             } else {
                 // 確認完整音節不能借用簡拼或失配解碼的回退邊界。
-                TwelveKeySnapshotBuilder.splitParts(effective).firstOrNull { reading in it.syllables }
-                    ?.let { effective.length - it.rest.length } ?: return null
+                MultiKeyProfile.active.resolveExactCodeLength(reading, effective) ?: return null
             }
             var boundary = lead + end
             while (boundary < code.length && (code[boundary] == '\'' || code[boundary].isWhitespace())) boundary++

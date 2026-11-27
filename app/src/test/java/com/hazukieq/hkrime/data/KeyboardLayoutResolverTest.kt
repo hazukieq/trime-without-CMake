@@ -117,7 +117,7 @@ class KeyboardLayoutResolverTest {
         assertTrue(KeyboardLayoutResolver.capabilitiesOf("12key").materializePreeditFromCandidate)
         assertTrue(KeyboardLayoutResolver.capabilitiesOf("12key").useTwelveKeySession)
         assertTrue(KeyboardLayoutResolver.capabilitiesOf("9key").materializePreeditFromCandidate)
-        assertFalse(KeyboardLayoutResolver.capabilitiesOf("9key").useTwelveKeySession)
+        assertTrue(KeyboardLayoutResolver.capabilitiesOf("9key").useTwelveKeySession)
         assertTrue(KeyboardLayoutResolver.capabilitiesOf("stroke").materializePreeditFromCandidate)
         // Future custom non-26-key types inherit the same paradigm automatically
         assertTrue(KeyboardLayoutResolver.capabilitiesOf("14key_custom").materializePreeditFromCandidate)

@@ -76,15 +76,16 @@ object PreeditPresentation {
         val key = RenderKey(current, raw, input, engineText, engineComment)
         cached?.takeIf { it.key == key }?.let { return it.text }
         val frame = current.frame?.takeIf { it.matches(input, raw) }
+        val profile = MultiKeyProfile.active
         val text = if (current.phonetics.isEmpty()) {
-            TwelveKeyPreedit.rewrite(raw, frame?.text ?: engineText, frame?.comment ?: engineComment, rawInput = input)
+            profile.rewritePreedit(raw, frame?.text ?: engineText, frame?.comment ?: engineComment, rawInput = input)
                 ?: raw.replace("\u2038", "")
         } else {
             val rawTail = PhoneticSelection.rawTail(input, current.phonetics)
             val pending = PhoneticSelection.pending(input, current.phonetics)
             val tailReading = TwelveKeyPreedit.parseComment(frame?.comment ?: engineComment.orEmpty())
                 ?.drop(current.phonetics.size)?.joinToString(" ")
-            val tail = if (pending.isEmpty()) "" else TwelveKeyPreedit.rewrite(pending, null, tailReading, rawInput = rawTail) ?: pending
+            val tail = if (pending.isEmpty()) "" else profile.rewritePreedit(pending, null, tailReading, rawInput = rawTail) ?: pending
             val joined = (current.phonetics.map { it.reading } + listOf(tail).filter { it.isNotEmpty() }).joinToString("'")
             if (pending.isEmpty() && rawTail.contains('\'')) "$joined'" else joined
         }

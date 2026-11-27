@@ -118,7 +118,7 @@ class TwelveKeyController(
         rankingEnabled: Boolean,
         loadAll: Boolean = false,
     ): String =
-        "f|$remaining|${if (full) (if (loadAll) "all" else "full") else "bar"}" +
+        "f|p${MultiKeyProfile.active.id}|$remaining|${if (full) (if (loadAll) "all" else "full") else "bar"}" +
             (if (segmentAnchor == null) "" else "|a" + segmentAnchor!!.code) +
             (if (segmentMode) "|seg" else "") +
             "|r${if (rankingEnabled) "1" else "0"}|h$constraint|o$optionsVersion|e$engineVersion|a${TwelveKeyPreedit.assocGeneration}"

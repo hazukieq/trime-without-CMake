@@ -53,7 +53,7 @@ object KeyboardLayoutResolver {
             )
             TYPE_9KEY -> KeyboardTypeCapabilities(
                 materializePreeditFromCandidate = true,
-                useTwelveKeySession = false,
+                useTwelveKeySession = true,
                 warmupProbeChar = '2',
             )
             TYPE_STROKE -> KeyboardTypeCapabilities(

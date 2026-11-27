@@ -280,14 +280,25 @@ class TextInputManager private constructor() :
 
     // ---------- 候選展開面板 ----------
 
-    fun isTwelveKeyMode(): Boolean = runCatching {
+    /** 解析當前鍵盤/方案對應的多鍵拼音配置（客語 12 鍵 / 普通話 9 鍵）；26 鍵等返回 null。 */
+    private fun activeMultiKeyProfile(): com.hazukieq.hkrime.core.twelvekey.MultiKeyProfile? = runCatching {
+        if (!Rime.isTwelveKeySchema()) return@runCatching null
         val keyboard = keyboardSwitcher.getCurrentKeyboardName()
-        Rime.isTwelveKeySchema() &&
-            Config.get(trime).isKeyboardLayoutOfType(
-                keyboard,
-                com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_12KEY,
-            )
-    }.getOrDefault(false)
+        val cfg = Config.get(trime)
+        when {
+            cfg.isKeyboardLayoutOfType(keyboard, com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_12KEY) ->
+                com.hazukieq.hkrime.core.twelvekey.MultiKeyProfile.Hakka12Key
+            cfg.isKeyboardLayoutOfType(keyboard, com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_9KEY) ->
+                com.hazukieq.hkrime.core.twelvekey.MultiKeyProfile.Mandarin9Key
+            else -> null
+        }
+    }.getOrNull()
+
+    fun isTwelveKeyMode(): Boolean {
+        val profile = activeMultiKeyProfile() ?: return false
+        com.hazukieq.hkrime.core.twelvekey.MultiKeyProfile.active = profile
+        return true
+    }
 
     /**
      * 「用戶想要面板開著」的意圖。

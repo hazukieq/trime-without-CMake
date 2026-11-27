@@ -85,6 +85,7 @@ object TwelveKeySnapshotBuilder {
         appRankingEnabled: Boolean = true,
     ): String =
         local.contextKey +
+            "|p" + MultiKeyProfile.active.id +
             (if (full) "|full" else "|bar") +
             (if (segmentAnchor == null) "" else "|a" + segmentAnchor.code) +
             (if (segmented) "|seg" else "") + "|r" + (if (appRankingEnabled) "1" else "0")
@@ -218,8 +219,9 @@ object TwelveKeySnapshotBuilder {
             dictionaryRows.any { it.restCode.isEmpty() }
         // 僅在剩餘碼無法完整切分為合法音節時才按每鍵首拼造詞；
         // 全拼長句（如 7 音節整句）本身可切分成真實音節，不得用逐鍵假詞劫持首選與 preedit。
-        val synthesized = if (mapFallbackLetters && !fullCodeCovered && remaining.length >= 2 &&
-            !TwelveKeyPreedit.hasFullSyllable(remaining)
+        val synthesized = if (mapFallbackLetters && MultiKeyProfile.active.allowLongCodeSynthesis &&
+            !fullCodeCovered && remaining.length >= 2 &&
+            !MultiKeyProfile.active.hasFullSyllable(remaining)
         ) {
             synthesizeLongCode(remaining, initial)
         } else {
@@ -442,10 +444,11 @@ object TwelveKeySnapshotBuilder {
      * 待確認碼為空時，列最後一段簡拼可切換的字母（`b ↔ c`）。
      */
     internal fun confirmGroups(code: String, phonetics: List<PhoneticSelection>): List<SyllableGroup> {
+        val profile = MultiKeyProfile.active
         val pending = PhoneticSelection.pending(code, phonetics)
         val rows = ArrayList<SyllableGroup>()
         if (pending.isNotEmpty()) {
-            TwelveKeyPreedit.syllablesCompletingPrefix(pending)
+            profile.syllablesCompletingPrefix(pending)
                 .take(TwelveKeyTuning.MAX_CONFIRM_SYLLABLES)
                 .forEach { syllable ->
                     rows.add(SyllableGroup(syllable, listOf(syllable), emptyList()))
@@ -459,9 +462,9 @@ object TwelveKeySnapshotBuilder {
         val lastCode = last.code.trim { it == '\'' || it.isWhitespace() }
         if (lastCode.isEmpty()) return rows
         if (!last.initialOnly) {
-            // 末段已確認為完整音節（含單音節如 pau）：保留左列該段候選音節並高亮當前選中項，
-            // 不再隱藏左列，方便直覺查看已選音節或同段切換（如 pau ↔ sau）。
-            val syllables = TwelveKeyPreedit.syllablesCompletingPrefix(lastCode)
+            // 末段已確認為完整音節（含單音節如 pau / tai）：保留左列該段候選音節並高亮當前選中項，
+            // 不再隱藏左列，方便直覺查看已選音節或同段切換（如 pau ↔ sau、ke ↔ le）。
+            val syllables = profile.syllablesCompletingPrefix(lastCode)
                 .take(TwelveKeyTuning.MAX_CONFIRM_SYLLABLES)
             val ordered = if (last.reading in syllables) syllables else listOf(last.reading) + syllables
             ordered.forEach { syllable ->
@@ -500,9 +503,10 @@ object TwelveKeySnapshotBuilder {
 
     /** 首段漢字：簡拼段取該首字母下全部音節的字；完整音節取該音節的字。 */
     private fun firstSegmentChars(first: PhoneticSelection, code: String): List<CandidateItem> {
-        val unit = TwelveKeyPreedit.initialUnit(first.reading)
+        val profile = MultiKeyProfile.active
+        val unit = profile.initialUnit(first.reading)
         val syllables = if (first.initialOnly) {
-            TwelveKeyPreedit.syllablesByInitials(listOf(unit))
+            profile.syllablesByInitials(listOf(unit))
         } else {
             listOf(first.reading)
         }
@@ -1219,11 +1223,11 @@ object TwelveKeySnapshotBuilder {
         return String(bytes, consumedEnd, bytes.size - consumedEnd, Charsets.UTF_8)
     }
 
-    /** 12 鍵碼 → 拼音字母（只用於本地兜底上屏，不影響引擎）。 */
+    /** 多鍵碼 → 代表字母（只用於本地兜底上屏，不影響引擎）。 */
     fun toLetters(rawCode: String): String = buildString(rawCode.length + 8) {
+        val profile = MultiKeyProfile.active
         rawCode.forEach { code ->
-            val replacement = FALLBACK_LETTERS[code]
-            if (replacement != null) append(replacement) else append(code)
+            append(profile.fallbackLetter(code))
         }
     }
 
