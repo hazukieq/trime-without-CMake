@@ -150,7 +150,9 @@ object TwelveKeySnapshotBuilder {
             }
         }
 
-        if (phonetics.isNotEmpty()) return phoneticSnapshot(local, flat, wantGroups, phonetics, appRankingEnabled, degraded)
+        if (phonetics.isNotEmpty()) {
+            return phoneticSnapshot(local, flat, wantGroups, phonetics, appRankingEnabled, degraded, maxCandidates)
+        }
         if (!appRankingEnabled) return engineOnlySnapshot(local, flat, wantGroups, mapFallbackLetters, initial, degraded)
 
         val __tFlat = System.nanoTime()
@@ -316,6 +318,7 @@ object TwelveKeySnapshotBuilder {
         phonetics: List<PhoneticSelection>,
         appRankingEnabled: Boolean,
         degraded: Boolean,
+        maxCandidates: Int = TwelveKeyTuning.CONFIRM_RECOMMEND_LIMIT,
     ): TwelveKeySnapshot {
         val code = local.remaining
         val binder = CandidateSelection.InputBinder(code, local.consumedEnd)
@@ -338,10 +341,13 @@ object TwelveKeySnapshotBuilder {
             firstSegmentChars(first, code).map(binder::bind)
         } else emptyList()
         val recommend = if (wantGroups) {
-            val rankedWords = words.take(TwelveKeyTuning.CONFIRM_RECOMMEND_LIMIT)
+            val rankedWords = words.take(maxCandidates)
             val split = TwelveKeyTuning.CONFIRM_CHARS_AFTER_WORDS.coerceIn(0, rankedWords.size)
             (rankedWords.take(split) + firstChars + rankedWords.drop(split)).distinctBy { it.text }
         } else emptyList()
+        val hasMore = wantGroups && !degraded &&
+            flat.size >= maxCandidates &&
+            maxCandidates < TwelveKeyTuning.CONFIRM_ALL_LIMIT
         val bar = (barMatched.distinctBy { it.text } + firstChars).distinctBy { it.text }
             .take(TwelveKeyTuning.BAR_ITEMS)
         val letters = letterChoices(code, phonetics)
@@ -352,7 +358,7 @@ object TwelveKeySnapshotBuilder {
         val preview = bar.firstOrNull()?.text.orEmpty()
         DiagLog.d("snapshot", "build code=${local.input} mode=confirm wantGroups=$wantGroups" +
             " groups=${groups.size} bar=${bar.size} words=${words.size} chars=${firstChars.size}" +
-            " phonetics=${phonetics.joinToString(" ")}")
+            " hasMore=$hasMore phonetics=${phonetics.joinToString(" ")}")
         return TwelveKeySnapshot(
             input = local.input, consumedEnd = local.consumedEnd, remaining = code,
             groups = groups, fallback = null, degradedToSinglePage = degraded,
@@ -364,6 +370,7 @@ object TwelveKeySnapshotBuilder {
             initial = selectedLetter(code, phonetics),
             engineOrderOnly = !appRankingEnabled,
             phonetics = phonetics, phoneticNavigation = true,
+            hasMore = hasMore,
         )
     }
 

@@ -37,6 +37,8 @@ class CandidatePanelAdapter(
 
     override fun getItemCount(): Int = items.size
 
+    var onLoadAll: (() -> Unit)? = null
+
     data class Item(
         val text: String,
         val comment: String,
@@ -49,11 +51,15 @@ class CandidatePanelAdapter(
         val contextKey: String = "",
         val inputSpan: InputCodeSpan? = null,
         val engineSpan: com.hazukieq.hkrime.core.twelvekey.EngineCandidateSpan? = null,
+        /** 末尾「全部」懶加載按鈕佔位項。 */
+        val isLoadAll: Boolean = false,
+        val isLoading: Boolean = false,
     )
 
     private val density = context.resources.displayMetrics.density
 
     private val wordSize = sp(19f)
+    private val actionSize = sp(15f)
     private val commentSize = sp(10.5f)
     private var ink: Int = 0xFF37474F.toInt()
     private var commentColor: Int = ink
@@ -178,12 +184,52 @@ class CandidatePanelAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
-        // 複用的 ViewHolder 也必須同步最新配色，避免切換主題色後殘留舊色。
+        // 複用的 ViewHolder 也必須同步最新配色與狀態，避免切換主題色或按鈕複用殘留舊態。
+        if (item.isLoadAll) {
+            val actionBg = androidx.core.graphics.ColorUtils.blendARGB(tileColor, ink, 0.08f)
+            val actionBorder = withAlpha(ink, 0.24f)
+            holder.shape.setColor(actionBg)
+            holder.shape.setStroke(borderWidth, actionBorder)
+            holder.ripple.setColor(ColorStateList.valueOf(rippleColor))
+            holder.word.setTextSize(TypedValue.COMPLEX_UNIT_PX, actionSize)
+            holder.word.setTextColor(if (item.isLoading) subColor else wordColor)
+            holder.word.setTypeface(wordTypeface, Typeface.BOLD)
+            holder.word.text = item.text
+            holder.box.isEnabled = !item.isLoading
+            val actionWidth = maxOf(holder.word.paint.measureText(item.text).toInt() + padH * 2 + dp(8f), minTileWidth + dp(12f))
+            val lp = holder.box.layoutParams
+            if (lp is FlexboxLayoutManager.LayoutParams) {
+                lp.width = actionWidth
+                lp.height = ViewGroup.LayoutParams.WRAP_CONTENT
+                lp.marginEnd = gap
+                lp.bottomMargin = gap
+            } else {
+                holder.box.layoutParams = FlexboxLayoutManager.LayoutParams(
+                    actionWidth,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    marginEnd = gap
+                    bottomMargin = gap
+                }
+            }
+            if (hideComment || !showComment || !listHasAnyComment) {
+                holder.comment.visibility = View.GONE
+            } else {
+                holder.comment.visibility = View.INVISIBLE
+                holder.comment.text = " "
+            }
+            holder.box.setOnClickListener {
+                if (!item.isLoading) onLoadAll?.invoke()
+            }
+            return
+        }
         holder.shape.setColor(tileColor)
         holder.shape.setStroke(borderWidth, tileBorderColor)
         holder.ripple.setColor(ColorStateList.valueOf(rippleColor))
+        holder.word.setTextSize(TypedValue.COMPLEX_UNIT_PX, wordSize)
         holder.word.setTextColor(wordColor)
-        holder.word.typeface = wordTypeface
+        holder.word.setTypeface(wordTypeface, Typeface.NORMAL)
+        holder.box.isEnabled = true
         holder.comment.setTextColor(subColor)
         holder.word.text = item.text
         val wordWidth = holder.word.paint.measureText(item.text)

@@ -77,6 +77,10 @@ object GenericPanelSnapshotBuilder {
         }
         val preview = bar.firstOrNull()?.text.orEmpty()
         val inline = runCatching { Rime.getCompositionPrefix() }.getOrDefault("") + preview
+        val hasMore = !degraded &&
+            maxCandidates >= TwelveKeyTuning.CONFIRM_RECOMMEND_LIMIT &&
+            flat.size >= maxCandidates &&
+            maxCandidates < TwelveKeyTuning.CONFIRM_ALL_LIMIT
 
         return TwelveKeySnapshot(
             input = local.input,
@@ -95,6 +99,7 @@ object GenericPanelSnapshotBuilder {
             initial = null,
             engineOrderOnly = true,
             phoneticNavigation = false,
+            hasMore = hasMore,
         )
     }
 

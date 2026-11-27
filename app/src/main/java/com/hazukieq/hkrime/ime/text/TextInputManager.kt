@@ -213,6 +213,7 @@ class TextInputManager private constructor() :
             controller.onPickCandidate = { item -> onPickPanelCandidate(item) }
             controller.onConfirmPhonetic = { reading, initialOnly, key -> confirmTwelveKeyPhonetic(reading, initialOnly, key) }
             controller.onInitialLetter = { letter -> onInitialLetter(letter) }
+            controller.onLoadAll = { loadAllPanelCandidates() }
             controller.onHideKeyboard = { trime.requestHideSelf(0) }
             // 面板右下的退格鍵：與鍵盤退格走同一條鏈路（引擎刪除 + 通知刷新面板）
             controller.onBackspace = { onKey(KeyEvent.KEYCODE_DEL, 0) }
@@ -586,6 +587,25 @@ class TextInputManager private constructor() :
             }
         }
         candidateView?.setPanelOpen(candidatePanelController?.isShown == true)
+    }
+
+    /** 展開面板滾動到底部點擊「全部」：後台按需枚舉至 CONFIRM_ALL_LIMIT（1000）。 */
+    private fun loadAllPanelCandidates() {
+        if (!panelWanted || !isCandidatePanelShown() || !Rime.isComposing()) return
+        if (isTwelveKeyMode()) {
+            twelveKeyController?.refresh(immediate = true, full = true, loadAll = true)
+            return
+        }
+        legacyExpandJob?.cancel()
+        legacyExpandJob = launch(kotlinx.coroutines.Dispatchers.Default) {
+            val fullSnapshot = legacySnapshot(com.hazukieq.hkrime.core.twelvekey.TwelveKeyTuning.CONFIRM_ALL_LIMIT)
+            if (fullSnapshot.isEmpty) return@launch
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                if (panelWanted && isCandidatePanelShown() && !isTwelveKeyMode()) {
+                    candidatePanelController?.submit(fullSnapshot, preserveReading = true)
+                }
+            }
+        }
     }
 
     fun hideCandidatePanel() {

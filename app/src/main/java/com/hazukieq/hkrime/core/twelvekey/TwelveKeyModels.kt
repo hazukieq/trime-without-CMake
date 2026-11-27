@@ -132,6 +132,8 @@ data class TwelveKeySnapshot(
     val engineOrderOnly: Boolean = false,
     val phonetics: List<PhoneticSelection> = emptyList(),
     val phoneticNavigation: Boolean = false,
+    /** 當前快照是否命中了枚舉上限、且仍可點擊「全部」懶加載更多候選。 */
+    val hasMore: Boolean = false,
 ) {
     val isEmpty: Boolean get() = input.isEmpty()
     /**

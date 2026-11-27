@@ -116,8 +116,9 @@ class TwelveKeyController(
         full: Boolean,
         constraint: String,
         rankingEnabled: Boolean,
+        loadAll: Boolean = false,
     ): String =
-        "f|$remaining|${if (full) "full" else "bar"}" +
+        "f|$remaining|${if (full) (if (loadAll) "all" else "full") else "bar"}" +
             (if (segmentAnchor == null) "" else "|a" + segmentAnchor!!.code) +
             (if (segmentMode) "|seg" else "") +
             "|r${if (rankingEnabled) "1" else "0"}|h$constraint|o$optionsVersion|e$engineVersion|a${TwelveKeyPreedit.assocGeneration}"
@@ -143,7 +144,7 @@ class TwelveKeyController(
      *
      * [immediate] 用於「點候選/開面板」這類需要盡快更新的場景（仍不阻塞 UI 線程）。
      */
-    fun refresh(immediate: Boolean = false, full: Boolean = false) {
+    fun refresh(immediate: Boolean = false, full: Boolean = false, loadAll: Boolean = false) {
         val rankingEnabled = appRankingEnabled
         val gen = ++generation
         refreshJob?.cancel()
@@ -171,13 +172,15 @@ class TwelveKeyController(
                                 segmentAnchor,
                                 segmentMode,
                                 rankingEnabled,
-                            ) + "|h" + constraint + "|o" + optionsVersion + "|e" + engineVersion +
+                            ) + (if (full && loadAll) "|all" else "") +
+                                "|h" + constraint + "|o" + optionsVersion + "|e" + engineVersion +
                                 "|a" + TwelveKeyPreedit.assocGeneration
-                            val fKey = fastCacheKey(local.remaining, full, constraint, rankingEnabled)
+                            val fKey = fastCacheKey(local.remaining, full, constraint, rankingEnabled, full && loadAll)
                             val cached = cacheLookup(key) { it } ?: cacheLookup(fKey) { it }
                             val t0 = System.nanoTime()
                             val limit = when {
                                 !full -> BAR_CANDIDATES
+                                loadAll -> TwelveKeyTuning.CONFIRM_ALL_LIMIT
                                 confirmed.isNotEmpty() -> TwelveKeyTuning.CONFIRM_RECOMMEND_LIMIT
                                 else -> TwelveKeySnapshotBuilder.MAX_CANDIDATES
                             }

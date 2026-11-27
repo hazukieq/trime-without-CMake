@@ -54,9 +54,13 @@ class CandidatePanelController(
     /** 左列字母行：確認下一段首拼或細化最後一段（同一鍵的另一個字母）。 */
     var onInitialLetter: ((String) -> Unit)? = null
 
+    /** 右格滾動到底部後點擊「全部」按鈕：按需懶加載至 [TwelveKeyTuning.CONFIRM_ALL_LIMIT]。 */
+    var onLoadAll: (() -> Unit)? = null
+
     private val groupList = groupListView
     private var snapshot: TwelveKeySnapshot = TwelveKeySnapshot.EMPTY
     private val navigation = PanelNavigation()
+    private var loadingAll = false
 
     /**
      * 所有方案（12 鍵、全字母 26 鍵…）都只讀同一份 [snapshot]：
@@ -97,6 +101,7 @@ class CandidatePanelController(
             adapter = gridAdapter
             itemAnimator = null
         }
+        gridAdapter.onLoadAll = { triggerLoadAll() }
         backspaceView?.setOnClickListener { onBackspace?.invoke() }
         applyTheme()
     }
@@ -208,6 +213,14 @@ class CandidatePanelController(
         groupAdapter.clear()
         gridAdapter.clear()
         navigation.resetSelection()
+        loadingAll = false
+    }
+
+    private fun triggerLoadAll() {
+        if (loadingAll || !snapshot.hasMore) return
+        loadingAll = true
+        render(scrollGrid = false, scrollGroups = false)
+        onLoadAll?.invoke()
     }
 
     /** 每次按鍵/上屏後由上層調用：整個面板只讀這一份快照。 */
@@ -215,6 +228,7 @@ class CandidatePanelController(
         val prevInput = snapshot.input
         val prevDepth = snapshot.phonetics.size
         val advanced = next.phonetics != snapshot.phonetics
+        loadingAll = false
         navigation.submit(next, preserveReading)
         snapshot = next
         if (!next.hasCandidates && next.fallback == null && next.phonetics.isEmpty()) {
@@ -300,8 +314,18 @@ class CandidatePanelController(
         railDivider?.visibility = if (showRail) View.VISIBLE else View.GONE
         groupAdapter.submit(leftItems)
         gridAdapter.setShowComment(showRail)
-        gridAdapter.submit(
-            display[gridIndex].items.map {
+        val savedGridAnchor = if (!scrollGrid) {
+            (grid?.layoutManager as? FlexboxLayoutManager)?.findFirstVisibleItemPosition()
+                ?: RecyclerView.NO_POSITION
+        } else {
+            RecyclerView.NO_POSITION
+        }
+        val showLoadAll = snapshot.hasMore && (gridIndex == recommendIndex || !snapshot.phoneticNavigation)
+        val gridItems = ArrayList<CandidatePanelAdapter.Item>(
+            display[gridIndex].items.size + (if (showLoadAll) 1 else 0),
+        )
+        display[gridIndex].items.forEach {
+            gridItems.add(
                 CandidatePanelAdapter.Item(
                     text = it.text,
                     comment = it.comment,
@@ -311,11 +335,28 @@ class CandidatePanelController(
                     contextKey = snapshot.contextKey,
                     inputSpan = it.inputSpan,
                     engineSpan = it.engineSpan,
-                )
-            },
-        )
+                ),
+            )
+        }
+        if (showLoadAll) {
+            gridItems.add(
+                CandidatePanelAdapter.Item(
+                    text = if (loadingAll) "加载中…" else "全部",
+                    comment = "",
+                    index = -1,
+                    contextKey = snapshot.contextKey,
+                    isLoadAll = true,
+                    isLoading = loadingAll,
+                ),
+            )
+        }
+        gridAdapter.submit(gridItems)
         if (scrollGroups) groupList?.scrollToPosition(0)
-        if (scrollGrid) grid?.scrollToPosition(0)
+        if (scrollGrid) {
+            grid?.scrollToPosition(0)
+        } else if (savedGridAnchor > 0 && savedGridAnchor < gridItems.size) {
+            grid?.scrollToPosition(savedGridAnchor)
+        }
     }
 
     /**
