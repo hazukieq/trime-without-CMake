@@ -102,7 +102,9 @@ class KeyboardSwitcher {
             name.contentEquals(".last_lock") -> lastLockId
             name.contentEquals(".ascii") -> {
                 val asciiKeyboard = keyboardAt(cur).asciiKeyboard
-                if (asciiKeyboard.isNullOrEmpty()) cur else keyboardNames.indexOf(asciiKeyboard)
+                val target = if (asciiKeyboard.isNullOrEmpty()) "english" else BuiltinKeyboards.canonicalName(asciiKeyboard)
+                val idx = keyboardNames.indexOf(target)
+                if (idx >= 0) idx else cur
             }
             else -> keyboardNames.indexOf(BuiltinKeyboards.canonicalName(name))
         }

@@ -166,9 +166,10 @@ object BuiltinKeyboards {
         putSwitch("Keyboard_kaomoji", "^_^", "kaomoji")
         putSwitch("Keyboard_bqrw", "符", "symbols")
 
-        // 8) Numeric pad digits (1..9) & Tab
-        for (d in 1..9) {
-            putIfAbsent("num_$d", "label" to d.toString(), "send" to d.toString(), "functional" to "false")
+        // 8) Numeric pad digits (0..9): use direct commit so digits always bypass Rime
+        //    (preventing 12-key/9-key schemas from swallowing 1..9 in verification code / number fields).
+        for (d in 0..9) {
+            putIfAbsent("num_$d", "label" to d.toString(), "commit" to d.toString(), "functional" to "false")
         }
         putIfAbsent("Tab1", "label" to "Tab", "send" to "Tab", "functional" to "false")
     }
@@ -235,6 +236,8 @@ object BuiltinKeyboards {
             "name" to "12键·标准客语",
             "type" to KeyboardLayoutResolver.TYPE_12KEY,
             "ascii_mode" to 0,
+            "reset_ascii_mode" to true,
+            "ascii_keyboard" to "english",
             "full_shape" to 0,
             "width" to 17,
             "height" to 55,
@@ -295,6 +298,8 @@ object BuiltinKeyboards {
             "name" to "26键·标准拼音",
             "type" to KeyboardLayoutResolver.TYPE_QWERTY,
             "ascii_mode" to 0,
+            "reset_ascii_mode" to true,
+            "ascii_keyboard" to "english",
             "full_shape" to 0,
             "width" to 10,
             "height" to 55,
@@ -344,6 +349,8 @@ object BuiltinKeyboards {
             "name" to "9键·标准拼音",
             "type" to KeyboardLayoutResolver.TYPE_9KEY,
             "ascii_mode" to 0,
+            "reset_ascii_mode" to true,
+            "ascii_keyboard" to "english",
             "full_shape" to 0,
             "width" to 17,
             "height" to 55,
@@ -405,6 +412,8 @@ object BuiltinKeyboards {
             "name" to "笔画·五笔划",
             "type" to KeyboardLayoutResolver.TYPE_STROKE,
             "ascii_mode" to 0,
+            "reset_ascii_mode" to true,
+            "ascii_keyboard" to "english",
             "full_shape" to 0,
             "width" to 17,
             "height" to 55,
@@ -465,6 +474,7 @@ object BuiltinKeyboards {
             "name" to "英文26键",
             "type" to "english",
             "ascii_mode" to 1,
+            "reset_ascii_mode" to true,
             "full_shape" to 0,
             "width" to 10,
             "height" to 55,
@@ -512,7 +522,7 @@ object BuiltinKeyboards {
             key("click" to "#", "long_click" to ":", "key_back_color" to 0, "height" to 50),
             key("click" to "Keyboard_default", "key_back_color" to "off_key_back_color", "key_text_color" to "off_key_text_color"),
             key("click" to "."),
-            key("click" to 0, "long_click" to "cut"),
+            key("click" to "num_0", "long_click" to "cut"),
             key("click" to "/", "long_click" to "\\"),
             key("click" to "Return", "key_back_color" to "off_key_back_color", "key_text_color" to "off_key_text_color"),
             sp,
@@ -527,6 +537,7 @@ object BuiltinKeyboards {
             "key_press_offset_x" to 2,
             "key_press_offset_y" to 2,
             "ascii_mode" to 1,
+            "reset_ascii_mode" to true,
             "keys" to keys,
         )
     }

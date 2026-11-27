@@ -52,6 +52,26 @@ class BuiltinKeyboardsTest {
         assertEquals("ng", custom["letter_1"]?.get("label"))
         assertEquals("ABC", custom["t9_2"]?.get("label"))
         assertEquals("一", custom["stroke_h"]?.get("label"))
-        assertEquals("9", custom["num_9"]?.get("send"))
+        for (d in 0..9) {
+            assertEquals(d.toString(), custom["num_$d"]?.get("commit"))
+            assertEquals(null, custom["num_$d"]?.get("send"))
+        }
+    }
+
+    @Test
+    fun numberAndTypingKeyboardsDeclareAsciiResetAndFallback() {
+        val number = BuiltinKeyboards.build("number")
+        assertEquals(1, number["ascii_mode"])
+        assertEquals(true, number["reset_ascii_mode"])
+
+        val english = BuiltinKeyboards.build("english")
+        assertEquals(1, english["ascii_mode"])
+        assertEquals(true, english["reset_ascii_mode"])
+
+        for (meta in BuiltinKeyboards.typingMetadata()) {
+            val map = BuiltinKeyboards.build(meta.id)
+            assertEquals("reset_ascii_mode for ${meta.id}", true, map["reset_ascii_mode"])
+            assertEquals("ascii_keyboard for ${meta.id}", "english", map["ascii_keyboard"])
+        }
     }
 }

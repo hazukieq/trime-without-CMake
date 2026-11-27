@@ -1225,6 +1225,7 @@ class TextInputManager private constructor() :
                         InputType.TYPE_CLASS_NUMBER,
                         InputType.TYPE_CLASS_PHONE,
                         InputType.TYPE_CLASS_DATETIME -> {
+                            tempAsciiMode = true
                             "number"
                         }
                         InputType.TYPE_CLASS_TEXT -> {
@@ -1265,8 +1266,9 @@ class TextInputManager private constructor() :
         Rime.get(trime)
 
         // style/reset_ascii_mode指定了弹出键盘时是否重置ASCII状态。
-        // 键盘的reset_ascii_mode指定了重置时是否重置到keyboard的ascii_mode描述的状态。
-        if (shouldResetAsciiMode && keyboardSwitcher.currentKeyboard.isResetAsciiMode) {
+        // 键盘的reset_ascii_mode指定了重置时是否重置到keyboard的ascii_mode描述的状态；
+        // 但输入框已明确要求强制 ASCII（数字/验证码/电话/密码）时，不得被重置回中文态。
+        if (tempAsciiMode != true && shouldResetAsciiMode && keyboardSwitcher.currentKeyboard.isResetAsciiMode) {
             tempAsciiMode = keyboardSwitcher.currentKeyboard.asciiMode
         }
         tempAsciiMode?.let { Rime.setOption("ascii_mode", it) }
@@ -1477,6 +1479,11 @@ class TextInputManager private constructor() :
     override fun onKey(keyEventCode: Int, metaState: Int) {
         printModifierKeyState(metaState, "keyEventCode=" + keyEventCode)
         if (trime.handleKey(keyEventCode, metaState)) return
+        if (metaState == 0 && keyEventCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) {
+            needSendUpRimeKey = false
+            activeEditorInstance.commitText(('0' + (keyEventCode - KeyEvent.KEYCODE_0)).toString(), false)
+            return
+        }
         if (Keycode.hasSymbolLabel(keyEventCode)) {
             needSendUpRimeKey = false
             activeEditorInstance.commitText(Keycode.getSymbolLabell(Keycode.valueOf(keyEventCode)))
