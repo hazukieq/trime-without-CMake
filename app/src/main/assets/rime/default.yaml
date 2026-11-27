@@ -4,9 +4,10 @@
 config_version: "0.36"
 
 schema_list:
-  - schema: bopomofo_tw
-  - schema: luna_pinyin_simp
-  - schema: luna_pinyin
+  - schema: hakka_jiugong
+  - schema: hakka_qwerty
+  - schema: rime_ice_qwerty
+  - schema: rime_ice_t9
   
 switcher:
   caption: 〔方案選單〕

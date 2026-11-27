@@ -38,6 +38,61 @@ object RimeDictSource {
         }.getOrNull()
     }
 
+    /** 共享目錄或 assets 中該詞典的字節大小（無法取得時返回 -1L）。 */
+    fun dictSizeBytes(context: Context, name: String): Long {
+        val base = normalizeName(name)
+        dictFile(base)?.let { return it.length() }
+        return runCatching {
+            context.assets.openFd("rime/$base$DICT_SUFFIX").use { it.length }
+        }.getOrElse {
+            // 壓縮存儲在 APK 內的 asset 無法 openFd，用 available() 取得估算大小。
+            runCatching {
+                context.assets.open("rime/$base$DICT_SUFFIX").use { it.available().toLong() }
+            }.getOrDefault(-1L)
+        }
+    }
+
+    /**
+     * 流式讀取字典本體（跳過 YAML 頭 `...`），不在內存構造整表 `List<String>`。
+     * 若文件字節數超過 [maxBytes]，直接跳過並返回 null，防止數十萬行大詞表撐爆 Java 堆。
+     */
+    fun <T> useBodyLines(
+        context: Context,
+        name: String,
+        maxBytes: Long = Long.MAX_VALUE,
+        block: (Sequence<String>) -> T,
+    ): T? {
+        val base = normalizeName(name)
+        val size = dictSizeBytes(context, base)
+        if (size > maxBytes) {
+            Timber.i("RimeDictSource: skip large dict %s (%d bytes > %d)", base, size, maxBytes)
+            return null
+        }
+        val reader = dictFile(base)?.let { file ->
+            runCatching { file.bufferedReader(Charsets.UTF_8) }.getOrNull()
+        } ?: runCatching {
+            context.assets.open("rime/$base$DICT_SUFFIX").bufferedReader(Charsets.UTF_8)
+        }.getOrNull() ?: return null
+        return runCatching {
+            reader.use { r ->
+                val headBuf = ArrayList<String>(32)
+                var hasHeaderEnd = false
+                var line = r.readLine()
+                while (line != null && headBuf.size < MAX_HEAD_LINES) {
+                    if (line.trim() == "...") {
+                        hasHeaderEnd = true
+                        break
+                    }
+                    headBuf.add(line)
+                    line = r.readLine()
+                }
+                val rest = generateSequence { r.readLine() }
+                val bodySeq = if (hasHeaderEnd) rest else headBuf.asSequence() + rest
+                block(bodySeq)
+            }
+        }.getOrNull()
+    }
+
     /** 只讀字典本體（跳過 YAML 頭），這是字表/詞表解析真正要的部分。 */
     fun body(context: Context, name: String): List<String> {
         val lines = rawLines(context, name) ?: return emptyList()

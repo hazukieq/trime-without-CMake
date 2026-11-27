@@ -217,11 +217,16 @@ object TwelveKeyPreedit {
 
         // 進口詞典（尤其 hakka_zon）的單字讀音並入運行時音節/字表：方言用字（`渠 gia`）
         // 只在 zon 收錄，主詞典沒有；不併會讓標準集音節有字卻無法在面板顯示。
+        // 通過字節上限 + 流式讀取自動跳過超大型純詞表（由原生 librime table.bin 承載），不寫死表名、不 OOM。
         runCatching {
             val names = RimeDictSource.namesWithImports(context, MAIN_DICT).filter { it != MAIN_DICT }
             val allowed = standardSyllables
+            var merged = 0
             names.forEach { name ->
-                val extra = loadDictLines(RimeDictSource.body(context, name).asSequence())
+                val extra = RimeDictSource.useBodyLines(context, name, maxBytes = MAX_IMPORT_DICT_BYTES) { seq ->
+                    loadDictLines(seq.take(MAX_APP_WORD_LINES))
+                } ?: return@forEach
+                merged++
                 extra.forEach { (syllable, count) ->
                     // 只並入標準音集收錄的音節；進口詞典可能混有方案外的拼寫（bon/hop）。
                     if (allowed.isEmpty() || syllable in allowed) {
@@ -229,28 +234,34 @@ object TwelveKeyPreedit {
                     }
                 }
             }
-            Timber.i("TwelveKeyPreedit: merged imports=%d", names.size)
+            Timber.i("TwelveKeyPreedit: merged imports=%d/%d", merged, names.size)
         }.onFailure { Timber.w(it, "TwelveKeyPreedit: merge import dicts failed") }
         finishLoading(counts)
 
-        // 詞表與聯想索引在後台載入，完成後發布不可變索引。
+        // 詞表與聯想索引在後台流式載入，嚴格受字節與全局條目預算約束，大詞表完全交給原生 librime。
         val appContext = context.applicationContext
         Thread({
             val t0 = System.nanoTime()
             runCatching {
-                // 詞表清單 = 主詞典 `import_tables` 展開後的其餘詞典（共享目錄優先），
-                // 讀不到就退回內置的 [DEFAULT_WORD_LISTS]——這樣用戶新建詞表掛進
-                // import_tables 也能被聯想索引看到，不必改代碼。
                 val names = RimeDictSource.namesWithImports(appContext, MAIN_DICT)
                     .filter { it != MAIN_DICT }
                     .ifEmpty { DEFAULT_WORD_LISTS }
-                names.forEach { name ->
-                    loadWordLines(RimeDictSource.body(appContext, name).asSequence())
+                var remainingBudget = MAX_APP_WORD_LINES
+                val loadedNames = ArrayList<String>()
+                for (name in names) {
+                    if (remainingBudget <= 0) break
+                    val consumed = RimeDictSource.useBodyLines(appContext, name, maxBytes = MAX_IMPORT_DICT_BYTES) { seq ->
+                        var count = 0
+                        loadWordLines(seq.take(remainingBudget).onEach { count++ })
+                        count
+                    } ?: continue
+                    remainingBudget -= consumed
+                    loadedNames.add(name)
                 }
                 finishWordIndex()
                 Timber.i(
                     "TwelveKeyPreedit: assoc keys=%d byFirst=%d lists=%s load=%dms",
-                    assocWords.size, assocByFirst.size, names.joinToString(","),
+                    assocWords.size, assocByFirst.size, loadedNames.joinToString(","),
                     (System.nanoTime() - t0) / 1_000_000,
                 )
             }.onFailure { Timber.w(it, "TwelveKeyPreedit: load word lists failed") }
@@ -263,11 +274,14 @@ object TwelveKeyPreedit {
     /** 主詞典名（`hakka.dict.yaml`）；它自己的 `import_tables` 決定聯想詞要讀哪些詞表。 */
     private const val MAIN_DICT = "hakka"
 
-    /** 讀不到共享目錄基準詞典時的內置詞表清單（發佈版原樣行為）。 */
-    private val DEFAULT_WORD_LISTS = listOf(
-        "hakka_sougou_words", "hakka_mobilewords", "hakka_oftenwords", "hakka_places",
-        "hakka_poems", "hakka_website", "hakka_zon", "hakka_cn_en",
-    )
+    /** App 側流式掃描進口詞典的單文件大小上限（1 MB）；超過即視為引擎側大詞表，避免 OOM 與 GC 卡死。 */
+    private const val MAX_IMPORT_DICT_BYTES = 1L * 1024 * 1024
+
+    /** App 側所有進口詞典合計最多解析條目上限，防止多張中型詞表疊加撐爆 Java 堆。 */
+    private const val MAX_APP_WORD_LINES = 30_000
+
+    /** 讀不到共享目錄基準詞典時的內置詞表清單（僅小型方言詞表）。 */
+    private val DEFAULT_WORD_LISTS = listOf("hakka_zon")
 
     /**
      * 從詞典行（`字<TAB>音節`）建立字表/音節表，返回「音節 → 出現次數」。

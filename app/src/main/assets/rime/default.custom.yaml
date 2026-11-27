@@ -9,4 +9,5 @@ patch:
   schema_list:
     - {schema: hakka_jiugong}
     - {schema: hakka_qwerty}
-    - {schema: ipa_yunlong}
+    - {schema: rime_ice_qwerty}
+    - {schema: rime_ice_t9}

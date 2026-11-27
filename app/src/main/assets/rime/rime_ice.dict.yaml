@@ -1,0 +1,11 @@
+# Rime dictionary
+# encoding: utf-8
+
+---
+name: rime_ice
+version: "2026-01-26-slim"
+import_tables:
+  - cn_dicts/8105     # 通用规范汉字表
+  - cn_dicts/base     # 基础词库
+  - cn_dicts/others   # 杂项
+...

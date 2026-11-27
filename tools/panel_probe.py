@@ -239,12 +239,13 @@ class Data:
 
     def _load_words(self, path: str) -> None:
         for line in _iter_body(path):
-            if "\t" not in line:
-                # 纯词表（`hakka_sougou_words` 这类没有读音列）：镜像 App
+            parts = line.split("\t")
+            if len(parts) == 1 or not parts[1].strip():
+                # 纯词表（无读音列，含 `word` 或 `word\t\tweight`）：镜像 App
                 # `TwelveKeyPreedit.loadWordLines` 的 charTable 反推——只反推**前两字**读音，
                 # 且只进联想索引（不建整串码：App 端同样只对带读音的条目建 word_codes，
                 # 否则 2 千条会撑到 17 万条、真机加载从 1s 变 18s）。
-                word = line.strip()
+                word = parts[0].strip()
                 if len(word) < 2:
                     continue
                 # 与 App `loadWordLines` 同口径：先反推前两字读音，再套词长规则

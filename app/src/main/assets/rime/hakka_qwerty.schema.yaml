@@ -109,7 +109,7 @@ custom_phrase:
   initial_quality: "1000"
 
 reverse_lookup:
-  dictionary: luna_pinyin
+  dictionary: rime_ice
   prefix: "`"
   suffix: "'"
   tips: 〔普拼〕

@@ -26,14 +26,8 @@ version: "20.20.20"
 sort: by_weight
 use_preset_vocabulary: true
 import_tables:   #导入拓展词典
-    - hakka_places
-    - hakka_sougou_words
-    - hakka_poems
     - hakka_zon
-    - hakka_mobilewords
-    - hakka_oftenwords
-    - hakka_website
-    - hakka_cn_en
+    - hakka_base_words
 
 ...
 

@@ -12,7 +12,7 @@ schema:
     「漢語拼音」，以符號按鍵 - / < \ 輸入四聲
     拼音碼表根據 CC-CEDICT 改編
   dependencies:
-    - luna_pinyin
+    - rime_ice_qwerty
 
 keyboard:
   type: 12key
@@ -132,7 +132,7 @@ custom_phrase:
   initial_quality: "1000"
 
 reverse_lookup:
-  dictionary: luna_pinyin
+  dictionary: rime_ice
   prefix: "`"
   suffix: "'"
   tips: 〔普通话拼音〕

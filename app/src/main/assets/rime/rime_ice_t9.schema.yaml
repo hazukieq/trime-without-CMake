@@ -1,0 +1,82 @@
+# Rime schema (slimmed: 9-key Mandarin Pinyin, no Lua / no melt_eng)
+# encoding: utf-8
+
+__include: rime_ice_qwerty.schema.yaml:/
+
+schema:
+  schema_id: rime_ice_t9
+  name: 普通话9键
+  version: "3.0.0-slim"
+  author:
+    - Dvel
+    - morse.hsiao
+  description: |
+    雾凇拼音·普通话9键（精简内置版）
+
+keyboard:
+  type: 9key
+
+engine:
+  processors:
+    - ascii_composer
+    - recognizer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+  segmentors:
+    - ascii_segmentor
+    - matcher
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
+  translators:
+    - punct_translator
+    - script_translator
+  filters:
+    - simplifier@emoji
+    - simplifier@traditionalize
+    - uniquifier
+
+translator:
+  prism: rime_ice_t9
+  spelling_hints: 100
+  always_show_comments: true
+  comment_format: []
+
+punctuator:
+  half_shape:
+    "1": [1, "@", ".", "/", ":", "_", "-", "#"]
+    "@": [1, "@", ！, ：, 、, ……, ～]
+    "#": [0, "#", "$", "%", "^", "&", "*", "(", ")"]
+
+key_binder:
+  bindings:
+    - { when: has_menu, accept: 1, send: apostrophe }
+
+speller:
+  alphabet: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA9876543210
+  initials: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA9876543210
+  algebra:
+    - abbrev/^([a-z]).+$/$1/
+    - abbrev/^([zcs]h).+$/$1/
+    - derive/^([nl])ve$/$1ue/
+    - derive/^([jqxy])u/$1v/
+    - derive/un$/uen/
+    - derive/ui$/uei/
+    - derive/iu$/iou/
+    - derive/([aeiou])ng$/$1gn/
+    - derive/([dtngkhrzcs])o(u|ng)$/$1o/
+    - derive/ong$/on/
+    - derive/ao$/oa/
+    - derive/([iu])a(o|ng?)$/a$1$2/
+    - derive/[abc]/2/
+    - derive/[def]/3/
+    - derive/[hgi]/4/
+    - derive/[jkl]/5/
+    - derive/[omn]/6/
+    - derive/[pqrs]/7/
+    - derive/[tuv]/8/
+    - derive/[wxyz]/9/
