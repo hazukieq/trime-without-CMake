@@ -1,8 +1,8 @@
 # Rime dictionary
 # encoding: utf-8
-# Derived from rime_ice cn_dicts/base.dict.yaml (Mandarin pinyin stripped; Hakka readings encoded by hakka.dict.yaml)
+# Shared pure-word vocabulary derived from rime_ice cn_dicts/base.dict.yaml (shared by hakka / wubi86 / terra_pinyin)
 ---
-name: hakka_base_words
+name: cn_dicts/rime_ice_words
 version: "2026-01-26"
 sort: by_weight
 use_preset_vocabulary: true

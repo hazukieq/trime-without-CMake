@@ -21,6 +21,8 @@
 name: wubi86
 version: "0.7"
 sort: by_weight
+import_tables:
+  - cn_dicts/rime_ice_words
 columns:
   - text
   - code

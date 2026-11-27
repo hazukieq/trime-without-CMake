@@ -27,7 +27,7 @@ sort: by_weight
 use_preset_vocabulary: true
 import_tables:   #导入拓展词典
     - hakka_zon
-    - hakka_base_words
+    - cn_dicts/rime_ice_words
 
 ...
 
