@@ -1273,12 +1273,12 @@ class TextInputManager private constructor() :
                 }
             }
 
+        Rime.get(trime)
         keyboardSwitcher.let {
             it.resize(trime.maxWidth)
             // Select a keyboard based on the input type of the editing field.
             it.startKeyboard(keyboardType)
         }
-        Rime.get(trime)
 
         // style/reset_ascii_mode指定了弹出键盘时是否重置ASCII状态。
         // 键盘的reset_ascii_mode指定了重置时是否重置到keyboard的ascii_mode描述的状态；

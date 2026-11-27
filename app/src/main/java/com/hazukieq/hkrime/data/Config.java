@@ -483,6 +483,11 @@ public class Config {
     return getValue(s) != null;
   }
 
+  /** 當前方案 ID（由 reset() 與 Rime 同步）。 */
+  public String getSchemaId() {
+    return schema_id;
+  }
+
   /** 當前方案聲明的鍵盤類型（缺省 qwerty）。 */
   public String getCurrentSchemaKeyboardType() {
     return Rime.getSchemaKeyboardType(schema_id);

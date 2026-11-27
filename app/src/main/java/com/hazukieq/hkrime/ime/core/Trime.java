@@ -806,6 +806,25 @@ public class Trime extends LifecycleInputMethodService {
   @Override
   public void onStartInputView(EditorInfo attribute, boolean restarting) {
     super.onStartInputView(attribute, restarting);
+    Rime.get(this);
+    final String liveSchema = Rime.getSchemaId();
+    final boolean hasRealSchema =
+        liveSchema != null && !liveSchema.isEmpty() && !".default".equals(liveSchema);
+    final boolean layoutMismatch =
+        hasRealSchema
+            && (!liveSchema.equals(getImeConfig().getSchemaId())
+                || (keyboardSwitcher != null
+                    && !keyboardSwitcher.getKeyboardNames().isEmpty()
+                    && !keyboardSwitcher
+                        .getKeyboardNames()
+                        .get(0)
+                        .equals(getImeConfig().getResolvedDefaultLayoutId())));
+    if (Rime.consumeKeyboardRebindPending() || layoutMismatch) {
+      Timber.i(
+          "onStartInputView: rebind keyboard for schema=%s (configSchema=%s)",
+          liveSchema, getImeConfig().getSchemaId());
+      initKeyboard();
+    }
     if (getPrefs().getLooks().getAutoDark()) {
       int nightModeFlags =
           getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
