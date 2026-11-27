@@ -9,7 +9,7 @@ object CandidateRanking {
     /** 首位優先取已證實覆蓋全部剩餘原碼的候選；其餘保序，不按顯示讀音或文字長度分區。 */
     fun preferCompleteFirst(ranked: List<CandidateItem>, code: String): List<CandidateItem> {
         val position = ranked.indexOfFirst { item ->
-            item.inputSpan?.let { it.matches(code) && it.end == code.length } == true
+            item.inputSpan?.let { it.matches(code) && CompositionInput.coversFullCode(code, it.end) } == true
         }
         if (position <= 0) return ranked
         return listOf(ranked[position]) + ranked.filterIndexed { index, _ -> index != position }

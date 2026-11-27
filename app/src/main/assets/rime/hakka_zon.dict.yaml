@@ -3529,13 +3529,15 @@ woc	vo kau
 bg	set tong
 bp	set qat
 OR	qeu qa
-deepseek	di si
-deepseek	di thok
-chatgpt	cat zi pi ti
-gemini	ze mi ni
-claude	ke lau de
-claude	ke lau
-claude code	ke lau keu de
-code	keu de
+deepseek	di si	1000
+deepseek	di thok	1000
+chatgpt	cat zi pi ti	1000
+GPT	zi pi ti	1000
+gpt	zi pi ti	1000
+gemini	ze mi ni	1000
+claude	ke lau de	1000
+claude	ke lau	1000
+claude code	ke lau keu de	1000
+code	keu de	1000
 Linux	li nak si	1000
 linux	li nak si	1000

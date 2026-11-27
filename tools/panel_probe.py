@@ -70,24 +70,22 @@ def _is_cjk(ch: str) -> bool:
 
 
 def code_of(syllable: str) -> str:
-    """音节拼写 → 12 键码串（镜像 TwelveKeyPreedit.codeOf）。"""
-    s = syllable
+    """音节拼写 → 12 键码串（镜像 TwelveKeyPreedit.codeOf 與 hakka_jiugong.schema.yaml）。"""
+    s = syllable[:-1] + "u" if syllable.endswith("w") else syllable
     if s.startswith("nz"):
         s = "y" + s[2:]
     elif s.startswith("th"):
         s = "w" + s[2:]
     elif s.startswith("ng"):
         s = "1" + s[2:]
-    s = re.sub(r"(\w)o", r"\g<1>4", s)
-    s = re.sub(r"(\w)u", r"\g<1>3", s)
     xlit = {
         "a": "a", "b": "a", "c": "a",
         "d": "e", "e": "e", "f": "e",
         "g": "i", "h": "i", "i": "i",
         "k": "5", "l": "5",
-        "m": "4", "n": "4",
+        "m": "4", "n": "4", "o": "4",
         "p": "7", "s": "7",
-        "v": "3", "r": "3",
+        "u": "3", "v": "3", "r": "3",
         "z": "8", "j": "8",
         "q": "9", "t": "9",
     }

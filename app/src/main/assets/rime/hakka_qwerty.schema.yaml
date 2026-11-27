@@ -19,23 +19,14 @@ switches:
     reset: 0
     states: ["简","繁"]
   - name: ywz
-    reset: 0    #0为默认关闭，1为默认开启，推荐默认关闭
-    states: [ 关, 情 ]    #控制开关，可自定义括号内，开关显示内容
+    reset: 1    #0为默认关闭，1为默认开启（颜文字联想：默认开启）
+    states: [ 关, 颜 ]    #控制开关，可自定义括号内，开关显示内容
   - name: lenth
-    reset: 0    #0为默认关闭，1为默认开启，推荐默认关闭
+    reset: 1    #0为默认关闭，1为默认开启（联想：默认开启）
     states: [ 关, 联 ]    #控制开关
-  
-  - name: full_shape
-    states: [ "全","半" ]
-
-  - options: [ _key_Hide ]
-    states: ["                                ▽"]
-  
-  #- options: [keyboard.default, _keyboard_mini]
-  #states: [ "-", mini]
-  
-  #- name: _hide_candidate #关闭候选栏
-  #  reset: 1
+  - name: emoji
+    reset: 1    #0为默认关闭，1为默认开启（表情联想：默认开启）
+    states: [ 关, 情 ]    #表情开关
 
 engine:
   processors:
@@ -63,6 +54,7 @@ engine:
     - uniquifier
     - simplifier@ywz
     - simplifier@lenth
+    - simplifier@emoji
 
 speller:
   alphabet: abcdefghijklmnopqrstuvz
@@ -147,4 +139,14 @@ ywz:
 lenth:
   opencc_config: lenth.json
   option_name: lenth
+  tips: none    #none无注释, char单字注释, all全部注释
+
+emoji:
+  opencc_config: emoji.json
+  option_name: emoji
+  tips: all    #none无注释, char单字注释, all全部注释
+
+emoji:
+  opencc_config: emoji.json
+  option_name: emoji
   tips: none    #none无注释, char单字注释, all全部注释

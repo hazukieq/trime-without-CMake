@@ -139,6 +139,140 @@ class CompositionSessionTest {
         assertEquals("9ai'i4", s.remaining)
     }
 
+    @Test fun duplicateAndLeadingDelimitersAreIgnoredAndConsecutiveDelimitersCollapseOnBackspace() {
+        // 空輸入：分詞專用鍵忽略，長按/實體引號（allowWhenEmpty=true）放行
+        assertTrue(CompositionInput.shouldIgnoreDelimiter("", 0, allowWhenEmpty = false))
+        assertFalse(CompositionInput.shouldIgnoreDelimiter("", 0, allowWhenEmpty = true))
+        // 組字開頭不能插引號
+        assertTrue(CompositionInput.shouldIgnoreDelimiter("7i4", 0))
+        // 正常碼位後允許插一次分詞符
+        assertFalse(CompositionInput.shouldIgnoreDelimiter("7i4", 3))
+        assertFalse(CompositionInput.shouldIgnoreDelimiter("7i45i", 3))
+        // 連續重複分詞符（光標前或光標後已有 `'`）一律忽略
+        assertTrue(CompositionInput.shouldIgnoreDelimiter("7i4'", 4))
+        assertTrue(CompositionInput.shouldIgnoreDelimiter("7i4'5i", 4))
+        assertTrue(CompositionInput.shouldIgnoreDelimiter("7i4'5i", 3))
+        assertTrue(CompositionInput.shouldIgnoreDelimiter("an'", 3))
+
+        // 單次退格：若意外存在多個連續 `'`，一次全刪
+        assertEquals(0, CompositionInput.backspaceCount("7i4", 0))
+        assertEquals(1, CompositionInput.backspaceCount("7i4", 3))
+        assertEquals(1, CompositionInput.backspaceCount("7i4'", 4))
+        assertEquals(3, CompositionInput.backspaceCount("7i4'''", 6))
+        assertEquals("7i4", CompositionInput.applyBackspace("7i4'''", 6))
+        assertEquals("7i45i", CompositionInput.applyBackspace("7i4'''5i", 6))
+        assertEquals("7i4", CompositionInput.beforeKey("7i4'''", 6, 0xff08, false).code)
+        assertEquals("an", CompositionInput.applyBackspace("an''''", 6))
+
+        // 尾端含分詞符時，覆蓋所有實質碼位即視為全碼覆蓋
+        assertTrue(CompositionInput.coversFullCode("7i4aa4", 6))
+        assertTrue(CompositionInput.coversFullCode("7i4aa4'", 6))
+        assertFalse(CompositionInput.coversFullCode("7i4aa4'", 3))
+        assertFalse(CompositionInput.coversFullCode("7i4aa4", 0))
+    }
+
+    @Test fun backspaceDeletesTypedTailBeforeUndoingPickOrPhonetic() {
+        val s = CompositionSession()
+        s.input("9aii4")
+        assertFalse(s.shouldUndoOnBackspace)
+
+        // 選中「太」後未追加輸入 → 退格立刻撤銷「太」
+        assertTrue(s.pick("太", "tai", 3, CompositionSession.Origin.BAR))
+        assertEquals("i4", s.remaining)
+        assertTrue(s.shouldUndoOnBackspace)
+
+        // 選中「太」後繼續輸入新碼或分詞符 → 退格先刪新輸入，回到 i4 才撤銷「太」
+        s.input("i4'")
+        assertFalse(s.shouldUndoOnBackspace)
+        s.input("i4'8i")
+        assertFalse(s.shouldUndoOnBackspace)
+        s.input("i4'8")
+        assertFalse(s.shouldUndoOnBackspace)
+        s.input("i4'")
+        assertFalse(s.shouldUndoOnBackspace)
+        s.input("i4")
+        assertTrue(s.shouldUndoOnBackspace)
+
+        // 回到選後邊界：撤銷「太」還原 9aii4
+        assertEquals("9aii4", s.undo())
+        assertEquals("", s.selectedText)
+        assertFalse(s.shouldUndoOnBackspace)
+    }
+
+    @Test fun multiPickAndPhoneticRollbackPreservesEarlierConfirmedSegments() {
+        val s = CompositionSession()
+        s.input("9ai")
+        assertTrue(s.confirmPhonetic("tai", initialOnly = false))
+        assertTrue(s.shouldUndoOnBackspace)
+
+        // 確認 tai 後加分詞符再打 i4：退格應先刪 4 / i / '，保留 tai
+        s.input("9ai'")
+        assertFalse(s.shouldUndoOnBackspace)
+        s.input("9ai'i4")
+        assertFalse(s.shouldUndoOnBackspace)
+        assertEquals("i4", s.pending)
+
+        // 確認第二段 go（code 包含前導 `'`）
+        assertTrue(s.confirmPhonetic("go", initialOnly = false))
+        assertEquals(2, s.phonetics.size)
+        assertEquals("'i4", s.phonetics[1].code)
+        assertEquals("", s.pending)
+        assertTrue(s.shouldUndoOnBackspace)
+
+        // 撤銷第二段 go → 回到剩餘 9ai'i4 且保留 tai
+        assertEquals("9ai'i4", s.undo())
+        assertEquals(listOf(PhoneticSelection("tai", "9ai", false)), s.phonetics)
+        assertFalse(s.shouldUndoOnBackspace)
+
+        // 繼續刪尾碼：9ai'i4 -> 9ai'i -> 9ai' -> 9ai，期間 tai 始終保留
+        s.input("9ai'i")
+        assertEquals(1, s.phonetics.size)
+        assertFalse(s.shouldUndoOnBackspace)
+        s.input("9ai'")
+        assertEquals(1, s.phonetics.size)
+        assertFalse(s.shouldUndoOnBackspace)
+        s.input("9ai")
+        assertEquals(1, s.phonetics.size)
+        assertTrue(s.shouldUndoOnBackspace)
+
+        // 回到確認時邊界 → 退格撤銷 tai
+        assertEquals("9ai", s.undo())
+        assertTrue(s.phonetics.isEmpty())
+        assertFalse(s.canUndo)
+
+        // 若兩段皆確認後縮短第二段碼（9ai'i4 -> 9ai'i），只丟第二段，保留第一段 tai 及其撤銷項
+        assertTrue(s.confirmPhonetic("tai", initialOnly = false))
+        s.input("9ai'i4")
+        assertTrue(s.confirmPhonetic("go", initialOnly = false))
+        s.input("9ai'i")
+        assertEquals(listOf(PhoneticSelection("tai", "9ai", false)), s.phonetics)
+        assertTrue(s.canUndo)
+        assertEquals("9ai'i", s.undo())
+        assertTrue(s.phonetics.isEmpty())
+        assertFalse(s.canUndo)
+    }
+
+    @Test fun singleSyllableConfirmAllowsInPlaceSiblingSwitchWithoutStackingUndo() {
+        val s = CompositionSession()
+        s.input("7a3")
+        assertTrue(s.confirmPhonetic("pau", initialOnly = false))
+        assertEquals(listOf(PhoneticSelection("pau", "7a3", false)), s.phonetics)
+        assertEquals("", s.pending)
+        // 重複點同一音節為 no-op
+        assertFalse(s.confirmPhonetic("pau", initialOnly = false))
+        // 同段切換為 sau（原地替換，不堆積撤銷棧）
+        assertTrue(s.confirmPhonetic("sau", initialOnly = false))
+        assertEquals(listOf(PhoneticSelection("sau", "7a3", false)), s.phonetics)
+        // 也可切回該段首拼 s（剩餘 a3 回到待確認）
+        assertTrue(s.onInitialLetter("s"))
+        assertEquals(listOf(PhoneticSelection("s", "7", true)), s.phonetics)
+        assertEquals("a3", s.pending)
+        // 單次退格直接撤回未確認狀態
+        assertEquals("7a3", s.undo())
+        assertTrue(s.phonetics.isEmpty())
+        assertFalse(s.canUndo)
+    }
+
     @Test fun deterministicRandomActionTracesMatchIndependentJournal() {
         val random = Random(20261120)
         data class Ref(val text: String, val before: String)

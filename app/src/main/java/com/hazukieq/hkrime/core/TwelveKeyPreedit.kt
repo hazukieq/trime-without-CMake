@@ -924,17 +924,16 @@ object TwelveKeyPreedit {
         Timber.i("TwelveKeyPreedit: syllables=%d codes=%d scores=%d", counts.size, table.size, generalScores.size)
     }
 
-    /** 拼音 → 12 鍵碼（對應 alphabet 的 abbrev/xform/xlit）。internal 供單測做鍵位覆蓋校驗。 */
+    /** 拼音 → 12 鍵碼（對應 `hakka_jiugong.schema.yaml` 的 xform/xlit）。internal 供單測做鍵位覆蓋校驗。 */
     internal fun codeOf(syllable: String): String {
-        var s = syllable
+        var s = if (syllable.endsWith("w")) syllable.dropLast(1) + "u" else syllable
         s = when {
             s.startsWith("nz") -> "y" + s.substring(2)
             s.startsWith("th") -> "w" + s.substring(2)
             s.startsWith("ng") -> "1" + s.substring(2)
             else -> s
         }
-        s = s.replace(Regex("(\\w)o"), "$14").replace(Regex("(\\w)u"), "$13")
-        val sb = StringBuilder()
+        val sb = StringBuilder(s.length)
         for (c in s) {
             sb.append(
                 when (c) {
@@ -942,9 +941,9 @@ object TwelveKeyPreedit {
                     'd', 'e', 'f' -> 'e'
                     'g', 'h', 'i' -> 'i'
                     'k', 'l' -> '5'
-                    'm', 'n' -> '4'
+                    'm', 'n', 'o' -> '4'
                     'p', 's' -> '7'
-                    'v', 'r' -> '3'
+                    'u', 'v', 'r' -> '3'
                     'z', 'j' -> '8'
                     'q', 't' -> '9'
                     else -> c
@@ -1095,8 +1094,9 @@ object TwelveKeyPreedit {
             val syllable = raw.trim()
             if (syllable.isEmpty() || syllable.startsWith("#")) return@forEach
             standardSyllables.add(syllable)
-            standardSyllableCodes.add(codeOf(syllable))
-            if (!isSuffixOnlySyllable(syllable)) standardNonSuffixCodes.add(codeOf(syllable))
+            val code = codeOf(syllable)
+            standardSyllableCodes.add(code)
+            if (!isSuffixOnlySyllable(syllable)) standardNonSuffixCodes.add(code)
         }
     }
 
@@ -1470,23 +1470,9 @@ object TwelveKeyPreedit {
         return canonicalSpelling(a) == canonicalSpelling(b)
     }
 
-    /** 把 schema `derive` 規則的變體拼寫歸一到同一形（只用於別名判定）。 */
-    private fun canonicalSpelling(syllable: String): String {
-        var s = syllable
-        s = when {
-            s.endsWith("iam") -> s.dropLast(3) + "ian"
-            s.endsWith("am") -> s.dropLast(2) + "an"
-            s.endsWith("om") -> s.dropLast(2) + "on"
-            s.endsWith("im") -> s.dropLast(2) + "in"
-            s.endsWith("em") -> s.dropLast(2) + "en"
-            s.endsWith("ap") -> s.dropLast(2) + "at"
-            s.endsWith("ep") -> s.dropLast(2) + "et"
-            s.endsWith("up") -> s.dropLast(2) + "ut"
-            s.endsWith("w") -> s.dropLast(1) + "u"
-            else -> s
-        }
-        return s
-    }
+    /** 把 `w$→u` 等 schema 歸一拼寫映射到同一形（只用於別名判定）。 */
+    private fun canonicalSpelling(syllable: String): String =
+        if (syllable.endsWith("w")) syllable.dropLast(1) + "u" else syllable
 
     /** librime preedit 的光標標記 `‸`(U+2038)。 */
     private const val CARET_MARK = "\u2038"

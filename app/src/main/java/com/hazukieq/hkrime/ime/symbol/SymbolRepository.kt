@@ -56,7 +56,7 @@ object SymbolRepository {
         for (rawLine in content.lineSequence()) {
             val trimmed = rawLine.trim()
             if (trimmed.isEmpty()) continue
-            if (trimmed.startsWith("#")) {
+            if (isCommentLine(trimmed)) {
                 val directive = trimmed.removePrefix("#").trim()
                 when {
                     directive.equals("split: line", ignoreCase = true) ||
@@ -68,7 +68,9 @@ object SymbolRepository {
                 continue
             }
             if (splitByLine) {
-                items.add(SymbolItem(trimmed, explicitBadge))
+                parseAnnotatedLine(trimmed, explicitBadge)?.let { items.add(it) }
+            } else if (trimmed.contains('\t')) {
+                parseAnnotatedLine(trimmed, explicitBadge)?.let { items.add(it) }
             } else {
                 for (token in trimmed.split(Regex("\\s+"))) {
                     if (token.isEmpty()) continue
@@ -86,6 +88,58 @@ object SymbolRepository {
             fileName = fileName,
             isBundled = isBundled,
         )
+    }
+
+    private fun isCommentLine(trimmed: String): Boolean {
+        if (!trimmed.startsWith("#")) return false
+        if (trimmed.length == 1) return false
+        val next = trimmed[1]
+        // Keep `#\t...` (annotated `#` symbol) and `#️⃣` (keycap `#` emoji) as real items
+        if (next == '\t' || next == '\uFE0F' || next == '\u20E3') return false
+        return true
+    }
+
+    private fun parseAnnotatedLine(line: String, defaultBadge: String?): SymbolItem? {
+        val tabIdx = line.indexOf('\t')
+        if (tabIdx < 0) return SymbolItem(line, defaultBadge)
+        val text = line.substring(0, tabIdx).trim()
+        if (text.isEmpty()) return null
+        val inlineBadge = line.substring(tabIdx + 1).trim().ifEmpty { null }
+        return SymbolItem(text, inlineBadge ?: defaultBadge)
+    }
+
+    /**
+     * Fills missing per-item badges in [userCategory] from [bundledCategory] by matching symbol
+     * text, while preserving any explicit badges or custom entries defined by the user.
+     */
+    internal fun mergeBundledBadges(
+        userCategory: SymbolCategory,
+        bundledCategory: SymbolCategory?,
+    ): SymbolCategory {
+        if (bundledCategory == null) return userCategory
+        val bundledBadges = HashMap<String, String>()
+        for (item in bundledCategory.items) {
+            val b = item.badge
+            if (!b.isNullOrEmpty() && !bundledBadges.containsKey(item.text)) {
+                bundledBadges[item.text] = b
+            }
+        }
+        if (bundledBadges.isEmpty()) return userCategory
+        var changed = false
+        val merged = userCategory.items.map { item ->
+            if (item.badge != null) {
+                item
+            } else {
+                val fallback = bundledBadges[item.text]
+                if (fallback != null) {
+                    changed = true
+                    item.copy(badge = fallback)
+                } else {
+                    item
+                }
+            }
+        }
+        return if (changed) userCategory.copy(items = merged) else userCategory
     }
 
     private fun inferBadge(categoryTitle: String, token: String): String? {
@@ -188,8 +242,10 @@ object SymbolRepository {
                     val text = file.readText(Charsets.UTF_8)
                     val parsed = parseTxt(file.name, text)
                     if (parsed.items.isNotEmpty()) {
-                        byTitle[parsed.title] = parsed.copy(
-                            isBundled = parsed.title in bundledTitles,
+                        val bundled = byTitle[parsed.title]?.takeIf { it.isBundled }
+                        val merged = mergeBundledBadges(parsed, bundled)
+                        byTitle[merged.title] = merged.copy(
+                            isBundled = merged.title in bundledTitles,
                         )
                     }
                 }

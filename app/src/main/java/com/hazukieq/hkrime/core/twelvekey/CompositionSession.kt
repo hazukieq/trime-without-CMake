@@ -18,7 +18,12 @@ class CompositionSession {
 
     data class Completion(val text: String, val code: String, val picks: List<Pick>)
 
-    private data class Undo(val pick: Pick?, val phonetics: List<PhoneticSelection>)
+    private data class Undo(
+        val pick: Pick?,
+        val phonetics: List<PhoneticSelection>,
+        /** 該次選字或確認拼音落地當下的剩餘原碼；若之後又追加輸入，退格先刪追加的碼。 */
+        val afterCode: String,
+    )
 
     private data class State(
         val remaining: String = "",
@@ -35,6 +40,19 @@ class CompositionSession {
     val selectedText: String get() = state.journal.joinToString("") { it.text }
     val active: Boolean get() = state.let { it.remaining.isNotEmpty() || it.journal.isNotEmpty() }
     val canUndo: Boolean get() = state.undo.isNotEmpty()
+    /**
+     * 退格是否應直接撤銷最後一次選字/確認拼音：
+     * 若用戶在最後一次選字/確認之後又繼續輸入了新碼（或分詞符），退格應先逐鍵刪除新輸入的尾碼，
+     * 回到當時的 [Undo.afterCode] 後再撤銷上一步選字/確認，不連帶抹掉剛敲的碼。
+     */
+    val shouldUndoOnBackspace: Boolean get() {
+        val old = state
+        val last = old.undo.lastOrNull() ?: return false
+        if (old.remaining.length > last.afterCode.length && old.remaining.startsWith(last.afterCode)) {
+            return false
+        }
+        return true
+    }
     /** 最後一個「只確認首拼」的單元（th/ng/nz 整段），供面板顯示選中態；完整音節不算。 */
     val initial: String? get() = state.phonetics.lastOrNull()?.takeIf { it.initialOnly }?.reading
     val phonetics: List<PhoneticSelection> get() = state.phonetics.toList()
@@ -45,7 +63,10 @@ class CompositionSession {
     /** 最後一段是簡拼且原碼已到尾：字母行點按是「細化」，不是再確認一段。 */
     val refinable: Boolean get() {
         val last = state.phonetics.lastOrNull() ?: return false
-        return last.initialOnly && pending.isEmpty() && last.code.length == state.remaining.length
+        val trimmedRemaining = state.remaining.trim { it == '\'' || it.isWhitespace() }
+        val trimmedLast = last.code.trim { it == '\'' || it.isWhitespace() }
+        return last.initialOnly && pending.isEmpty() &&
+            state.phonetics.size == 1 && trimmedLast.length == trimmedRemaining.length
     }
 
     @Synchronized fun bindEditor(editor: EditorIdentity): Boolean {
@@ -59,25 +80,62 @@ class CompositionSession {
 
     @Synchronized fun input(code: String) {
         val old = state
-        val prefix = old.phonetics.joinToString("") { it.code }
-        val kept = old.phonetics.takeIf { code.startsWith(prefix) }.orEmpty()
-        state = old.copy(remaining = code, completion = old.completion.takeIf { code == old.remaining },
+        var matchedLen = 0
+        var keptCount = 0
+        for (sel in old.phonetics) {
+            val nextLen = matchedLen + sel.code.length
+            if (nextLen <= code.length && code.startsWith(sel.code, matchedLen)) {
+                matchedLen = nextLen
+                keptCount++
+            } else {
+                break
+            }
+        }
+        val kept = if (keptCount == old.phonetics.size) old.phonetics else old.phonetics.take(keptCount)
+        val nextUndo = if (kept.size == old.phonetics.size) {
+            old.undo
+        } else {
+            val lastPickIdx = old.undo.indexOfLast { it.pick != null }
+            var trimEnd = old.undo.size
+            while (trimEnd > lastPickIdx + 1) {
+                val entry = old.undo[trimEnd - 1]
+                if (entry.pick == null && entry.phonetics.size >= kept.size) {
+                    trimEnd--
+                } else {
+                    break
+                }
+            }
+            old.undo.take(trimEnd)
+        }
+        state = old.copy(
+            remaining = code,
+            completion = old.completion.takeIf { code == old.remaining },
             phonetics = kept,
-            undo = if (kept.size == old.phonetics.size) old.undo
-            else old.undo.take(old.undo.indexOfLast { it.pick != null } + 1))
+            undo = nextUndo,
+        )
     }
 
     /**
      * 確認一段：`initialOnly` 消費待確認碼的首鍵（簡拼），否則消費實際匹配的音節跨度。
+     * 待確認尾碼已為空時（如單音節 pau 選完後再點 sau），原地切換末段音節而不重複壓撤銷棧。
      * 只鎖定讀音，不選字、不給提交許可。
      */
     @Synchronized fun confirmPhonetic(reading: String, initialOnly: Boolean): Boolean {
         val old = state
         if (old.completion != null) return false
-        val pending = PhoneticSelection.pending(old.remaining, old.phonetics)
-        val selection = PhoneticSelection.resolve(reading, pending, initialOnly) ?: return false
-        state = old.copy(phonetics = old.phonetics + selection,
-            undo = old.undo + Undo(null, old.phonetics))
+        val rawTail = PhoneticSelection.rawTail(old.remaining, old.phonetics)
+        if (PhoneticSelection.pending(old.remaining, old.phonetics).isEmpty()) {
+            val last = old.phonetics.lastOrNull() ?: return false
+            if (last.reading == reading && last.initialOnly == initialOnly) return false
+            val replacement = PhoneticSelection.resolve(reading, last.code + rawTail, initialOnly) ?: return false
+            state = old.copy(phonetics = old.phonetics.dropLast(1) + replacement)
+            return true
+        }
+        val selection = PhoneticSelection.resolve(reading, rawTail, initialOnly) ?: return false
+        state = old.copy(
+            phonetics = old.phonetics + selection,
+            undo = old.undo + Undo(null, old.phonetics, old.remaining),
+        )
         return true
     }
 
@@ -93,13 +151,15 @@ class CompositionSession {
     }
 
     /**
-     * 左列字母行統一入口：還有待確認碼就確認下一段的首拼；否則替換最後一段的字母。
+     * 左列字母行統一入口：還有待確認碼就確認下一段的首拼；否則替換最後一段（細化首拼或從完整音節切回首拼）。
      */
     @Synchronized fun onInitialLetter(letter: String): Boolean {
         val old = state
         if (old.remaining.isEmpty() || old.completion != null) return false
         val pending = PhoneticSelection.pending(old.remaining, old.phonetics)
-        return if (pending.isEmpty()) refineInitial(letter)
+        if (pending.isNotEmpty()) return confirmPhonetic(letter, initialOnly = true)
+        val last = old.phonetics.lastOrNull() ?: return false
+        return if (last.initialOnly) refineInitial(letter)
         else confirmPhonetic(letter, initialOnly = true)
     }
 
@@ -123,7 +183,7 @@ class CompositionSession {
         val journal = old.journal + Pick(text, reading, before, before.substring(0, end), origin)
         val remaining = before.substring(end)
         state = State(remaining, journal, if (remaining.isEmpty()) complete(journal) else null, old.owner,
-            undo = old.undo + Undo(journal.last(), old.phonetics),
+            undo = old.undo + Undo(journal.last(), old.phonetics, remaining),
             phonetics = old.phonetics.drop(confirmed))
         return true
     }

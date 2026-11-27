@@ -33,4 +33,13 @@ class PreeditDelimiterTest {
         assertEquals("an'ki", TwelveKeyPreedit.restoreDelimiters("an ki‸", "an'ki"))
         assertEquals("an ki", TwelveKeyPreedit.restoreDelimiters("an ki", "anki"))
     }
+
+    @Test
+    fun confirmedPhoneticPreeditPreservesTrailingAndInfixApostrophe() {
+        val tai = listOf(PhoneticSelection("tai", "9ai", false))
+        PreeditPresentation.invalidate("", tai)
+        assertEquals("tai'", PreeditPresentation.render("9ai ‸", "9ai'"))
+        assertEquals("tai'go", PreeditPresentation.render("9ai i4‸", "9ai'i4", "太哥", "tai go"))
+        PreeditPresentation.invalidate("")
+    }
 }

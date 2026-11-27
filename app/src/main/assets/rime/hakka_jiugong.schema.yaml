@@ -23,11 +23,14 @@ switches:
     reset: 0
     states: ["简","繁"]
   - name: ywz
-    reset: 0    #0为默认关闭，1为默认开启，推荐默认关闭
-    states: [ 关, 情 ]    #控制开关，可自定义括号内，开关显示内容
+    reset: 1    #0为默认关闭，1为默认开启（颜文字联想：默认开启）
+    states: [ 关, 颜 ]    #控制开关，可自定义括号内，开关显示内容
   - name: lenth
-    reset: 0    #0为默认关闭，1为默认开启，推荐默认关闭
+    reset: 1    #0为默认关闭，1为默认开启（联想：默认开启）
     states: [ 关, 联 ]    #控制开关
+  - name: emoji
+    reset: 1    #0为默认关闭，1为默认开启（表情联想：默认开启）
+    states: [ 关, 情 ]    #表情开关
   
   #- name: full_shape
    # states: [ "全","半" ]
@@ -65,6 +68,7 @@ engine:
     - uniquifier
     - simplifier@ywz
     - simplifier@lenth
+    - simplifier@emoji
 
 speller:
   alphabet: zwxyvutsrqponmlkjihgfedcba1234567890;
@@ -77,23 +81,12 @@ speller:
     # 之後再經 xform/xlit，th→w、nz→y、ng→1、k/l→5、m/n→4… 落到 12 鍵上。
     # 這樣任意音節都有「聲母縮寫」，兩鍵／多鍵只打聲母也能聯想出組詞。
     - abbrev/^(th|nz|ng|[a-z]).*$/$1/
-    - derive/ap$/at/
-    - derive/ep$/et/
-    - derive/up$/ut/
-    - derive/w$/u/
-    - derive/iam$/ian/
-    - derive/am$/an/
-    - derive/om$/on/
-    - derive/im$/in/
-    - derive/em$/en/
+    # 12 鍵沒有獨立韻母 w 鍵（w 鍵為 th），直接歸位到 u（3 鍵）：cw→a3、zw→83
+    - xform/w$/u/
     - xform/^nz/y/
     - xform/^th/w/
     - xform/^ng/1/
-    - xform/(\w)o/$1M/
-    - xform/M/4/
-    - xform/(\w)u/$1V/
-    - xform/V/3/
-    - xlit/abcdefghiklmnpsvrzjqt/aaaeeeiii554477338899/
+    - xlit/abcdefghiklmnopsuvrzjqt/aaaeeeiii55444773338899/
     #- derive/[+_*^0]//
     #- derive/([+_*^0])$//
     #- derive/^(.*)$/\U$1/
@@ -121,6 +114,11 @@ lenth:
   opencc_config: lenth.json
   option_name: lenth
   tips: none    #none无注释, char单字注释, all全部注释
+
+emoji:
+  opencc_config: emoji.json
+  option_name: emoji
+  tips: all    #none无注释, char单字注释, all全部注释
   
 
 custom_phrase:

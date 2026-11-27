@@ -269,4 +269,105 @@ class InitialDisambiguationTest {
         assertEquals(input, full.remaining)
         assertEquals(listOf("k", "l"), full.initialChoices)
     }
+
+    @Test fun delimiterAfterConfirmedPhoneticKeepsConfirmRowsAndMatchesInput() {
+        val code = "9ai'i4"
+        val taiWithQuote = PhoneticSelection("tai", "9ai'", false)
+        val taiNoQuote = PhoneticSelection("tai", "9ai", false)
+
+        // 前導分詞符不阻斷第二段待確認碼與左列確認項
+        assertEquals("i4", PhoneticSelection.pending(code, listOf(taiNoQuote)))
+        assertEquals(listOf("g", "h"), InitialDisambiguation.choices("'i4"))
+        assertTrue(TwelveKeySnapshotBuilder.confirmGroups(code, listOf(taiNoQuote)).any { it.reading == "go" })
+
+        // 候選跨度在引號前（end=3）或引號後（end=4）皆視為合法匹配
+        assertTrue(PhoneticSelection.matchesInput("tai", code, 3, listOf(taiWithQuote)))
+        assertTrue(PhoneticSelection.matchesInput("tai", code, 4, listOf(taiWithQuote)))
+        assertTrue(PhoneticSelection.matchesInput("tai", code, 3, listOf(taiNoQuote)))
+        assertTrue(PhoneticSelection.matchesInput("tai", code, 4, listOf(taiNoQuote)))
+        assertFalse(PhoneticSelection.matchesInput("tai", code, 2, listOf(taiWithQuote)))
+
+        // 尾端含分詞符的全碼候選仍置頂
+        val codeWithTrailingQuote = "7i4aa4'"
+        val partial = CandidateItem("身", "sin", 0, inputSpan = InputCodeSpan(codeWithTrailingQuote, 3, "sin"))
+        val full = CandidateItem("平板", "pin ban", 1, inputSpan = InputCodeSpan(codeWithTrailingQuote, 6, "pin ban"))
+        assertEquals(
+            listOf(full, partial),
+            CandidateRanking.preferCompleteFirst(listOf(partial, full), codeWithTrailingQuote),
+        )
+    }
+
+    @Test fun optimisticPhoneticRefusesStaleRemainingAfterPickUndo() {
+        val prev = TwelveKeySnapshot(
+            input = "i4",
+            consumedEnd = 0,
+            remaining = "i4",
+            groups = emptyList(),
+            fallback = null,
+            barEntries = listOf(CandidateItem("哥", "go", 0, inputSpan = InputCodeSpan("i4", 2, "go"))),
+            recommend = listOf(CandidateItem("哥", "go", 0, inputSpan = InputCodeSpan("i4", 2, "go"))),
+            contextKey = "stale-i4",
+            rawPreedit = "i4",
+        )
+        // 撤銷選字後 remaining 從 "i4" 變回 "9aii4"：絕不能復用 "i4" 的舊候選與 contextKey
+        assertNull(TwelveKeySnapshotBuilder.optimisticPhonetic(prev, "9aii4", emptyList(), true))
+        assertNull(TwelveKeySnapshotBuilder.optimisticPhonetic(TwelveKeySnapshot.EMPTY, "i4", emptyList(), true))
+
+        // 同一 remaining 上的拼音確認/撤銷可安全產生樂觀快照
+        val same = TwelveKeySnapshotBuilder.optimisticPhonetic(
+            prev, "i4", listOf(PhoneticSelection("g", "i", true)), true,
+        )
+        assertNotNull(same)
+        assertEquals("i4", same!!.input)
+        assertEquals("i4", same.remaining)
+    }
+
+    @Test fun confirmingSingleSyllableKeepsLeftRailVisibleForHighlightAndSiblingSwitch() {
+        val code = "7a3" // pau / sau / pa / sa / p / s
+        val pau = PhoneticSelection("pau", code, false)
+        val rows = TwelveKeySnapshotBuilder.confirmGroups(code, listOf(pau))
+        assertTrue("單音節確認後左列不能為空", rows.isNotEmpty())
+        assertTrue("左列必須保留當前已選音節 pau", rows.any { it.reading == "pau" && it.segment != INITIAL_LETTER_SEGMENT })
+        assertTrue("左列應保留同段其他可選音節 sau", rows.any { it.reading == "sau" && it.segment != INITIAL_LETTER_SEGMENT })
+        assertTrue("左列應保留該段首拼行 p/s", rows.any { it.reading == "p" && it.segment == INITIAL_LETTER_SEGMENT })
+
+        // 多音節末段確認後同理保留末段左列音節
+        val multi = "7i45i"
+        val sin = PhoneticSelection("sin", "7i4", false)
+        val ki = PhoneticSelection("ki", "5i", false)
+        val tailRows = TwelveKeySnapshotBuilder.confirmGroups(multi, listOf(sin, ki))
+        assertTrue(tailRows.any { it.reading == "ki" && it.segment != INITIAL_LETTER_SEGMENT })
+        assertTrue(tailRows.any { it.reading == "li" && it.segment != INITIAL_LETTER_SEGMENT })
+    }
+
+    @Test fun wEndingMapsToUKeyAndRemovedApDeriveNoLongerPollutesAtKey() {
+        // xform/w$/u/：cw→a3、zw→83 直接歸位到 u 鍵，不再產生 aw/8w 死碼
+        assertEquals("a3", TwelveKeyPreedit.codeOf("cw"))
+        assertEquals("83", TwelveKeyPreedit.codeOf("zw"))
+
+        val a3Syllables = TwelveKeySnapshotBuilder.confirmGroups("a3", emptyList())
+            .filter { it.segment != INITIAL_LETTER_SEGMENT }
+            .map { it.reading }
+        assertTrue("a3 左列應包含 cu: $a3Syllables", "cu" in a3Syllables)
+        assertTrue("a3 左列應包含 cw: $a3Syllables", "cw" in a3Syllables)
+        assertTrue("cu 應排在 cw 之前: $a3Syllables", a3Syllables.indexOf("cu") < a3Syllables.indexOf("cw"))
+
+        // 點擊左列 cw 可正確解析為消費 a3 的確認段，並保留高亮與可切換
+        val cwSel = PhoneticSelection.resolve("cw", "a3", initialOnly = false)
+        assertNotNull("cw 應可作為 a3 的有效確認段", cwSel)
+        assertEquals("cw", cwSel!!.reading)
+        assertEquals("a3", cwSel.code)
+        val afterConfirm = TwelveKeySnapshotBuilder.confirmGroups("a3", listOf(cwSel))
+            .filter { it.segment != INITIAL_LETTER_SEGMENT }
+            .map { it.reading }
+        assertTrue("確認 cw 後左列應保留 cw 高亮: $afterConfirm", "cw" in afterConfirm)
+        assertTrue("確認 cw 後應保留 cu 供切換: $afterConfirm", "cu" in afterConfirm)
+
+        // derive/ap$/at/ 已移除：ia9 只列原生 -at 音節，不再混入 -ap
+        val ia9Syllables = TwelveKeySnapshotBuilder.confirmGroups("ia9", emptyList())
+            .filter { it.segment != INITIAL_LETTER_SEGMENT }
+            .map { it.reading }
+        assertTrue("ia9 應包含原生音節 gat: $ia9Syllables", "gat" in ia9Syllables)
+        assertFalse("移除 derive/ap$/at/ 後 ia9 不應包含 gap: $ia9Syllables", "gap" in ia9Syllables)
+    }
 }

@@ -81,13 +81,16 @@ class SyllableGroupCountTest {
     private fun scoreOf(ch: String): Int =
         if (ch.isEmpty()) 0 else generalScore[ch.codePointAt(0)] ?: 0
 
-    /** 復刻 speller/algebra：nz→y、th→w、ng→1、(\w)o→$1M→4、(\w)u→$1V→3 + xlit。 */
+    /** 復刻 speller/algebra：w$→u、nz→y、th→w、ng→1 + xlit。 */
     private fun codeOf(syllable: String): String {
-        var s = syllable.replace("nz", "y").replace("th", "w").replace("ng", "1")
-        s = Regex("(\\w)o").replace(s) { it.groupValues[1] + "M" }
-        s = Regex("(\\w)u").replace(s) { it.groupValues[1] + "V" }
-        s = s.replace("M", "4").replace("V", "3")
-        val xlit = "abcdefghiklmnpsvrzjqt" to "aaaeeeiii554477338899"
+        var s = if (syllable.endsWith("w")) syllable.dropLast(1) + "u" else syllable
+        s = when {
+            s.startsWith("nz") -> "y" + s.substring(2)
+            s.startsWith("th") -> "w" + s.substring(2)
+            s.startsWith("ng") -> "1" + s.substring(2)
+            else -> s
+        }
+        val xlit = "abcdefghiklmnopsuvrzjqt" to "aaaeeeiii55444773338899"
         val sb = StringBuilder(s.length)
         for (c in s) {
             val idx = xlit.first.indexOf(c)

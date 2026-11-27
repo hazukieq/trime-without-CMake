@@ -534,6 +534,9 @@ public class Trime extends LifecycleInputMethodService {
       inputRootBinding.inputRoot.setBackgroundColor(Color.BLACK);
     }
 
+    if (textInputManager != null) {
+      textInputManager.applyTheme();
+    }
   }
 
   public void resetKeyboard() {
@@ -1021,7 +1024,7 @@ public class Trime extends LifecycleInputMethodService {
     Timber.i("\t<TrimeInput>\tonKeyEvent()\tRealKeyboard event=%s", event.toString());
     int keyCode = event.getKeyCode();
     textInputManager.setNeedSendUpRimeKey(Rime.isComposing());
-    if (!isComposing()) {
+    if (!isComposing() && !textInputManager.hasTwelveKeySession()) {
       if (keyCode == KeyEvent.KEYCODE_DEL
           || keyCode == KeyEvent.KEYCODE_ENTER
           || keyCode == KeyEvent.KEYCODE_ESCAPE
@@ -1095,7 +1098,14 @@ public class Trime extends LifecycleInputMethodService {
   // 处理键盘事件(Android keycode)
   public boolean handleKey(int keyEventCode, int metaState) { // 軟鍵盤
     // 12 鍵：空格上屏候選條第一條（學習重排後引擎高亮不等於用戶看到的第一個）
-    if (textInputManager.handleTwelveKeyKey(keyEventCode)) return true;
+    if (textInputManager.handleTwelveKeyKey(keyEventCode)) {
+      textInputManager.setNeedSendUpRimeKey(false);
+      return true;
+    }
+    if (textInputManager.handleComposingSpecialKey(keyEventCode, metaState)) {
+      textInputManager.setNeedSendUpRimeKey(false);
+      return true;
+    }
     textInputManager.setNeedSendUpRimeKey(false);
     if (onRimeKey(Event.getRimeEvent(keyEventCode, metaState))) {
       // 如果输入法消费了按键事件，则需要释放按键

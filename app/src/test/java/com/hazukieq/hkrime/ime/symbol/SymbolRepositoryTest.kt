@@ -2,7 +2,9 @@ package com.hazukieq.hkrime.ime.symbol
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class SymbolRepositoryTest {
 
@@ -32,12 +34,68 @@ class SymbolRepositoryTest {
             """
             # split: line
             # 注释行
-            ٩( 'ω' )و
+            ٩( 'ω' )و	振作
             ╰(*´︶`*)╯
             """.trimIndent(),
         )
         assertEquals("颜文", cat.title)
         assertEquals(listOf("٩( 'ω' )و", "╰(*´︶`*)╯"), cat.items.map { it.text })
+        assertEquals(listOf("振作", null), cat.items.map { it.badge })
+    }
+
+    @Test
+    fun parseInlineTabBadgeInDefaultMode() {
+        val cat = SymbolRepository.parseTxt(
+            "07_表情.txt",
+            """
+            😀	嘿嘿
+            😂	笑哭了
+            👍 👎
+            """.trimIndent(),
+        )
+        assertEquals(listOf("😀", "😂", "👍", "👎"), cat.items.map { it.text })
+        assertEquals(listOf("嘿嘿", "笑哭了", null, null), cat.items.map { it.badge })
+    }
+
+    @Test
+    fun mergeBundledBadgesFillsMissingWithoutOverwritingUserBadges() {
+        val bundled = SymbolRepository.parseTxt(
+            "07_表情.txt",
+            """
+            # split: line
+            😀	嘿嘿
+            😂	笑哭了
+            """.trimIndent(),
+            isBundled = true,
+        )
+        val user = SymbolRepository.parseTxt(
+            "07_表情.txt",
+            """
+            # split: line
+            😀
+            😂	自定义笑哭
+            🌟
+            """.trimIndent(),
+        )
+        val merged = SymbolRepository.mergeBundledBadges(user, bundled)
+        assertEquals(listOf("嘿嘿", "自定义笑哭", null), merged.items.map { it.badge })
+    }
+
+    @Test
+    fun bundledEmojiAndKaomojiFilesHaveCompleteMeaningBadges() {
+        val assetsDir = listOf(
+            File("src/main/assets/rime/symbols"),
+            File("app/src/main/assets/rime/symbols"),
+        ).first { it.isDirectory }
+
+        for ((name, expectedCount) in listOf("07_表情.txt" to 1220, "08_颜文.txt" to 240)) {
+            val file = File(assetsDir, name)
+            assertTrue("Missing bundled file: $name", file.isFile)
+            val cat = SymbolRepository.parseTxt(name, file.readText(Charsets.UTF_8), isBundled = true)
+            assertEquals("$name item count mismatch", expectedCount, cat.items.size)
+            val missing = cat.items.filter { it.badge.isNullOrBlank() }
+            assertEquals("$name has items missing meaning badge: ${missing.take(5)}", 0, missing.size)
+        }
     }
 
     @Test
