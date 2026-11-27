@@ -72,6 +72,7 @@ class HardwareKeyboardController(
             toggleHardwareSchemaEnabled(schemaId, enable, switchAfter, onDone)
         }
         onToggleSwitch = { switchIndex -> toggleHardwareSwitch(switchIndex) }
+        onSelectColor = { colorKey -> selectHardwareColor(colorKey) }
         onDismissed = { hideAnchorIfIdle() }
         setOnBoundsChanged { requestRecomputeInsets(true) }
     }
@@ -817,6 +818,13 @@ class HardwareKeyboardController(
             Rime.getContexts()
         }
         service.updateComposing()
+    }
+
+    private fun selectHardwareColor(colorKey: String) {
+        AppPrefs.defaultInstance().looks.selectedColor = colorKey
+        runCatching { com.hazukieq.hkrime.data.Config.get(service).initCurrentColors() }
+        applyTheme()
+        service.initKeyboard()
     }
 
     private fun hideAnchorIfIdle() {

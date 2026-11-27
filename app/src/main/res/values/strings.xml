@@ -98,8 +98,8 @@
     <string name="keyboard__hw_shortcut_symbol_summary">Shows near cursor; Tab switches tabs, arrows move, Enter / 1-9 commits, Esc closes</string>
     <string name="keyboard__hw_shortcut_clipboard_title">Clipboard history popup (Ctrl + Shift + V)</string>
     <string name="keyboard__hw_shortcut_clipboard_summary">Shows near cursor; ↑↓ / 1-9 pastes, P pins, Del deletes, Esc closes</string>
-    <string name="keyboard__hw_shortcut_menu_title">Schema &amp; Switches popup (Ctrl + Shift + M)</string>
-    <string name="keyboard__hw_shortcut_menu_summary">Shows near cursor; Tab switches Schema/Switches, Enter / 1-9 selects, Space enables/disables supported schemas, Esc closes</string>
+    <string name="keyboard__hw_shortcut_menu_title">Settings menu popup (Ctrl + Shift + M)</string>
+    <string name="keyboard__hw_shortcut_menu_summary">Shows near cursor; Tab switches Schema / Switches / Theme, Enter / 1-9 selects, Space enables/disables schemas, Esc closes</string>
     <string name="keyboard__hw_shortcut_editing_title">Selection, paging &amp; mode switch</string>
     <string name="keyboard__hw_shortcut_editing_summary">Shift toggles CN/EN; ← / → edits preedit caret; ↑ / ↓ selects; - / = flips page</string>
     <string name="unit__candidate_count"> items</string>
