@@ -704,11 +704,6 @@ public class Trime extends LifecycleInputMethodService {
   }
 
   @Override
-  public View onCreateCandidatesView() {
-    return getHardwareController().createAnchorView();
-  }
-
-  @Override
   public void onUpdateCursorAnchorInfo(CursorAnchorInfo cursorAnchorInfo) {
     if (isHardwareKeyboardModeActive()) {
       getHardwareController().onUpdateCursorAnchorInfo(cursorAnchorInfo);
@@ -886,7 +881,11 @@ public class Trime extends LifecycleInputMethodService {
       return;
     }
     if (showingHardwareCanvas || inputRootBinding == null) {
+      if (hardwareKeyboardController != null) {
+        hardwareKeyboardController.onExitHardwareMode();
+      }
       setInputView(createTouchInputView());
+      updateFullscreenMode();
     }
     final String liveSchema = Rime.getSchemaId();
     final boolean hasRealSchema =
@@ -1387,7 +1386,7 @@ public class Trime extends LifecycleInputMethodService {
       return 0;
     }
     if (hardwareKeyboardController != null) {
-      hardwareKeyboardController.onFinishInput();
+      hardwareKeyboardController.dismissOverlaysOnly();
     }
     if (ic != null && !isWinFixed()) isCursorUpdated = ic.requestCursorUpdates(1);
     int startNum = 0;

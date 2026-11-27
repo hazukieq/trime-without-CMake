@@ -173,10 +173,35 @@ class HardwareKeyboardController(
         }.also { canvasView = it }
     }
 
-    fun createAnchorView(): View = View(service).apply {
-        layoutParams = ViewGroup.LayoutParams(1, 1)
-        setBackgroundColor(Color.TRANSPARENT)
-    }.also { anchorView = it }
+    /** 退出物理鍵盤接手模式（切回觸屏軟鍵盤時呼叫）：釋放畫布附著並還原系統欄 fitsSystemWindows。 */
+    fun onExitHardwareMode() {
+        handler.removeCallbacks(retryShowRunnable)
+        handler.removeCallbacks(retryIndicatorRunnable)
+        handler.removeCallbacks(retryToolRunnable)
+        handler.removeCallbacks(recomputeInsetsRunnable)
+        recomputeInsetsScheduled = false
+        transparentWindowKey = 0L
+        pendingModeIndicatorAscii = null
+        pendingToolPopup = null
+        consumedDownKeys.clear()
+        popup.detach()
+        modeIndicator.dismiss()
+        symbolPopup.dismiss()
+        clipboardPopup.dismiss()
+        val win = service.window?.window ?: return
+        runCatching {
+            WindowCompat.setDecorFitsSystemWindows(win, true)
+            win.decorView.findViewById<View>(android.R.id.navigationBarBackground)?.alpha = 1f
+        }
+    }
+
+    /** 僅收起外設懸浮窗，不干涉觸屏模式的 candidatesView 狀態。 */
+    fun dismissOverlaysOnly() {
+        if (popup.isShowing) popup.dismiss()
+        if (modeIndicator.isShowing) modeIndicator.dismiss()
+        if (symbolPopup.isShowing) symbolPopup.dismiss()
+        if (clipboardPopup.isShowing) clipboardPopup.dismiss()
+    }
 
     fun applyInsets(outInsets: InputMethodService.Insets) {
         val h = service.window?.window?.decorView?.height ?: 0
