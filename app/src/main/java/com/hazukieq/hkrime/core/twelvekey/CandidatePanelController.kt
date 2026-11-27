@@ -70,10 +70,25 @@ class CandidatePanelController(
             itemAnimator = null
         }
         grid?.apply {
-            // 官方 FlexboxLayoutManager：Row + Wrap 的流式候選，滾出屏幕的格子由 RecyclerView
-            // 回收複用（Google 的 flexbox README 明確說明它會 recycle 離屏 view），不再自繪
-            // 一個「實例化全部項目」的 LayoutManager。
-            layoutManager = FlexboxLayoutManager(context).apply {
+            // 官方 FlexboxLayoutManager：Row + Wrap 的流式候選；覆寫 onItemsChanged 清理舊 flexLine 緩存，
+            // 避免數據集驟縮（如 60 項 → 1 項）時 FlexboxLayoutManager 觸發 IndexOutOfBoundsException。
+            layoutManager = object : FlexboxLayoutManager(context) {
+                override fun onItemsChanged(recyclerView: RecyclerView) {
+                    removeAllViews()
+                    super.onItemsChanged(recyclerView)
+                }
+
+                override fun onLayoutChildren(
+                    recycler: RecyclerView.Recycler,
+                    state: RecyclerView.State,
+                ) {
+                    try {
+                        super.onLayoutChildren(recycler, state)
+                    } catch (_: IndexOutOfBoundsException) {
+                        removeAllViews()
+                    }
+                }
+            }.apply {
                 flexDirection = FlexDirection.ROW
                 flexWrap = FlexWrap.WRAP
                 justifyContent = JustifyContent.FLEX_START
