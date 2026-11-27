@@ -41,6 +41,13 @@
         app:icon="@drawable/ic_pref_theme_color"
         android:fragment="com.hazukieq.hkrime.settings.fragments.LooksFragment"/>
 
+    <Preference android:key="pref_hardware_keyboard"
+        android:order="7"
+        android:title="@string/pref_keyboard__hardware"
+        android:summary="@string/pref_keyboard__hardware_entry_summary"
+        app:icon="@drawable/ic_baseline_keyboard_24"
+        android:fragment="com.hazukieq.hkrime.settings.fragments.HardwareKeyboardFragment"/>
+
     <Preference android:key="pref_input"
         android:order="8"
         android:title="@string/settings__configuration_title"

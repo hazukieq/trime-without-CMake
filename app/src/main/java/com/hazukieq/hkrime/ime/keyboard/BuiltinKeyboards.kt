@@ -178,6 +178,7 @@ object BuiltinKeyboards {
         putSwitch("Keyboard_cn", "中文", ".default")
         putSwitch("Keyboard_number", "123", "number")
         putSwitch("Keyboard_edit", "编辑", "edit")
+        putSwitch("Keyboard_clipboard", "剪贴板", "clipboard")
         putIfAbsent("Mode_switch", "toggle" to "ascii_mode", "send" to "Mode_switch", "states" to "[中文, 英文]", "functional" to "false")
         putIfAbsent("IME_switch", "label" to "ime", "send" to "LANGUAGE_SWITCH")
         putIfAbsent("Menu", "label" to "菜单", "send" to "Menu", "functional" to "false")

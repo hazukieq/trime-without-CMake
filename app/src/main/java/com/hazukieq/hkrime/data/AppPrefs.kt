@@ -172,6 +172,10 @@ class AppPrefs(
             const val FLOATING_WINDOW_ENABLED = "keyboard__show_window"
             const val FULLSCREEN_MODE = "keyboard__fullscreen_mode"
             const val CANDIDATE_ALGORITHM_ENABLED = "keyboard__candidate_algorithm"
+            const val HW_KEYBOARD_MODE = "keyboard__hw_keyboard_mode"
+            const val HW_CANDIDATE_ORIENTATION = "keyboard__hw_candidate_orientation"
+            const val HW_CANDIDATE_COUNT = "keyboard__hw_candidate_count"
+            const val HW_INLINE_PREEDIT = "keyboard__hw_inline_preedit"
 
 
             const val SOUND_ENABLED = "keyboard__key_sound"
@@ -198,6 +202,15 @@ class AppPrefs(
             set(v) = prefs.setPref(INLINE_PREEDIT_MODE, v)
         val candidateAlgorithmEnabled: Boolean
             get() = prefs.getPref(CANDIDATE_ALGORITHM_ENABLED, true)
+        val hwKeyboardMode: Boolean
+            get() = prefs.getPref(HW_KEYBOARD_MODE, true)
+        val hwCandidateOrientation: String
+            get() = prefs.getPref(HW_CANDIDATE_ORIENTATION, "horizontal")
+        val hwCandidateCount: Int
+            get() = prefs.getPref(HW_CANDIDATE_COUNT, 5).coerceIn(3, 9)
+        var hwInlinePreedit: InlineModeType
+            get() = InlineModeType.fromString(prefs.getPref(HW_INLINE_PREEDIT, "preview"))
+            set(v) = prefs.setPref(HW_INLINE_PREEDIT, v)
         var fullscreenMode: LandscapeInputUIMode
             get() = LandscapeInputUIMode.fromString(prefs.getPref(FULLSCREEN_MODE, "auto_show"))
             set(v) = prefs.setPref(FULLSCREEN_MODE, v)

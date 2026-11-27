@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:key="pref_hardware_keyboard"
+    android:title="@string/pref_keyboard__hardware">
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:title="@string/pref_keyboard__hardware_mode_section">
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="keyboard__hw_keyboard_mode"
+            android:title="@string/keyboard__hw_keyboard_mode_title"
+            android:summary="@string/keyboard__hw_keyboard_mode_summary"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:title="@string/pref_keyboard__hardware_candidate_section">
+        <com.hazukieq.hkrime.settings.components.ModernListPreference
+            android:defaultValue="horizontal"
+            android:dependency="keyboard__hw_keyboard_mode"
+            android:entries="@array/keyboard__hw_candidate_orientation_entries"
+            android:entryValues="@array/keyboard__hw_candidate_orientation_values"
+            android:key="keyboard__hw_candidate_orientation"
+            android:title="@string/keyboard__hw_candidate_orientation_title"
+            app:iconSpaceReserved="false"
+            app:useSimpleSummaryProvider="true" />
+        <com.hazukieq.hkrime.settings.components.DialogSeekBarPreference
+            android:defaultValue="5"
+            android:dependency="keyboard__hw_keyboard_mode"
+            android:key="keyboard__hw_candidate_count"
+            android:title="@string/keyboard__hw_candidate_count_title"
+            app:allowDividerAbove="false"
+            app:iconSpaceReserved="false"
+            app:max="9"
+            app:min="3"
+            app:seekBarIncrement="1"
+            app:unit="@string/unit__candidate_count" />
+        <com.hazukieq.hkrime.settings.components.ModernListPreference
+            android:defaultValue="preview"
+            android:dependency="keyboard__hw_keyboard_mode"
+            android:entries="@array/keyboard__inline_entries"
+            android:entryValues="@array/keyboard__inline_values"
+            android:key="keyboard__hw_inline_preedit"
+            android:title="@string/keyboard__hw_inline_preedit_title"
+            android:summary="@string/keyboard__hw_inline_preedit_summary"
+            app:iconSpaceReserved="false"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:title="@string/pref_keyboard__hardware_shortcuts_section">
+        <Preference
+            android:selectable="false"
+            android:title="@string/keyboard__hw_shortcut_symbol_title"
+            android:summary="@string/keyboard__hw_shortcut_symbol_summary"
+            app:iconSpaceReserved="false" />
+        <Preference
+            android:selectable="false"
+            android:title="@string/keyboard__hw_shortcut_clipboard_title"
+            android:summary="@string/keyboard__hw_shortcut_clipboard_summary"
+            app:iconSpaceReserved="false" />
+        <Preference
+            android:selectable="false"
+            android:title="@string/keyboard__hw_shortcut_editing_title"
+            android:summary="@string/keyboard__hw_shortcut_editing_summary"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

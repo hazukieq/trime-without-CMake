@@ -81,6 +81,32 @@
     <string name="keyboard__show_key_popup_title">按键时弹出显示字符</string>
     <string name="keyboard__show_window_title">悬浮编码条</string>
     <string name="keyboard__show_window_summary">在键盘上方显示正在输入的拼音</string>
+    <string name="pref_keyboard__hardware">物理键盘</string>
+    <string name="pref_keyboard__hardware_entry_summary">桌面式光标跟随候选窗（仅 26 键方案，独立于触屏设置）</string>
+    <string name="pref_keyboard__hardware_mode_section">外设接手</string>
+    <string name="pref_keyboard__hardware_candidate_section">候选窗与预编辑</string>
+    <string name="keyboard__hw_keyboard_mode_title">物理键盘接手模式</string>
+    <string name="keyboard__hw_keyboard_mode_summary">连接物理键盘时隐藏软键盘，仅跟随光标显示桌面式候选窗（仅支持 26 键方案）</string>
+    <string name="keyboard__hw_candidate_orientation_title">候选窗排列方式</string>
+    <string name="keyboard__hw_candidate_count_title">每页候选数量</string>
+    <string name="keyboard__hw_inline_preedit_title">输入框内预编辑（外设独立）</string>
+    <string name="keyboard__hw_inline_preedit_summary">仅物理键盘模式生效，不干扰触屏模式设置</string>
+    <string name="pref_keyboard__hardware_shortcuts_section">快捷键说明</string>
+    <string name="keyboard__hw_shortcut_symbol_title">符号与表情悬浮窗（Ctrl + Shift + E）</string>
+    <string name="keyboard__hw_shortcut_symbol_summary">光标旁弹出；Tab 切分类，方向键选，Enter / 1-9 上屏，Esc 关闭</string>
+    <string name="keyboard__hw_shortcut_clipboard_title">剪切板历史悬浮窗（Ctrl + Shift + V）</string>
+    <string name="keyboard__hw_shortcut_clipboard_summary">光标旁弹出；↑↓ / 1-9 粘贴，P 置顶，Del 删除，Esc 关闭</string>
+    <string name="keyboard__hw_shortcut_editing_title">选词、翻页与中英切换</string>
+    <string name="keyboard__hw_shortcut_editing_summary">Shift 切中英；← / → 编辑编码光标；↑ / ↓ 选候选；- / = 翻页</string>
+    <string name="unit__candidate_count"> 个</string>
+    <string-array name="keyboard__hw_candidate_orientation_entries">
+        <item>横排</item>
+        <item>竖排</item>
+    </string-array>
+    <string-array name="keyboard__hw_candidate_orientation_values">
+        <item>horizontal</item>
+        <item>vertical</item>
+    </string-array>
     <string name="keyboard__inline_preedit_title">输入框内显示</string>
     <string-array name="keyboard__inline_entries">
         <item>首选词</item>

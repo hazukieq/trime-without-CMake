@@ -63,11 +63,13 @@ class EditorInstance(private val ims: InputMethodService) {
     }
 
     fun updateComposingText() {
+        val isHwMode = (ims as? Trime)?.isHardwareKeyboardModeActive == true
         // 切換焦點可由宿主自行結束 composing，不能靠事後取消阻止未選內容上屏。
         // 十二鍵的待選狀態只畫在輸入法 preedit，全部選完才經提交許可寫入宿主。
-        if (textInputManager.isTwelveKeyMode() || textInputManager.hasTwelveKeySession()) return
+        if (!isHwMode && (textInputManager.isTwelveKeyMode() || textInputManager.hasTwelveKeySession())) return
         val ic = inputConnection ?: return
-        val composingText = when (prefs.keyboard.inlinePreedit) {
+        val inlineMode = if (isHwMode) prefs.keyboard.hwInlinePreedit else prefs.keyboard.inlinePreedit
+        val composingText = when (inlineMode) {
             InlineModeType.INLINE_PREVIEW ->
                 Rime.getComposingText()
             InlineModeType.INLINE_COMPOSITION -> Rime.getCompositionText()

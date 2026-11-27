@@ -74,6 +74,8 @@ public class Candidate extends View {
   public static final String PAGE_EX_BUTTON = "▼";
   /** 候選為空時的按鈕：點它收起輸入法鍵盤 */
   public static final String HIDE_KEYBOARD_BUTTON = "⌄";
+  /** 候選為空時的剪切板按鈕：點它開/關原生剪切板面板 */
+  public static final String CLIPBOARD_BUTTON = "📋";
 
   /** 面板展開時，▼ 反向繪製成 ▲（同一個路徑，僅方向不同），保證展開/收起圖標同尺寸。 */
   private static final String PANEL_OPEN_ARROW = "▲";
@@ -372,6 +374,8 @@ public class Candidate extends View {
           drawChevron(canvas, computedCandidate.getGeometry(), up);
         } else if (MENU_BUTTON.equals(arrow)) {
           drawMenuIcon(canvas, computedCandidate.getGeometry());
+        } else if (CLIPBOARD_BUTTON.equals(arrow)) {
+          drawClipboardIcon(canvas, computedCandidate.getGeometry());
         } else if (THEME_BUTTON.equals(arrow)) {
           drawPaletteIcon(canvas, computedCandidate.getGeometry());
         } else {
@@ -416,6 +420,11 @@ public class Candidate extends View {
         new ComputedCandidate.Symbol(MENU_BUTTON, symbolRect(left, symbolBoxSize)));
   }
 
+  private void addClipboardSymbol(int left) {
+    computedCandidates.add(
+        new ComputedCandidate.Symbol(CLIPBOARD_BUTTON, symbolRect(left, symbolBoxSize)));
+  }
+
   private void addThemeSymbol(int left) {
     computedCandidates.add(
         new ComputedCandidate.Symbol(THEME_BUTTON, symbolRect(left, symbolBoxSize)));
@@ -440,6 +449,37 @@ public class Candidate extends View {
     canvas.drawLine(cx - halfW, cy - gap, cx + halfW, cy - gap, symbolPaint);
     canvas.drawLine(cx - halfW, cy, cx + halfW, cy, symbolPaint);
     canvas.drawLine(cx - halfW, cy + gap, cx + halfW, cy + gap, symbolPaint);
+    symbolPaint.setStrokeCap(Paint.Cap.BUTT);
+    symbolPaint.setStyle(Paint.Style.FILL);
+  }
+
+  /** 剪切板：與菜單/配色同線寬（2.2dp 圓角描邊）的簡潔剪貼板圖標。 */
+  private void drawClipboardIcon(Canvas canvas, Rect rect) {
+    final float d = dp();
+    final float cx = rect.centerX();
+    final float cy = iconCenterY(rect);
+    final float halfW = 7.4f * d;
+    final float top = cy - 7.8f * d;
+    final float bottom = cy + 9.2f * d;
+    final float r = 2.4f * d;
+    final float clipHalfW = 3.6f * d;
+    final float clipTop = cy - 9.8f * d;
+    final float clipBottom = cy - 5.8f * d;
+
+    symbolPaint.setStyle(Paint.Style.STROKE);
+    symbolPaint.setStrokeWidth(ICON_STROKE_DP * d);
+    symbolPaint.setStrokeCap(Paint.Cap.ROUND);
+    symbolPaint.setStrokeJoin(Paint.Join.ROUND);
+
+    // 頂部夾子（小圓角矩形）
+    canvas.drawRoundRect(
+        cx - clipHalfW, clipTop, cx + clipHalfW, clipBottom, 1.4f * d, 1.4f * d, symbolPaint);
+    // 主板外框
+    canvas.drawRoundRect(cx - halfW, top, cx + halfW, bottom, r, r, symbolPaint);
+    // 兩條簡短文字線條
+    canvas.drawLine(cx - 3.6f * d, cy + 0.6f * d, cx + 3.6f * d, cy + 0.6f * d, symbolPaint);
+    canvas.drawLine(cx - 3.6f * d, cy + 4.4f * d, cx + 1.8f * d, cy + 4.4f * d, symbolPaint);
+
     symbolPaint.setStrokeCap(Paint.Cap.BUTT);
     symbolPaint.setStyle(Paint.Style.FILL);
   }
@@ -510,6 +550,7 @@ public class Candidate extends View {
       final int rightMost = avail - edge - symbolBoxSize;
       final int themeLeft = rightMost - symbolBoxSize;
       addMenuSymbol(edge);
+      addClipboardSymbol(edge + symbolBoxSize);
       addThemeSymbol(themeLeft);
       computedCandidates.add(
           new ComputedCandidate.Symbol(HIDE_KEYBOARD_BUTTON, symbolRect(rightMost, symbolBoxSize)));

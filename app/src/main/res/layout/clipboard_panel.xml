@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/clipboard_panel_root"
+    android:layout_width="match_parent"
+    android:layout_height="250dp"
+    android:orientation="vertical"
+    android:visibility="gone">
+
+    <!-- 顶部栏：与文字编辑面板保持统一（< 剪切板  +  清空） -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp">
+
+        <LinearLayout
+            android:id="@+id/clipboard_btn_back"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingEnd="12dp">
+
+            <ImageView
+                android:id="@+id/clipboard_icon_back"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:contentDescription="@string/back"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_edit_back" />
+
+            <TextView
+                android:id="@+id/clipboard_title_back"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="剪切板"
+                android:textSize="15sp" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/clipboard_btn_clear"
+            android:layout_width="wrap_content"
+            android:layout_height="26dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="清空"
+            android:textSize="12.5sp" />
+
+        <!-- 清空二次确认条（点击「清空」后原地展开，不抢占宿主焦点） -->
+        <LinearLayout
+            android:id="@+id/clipboard_clear_confirm_bar"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/clipboard_clear_confirm_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:text="清空未置顶记录？"
+                android:textSize="12.5sp" />
+
+            <TextView
+                android:id="@+id/clipboard_btn_clear_cancel"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:layout_marginEnd="6dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:paddingStart="9dp"
+                android:paddingEnd="9dp"
+                android:text="取消"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/clipboard_btn_clear_ok"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:paddingStart="9dp"
+                android:paddingEnd="9dp"
+                android:text="确认清空"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <View
+        android:id="@+id/clipboard_top_divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp" />
+
+    <!-- 内容区：历史记录卡片列表 / 空态提示 -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/clipboard_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:overScrollMode="never"
+            android:paddingStart="10dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="8dp" />
+
+        <LinearLayout
+            android:id="@+id/clipboard_empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/clipboard_empty_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="剪切板为空"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/clipboard_empty_hint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="复制文字后会自动记录到这里"
+                android:textSize="12.5sp" />
+        </LinearLayout>
+    </FrameLayout>
+
+</LinearLayout>

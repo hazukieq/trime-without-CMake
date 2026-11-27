@@ -413,6 +413,20 @@ public class Rime {
     return isComposing() && mContext.menu.num_candidates != 0;
   }
 
+  public static int getMenuPageNo() {
+    return hasMenu() ? mContext.menu.page_no : 0;
+  }
+
+  public static int getMenuPageSize() {
+    return (mContext != null && mContext.menu != null && mContext.menu.page_size > 0)
+        ? mContext.menu.page_size
+        : 5;
+  }
+
+  public static boolean isMenuLastPage() {
+    return !hasMenu() || mContext.menu.is_last_page;
+  }
+
   public static boolean hasLeft() {
     return hasMenu() && mContext.menu.page_no != 0;
   }
@@ -947,6 +961,70 @@ public class Rime {
     boolean b = select_schema(schema_id);
     getContexts();
     return b;
+  }
+
+  private static volatile int sLastAppliedHardwarePageSize = -1;
+  private static volatile String sLastAppliedHardwarePageSchema = null;
+
+  /**
+   * 物理鍵盤模式專用：將用戶設定的每頁候選數（3..9）同步到當前方案的 compiled schema
+   * `menu/page_size`，讓 librime 引擎原生分頁（- / = / 1-9 / ↑ ↓）與候選窗完全一致。
+   * 若當前值已一致則立即返回，零開銷。
+   */
+  public static void applyHardwarePageSize(int pageSize) {
+    final int clamped = Math.max(3, Math.min(9, pageSize));
+    synchronized (ENGINE_LOCK) {
+      if (!isEngineReady()) return;
+      final String schemaId = getSchemaId();
+      if (schemaId == null || schemaId.isEmpty() || ".default".equals(schemaId)) return;
+      if (clamped == sLastAppliedHardwarePageSize && schemaId.equals(sLastAppliedHardwarePageSchema)) {
+        return;
+      }
+      if (patchCompiledPageSize(schemaId, clamped)) {
+        select_schema("nill");
+        select_schema(schemaId);
+        getContexts();
+      }
+      sLastAppliedHardwarePageSize = clamped;
+      sLastAppliedHardwarePageSchema = schemaId;
+    }
+  }
+
+  private static boolean patchCompiledPageSize(String schemaId, int pageSize) {
+    File file =
+        new File(Rime.get_user_data_dir() + File.separator + "build", schemaId + ".schema.yaml");
+    if (!file.exists()) return false;
+    try {
+      StringBuilder sb = new StringBuilder();
+      boolean changed = false;
+      String sep = System.getProperty("line.separator");
+      try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+        String line;
+        while ((line = br.readLine()) != null) {
+          if (!changed && line.trim().startsWith("page_size:")) {
+            String trimmedVal = line.substring(line.indexOf(':') + 1).trim();
+            if (String.valueOf(pageSize).equals(trimmedVal)) {
+              return false; // 已是目標值，無需重寫或重載方案
+            }
+            sb.append(line.substring(0, line.indexOf(':') + 1))
+                .append(' ')
+                .append(pageSize)
+                .append(sep);
+            changed = true;
+          } else {
+            sb.append(line).append(sep);
+          }
+        }
+      }
+      if (!changed) return false;
+      try (FileWriter out = new FileWriter(file)) {
+        out.write(sb.toString());
+      }
+      return true;
+    } catch (IOException e) {
+      Timber.w(e, "patchCompiledPageSize failed for %s", schemaId);
+      return false;
+    }
   }
 
   // 刷新当前输入方案

@@ -164,6 +164,7 @@ public class Trime extends LifecycleInputMethodService {
   private int minPopupCheckSize; // 第一屏候选词数量少于设定值，则候选词上悬浮窗。（也就是说，第一屏存在长词）此选项大于1时，min_length等参数失效
   private PositionType popupWindowPos; // 悬浮窗口彈出位置
   private PopupWindow mPopupWindow;
+  private com.hazukieq.hkrime.ime.hardware.HardwareKeyboardController hardwareKeyboardController;
   private final RectF mPopupRectF = new RectF();
   private final Handler mPopupHandler = new Handler(Looper.getMainLooper());
   private final Runnable mPopupTimer =
@@ -296,6 +297,9 @@ public class Trime extends LifecycleInputMethodService {
       Timber.i("onWindowShown...");
     }
     isWindowShown = true;
+    if (isHardwareKeyboardModeActive()) {
+      getHardwareController().applyTransparentHostWindow();
+    }
 
     updateComposing();
 
@@ -378,7 +382,9 @@ public class Trime extends LifecycleInputMethodService {
     try {
       if (textInputManager.getShouldUpdateRimeOption()) {
         Rime.setOption("soft_cursor", getPrefs().getKeyboard().getSoftCursorEnabled()); // 軟光標
-        Rime.setOption("_horizontal", getImeConfig().getBoolean("horizontal")); // 水平模式
+        Rime.setOption(
+            "_horizontal",
+            !isHardwareKeyboardModeActive() && getImeConfig().getBoolean("horizontal")); // 水平模式（外設模式固定關閉）
         textInputManager.setShouldUpdateRimeOption(false);
       }
     } catch (Exception e) {
@@ -578,9 +584,13 @@ public class Trime extends LifecycleInputMethodService {
   /** Must be called on the UI thread */
   public void initKeyboard() {
     reset();
+    getImeConfig().initCurrentColors();
     setNavBarColor();
     textInputManager.setShouldUpdateRimeOption(true); // 不能在Rime.onMessage中調用set_option，會卡死
     bindKeyboardToInputView();
+    if (hardwareKeyboardController != null) {
+      hardwareKeyboardController.applyTheme();
+    }
     // loadBackground(); // reset()调用过resetCandidate()，resetCandidate()一键调用过loadBackground();
     updateComposing(); // 切換主題時刷新候選
   }
@@ -599,6 +609,9 @@ public class Trime extends LifecycleInputMethodService {
       setNavBarColor();
       textInputManager.setShouldUpdateRimeOption(true); // 不能在Rime.onMessage中調用set_option，會卡死
       bindKeyboardToInputView();
+      if (hardwareKeyboardController != null) {
+        hardwareKeyboardController.applyTheme();
+      }
       // loadBackground(); // reset()调用过resetCandidate()，resetCandidate()一键调用过loadBackground();
       updateComposing(); // 切換主題時刷新候選
     }
@@ -615,6 +628,10 @@ public class Trime extends LifecycleInputMethodService {
     if (mPopupWindow != null) {
       mPopupWindow.dismiss();
       mPopupWindow = null;
+    }
+    if (hardwareKeyboardController != null) {
+      hardwareKeyboardController.destroy();
+      hardwareKeyboardController = null;
     }
     // 釋放 window context：清掉引用後由 WindowContext.finalize() 解綁 DisplayArea 上的 token。
     windowContext = null;
@@ -654,8 +671,49 @@ public class Trime extends LifecycleInputMethodService {
     super.onConfigurationChanged(newConfig);
   }
 
+  private com.hazukieq.hkrime.ime.hardware.HardwareKeyboardController getHardwareController() {
+    if (hardwareKeyboardController == null) {
+      hardwareKeyboardController =
+          new com.hazukieq.hkrime.ime.hardware.HardwareKeyboardController(this);
+    }
+    return hardwareKeyboardController;
+  }
+
+  /** 是否處於「物理鍵盤接手模式」：由獨立的 [HardwareKeyboardController] 接管，與觸屏模式隔離。 */
+  public boolean isHardwareKeyboardModeActive() {
+    return getHardwareController().isActive();
+  }
+
+  /** 物理鍵盤模式下中英文狀態切換通知（例如按 Shift），於光標旁短暫彈出 macOS 風格狀態膠囊。 */
+  public void onHardwareAsciiModeChanged(boolean asciiMode) {
+    if (isHardwareKeyboardModeActive()) {
+      getHardwareController().onAsciiModeChanged(asciiMode);
+    }
+  }
+
+  private boolean showingHardwareCanvas = false;
+
+  @Override
+  public boolean onEvaluateInputViewShown() {
+    if (isHardwareKeyboardModeActive()) {
+      // 物理鍵盤接手模式：返回 true 讓系統合法拉起 InputMethod(type=2011) 透明畫布窗口，
+      // 徹底適配 Android 12-15 及各國產 ROM（OriginOS / HyperOS / ColorOS）在系統設定頁與 QQ 中的顯示。
+      return true;
+    }
+    return super.onEvaluateInputViewShown();
+  }
+
+  @Override
+  public View onCreateCandidatesView() {
+    return getHardwareController().createAnchorView();
+  }
+
   @Override
   public void onUpdateCursorAnchorInfo(CursorAnchorInfo cursorAnchorInfo) {
+    if (isHardwareKeyboardModeActive()) {
+      getHardwareController().onUpdateCursorAnchorInfo(cursorAnchorInfo);
+      return;
+    }
     if (!isWinFixed()) {
       final CharSequence composingText = cursorAnchorInfo.getComposingText();
       // update mPopupRectF
@@ -720,6 +778,10 @@ public class Trime extends LifecycleInputMethodService {
   @Override
   public void onComputeInsets(InputMethodService.Insets outInsets) {
     super.onComputeInsets(outInsets);
+    if (isHardwareKeyboardModeActive()) {
+      getHardwareController().applyInsets(outInsets);
+      return;
+    }
     outInsets.contentTopInsets = outInsets.visibleTopInsets;
   }
 
@@ -745,7 +807,15 @@ public class Trime extends LifecycleInputMethodService {
     Timber.e("onCreateInputView()");
     // 初始化键盘布局
     super.onCreateInputView();
+    if (isHardwareKeyboardModeActive()) {
+      showingHardwareCanvas = true;
+      return getHardwareController().createCanvasView();
+    }
+    return createTouchInputView();
+  }
 
+  private View createTouchInputView() {
+    showingHardwareCanvas = false;
     // 適配 android12 以後的懸浮窗：window context 只建一次並複用（見 obtainWindowContext）。
     final Context mwcontext = obtainWindowContext();
 
@@ -807,6 +877,17 @@ public class Trime extends LifecycleInputMethodService {
   public void onStartInputView(EditorInfo attribute, boolean restarting) {
     super.onStartInputView(attribute, restarting);
     Rime.get(this);
+    if (isHardwareKeyboardModeActive()) {
+      if (!showingHardwareCanvas) {
+        showingHardwareCanvas = true;
+        setInputView(getHardwareController().createCanvasView());
+      }
+      getHardwareController().applyTransparentHostWindow();
+      return;
+    }
+    if (showingHardwareCanvas || inputRootBinding == null) {
+      setInputView(createTouchInputView());
+    }
     final String liveSchema = Rime.getSchemaId();
     final boolean hasRealSchema =
         liveSchema != null && !liveSchema.isEmpty() && !".default".equals(liveSchema);
@@ -910,10 +991,14 @@ public class Trime extends LifecycleInputMethodService {
   public void onStartInput(EditorInfo info, boolean restarting) {
     super.onStartInput(info, restarting);
     if (textInputManager != null) textInputManager.onEditorSessionChanged();
+    if (isHardwareKeyboardModeActive()) {
+      getHardwareController().onStartInput(info, getCurrentInputConnection());
+    }
   }
 
   @Override
   public void onFinishInput() {
+    if (hardwareKeyboardController != null) hardwareKeyboardController.onFinishInput();
     if (textInputManager != null) textInputManager.cancelTwelveKeyComposition();
     super.onFinishInput();
   }
@@ -925,7 +1010,9 @@ public class Trime extends LifecycleInputMethodService {
     textInputManager.cancelTwelveKeyComposition();
     super.onFinishInputView(finishingInput);
     // Dismiss any pop-ups when the input-view is being finished and hidden.
-    mainKeyboardView.closing();
+    if (mainKeyboardView != null) {
+      mainKeyboardView.closing();
+    }
     performEscape();
     try {
       hideCompositionView();
@@ -1002,7 +1089,8 @@ public class Trime extends LifecycleInputMethodService {
           onRimeKey(
               Event.getRimeEvent(
                   keyCode, event.getAction() == KeyEvent.ACTION_DOWN ? 0 : Rime.META_RELEASE_ON));
-      if (isComposing()) setCandidatesViewShown(textInputManager.isComposable()); // 藍牙鍵盤打字時顯示候選欄
+      if (isComposing() && !isHardwareKeyboardModeActive())
+        setCandidatesViewShown(textInputManager.isComposable()); // 藍牙鍵盤打字時顯示候選欄
       return ret;
     }
     return textInputManager.isComposable() && !Rime.isVoidKeycode(keyCode);
@@ -1011,6 +1099,10 @@ public class Trime extends LifecycleInputMethodService {
   @Override
   public boolean onKeyDown(int keyCode, KeyEvent event) {
     Timber.i("\t<TrimeInput>\tonKeyDown()\tkeycode=%d, event=%s", keyCode, event.toString());
+    // 物理鍵盤接手模式：完全由獨立控制器直連 librime 引擎處理，徹底隔離軟鍵盤邏輯
+    if (isHardwareKeyboardModeActive()) {
+      return getHardwareController().onKeyDown(event) || super.onKeyDown(keyCode, event);
+    }
     // 候選展開面板打開時，返回鍵先收起面板而不是直接收起鍵盤
     if (keyCode == KeyEvent.KEYCODE_BACK
         && textInputManager != null
@@ -1025,6 +1117,9 @@ public class Trime extends LifecycleInputMethodService {
   @Override
   public boolean onKeyUp(int keyCode, KeyEvent event) {
     Timber.i("\t<TrimeInput>\tonKeyUp()\tkeycode=%d, event=%s", keyCode, event.toString());
+    if (isHardwareKeyboardModeActive()) {
+      return getHardwareController().onKeyUp(event) || super.onKeyUp(keyCode, event);
+    }
     if (composeEvent(event) && textInputManager.getNeedSendUpRimeKey()) {
       textInputManager.onRelease(keyCode);
       return true;
@@ -1070,7 +1165,8 @@ public class Trime extends LifecycleInputMethodService {
       mask = event.getMetaState();
     }
     final boolean ret = handleKey(keyCode, mask);
-    if (isComposing()) setCandidatesViewShown(textInputManager.isComposable()); // 藍牙鍵盤打字時顯示候選欄
+    if (isComposing() && !isHardwareKeyboardModeActive())
+      setCandidatesViewShown(textInputManager.isComposable()); // 藍牙鍵盤打字時顯示候選欄
     return ret;
   }
 
@@ -1285,6 +1381,14 @@ public class Trime extends LifecycleInputMethodService {
     final long __perfT0 = System.nanoTime();
     final @Nullable InputConnection ic = getCurrentInputConnection();
     activeEditorInstance.updateComposingText();
+    if (isHardwareKeyboardModeActive()) {
+      hideCompositionView();
+      getHardwareController().refreshComposing(ic);
+      return 0;
+    }
+    if (hardwareKeyboardController != null) {
+      hardwareKeyboardController.onFinishInput();
+    }
     if (ic != null && !isWinFixed()) isCursorUpdated = ic.requestCursorUpdates(1);
     int startNum = 0;
     if (mCandidateRoot != null) {
@@ -1401,6 +1505,10 @@ public class Trime extends LifecycleInputMethodService {
   private void setNavBarColor() {
     if (VERSION.SDK_INT >= VERSION_CODES.LOLLIPOP) {
       try {
+        if (isHardwareKeyboardModeActive()) {
+          getHardwareController().applyTransparentHostWindow();
+          return;
+        }
         final Window window = getWindow().getWindow();
         @ColorInt final Integer keyboardBackColor = getImeConfig().getCurrentColor_("back_color");
         if (keyboardBackColor != null) {
@@ -1414,6 +1522,7 @@ public class Trime extends LifecycleInputMethodService {
 
   @Override
   public boolean onEvaluateFullscreenMode() {
+    if (isHardwareKeyboardModeActive()) return false;
     final Configuration config = getResources().getConfiguration();
     if (config != null) {
       if (config.orientation != Configuration.ORIENTATION_LANDSCAPE) {
@@ -1446,7 +1555,7 @@ public class Trime extends LifecycleInputMethodService {
     final Window w = getWindow().getWindow();
     if (w == null) return;
     final LinearLayout inputRoot = inputRootBinding != null ? inputRootBinding.inputRoot : null;
-    if (inputRoot != null) {
+    if (inputRoot != null && !isHardwareKeyboardModeActive()) {
       final int layoutHeight =
           isFullscreenMode()
               ? WindowManager.LayoutParams.WRAP_CONTENT

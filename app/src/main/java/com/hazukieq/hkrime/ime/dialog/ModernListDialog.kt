@@ -115,14 +115,17 @@ class ModernListDialog private constructor(
         }
         card.addView(buildButtons())
 
+        val cardWidth = minOf(
+            context.resources.displayMetrics.widthPixels - dp(64),
+            dp(420),
+        ).coerceAtLeast(dp(260))
         root.addView(
             card,
             FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
+                cardWidth,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             ).apply {
                 gravity = Gravity.CENTER
-                leftMargin = dp(32); rightMargin = dp(32)
                 topMargin = dp(24); bottomMargin = dp(24)
             },
         )

@@ -97,9 +97,14 @@ class DialogSeekBarPreference : Preference {
         val hairline = if (night) 0xFF38383A.toInt() else 0xFFE5E5EA.toInt()
 
         val dialog = android.app.Dialog(ctx)
-        val root = android.widget.FrameLayout(ctx)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        val root = android.widget.FrameLayout(ctx).apply {
+            setOnClickListener { dialog.dismiss() }
+        }
         val card = android.widget.LinearLayout(ctx).apply {
             orientation = android.widget.LinearLayout.VERTICAL
+            isClickable = true
+            elevation = 0f
             background = android.graphics.drawable.GradientDrawable().apply {
                 cornerRadius = dp(22).toFloat(); setColor(surface)
             }
@@ -147,13 +152,16 @@ class DialogSeekBarPreference : Preference {
                     if (bold) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
                 setOnClickListener { onClick() }
             }
+        fun vDivider() = android.view.View(ctx).apply { setBackgroundColor(hairline) }
         buttons.addView(button(ctx.getString(android.R.string.cancel), false) { dialog.dismiss() },
             android.widget.LinearLayout.LayoutParams(0, dp(48), 1f))
+        buttons.addView(vDivider(), android.widget.LinearLayout.LayoutParams(1, dp(48)))
         buttons.addView(button(ctx.getString(R.string.pref__default), false) {
             sharedPreferences?.edit()?.putInt(key, defaultValue)?.apply()
             summary = getTextForValue(currentValue)
             dialog.dismiss()
         }, android.widget.LinearLayout.LayoutParams(0, dp(48), 1f))
+        buttons.addView(vDivider(), android.widget.LinearLayout.LayoutParams(1, dp(48)))
         buttons.addView(button(ctx.getString(android.R.string.ok), true) {
             val actualValue = seekBarProgressToActualValue(seek.progress)
             if (callChangeListener(actualValue)) {
@@ -164,13 +172,22 @@ class DialogSeekBarPreference : Preference {
         }, android.widget.LinearLayout.LayoutParams(0, dp(48), 1f))
         card.addView(buttons)
 
+        val cardWidth = minOf(
+            ctx.resources.displayMetrics.widthPixels - dp(64),
+            dp(400),
+        ).coerceAtLeast(dp(260))
         root.addView(card, android.widget.FrameLayout.LayoutParams(
-            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            cardWidth,
             android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-        ).apply { leftMargin = dp(32); rightMargin = dp(32); topMargin = dp(24); bottomMargin = dp(24) })
+        ).apply {
+            gravity = android.view.Gravity.CENTER
+            topMargin = dp(24); bottomMargin = dp(24)
+        })
         dialog.setContentView(root)
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
         dialog.window?.setDimAmount(0.4f)
+        dialog.window?.setElevation(0f)
+        dialog.setCanceledOnTouchOutside(true)
         dialog.show()
         dialog.window?.setLayout(
             android.view.ViewGroup.LayoutParams.MATCH_PARENT,

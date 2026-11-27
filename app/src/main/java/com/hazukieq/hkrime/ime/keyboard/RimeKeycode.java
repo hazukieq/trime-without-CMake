@@ -24,7 +24,7 @@ public class RimeKeycode {
     return rimeKeycode.get(code);
   }
 
-  // TODO 把软键盘预设android_keys的keycode(index)->keyname(string)—>rimeKeycode的过程改为直接返回int
+  // KeyEvent keycode -> Keycode 枚举名 -> librime keycode 映射
   // https://github.com/rime/librime/blob/99e269c8eb251deddbad9b0d2c4d965b228f8006/src/rime/key_table.cc
   public static int rimeCode(int code) {
     int i = 0;

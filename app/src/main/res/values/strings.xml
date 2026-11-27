@@ -83,6 +83,32 @@
     <string name="keyboard__show_key_popup_title">Popup on key press</string>
     <string name="keyboard__show_window_title">Floating pinyin bar</string>
     <string name="keyboard__show_window_summary">Show composing pinyin above the keyboard</string>
+    <string name="pref_keyboard__hardware">Physical Keyboard</string>
+    <string name="pref_keyboard__hardware_entry_summary">Desktop-style cursor-following candidate window (26-key schemas only)</string>
+    <string name="pref_keyboard__hardware_mode_section">Takeover Mode</string>
+    <string name="pref_keyboard__hardware_candidate_section">Candidate Window &amp; Preedit</string>
+    <string name="keyboard__hw_keyboard_mode_title">Physical keyboard takeover mode</string>
+    <string name="keyboard__hw_keyboard_mode_summary">Hide soft keyboard and follow cursor with a desktop-style candidate window (26-key schemas only)</string>
+    <string name="keyboard__hw_candidate_orientation_title">Candidate window layout</string>
+    <string name="keyboard__hw_candidate_count_title">Candidates per page</string>
+    <string name="keyboard__hw_inline_preedit_title">Inline preedit (physical keyboard)</string>
+    <string name="keyboard__hw_inline_preedit_summary">Independent from touch keyboard preedit setting</string>
+    <string name="pref_keyboard__hardware_shortcuts_section">Shortcuts</string>
+    <string name="keyboard__hw_shortcut_symbol_title">Symbols &amp; Emoji popup (Ctrl + Shift + E)</string>
+    <string name="keyboard__hw_shortcut_symbol_summary">Shows near cursor; Tab switches tabs, arrows move, Enter / 1-9 commits, Esc closes</string>
+    <string name="keyboard__hw_shortcut_clipboard_title">Clipboard history popup (Ctrl + Shift + V)</string>
+    <string name="keyboard__hw_shortcut_clipboard_summary">Shows near cursor; ↑↓ / 1-9 pastes, P pins, Del deletes, Esc closes</string>
+    <string name="keyboard__hw_shortcut_editing_title">Selection, paging &amp; mode switch</string>
+    <string name="keyboard__hw_shortcut_editing_summary">Shift toggles CN/EN; ← / → edits preedit caret; ↑ / ↓ selects; - / = flips page</string>
+    <string name="unit__candidate_count"> items</string>
+    <string-array name="keyboard__hw_candidate_orientation_entries">
+        <item>Horizontal</item>
+        <item>Vertical</item>
+    </string-array>
+    <string-array name="keyboard__hw_candidate_orientation_values">
+        <item>horizontal</item>
+        <item>vertical</item>
+    </string-array>
     <string name="keyboard__inline_preedit_title">Composing text in editor</string>
     <string-array name="keyboard__inline_entries">
         <item>Preview</item>

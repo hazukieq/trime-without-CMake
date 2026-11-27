@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- 平板大屏（sw600dp+）：收緊 AlertDialog / ListPreference 對話框寬度，避免橫屏拉伸過寬 -->
+    <style name="AlertDialogTheme" parent="Theme.AppCompat.DayNight.Dialog.Alert">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:colorAccent" tools:targetApi="lollipop">@color/colorAccent</item>
+
+        <item name="android:windowBackground">@drawable/dialog_flat_bg</item>
+        <item name="android:colorBackground">@color/modern_surface</item>
+        <item name="android:windowElevation">0dp</item>
+        <item name="android:backgroundDimAmount">0.4</item>
+
+        <item name="windowFixedWidthMajor">420dp</item>
+        <item name="windowFixedWidthMinor">400dp</item>
+        <item name="windowMinWidthMajor">360dp</item>
+        <item name="windowMinWidthMinor">340dp</item>
+    </style>
+</resources>

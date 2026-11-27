@@ -35,6 +35,10 @@ import com.hazukieq.hkrime.ime.keyboard.Event
 import com.hazukieq.hkrime.ime.keyboard.Keyboard.printModifierKeyState
 import com.hazukieq.hkrime.ime.keyboard.KeyboardSwitcher
 import com.hazukieq.hkrime.ime.keyboard.KeyboardView
+import android.content.ClipboardManager
+import android.content.Context
+import com.hazukieq.hkrime.ime.clipboard.ClipboardPanelController
+import com.hazukieq.hkrime.ime.clipboard.ClipboardStore
 import com.hazukieq.hkrime.ime.edit.EditPanelController
 import com.hazukieq.hkrime.ime.symbol.SymbolPanelController
 import com.hazukieq.hkrime.util.ShortcutUtils
@@ -82,6 +86,9 @@ class TextInputManager private constructor() :
     private var candidatePanelController: CandidatePanelController? = null
     private var symbolPanelController: SymbolPanelController? = null
     private var editPanelController: EditPanelController? = null
+    private var clipboardStore: ClipboardStore? = null
+    private var clipboardPanelController: ClipboardPanelController? = null
+    private var clipChangeListener: ClipboardManager.OnPrimaryClipChangedListener? = null
     private var legacyExpandJob: kotlinx.coroutines.Job? = null
     private var schemaWarmupJob: kotlinx.coroutines.Job? = null
     private var candidateBarBinder: CandidateBarBinder? = null
@@ -264,6 +271,44 @@ class TextInputManager private constructor() :
             controller.onAction = { action, selecting -> handleEditPanelAction(action, selecting) }
             controller.onSelectModeChanged = { resetEditSelectionAnchor() }
         }
+        val store = clipboardStore ?: ClipboardStore.create(trime).also { s ->
+            clipboardStore = s
+            s.syncFromSystem(trime)
+            val cm = trime.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            val listener = ClipboardManager.OnPrimaryClipChangedListener {
+                s.syncFromSystem(trime)
+                if (clipboardPanelController?.isShown == true) {
+                    clipboardPanelController?.refresh()
+                }
+            }
+            clipChangeListener = listener
+            runCatching { cm?.addPrimaryClipChangedListener(listener) }
+        }
+        val clipBinding = uiBinding.main.clipboardPanel
+        clipboardPanelController = ClipboardPanelController(
+            context = trime,
+            store = store,
+            keyboardView = uiBinding.main.mainKeyboardView,
+            inputArea = uiBinding.main.inputArea,
+            panelRoot = clipBinding.clipboardPanelRoot,
+            btnBack = clipBinding.clipboardBtnBack,
+            iconBack = clipBinding.clipboardIconBack,
+            titleBack = clipBinding.clipboardTitleBack,
+            btnClear = clipBinding.clipboardBtnClear,
+            clearConfirmBar = clipBinding.clipboardClearConfirmBar,
+            clearConfirmLabel = clipBinding.clipboardClearConfirmLabel,
+            btnClearCancel = clipBinding.clipboardBtnClearCancel,
+            btnClearOk = clipBinding.clipboardBtnClearOk,
+            topDivider = clipBinding.clipboardTopDivider,
+            listView = clipBinding.clipboardList,
+            emptyView = clipBinding.clipboardEmpty,
+            emptyTitle = clipBinding.clipboardEmptyTitle,
+            emptyHint = clipBinding.clipboardEmptyHint,
+        ).also { controller ->
+            controller.onCommitText = { text ->
+                activeEditorInstance.commitText(text, false)
+            }
+        }
         candidateBarBinder = CandidateBarBinder(candidateView)
         twelveKeyController = TwelveKeyController(
             scope = this,
@@ -330,11 +375,12 @@ class TextInputManager private constructor() :
         if (isTwelveKeyMode()) refreshTwelveKey()
     }
 
-    /** 主題/配色/深淺模式切換時即時同步展開面板、符號面板與編輯面板。 */
+    /** 主題/配色/深淺模式切換時即時同步展開面板、符號面板、編輯面板與剪切板面板。 */
     fun applyTheme() {
         candidatePanelController?.applyTheme()
         symbolPanelController?.applyTheme()
         editPanelController?.applyTheme()
+        clipboardPanelController?.applyTheme()
     }
 
     /**
@@ -626,6 +672,7 @@ class TextInputManager private constructor() :
         candidatePanelController?.hide()
         symbolPanelController?.hide()
         editPanelController?.hide()
+        clipboardPanelController?.hide()
         candidateView?.setPanelOpen(false)
         if (Rime.isComposing()) {
             runCatching { trime.updateComposing() }
@@ -1203,6 +1250,13 @@ class TextInputManager private constructor() :
      */
     override fun onDestroy() {
         cancelTwelveKeyComposition()
+        clipChangeListener?.let { listener ->
+            runCatching {
+                val cm = trime.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                cm?.removePrimaryClipChangedListener(listener)
+            }
+        }
+        clipChangeListener = null
         intentReceiver?.unregisterReceiver(trime)
         intentReceiver = null
 
@@ -1274,6 +1328,7 @@ class TextInputManager private constructor() :
             }
 
         Rime.get(trime)
+        clipboardStore?.syncFromSystem(trime)
         keyboardSwitcher.let {
             it.resize(trime.maxWidth)
             // Select a keyboard based on the input type of the editing field.
@@ -1300,6 +1355,7 @@ class TextInputManager private constructor() :
                 if (value && composition.active) cancelTwelveKeyComposition()
                 trime.inputFeedbackManager.ttsLanguage =
                     locales[if (value) 1 else 0]
+                trime.onHardwareAsciiModeChanged(value)
             }
             "_hide_comment" -> trime.setShowComment(!value)
             "_hide_candidate" -> {
@@ -1406,6 +1462,10 @@ class TextInputManager private constructor() :
                 activeEditorInstance.commitRimeText()
             }
             KeyEvent.KEYCODE_EISU -> { // Switch keyboard
+                if (ClipboardPanelController.isClipboardSelect(event.select)) {
+                    toggleClipboardPanel()
+                    return
+                }
                 if (EditPanelController.isEditSelect(event.select)) {
                     if (composition.active) cancelTwelveKeyComposition()
                     hideCandidatePanel()
@@ -1421,6 +1481,7 @@ class TextInputManager private constructor() :
                 }
                 symbolPanelController?.hide()
                 editPanelController?.hide()
+                clipboardPanelController?.hide()
                 keyboardSwitcher.switchToKeyboard(event.select)
                 if (!isTwelveKeyMode() && composition.active) {
                     cancelTwelveKeyComposition()
@@ -1643,9 +1704,22 @@ class TextInputManager private constructor() :
             Candidate.HIDE_KEYBOARD_BUTTON -> Trime.getService().requestHideSelf(0)
             // Gboard 式左側菜單：方案開關（简/繁、情、联）
             Candidate.MENU_BUTTON -> trime.showSchemaSwitchDialog()
+            // 菜單右側：原生剪切板面板
+            Candidate.CLIPBOARD_BUTTON -> toggleClipboardPanel()
             // 展開箭頭左側：配色
             Candidate.THEME_BUTTON -> trime.showColorDialog()
         }
+    }
+
+    private fun toggleClipboardPanel() {
+        val controller = clipboardPanelController ?: return
+        if (controller.isShown) {
+            controller.hide()
+            return
+        }
+        if (composition.active) cancelTwelveKeyComposition()
+        hideCandidatePanel()
+        controller.show()
     }
 
     override fun onCandidateLongClicked(index: Int) {

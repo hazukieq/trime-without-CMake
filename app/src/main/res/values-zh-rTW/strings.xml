@@ -82,6 +82,32 @@
     <string name="keyboard__show_key_popup_title">按鍵時彈出顯示字符</string>
     <string name="keyboard__show_window_title">懸浮編碼條</string>
     <string name="keyboard__show_window_summary">在鍵盤上方顯示正在輸入的拼音</string>
+    <string name="pref_keyboard__hardware">實體鍵盤</string>
+    <string name="pref_keyboard__hardware_entry_summary">桌面式游標跟隨候選窗（僅 26 鍵方案，獨立於觸控設定）</string>
+    <string name="pref_keyboard__hardware_mode_section">外設接手</string>
+    <string name="pref_keyboard__hardware_candidate_section">候選窗與預編輯</string>
+    <string name="keyboard__hw_keyboard_mode_title">實體鍵盤接手模式</string>
+    <string name="keyboard__hw_keyboard_mode_summary">連接實體鍵盤時隱藏軟鍵盤，僅跟隨游標顯示桌面式候選窗（僅支援 26 鍵方案）</string>
+    <string name="keyboard__hw_candidate_orientation_title">候選窗排列方式</string>
+    <string name="keyboard__hw_candidate_count_title">每頁候選數量</string>
+    <string name="keyboard__hw_inline_preedit_title">輸入框內預編輯（外設獨立）</string>
+    <string name="keyboard__hw_inline_preedit_summary">僅實體鍵盤模式生效，不干擾觸控模式設定</string>
+    <string name="pref_keyboard__hardware_shortcuts_section">快捷鍵說明</string>
+    <string name="keyboard__hw_shortcut_symbol_title">符號與表情懸浮窗（Ctrl + Shift + E）</string>
+    <string name="keyboard__hw_shortcut_symbol_summary">光標旁彈出；Tab 切分類，方向鍵選，Enter / 1-9 上屏，Esc 關閉</string>
+    <string name="keyboard__hw_shortcut_clipboard_title">剪切板歷史懸浮窗（Ctrl + Shift + V）</string>
+    <string name="keyboard__hw_shortcut_clipboard_summary">光標旁彈出；↑↓ / 1-9 貼上，P 置頂，Del 刪除，Esc 關閉</string>
+    <string name="keyboard__hw_shortcut_editing_title">選詞、翻頁與中英切換</string>
+    <string name="keyboard__hw_shortcut_editing_summary">Shift 切中英；← / → 編輯編碼光標；↑ / ↓ 選候選；- / = 翻頁</string>
+    <string name="unit__candidate_count"> 個</string>
+    <string-array name="keyboard__hw_candidate_orientation_entries">
+        <item>橫排</item>
+        <item>豎排</item>
+    </string-array>
+    <string-array name="keyboard__hw_candidate_orientation_values">
+        <item>horizontal</item>
+        <item>vertical</item>
+    </string-array>
     <string name="keyboard__inline_preedit_title">嵌入式編輯模式</string>
     <string-array name="keyboard__inline_entries">
         <item>首選</item>
