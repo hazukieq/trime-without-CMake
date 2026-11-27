@@ -12,7 +12,7 @@ class BuiltinKeyboardsTest {
     fun allStandardAndUtilityBuiltinsBuildValidMaps() {
         assertEquals(listOf("english", "number"), BuiltinKeyboards.utilityNames())
         assertEquals(
-            listOf("jiugong_simp", "letter", "pinyin_9key", "wubi_qwerty", "stroke_9key"),
+            listOf("jiugong_simp", "letter", "pinyin_9key", "wubi_qwerty", "stroke_9key", "bopomofo_kbd"),
             BuiltinKeyboards.typingMetadata().map { it.id },
         )
 

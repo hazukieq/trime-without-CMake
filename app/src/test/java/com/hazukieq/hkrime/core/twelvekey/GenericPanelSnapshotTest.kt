@@ -44,11 +44,11 @@ class GenericPanelSnapshotTest {
             rawPreedit = "n",
         )
         val engineCandidates = listOf(
-            CandidateItem("n", "", 0, engineSpan = EngineCandidateSpan(0, 1, "")),
-            CandidateItem("ŋ", "g", 1, engineSpan = EngineCandidateSpan(0, 1, "g")),
-            CandidateItem("ȵ", "j", 2, engineSpan = EngineCandidateSpan(0, 1, "j")),
-            CandidateItem("ɲ", "n", 3, engineSpan = EngineCandidateSpan(0, 1, "n")),
-            CandidateItem("ⁿ", "q", 4, engineSpan = EngineCandidateSpan(0, 1, "q")),
+            CandidateItem("n", "n", 0, engineSpan = EngineCandidateSpan(0, 1, "n")),
+            CandidateItem("ŋ", "ng", 1, engineSpan = EngineCandidateSpan(0, 1, "ng")),
+            CandidateItem("ȵ", "nj", 2, engineSpan = EngineCandidateSpan(0, 1, "nj")),
+            CandidateItem("ɲ", "nn", 3, engineSpan = EngineCandidateSpan(0, 1, "nn")),
+            CandidateItem("ⁿ", "nq", 4, engineSpan = EngineCandidateSpan(0, 1, "nq")),
         )
         val snap = GenericPanelSnapshotBuilder.build(
             local = local,
@@ -142,5 +142,124 @@ class GenericPanelSnapshotTest {
         assertEquals("ni hao", PreeditPresentation.materializeSegmentedPreedit("64 426", "ni hao"))
         assertEquals("n h", PreeditPresentation.materializeSegmentedPreedit("6 4", "ni hao"))
         assertEquals("min j 2", PreeditPresentation.materializeSegmentedPreedit("646 5 2", "min jian"))
+    }
+
+    @Test
+    fun terraPinyinTonesAndCjkExtBHanziNeverMisclassifiedAsEmoji() {
+        val local = TwelveKeySnapshotBuilder.Local(
+            input = "wo,men/",
+            consumedEnd = 0,
+            remaining = "wo,men/",
+            segmentsKey = "",
+            rawPreedit = "wǒ mén",
+        )
+        val extBChar = String(Character.toChars(0x20BB6)) // CJK Extension B 漢字
+        val snap = GenericPanelSnapshotBuilder.build(
+            local = local,
+            candidatesOverride = listOf(
+                CandidateItem("我們", "", 0, engineSpan = EngineCandidateSpan(0, 7, "")),
+                CandidateItem("我", "", 1, engineSpan = EngineCandidateSpan(0, 3, "")),
+                CandidateItem(extBChar, "", 2, engineSpan = EngineCandidateSpan(0, 3, "")),
+            ),
+        )
+        assertEquals(listOf("全部", "wǒ mén", "wǒ"), snap.groups.map { it.reading })
+        assertEquals("wǒ mén", snap.recommend[0].comment)
+        assertEquals("wǒ", snap.recommend[1].comment)
+        assertEquals("wǒ", snap.recommend[2].comment)
+    }
+
+    @Test
+    fun exactFirstCandidateInWubiAndStrokeKeepsAnnotation() {
+        val strokeLocal = TwelveKeySnapshotBuilder.Local(
+            input = "hs",
+            consumedEnd = 0,
+            remaining = "hs",
+            segmentsKey = "",
+            rawPreedit = "⼀⼁",
+        )
+        val strokeSnap = GenericPanelSnapshotBuilder.build(
+            local = strokeLocal,
+            candidatesOverride = listOf(
+                CandidateItem("一", "", 0, engineSpan = EngineCandidateSpan(0, 1, "")),
+                CandidateItem("丁", "⼁", 1, engineSpan = EngineCandidateSpan(0, 2, "⼁")),
+                CandidateItem("下", "⼁", 2, engineSpan = EngineCandidateSpan(0, 2, "⼁")),
+            ),
+        )
+        assertEquals("⼀", strokeSnap.recommend[0].comment)
+
+        val wubiLocal = TwelveKeySnapshotBuilder.Local(
+            input = "a",
+            consumedEnd = 0,
+            remaining = "a",
+            segmentsKey = "",
+            rawPreedit = "a",
+        )
+        val wubiSnap = GenericPanelSnapshotBuilder.build(
+            local = wubiLocal,
+            candidatesOverride = listOf(
+                CandidateItem("工", "", 0, engineSpan = EngineCandidateSpan(0, 1, "")),
+                CandidateItem("式", "~a", 1, engineSpan = EngineCandidateSpan(0, 1, "~a")),
+                CandidateItem("匿", "~a", 2, engineSpan = EngineCandidateSpan(0, 1, "~a")),
+            ),
+        )
+        assertEquals("a", wubiSnap.recommend[0].comment)
+        assertEquals("aa", wubiSnap.recommend[1].comment)
+
+        // 引擎已返回完整編碼註釋時（五筆 wo -> wo / wov / woy），不得重複拼接成 wowo
+        val wubiFullLocal = TwelveKeySnapshotBuilder.Local(
+            input = "wo",
+            consumedEnd = 0,
+            remaining = "wo",
+            segmentsKey = "",
+            rawPreedit = "wo",
+        )
+        val wubiFullSnap = GenericPanelSnapshotBuilder.build(
+            local = wubiFullLocal,
+            candidatesOverride = listOf(
+                CandidateItem("伙", "wo", 0, engineSpan = EngineCandidateSpan(0, 2, "wo")),
+                CandidateItem("偻", "wov", 1, engineSpan = EngineCandidateSpan(0, 2, "wov")),
+                CandidateItem("侉", "woy", 2, engineSpan = EngineCandidateSpan(0, 2, "woy")),
+            ),
+        )
+        assertEquals(listOf("wo"), wubiFullSnap.groups.map { it.reading })
+        assertEquals(listOf("wo", "wov", "woy"), wubiFullSnap.recommend.map { it.comment })
+
+        // 單候選帶聲調（地球拼音 wo -> wǒ），不得重複拼接成 wowǒ
+        val terraSingleSnap = GenericPanelSnapshotBuilder.build(
+            local = wubiFullLocal,
+            candidatesOverride = listOf(
+                CandidateItem("我", "wǒ", 0, engineSpan = EngineCandidateSpan(0, 2, "wǒ")),
+            ),
+        )
+        assertEquals(listOf("wǒ"), terraSingleSnap.recommend.map { it.comment })
+    }
+
+    @Test
+    fun hasMoreIsFalseWhenTotalCountIsAtOrBelow400AndTrueOnlyWhenMoreExist() {
+        val local = TwelveKeySnapshotBuilder.Local(
+            input = "wo",
+            consumedEnd = 0,
+            remaining = "wo",
+            segmentsKey = "",
+            rawPreedit = "wo",
+        )
+        fun makeItems(n: Int) = (0 until n).map { idx ->
+            CandidateItem("字$idx", "wo", idx, engineSpan = EngineCandidateSpan(0, 2, "wo"))
+        }
+
+        val snap400 = GenericPanelSnapshotBuilder.build(
+            local = local,
+            maxCandidates = TwelveKeyTuning.CONFIRM_RECOMMEND_LIMIT,
+            candidatesOverride = makeItems(400),
+        )
+        assertFalse(snap400.hasMore)
+
+        val snap401 = GenericPanelSnapshotBuilder.build(
+            local = local,
+            maxCandidates = TwelveKeyTuning.CONFIRM_RECOMMEND_LIMIT,
+            candidatesOverride = makeItems(401),
+        )
+        assertTrue(snap401.hasMore)
+        assertEquals(400, snap401.recommend.size)
     }
 }

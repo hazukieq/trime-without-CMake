@@ -313,18 +313,21 @@ class CandidatePanelController(
         groupList?.visibility = if (showRail) View.VISIBLE else View.GONE
         railDivider?.visibility = if (showRail) View.VISIBLE else View.GONE
         groupAdapter.submit(leftItems)
-        gridAdapter.setShowComment(showRail)
+        gridAdapter.setShowComment(true)
         val savedGridAnchor = if (!scrollGrid) {
             (grid?.layoutManager as? FlexboxLayoutManager)?.findFirstVisibleItemPosition()
                 ?: RecyclerView.NO_POSITION
         } else {
             RecyclerView.NO_POSITION
         }
-        val showLoadAll = snapshot.hasMore && (gridIndex == recommendIndex || !snapshot.phoneticNavigation)
+        val currentItems = display[gridIndex].items
+        val showLoadAll = snapshot.hasMore &&
+            (gridIndex == recommendIndex || !snapshot.phoneticNavigation) &&
+            currentItems.size >= TwelveKeyTuning.CONFIRM_RECOMMEND_LIMIT
         val gridItems = ArrayList<CandidatePanelAdapter.Item>(
-            display[gridIndex].items.size + (if (showLoadAll) 1 else 0),
+            currentItems.size + (if (showLoadAll) 1 else 0),
         )
-        display[gridIndex].items.forEach {
+        currentItems.forEach {
             gridItems.add(
                 CandidatePanelAdapter.Item(
                     text = it.text,

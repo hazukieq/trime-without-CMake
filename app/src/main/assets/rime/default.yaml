@@ -8,6 +8,9 @@ schema_list:
   - schema: hakka_qwerty
   - schema: rime_ice_qwerty
   - schema: rime_ice_t9
+  - schema: wubi86
+  - schema: stroke
+  - schema: terra_pinyin
   
 switcher:
   caption: 〔方案選單〕

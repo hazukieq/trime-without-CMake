@@ -34,12 +34,18 @@ object GenericPanelSnapshotBuilder {
         if (local.isEmpty) return TwelveKeySnapshot.EMPTY
 
         var degraded = false
+        val probeMore = maxCandidates >= TwelveKeyTuning.CONFIRM_RECOMMEND_LIMIT &&
+            maxCandidates < TwelveKeyTuning.CONFIRM_ALL_LIMIT
+        val hasEngineMore: Boolean
         val flat: List<CandidateItem> = if (candidatesOverride != null) {
+            hasEngineMore = probeMore && candidatesOverride.size > maxCandidates
             candidatesOverride.take(maxCandidates)
         } else {
-            val snapshot = runCatching { Rime.candidatesSnapshot(maxCandidates) }.getOrNull()
+            val fetchLimit = if (probeMore) maxCandidates + 1 else maxCandidates
+            val snapshot = runCatching { Rime.candidatesSnapshot(fetchLimit) }.getOrNull()
             if (snapshot != null) {
-                snapshot.mapIndexed { index, row ->
+                hasEngineMore = probeMore && snapshot.size > maxCandidates
+                snapshot.take(maxCandidates).mapIndexed { index, row ->
                     CandidateItem(
                         text = row.getOrNull(0) ?: "",
                         comment = cleanComment(row.getOrNull(1)),
@@ -49,6 +55,7 @@ object GenericPanelSnapshotBuilder {
                 }
             } else {
                 degraded = true
+                hasEngineMore = false
                 singlePageFallback()
             }
         }
@@ -60,7 +67,7 @@ object GenericPanelSnapshotBuilder {
         val grouped = LinkedHashMap<String, MutableList<CandidateItem>>()
         for (item in flat) {
             val railLabel = resolveRailGroupLabel(item, local.input, local.rawPreedit, fallbackReading, mode)
-            val cardAnnotation = formatCardAnnotation(item, local.input, fallbackReading, mode)
+            val cardAnnotation = formatCardAnnotation(item, local.input, local.rawPreedit, fallbackReading)
             val displayItem = if (cardAnnotation != item.comment) item.copy(comment = cardAnnotation) else item
             displayFlat.add(displayItem)
             if (railLabel.isNotEmpty()) {
@@ -77,10 +84,7 @@ object GenericPanelSnapshotBuilder {
         }
         val preview = bar.firstOrNull()?.text.orEmpty()
         val inline = runCatching { Rime.getCompositionPrefix() }.getOrDefault("") + preview
-        val hasMore = !degraded &&
-            maxCandidates >= TwelveKeyTuning.CONFIRM_RECOMMEND_LIMIT &&
-            flat.size >= maxCandidates &&
-            maxCandidates < TwelveKeyTuning.CONFIRM_ALL_LIMIT
+        val hasMore = !degraded && hasEngineMore && displayFlat.size >= TwelveKeyTuning.CONFIRM_RECOMMEND_LIMIT
 
         return TwelveKeySnapshot(
             input = local.input,
@@ -113,17 +117,36 @@ object GenericPanelSnapshotBuilder {
     internal fun formatCardAnnotation(
         item: CandidateItem,
         input: String,
+        rawPreedit: String = "",
         fallbackReading: String,
-        mode: CommentMode,
     ): String {
         val raw = cleanComment(item.comment)
-        val prefix = matchedCodeSpan(item, input, fallbackReading)
+        val prefix = matchedDisplaySpan(item, input, rawPreedit, fallbackReading)
         return when {
             raw.startsWith("~") && prefix.isNotEmpty() -> prefix + raw.removePrefix("~")
-            mode == CommentMode.COMPLETION_SUFFIX -> if (prefix.isNotEmpty()) prefix + raw else raw
-            raw.isEmpty() && mode == CommentMode.SHARED_READINGS && isEmojiText(item.text) -> "表情"
+            raw.isEmpty() && isEmojiText(item.text) -> "表情"
+            raw.isEmpty() && prefix.isNotEmpty() -> prefix
             else -> raw
         }
+    }
+
+    private fun matchedDisplaySpan(
+        item: CandidateItem,
+        input: String,
+        rawPreedit: String,
+        fallbackReading: String,
+    ): String {
+        val span = item.engineSpan
+        if (span != null && input.isNotEmpty()) {
+            val s = span.start.coerceIn(0, input.length)
+            val e = span.end.coerceIn(s, input.length)
+            if (e > s) {
+                val mapped = slicePreeditByInputSpan(input, rawPreedit, s, e)
+                if (mapped.isNotEmpty()) return mapped
+                return input.substring(s, e)
+            }
+        }
+        return matchedCodeSpan(item, input, fallbackReading)
     }
 
     internal fun resolveRailGroupLabel(
@@ -196,6 +219,18 @@ object GenericPanelSnapshotBuilder {
     ): String {
         if (rawPreedit.isBlank() || start < 0 || end <= start || end > input.length) return ""
         val cleanPreedit = rawPreedit.trim()
+        // 覆蓋全碼時直接復用引擎已格式化的 preedit（如地球拼音 `wǒ mén`、筆畫 `⼀⼁`）。
+        if (start == 0 && end == input.length) return cleanPreedit
+        // 1:1 字符變換（如五筆畫 `hspnz` → `⼀⼁⼃⼂⼄`）：直接按相同下標切片。
+        val preeditNoSpace = cleanPreedit.filter { it != ' ' && it != '\'' && it != '\u200B' }
+        val inputNoSpace = input.filter { it != ' ' && it != '\'' }
+        if (preeditNoSpace.length == inputNoSpace.length && preeditNoSpace.indices.all {
+                normalizeToneBase(preeditNoSpace[it]) != inputNoSpace[it].lowercaseChar()
+            }
+        ) {
+            return sliceIgnoringSpaces(cleanPreedit, start, end)
+        }
+        // 字母/帶調拼音對齊：把聲調元音歸一為基礎字母（`ǒ → o`、`ǖ → u`），並跳過原碼中的標調符號（`-;/<,\.`）。
         var inIdx = 0
         var outStart = -1
         var outEnd = -1
@@ -206,10 +241,27 @@ object GenericPanelSnapshotBuilder {
                 i++
                 continue
             }
-            if (ch.lowercaseChar() != input[inIdx].lowercaseChar()) return ""
-            if (inIdx == start && outStart < 0) outStart = i
+            while (inIdx < input.length && isToneInputSymbol(input[inIdx])) {
+                inIdx++
+                if (inIdx == end && outStart >= 0) {
+                    outEnd = i
+                    return cleanPreedit.substring(outStart, outEnd).trim()
+                }
+            }
+            if (inIdx >= input.length) break
+            val normPreedit = normalizeToneBase(ch)
+            val normInput = input[inIdx].lowercaseChar()
+            if (normPreedit != normInput && !(normPreedit == 'u' && normInput == 'v')) return ""
+            if (inIdx >= start && outStart < 0) outStart = i
             inIdx++
-            if (inIdx == end) {
+            while (inIdx < input.length && isToneInputSymbol(input[inIdx])) {
+                if (inIdx == end) {
+                    outEnd = i + 1
+                    return cleanPreedit.substring(outStart, outEnd).trim()
+                }
+                inIdx++
+            }
+            if (inIdx >= end && outStart >= 0) {
                 outEnd = i + 1
                 break
             }
@@ -217,6 +269,34 @@ object GenericPanelSnapshotBuilder {
         }
         if (outStart < 0 || outEnd <= outStart) return ""
         return cleanPreedit.substring(outStart, outEnd).trim()
+    }
+
+    private fun sliceIgnoringSpaces(text: String, start: Int, end: Int): String {
+        var idx = 0
+        var outStart = -1
+        var outEnd = -1
+        for (i in text.indices) {
+            val ch = text[i]
+            if (ch == ' ' || ch == '\'' || ch == '\u200B') continue
+            if (idx == start) outStart = i
+            idx++
+            if (idx == end) {
+                outEnd = i + 1
+                break
+            }
+        }
+        return if (outStart >= 0 && outEnd > outStart) text.substring(outStart, outEnd).trim() else ""
+    }
+
+    private fun isToneInputSymbol(ch: Char): Boolean = ch in "-;/<,\\."
+
+    private fun normalizeToneBase(ch: Char): Char = when (ch.lowercaseChar()) {
+        'ā', 'á', 'ǎ', 'à' -> 'a'
+        'ē', 'é', 'ě', 'è', 'ê' -> 'e'
+        'ī', 'í', 'ǐ', 'ì' -> 'i'
+        'ō', 'ó', 'ǒ', 'ò' -> 'o'
+        'ū', 'ú', 'ǔ', 'ù', 'ǖ', 'ǘ', 'ǚ', 'ǜ', 'ü' -> 'u'
+        else -> ch.lowercaseChar()
     }
 
     private fun matchedCodeSpan(item: CandidateItem, input: String, fallback: String): String {
@@ -234,7 +314,9 @@ object GenericPanelSnapshotBuilder {
         var i = 0
         while (i < text.length) {
             val cp = text.codePointAt(i)
-            if (cp >= 0x1F000 || cp in 0x2600..0x27BF || cp == 0xFE0F) return true
+            // 僅匹配真正的 Emoji 區段（U+1F000..U+1FAFF、U+2600..U+27BF、U+FE0F），
+            // 絕不把 CJK 擴展 B/C/D/E/F 區生僻漢字（U+20000+）誤判為表情。
+            if (cp in 0x1F000..0x1FAFF || cp in 0x2600..0x27BF || cp == 0xFE0F) return true
             i += Character.charCount(cp)
         }
         return false

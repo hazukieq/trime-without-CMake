@@ -28,6 +28,7 @@ object BuiltinKeyboards {
         KeyboardLayoutResolver.LayoutInfo("pinyin_9key", "9键·标准拼音", KeyboardLayoutResolver.TYPE_9KEY),
         KeyboardLayoutResolver.LayoutInfo("wubi_qwerty", "五笔·26键", KeyboardLayoutResolver.TYPE_WUBI),
         KeyboardLayoutResolver.LayoutInfo("stroke_9key", "笔画·五笔划", KeyboardLayoutResolver.TYPE_STROKE),
+        KeyboardLayoutResolver.LayoutInfo("bopomofo_kbd", "注音·大千键位", KeyboardLayoutResolver.TYPE_BOPOMOFO),
     )
 
     private val typingIdSet: Set<String> = typingCatalog.map { it.id }.toSet()
@@ -123,6 +124,29 @@ object BuiltinKeyboards {
         putIfAbsent("stroke_z", "label" to "乙", "send" to "z", "functional" to "false")
         putIfAbsent("stroke_wild", "label" to "通配", "send" to "question", "functional" to "false")
 
+        // 3b) Standard Daqian Bopomofo (大千注音) keys
+        val bopoMap = listOf(
+            "bopo_1" to ("ㄅ" to "1"), "bopo_2" to ("ㄉ" to "2"), "bopo_3" to ("ˇ" to "3"),
+            "bopo_4" to ("ˋ" to "4"), "bopo_5" to ("ㄓ" to "5"), "bopo_6" to ("ˊ" to "6"),
+            "bopo_7" to ("˙" to "7"), "bopo_8" to ("ㄚ" to "8"), "bopo_9" to ("ㄞ" to "9"),
+            "bopo_0" to ("ㄢ" to "0"), "bopo_minus" to ("ㄦ" to "minus"),
+            "bopo_q" to ("ㄆ" to "q"), "bopo_w" to ("ㄊ" to "w"), "bopo_e" to ("ㄍ" to "e"),
+            "bopo_r" to ("ㄐ" to "r"), "bopo_t" to ("ㄔ" to "t"), "bopo_y" to ("ㄗ" to "y"),
+            "bopo_u" to ("ㄧ" to "u"), "bopo_i" to ("ㄛ" to "i"), "bopo_o" to ("ㄟ" to "o"),
+            "bopo_p" to ("ㄣ" to "p"),
+            "bopo_a" to ("ㄇ" to "a"), "bopo_s" to ("ㄋ" to "s"), "bopo_d" to ("ㄎ" to "d"),
+            "bopo_f" to ("ㄑ" to "f"), "bopo_g" to ("ㄕ" to "g"), "bopo_h" to ("ㄘ" to "h"),
+            "bopo_j" to ("ㄨ" to "j"), "bopo_k" to ("ㄜ" to "k"), "bopo_l" to ("ㄠ" to "l"),
+            "bopo_semi" to ("ㄤ" to "semicolon"),
+            "bopo_z" to ("ㄈ" to "z"), "bopo_x" to ("ㄌ" to "x"), "bopo_c" to ("ㄏ" to "c"),
+            "bopo_v" to ("ㄒ" to "v"), "bopo_b" to ("ㄖ" to "b"), "bopo_n" to ("ㄙ" to "n"),
+            "bopo_m" to ("ㄩ" to "m"), "bopo_comma" to ("ㄝ" to "comma"),
+            "bopo_period" to ("ㄡ" to "period"), "bopo_slash" to ("ㄥ" to "slash"),
+        )
+        for ((presetId, pair) in bopoMap) {
+            putIfAbsent(presetId, "label" to pair.first, "send" to pair.second, "functional" to "false")
+        }
+
         // 4) Core typing & navigation keys
         putIfAbsent("space", "label" to "空格", "preview" to " ", "send" to "space", "repeatable" to "false", "functional" to "false")
         putIfAbsent("BackSpace", "label" to "退格", "preview" to "⇦", "send" to "BackSpace", "repeatable" to "true", "functional" to "false")
@@ -184,6 +208,7 @@ object BuiltinKeyboards {
         "pinyin_9key" -> buildNineKeyPinyinKeyboard()
         "wubi_qwerty" -> buildWubiKeyboard()
         "stroke_9key" -> buildStrokeKeyboard()
+        "bopomofo_kbd" -> buildBopomofoKeyboard()
         "english" -> buildEnglishKeyboard()
         "number" -> buildNumberKeyboard()
         else -> buildQwertyKeyboard()
@@ -419,6 +444,85 @@ object BuiltinKeyboards {
             "height" to 55,
             "horizontal_gap" to 5,
             "vertical_gap" to 0,
+            "key_press_offset_x" to 2,
+            "key_press_offset_y" to 2,
+            "keys" to keys,
+        )
+    }
+
+    // -------------------------------------------------------------------------
+    // 5b. 内置注音键盘·大千键位（type: bopomofo）
+    // -------------------------------------------------------------------------
+    private fun buildBopomofoKeyboard(): Map<String, Any> {
+        val w11 = 9.09
+        val keys = listOf(
+            // Row 1 (11 keys): ㄅ ㄉ ˇ ˋ ㄓ ˊ ˙ ㄚ ㄞ ㄢ ㄦ
+            key("click" to "bopo_1", "width" to w11),
+            key("click" to "bopo_2", "width" to w11),
+            key("click" to "bopo_3", "width" to w11, "key_back_color" to "off_key_back_color", "key_text_color" to "off_key_text_color"),
+            key("click" to "bopo_4", "width" to w11, "key_back_color" to "off_key_back_color", "key_text_color" to "off_key_text_color"),
+            key("click" to "bopo_5", "width" to w11),
+            key("click" to "bopo_6", "width" to w11, "key_back_color" to "off_key_back_color", "key_text_color" to "off_key_text_color"),
+            key("click" to "bopo_7", "width" to w11, "key_back_color" to "off_key_back_color", "key_text_color" to "off_key_text_color"),
+            key("click" to "bopo_8", "width" to w11),
+            key("click" to "bopo_9", "width" to w11),
+            key("click" to "bopo_0", "width" to w11),
+            key("click" to "bopo_minus", "width" to 9.10),
+
+            // Row 2 (10 keys): ㄆ ㄊ ㄍ ㄐ ㄔ ㄗ ㄧ ㄛ ㄟ ㄣ
+            key("click" to "bopo_q", "width" to 10),
+            key("click" to "bopo_w", "width" to 10),
+            key("click" to "bopo_e", "width" to 10),
+            key("click" to "bopo_r", "width" to 10),
+            key("click" to "bopo_t", "width" to 10),
+            key("click" to "bopo_y", "width" to 10),
+            key("click" to "bopo_u", "width" to 10),
+            key("click" to "bopo_i", "width" to 10),
+            key("click" to "bopo_o", "width" to 10),
+            key("click" to "bopo_p", "width" to 10),
+
+            // Row 3 (10 keys): ㄇ ㄋ ㄎ ㄑ ㄕ ㄘ ㄨ ㄜ ㄠ ㄤ
+            key("click" to "bopo_a", "width" to 10),
+            key("click" to "bopo_s", "width" to 10),
+            key("click" to "bopo_d", "width" to 10),
+            key("click" to "bopo_f", "width" to 10),
+            key("click" to "bopo_g", "width" to 10),
+            key("click" to "bopo_h", "width" to 10),
+            key("click" to "bopo_j", "width" to 10),
+            key("click" to "bopo_k", "width" to 10),
+            key("click" to "bopo_l", "width" to 10),
+            key("click" to "bopo_semi", "width" to 10),
+
+            // Row 4 (11 keys): ㄈ ㄌ ㄏ ㄒ ㄖ ㄙ ㄩ ㄝ ㄡ ㄥ + BackSpace
+            key("click" to "bopo_z", "width" to 8.8),
+            key("click" to "bopo_x", "width" to 8.8),
+            key("click" to "bopo_c", "width" to 8.8),
+            key("click" to "bopo_v", "width" to 8.8),
+            key("click" to "bopo_b", "width" to 8.8),
+            key("click" to "bopo_n", "width" to 8.8),
+            key("click" to "bopo_m", "width" to 8.8),
+            key("click" to "bopo_comma", "width" to 8.8),
+            key("click" to "bopo_period", "width" to 8.8),
+            key("click" to "bopo_slash", "width" to 8.8),
+            key("click" to "BackSpace", "width" to 12, "key_back_color" to "off_key_back_color", "key_text_color" to "off_key_text_color"),
+
+            // Row 5 (bottom bar)
+            key("click" to "Keyboard_number", "width" to 14, "long_click" to "Keyboard_symbols", "key_back_color" to "off_key_back_color", "key_text_color" to "off_key_text_color"),
+            key("click" to "，", "width" to 11, "long_click" to "Keyboard_edit"),
+            key("click" to "space", "label" to "一声", "width" to 34),
+            key("click" to "。", "width" to 11, "long_click" to "？"),
+            key("click" to "Keyboard_en", "long_click" to "Menu", "width" to 14, "key_back_color" to "off_key_back_color", "key_text_color" to "off_key_text_color"),
+            key("click" to "Return", "width" to 16, "key_back_color" to "off_key_back_color", "key_text_color" to "off_key_text_color"),
+        )
+        return linkedMapOf(
+            "name" to "注音·大千键位",
+            "type" to KeyboardLayoutResolver.TYPE_BOPOMOFO,
+            "ascii_mode" to 0,
+            "reset_ascii_mode" to true,
+            "ascii_keyboard" to "english",
+            "full_shape" to 0,
+            "width" to 10,
+            "height" to 46,
             "key_press_offset_x" to 2,
             "key_press_offset_y" to 2,
             "keys" to keys,

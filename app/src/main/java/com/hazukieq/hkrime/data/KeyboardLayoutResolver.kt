@@ -18,6 +18,7 @@ object KeyboardLayoutResolver {
     const val TYPE_9KEY = "9key"
     const val TYPE_WUBI = "wubi"
     const val TYPE_STROKE = "stroke"
+    const val TYPE_BOPOMOFO = "bopomofo"
 
     /** 單個可選主鍵盤布局的輕量描述。 */
     data class LayoutInfo(
@@ -61,6 +62,11 @@ object KeyboardLayoutResolver {
                 useTwelveKeySession = false,
                 warmupProbeChar = 'h',
             )
+            TYPE_BOPOMOFO -> KeyboardTypeCapabilities(
+                materializePreeditFromCandidate = false,
+                useTwelveKeySession = false,
+                warmupProbeChar = '1',
+            )
             else -> KeyboardTypeCapabilities(
                 // 未來自定義的非 26 鍵類型默認統一走 preedit 具體化範式
                 materializePreeditFromCandidate = true,
@@ -97,6 +103,7 @@ object KeyboardLayoutResolver {
             id == "wubi" || id.startsWith("wubi") || id.contains("_wubi") -> TYPE_WUBI
             id == "stroke" || id.startsWith("stroke_") || id.endsWith("_stroke") ||
                 id.startsWith("bihua") -> TYPE_STROKE
+            id == "bopomofo" || id.startsWith("bopomofo_") || id.contains("zhuyin") -> TYPE_BOPOMOFO
             else -> TYPE_QWERTY
         }
     }

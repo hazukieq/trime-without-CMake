@@ -122,20 +122,27 @@ object TwelveKeySnapshotBuilder {
         // 點擊時要回傳原始下標（否則就是「貨不對版」）。
         val flat: List<CandidateItem>
         var degraded = false
+        val probeMore = wantGroups && phonetics.isNotEmpty() &&
+            maxCandidates >= TwelveKeyTuning.CONFIRM_RECOMMEND_LIMIT &&
+            maxCandidates < TwelveKeyTuning.CONFIRM_ALL_LIMIT
+        val hasEngineMore: Boolean
         var __enumStartNs = System.nanoTime()
         var __enumMs = 0L
         if (candidatesOverride != null) {
             // 單測：完全繞開引擎（bar/full 兩條構建路徑要對同一份候選給出同一份「候選條 + 預覽 + 兜底」）。
-            flat = candidatesOverride.filter { InitialDisambiguation.matches(initial, it.engineSpan?.sourceComment ?: it.comment) }
-                .take(maxCandidates)
+            val filtered = candidatesOverride.filter { InitialDisambiguation.matches(initial, it.engineSpan?.sourceComment ?: it.comment) }
+            hasEngineMore = probeMore && filtered.size > maxCandidates
+            flat = filtered.take(maxCandidates)
         } else {
             __enumStartNs = System.nanoTime()
-            val snapshot = runCatching { Rime.candidatesSnapshot(maxCandidates) }.getOrNull()
+            val fetchLimit = if (probeMore) maxCandidates + 1 else maxCandidates
+            val snapshot = runCatching { Rime.candidatesSnapshot(fetchLimit) }.getOrNull()
             __enumMs = (System.nanoTime() - __enumStartNs) / 1_000_000
             if (__enumMs >= 8) DiagLog.d("perf", "enum=${__enumMs}ms code=$input n=${snapshot?.size ?: -1}")
 
         if (snapshot != null) {
-            flat = snapshot.mapIndexed { index, row ->
+            hasEngineMore = probeMore && snapshot.size > maxCandidates
+            flat = snapshot.take(maxCandidates).mapIndexed { index, row ->
                 CandidateItem(
                     text = row.getOrNull(0) ?: "",
                     comment = cleanComment(row.getOrNull(1)),
@@ -145,6 +152,7 @@ object TwelveKeySnapshotBuilder {
             }
         } else {
                 degraded = true
+                hasEngineMore = false
                 flat = singlePageFallback().mapIndexed { index, (text, comment) ->
                     CandidateItem(text, cleanComment(comment), index)
                 }
@@ -152,7 +160,7 @@ object TwelveKeySnapshotBuilder {
         }
 
         if (phonetics.isNotEmpty()) {
-            return phoneticSnapshot(local, flat, wantGroups, phonetics, appRankingEnabled, degraded, maxCandidates)
+            return phoneticSnapshot(local, flat, wantGroups, phonetics, appRankingEnabled, degraded, maxCandidates, hasEngineMore)
         }
         if (!appRankingEnabled) return engineOnlySnapshot(local, flat, wantGroups, mapFallbackLetters, initial, degraded)
 
@@ -321,6 +329,7 @@ object TwelveKeySnapshotBuilder {
         appRankingEnabled: Boolean,
         degraded: Boolean,
         maxCandidates: Int = TwelveKeyTuning.CONFIRM_RECOMMEND_LIMIT,
+        hasEngineMore: Boolean = false,
     ): TwelveKeySnapshot {
         val code = local.remaining
         val binder = CandidateSelection.InputBinder(code, local.consumedEnd)
@@ -348,7 +357,8 @@ object TwelveKeySnapshotBuilder {
             (rankedWords.take(split) + firstChars + rankedWords.drop(split)).distinctBy { it.text }
         } else emptyList()
         val hasMore = wantGroups && !degraded &&
-            flat.size >= maxCandidates &&
+            hasEngineMore &&
+            recommend.size >= TwelveKeyTuning.CONFIRM_RECOMMEND_LIMIT &&
             maxCandidates < TwelveKeyTuning.CONFIRM_ALL_LIMIT
         val bar = (barMatched.distinctBy { it.text } + firstChars).distinctBy { it.text }
             .take(TwelveKeyTuning.BAR_ITEMS)
