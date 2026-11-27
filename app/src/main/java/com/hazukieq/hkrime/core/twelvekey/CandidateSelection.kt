@@ -30,11 +30,15 @@ object CandidateSelection {
         fun bind(item: CandidateItem): CandidateItem {
             if (item.text.isEmpty() || !isCode) return item.copy(inputSpan = null)
             item.engineSpan?.let { native ->
-                val end = native.end - inputOffset
+                val rawEnd = native.end - inputOffset
                 val reading = TwelveKeySnapshotBuilder.cleanCommentForSelection(native.sourceComment)
                 val tokens = TwelveKeyPreedit.parseComment(reading)
                 val knownReading = reading.takeIf { !tokens.isNullOrEmpty() &&
-                    tokens.all { token -> TwelveKeyPreedit.isKnownSyllable(token) } }.orEmpty()
+                    tokens.all { token -> MultiKeyProfile.active.isKnownSyllable(token) } }.orEmpty()
+                val parsedEnd = if (knownReading.isNotEmpty()) {
+                    CandidateInputBoundary.selectedInputEnd(knownReading, code)
+                } else null
+                val end = if (parsedEnd != null && parsedEnd < rawEnd) parsedEnd else rawEnd
                 val span = if (item.index >= 0 && native.start == inputOffset && end in 1..code.length)
                     InputCodeSpan(code, end, knownReading) else null
                 return item.copy(inputSpan = span)

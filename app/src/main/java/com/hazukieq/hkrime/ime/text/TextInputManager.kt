@@ -711,6 +711,10 @@ class TextInputManager private constructor() :
                 refreshTwelveKey()
                 return@withEngineLock
             }
+            Timber.i(
+                "twelvekey: pick text=%s reading=%s nativeEnd=%s consumed=%d remaining=%s origin=%s",
+                item.text, item.inputSpan?.reading, item.engineSpan?.end, consumed, local.remaining, origin,
+            )
             // 原生部分選中不應與 App 日誌並存；保留原碼，退格仍可交引擎撤回。
             if (local.consumedEnd != 0) { refreshTwelveKey(); return@withEngineLock }
             composition.input(local.remaining)
