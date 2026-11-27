@@ -1156,7 +1156,7 @@ class TextInputManager private constructor() :
             Rime.setProperty(com.hazukieq.hkrime.core.twelvekey.InitialDisambiguation.PROPERTY, "")
             val local = TwelveKeySnapshotBuilder.local()
             if (local.isEmpty) return@runCatching TwelveKeySnapshot.EMPTY
-            TwelveKeySnapshotBuilder.buildGenericSnapshot(
+            com.hazukieq.hkrime.core.twelvekey.GenericPanelSnapshotBuilder.build(
                 local = local,
                 maxCandidates = maxCandidates,
             )

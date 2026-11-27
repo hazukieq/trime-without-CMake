@@ -22,7 +22,7 @@ class GenericPanelSnapshotTest {
             CandidateItem("你", "", 2, engineSpan = EngineCandidateSpan(0, 2, "")),
             CandidateItem("泥", "", 3, engineSpan = EngineCandidateSpan(0, 2, "")),
         )
-        val snap = TwelveKeySnapshotBuilder.buildGenericSnapshot(
+        val snap = GenericPanelSnapshotBuilder.build(
             local = local,
             candidatesOverride = engineCandidates,
         )
@@ -50,7 +50,7 @@ class GenericPanelSnapshotTest {
             CandidateItem("ɲ", "n", 3, engineSpan = EngineCandidateSpan(0, 1, "n")),
             CandidateItem("ⁿ", "q", 4, engineSpan = EngineCandidateSpan(0, 1, "q")),
         )
-        val snap = TwelveKeySnapshotBuilder.buildGenericSnapshot(
+        val snap = GenericPanelSnapshotBuilder.build(
             local = local,
             candidatesOverride = engineCandidates,
         )
@@ -78,7 +78,7 @@ class GenericPanelSnapshotTest {
             CandidateItem("米", "mi", 2, engineSpan = EngineCandidateSpan(0, 2, "mi")),
             CandidateItem("迷", "mi", 3, engineSpan = EngineCandidateSpan(0, 2, "mi")),
         )
-        val snap = TwelveKeySnapshotBuilder.buildGenericSnapshot(
+        val snap = GenericPanelSnapshotBuilder.build(
             local = local,
             candidatesOverride = engineCandidates,
         )
@@ -100,7 +100,7 @@ class GenericPanelSnapshotTest {
             CandidateItem("甲", "~i'mu", 1, engineSpan = EngineCandidateSpan(0, 2, "~i'mu")),
             CandidateItem("乙", "~i'mu", 2, engineSpan = EngineCandidateSpan(0, 2, "~i'mu")),
         )
-        val snap = TwelveKeySnapshotBuilder.buildGenericSnapshot(
+        val snap = GenericPanelSnapshotBuilder.build(
             local = local,
             candidatesOverride = engineCandidates,
         )
@@ -125,7 +125,7 @@ class GenericPanelSnapshotTest {
             CandidateItem("拟好", "ni hao", 2, engineSpan = EngineCandidateSpan(0, 5, "ni hao")),
             CandidateItem("蜜柑", "mi gan", 3, engineSpan = EngineCandidateSpan(0, 5, "mi gan")),
         )
-        val snap = TwelveKeySnapshotBuilder.buildGenericSnapshot(
+        val snap = GenericPanelSnapshotBuilder.build(
             local = local,
             candidatesOverride = engineCandidates,
         )
