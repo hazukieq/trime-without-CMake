@@ -34,9 +34,9 @@ object TwelveKeyTuning {
 
     /**
      * 已確認拼音序列後，右列（推薦組）首頁默認枚舉與展示的引擎詞上限。
-     * 保持 200 以確保低延遲；超出時在列表末尾顯示「全部」按鈕，按需懶加載至 [CONFIRM_ALL_LIMIT]。
+     * 默認 400 覆蓋絕大多數聲母且保持低延遲；超出時在列表末尾顯示「全部」按鈕，按需懶加載至 [CONFIRM_ALL_LIMIT]。
      */
-    const val CONFIRM_RECOMMEND_LIMIT = 200
+    const val CONFIRM_RECOMMEND_LIMIT = 400
 
     /**
      * 用戶在面板末尾主動點擊「全部」後的懶加載上限（覆蓋單個聲母最多 874 條詞條）。
