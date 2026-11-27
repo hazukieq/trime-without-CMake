@@ -63,6 +63,18 @@ class HardwareKeyboardController(
         onDismissed = { hideAnchorIfIdle() }
         setOnBoundsChanged { requestRecomputeInsets(true) }
     }
+    private val menuPopup = HardwareMenuPopup(
+        context = service,
+        isSchemaSupported = { sid -> isSchemaSupportedForHardware(sid) },
+    ).apply {
+        onSwitchSchema = { schemaId -> selectHardwareSchemaById(schemaId) }
+        onToggleSchemaEnabled = { schemaId, enable, switchAfter, onDone ->
+            toggleHardwareSchemaEnabled(schemaId, enable, switchAfter, onDone)
+        }
+        onToggleSwitch = { switchIndex -> toggleHardwareSwitch(switchIndex) }
+        onDismissed = { hideAnchorIfIdle() }
+        setOnBoundsChanged { requestRecomputeInsets(true) }
+    }
 
     private var canvasView: android.widget.FrameLayout? = null
     private var anchorView: View? = null
@@ -77,7 +89,7 @@ class HardwareKeyboardController(
         service.window?.window?.decorView?.requestLayout()
     }
 
-    private enum class PendingTool { SYMBOL, CLIPBOARD }
+    private enum class PendingTool { SYMBOL, CLIPBOARD, MENU }
 
     init {
         runCatching {
@@ -167,6 +179,10 @@ class HardwareKeyboardController(
                         clipboardPopup.dismiss()
                         return@setOnTouchListener true
                     }
+                    if (menuPopup.isShowing) {
+                        menuPopup.dismiss()
+                        return@setOnTouchListener true
+                    }
                 }
                 false
             }
@@ -188,6 +204,8 @@ class HardwareKeyboardController(
         modeIndicator.dismiss()
         symbolPopup.dismiss()
         clipboardPopup.dismiss()
+        menuPopup.dismiss()
+        menuPopup.dismiss()
         val win = service.window?.window ?: return
         runCatching {
             WindowCompat.setDecorFitsSystemWindows(win, true)
@@ -201,6 +219,7 @@ class HardwareKeyboardController(
         if (modeIndicator.isShowing) modeIndicator.dismiss()
         if (symbolPopup.isShowing) symbolPopup.dismiss()
         if (clipboardPopup.isShowing) clipboardPopup.dismiss()
+        if (menuPopup.isShowing) menuPopup.dismiss()
     }
 
     fun applyInsets(outInsets: InputMethodService.Insets) {
@@ -217,6 +236,7 @@ class HardwareKeyboardController(
         if (popup.copyTouchableRect(tmpRect)) outInsets.touchableRegion.union(tmpRect)
         if (symbolPopup.copyTouchableRect(tmpRect)) outInsets.touchableRegion.union(tmpRect)
         if (clipboardPopup.copyTouchableRect(tmpRect)) outInsets.touchableRegion.union(tmpRect)
+        if (menuPopup.copyTouchableRect(tmpRect)) outInsets.touchableRegion.union(tmpRect)
     }
 
     private fun requestRecomputeInsets(immediate: Boolean = true) {
@@ -234,6 +254,7 @@ class HardwareKeyboardController(
         popup.applyTheme()
         symbolPopup.applyTheme()
         clipboardPopup.applyTheme()
+        menuPopup.applyTheme()
     }
 
     fun applyTransparentHostWindow() {
@@ -308,6 +329,7 @@ class HardwareKeyboardController(
         modeIndicator.dismiss()
         symbolPopup.dismiss()
         clipboardPopup.dismiss()
+        menuPopup.dismiss()
         service.setCandidatesViewShown(false)
     }
 
@@ -329,6 +351,8 @@ class HardwareKeyboardController(
         modeIndicator.dismiss()
         symbolPopup.dismiss()
         clipboardPopup.dismiss()
+        menuPopup.dismiss()
+        menuPopup.dismiss()
         canvasView = null
         anchorView = null
     }
@@ -390,6 +414,7 @@ class HardwareKeyboardController(
         modeIndicator.updateCursorPosition(anchor, cursorRect)
         symbolPopup.updateCursorPosition(anchor, cursorRect)
         clipboardPopup.updateCursorPosition(anchor, cursorRect)
+        menuPopup.updateCursorPosition(anchor, cursorRect)
     }
 
     /**
@@ -407,6 +432,7 @@ class HardwareKeyboardController(
         // 外設專屬桌面懸浮工具快捷鍵：
         // - Ctrl+Shift+E：符號 / 表情懸浮窗
         // - Ctrl+Shift+V：剪切板歷史懸浮窗
+        // - Ctrl+Shift+M：方案切換 / 啟停 & Rime 開關懸浮窗
         if (event.isCtrlPressed && event.isShiftPressed && !event.isAltPressed && event.repeatCount == 0) {
             if (keyCode == KeyEvent.KEYCODE_E) {
                 if (symbolPopup.isShowing) symbolPopup.dismiss() else openToolPopup(PendingTool.SYMBOL)
@@ -418,9 +444,14 @@ class HardwareKeyboardController(
                 consumedDownKeys.add(keyCode)
                 return true
             }
+            if (keyCode == KeyEvent.KEYCODE_M) {
+                if (menuPopup.isShowing) menuPopup.dismiss() else openToolPopup(PendingTool.MENU)
+                consumedDownKeys.add(keyCode)
+                return true
+            }
         }
 
-        // 若符號或剪切板懸浮窗打開，優先由懸浮窗獨佔鍵盤導航（修飾鍵放行以維持 meta 狀態）
+        // 若符號、剪切板或方案/開關懸浮窗打開，優先由懸浮窗獨佔鍵盤導航（修飾鍵放行以維持 meta 狀態）
         if (symbolPopup.isShowing) {
             if (Key.isTrimeModifierKey(keyCode)) return false
             consumedDownKeys.add(keyCode)
@@ -430,6 +461,11 @@ class HardwareKeyboardController(
             if (Key.isTrimeModifierKey(keyCode)) return false
             consumedDownKeys.add(keyCode)
             return clipboardPopup.handleKeyDown(event)
+        }
+        if (menuPopup.isShowing) {
+            if (Key.isTrimeModifierKey(keyCode)) return false
+            consumedDownKeys.add(keyCode)
+            return menuPopup.handleKeyDown(event)
         }
 
         // 修飾鍵（含 Shift_L / Shift_R）：直傳給 librime ascii_composer
@@ -659,7 +695,9 @@ class HardwareKeyboardController(
             popup.dismiss()
             service.activeEditorInstance.updateComposingText()
         }
-        if (tool == PendingTool.SYMBOL) clipboardPopup.dismiss() else symbolPopup.dismiss()
+        if (tool != PendingTool.SYMBOL) symbolPopup.dismiss()
+        if (tool != PendingTool.CLIPBOARD) clipboardPopup.dismiss()
+        if (tool != PendingTool.MENU) menuPopup.dismiss()
 
         pendingToolPopup = tool
         showToolPopupNow(tool)
@@ -679,15 +717,106 @@ class HardwareKeyboardController(
         when (tool) {
             PendingTool.SYMBOL -> symbolPopup.show(anchor, cursorRect)
             PendingTool.CLIPBOARD -> clipboardPopup.show(anchor, cursorRect)
+            PendingTool.MENU -> menuPopup.show(anchor, cursorRect)
         }
         val shown = when (tool) {
             PendingTool.SYMBOL -> symbolPopup.isShowing
             PendingTool.CLIPBOARD -> clipboardPopup.isShowing
+            PendingTool.MENU -> menuPopup.isShowing
         }
         if (!shown && anchor == null) {
             pendingToolPopup = tool
             handler.postDelayed(retryToolRunnable, 24L)
         }
+    }
+
+    private fun selectHardwareSchemaById(schemaId: String) {
+        if (!isSchemaSupportedForHardware(schemaId)) return
+        val changed = synchronized(Rime.ENGINE_LOCK) {
+            if (Rime.getSchemaId() == schemaId) return@synchronized false
+            val selected = runCatching { Rime.get_selected_schema_list() }.getOrNull().orEmpty()
+            val idx = selected.indexOfFirst { it["schema_id"]?.toString() == schemaId }
+            val ok = if (idx >= 0) Rime.selectSchema(idx) else false
+            if (ok) {
+                Rime.setOption("_horizontal", false)
+            }
+            ok
+        }
+        if (changed) {
+            val desiredPageSize = AppPrefs.defaultInstance().keyboard.hwCandidateCount
+            Rime.applyHardwarePageSize(desiredPageSize)
+            service.updateComposing()
+            if (isActive() && composable && !Rime.isComposing()) {
+                showModeIndicator(Rime.isAsciiMode())
+            }
+        }
+    }
+
+    private fun toggleHardwareSchemaEnabled(
+        schemaId: String,
+        enable: Boolean,
+        switchAfterEnable: Boolean,
+        onDone: () -> Unit,
+    ) {
+        if (!isSchemaSupportedForHardware(schemaId)) {
+            onDone()
+            return
+        }
+        Thread({
+            val ids = LinkedHashSet<String>()
+            synchronized(Rime.ENGINE_LOCK) {
+                val selected = runCatching { Rime.get_selected_schema_list() }.getOrNull().orEmpty()
+                for (m in selected) {
+                    val id = m["schema_id"]?.toString()
+                    if (!id.isNullOrBlank()) ids.add(id)
+                }
+            }
+            if (enable) {
+                ids.add(schemaId)
+            } else {
+                // 保留所有觸屏方案，且確保至少保留一個啟用的外設方案
+                val supportedRemaining = ids.count { it != schemaId && isSchemaSupportedForHardware(it) }
+                if (supportedRemaining >= 1) {
+                    ids.remove(schemaId)
+                }
+            }
+            if (ids.isNotEmpty()) {
+                Rime.select_schemas(ids.toTypedArray())
+                kotlinx.coroutines.runBlocking {
+                    com.hazukieq.hkrime.util.RimeUtils.deploy(service)
+                }
+                if (enable && switchAfterEnable) {
+                    synchronized(Rime.ENGINE_LOCK) {
+                        val updated = runCatching { Rime.get_selected_schema_list() }.getOrNull().orEmpty()
+                        val idx = updated.indexOfFirst { it["schema_id"]?.toString() == schemaId }
+                        if (idx >= 0) {
+                            Rime.selectSchema(idx)
+                        }
+                        Rime.setOption("_horizontal", false)
+                    }
+                } else {
+                    synchronized(Rime.ENGINE_LOCK) {
+                        Rime.setOption("_horizontal", false)
+                    }
+                }
+                Rime.applyHardwarePageSize(AppPrefs.defaultInstance().keyboard.hwCandidateCount)
+            }
+            handler.post {
+                service.updateComposing()
+                onDone()
+                if (enable && switchAfterEnable && isActive() && composable && !Rime.isComposing()) {
+                    showModeIndicator(Rime.isAsciiMode())
+                }
+            }
+        }, "hw-schema-toggle").start()
+    }
+
+    private fun toggleHardwareSwitch(switchIndex: Int) {
+        synchronized(Rime.ENGINE_LOCK) {
+            Rime.toggleOption(switchIndex)
+            Rime.getContexts()
+        }
+        service.updateComposing()
     }
 
     private fun hideAnchorIfIdle() {

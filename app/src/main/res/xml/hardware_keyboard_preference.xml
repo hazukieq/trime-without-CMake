@@ -65,6 +65,11 @@
             app:iconSpaceReserved="false" />
         <Preference
             android:selectable="false"
+            android:title="@string/keyboard__hw_shortcut_menu_title"
+            android:summary="@string/keyboard__hw_shortcut_menu_summary"
+            app:iconSpaceReserved="false" />
+        <Preference
+            android:selectable="false"
             android:title="@string/keyboard__hw_shortcut_editing_title"
             android:summary="@string/keyboard__hw_shortcut_editing_summary"
             app:iconSpaceReserved="false" />

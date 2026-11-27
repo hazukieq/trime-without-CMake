@@ -97,6 +97,8 @@
     <string name="keyboard__hw_shortcut_symbol_summary">光標旁彈出；Tab 切分類，方向鍵選，Enter / 1-9 上屏，Esc 關閉</string>
     <string name="keyboard__hw_shortcut_clipboard_title">剪切板歷史懸浮窗（Ctrl + Shift + V）</string>
     <string name="keyboard__hw_shortcut_clipboard_summary">光標旁彈出；↑↓ / 1-9 貼上，P 置頂，Del 刪除，Esc 關閉</string>
+    <string name="keyboard__hw_shortcut_menu_title">方案切換與開關懸浮窗（Ctrl + Shift + M）</string>
+    <string name="keyboard__hw_shortcut_menu_summary">光標旁彈出；Tab 切方案/開關，Enter / 1-9 切換，Space 開啟或關閉支援的方案，Esc 關閉</string>
     <string name="keyboard__hw_shortcut_editing_title">選詞、翻頁與中英切換</string>
     <string name="keyboard__hw_shortcut_editing_summary">Shift 切中英；← / → 編輯編碼光標；↑ / ↓ 選候選；- / = 翻頁</string>
     <string name="unit__candidate_count"> 個</string>
