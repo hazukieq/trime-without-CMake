@@ -2,8 +2,9 @@
 
 ## 版本管理
 
-`hkrime` 的当前开发分支为 `dev`，`main` 是 without-CMake 基线；两条线包名和内容不同，
-不要直接互相合并。先核对 `git branch -av`、`git status` 与目标提交再操作。
+`hkrime` 已独立演进，不再同步上游 `tumuyan/trime-without-CMake`；原旧 Trime 基线已备份在
+tag `legacy-trime-baseline`。`main` 与 `dev` 保持进度一致（发布时同步推进）。
+操作前先核对 `git branch -av`、`git status` 与目标提交。
 JNI 工程与其 librime 源码为独立仓库，跨仓库变更要分别记录提交，并同步可重放补丁。
 依赖源码不由 App 仓库跟踪，不能只提交 App 的 `.so` 就声称变更已完整保存。
 
