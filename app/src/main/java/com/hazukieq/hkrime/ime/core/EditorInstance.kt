@@ -32,6 +32,11 @@ class EditorInstance(private val ims: InputMethodService) {
         get() = (ims as Trime).textInputManager
 
     var lastCommittedText: CharSequence = ""
+    private var lastInlineComposingText: String = ""
+
+    fun resetInlineComposingCache() {
+        lastInlineComposingText = ""
+    }
 
     fun commitText(text: CharSequence, dispatchToRime: Boolean = true): Boolean = commitToEditor(text)
 
@@ -49,16 +54,20 @@ class EditorInstance(private val ims: InputMethodService) {
     /**
      * Commits the text got from Rime.
      */
-    fun commitRimeText(): Boolean {
+    @JvmOverloads
+    fun commitRimeText(updateUi: Boolean = true): Boolean {
         if ((textInputManager.isTwelveKeyMode() && !Rime.isAsciiMode()) || textInputManager.hasTwelveKeySession()) {
             return textInputManager.consumeTwelveKeyEngineCommit()
         }
         val ret = Rime.getCommit()
         if (ret) {
             commitText(Rime.getCommitText())
+            lastInlineComposingText = ""
         }
-        Timber.i("\t<TrimeInput>\tcommitRimeText()\tupdateComposing")
-        (ims as Trime).updateComposing()
+        if (updateUi) {
+            Timber.i("\t<TrimeInput>\tcommitRimeText()\tupdateComposing")
+            (ims as Trime).updateComposing()
+        }
         return ret
     }
 
@@ -75,9 +84,14 @@ class EditorInstance(private val ims: InputMethodService) {
             InlineModeType.INLINE_COMPOSITION -> Rime.getCompositionText()
             InlineModeType.INLINE_INPUT -> Rime.RimeGetInput()
             else -> ""
-        }
-        if (ic.getSelectedText(0).isNullOrEmpty() || !composingText.isNullOrEmpty()) {
+        }.orEmpty()
+        // 快速路徑：INLINE_NONE 或空串且上次已清空，跳過昂貴的同步 Binder IPC（getSelectedText）
+        if (composingText.isEmpty() && lastInlineComposingText.isEmpty()) return
+        if (composingText == lastInlineComposingText) return
+        // 短路求值：composingText 非空時絕不呼叫阻塞式 ic.getSelectedText(0)
+        if (composingText.isNotEmpty() || ic.getSelectedText(0).isNullOrEmpty()) {
             ic.setComposingText(composingText, 1)
+            lastInlineComposingText = composingText
         }
     }
 

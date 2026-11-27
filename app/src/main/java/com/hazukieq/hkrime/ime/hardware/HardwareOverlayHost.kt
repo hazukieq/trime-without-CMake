@@ -69,25 +69,44 @@ class HardwareOverlayHost(
             canvas.getLocationInWindow(canvasWindowLoc)
             val localX = (x - canvasScreenLoc[0]).coerceAtLeast(0)
             val localY = (y - canvasScreenLoc[1]).coerceAtLeast(0)
-            val lp = (contentView.layoutParams as? FrameLayout.LayoutParams)
-                ?: FrameLayout.LayoutParams(width, height)
-            lp.width = width
-            lp.height = height
-            lp.gravity = Gravity.START or Gravity.TOP
-            lp.leftMargin = localX
-            lp.topMargin = localY
+            val existingLp = contentView.layoutParams as? FrameLayout.LayoutParams
+            val sizeChanged = existingLp == null ||
+                existingLp.width != width ||
+                existingLp.height != height ||
+                existingLp.leftMargin != 0 ||
+                existingLp.topMargin != 0
             if (contentView.parent !== canvas) {
                 (contentView.parent as? ViewGroup)?.removeView(contentView)
+                val lp = FrameLayout.LayoutParams(width, height, Gravity.START or Gravity.TOP)
                 canvas.addView(contentView, lp)
-            } else {
+            } else if (sizeChanged) {
+                val lp = existingLp ?: FrameLayout.LayoutParams(width, height, Gravity.START or Gravity.TOP)
+                lp.width = width
+                lp.height = height
+                lp.gravity = Gravity.START or Gravity.TOP
+                lp.leftMargin = 0
+                lp.topMargin = 0
                 contentView.layoutParams = lp
             }
+            // 使用 GPU 加速的 translationX/Y 定位，移動時零 requestLayout 開銷
+            val targetTx = localX.toFloat()
+            val targetTy = localY.toFloat()
+            if (contentView.translationX != targetTx) contentView.translationX = targetTx
+            if (contentView.translationY != targetTy) contentView.translationY = targetTy
             attachedView = contentView
             attachedToCanvas = true
             val winX = canvasWindowLoc[0] + localX
             val winY = canvasWindowLoc[1] + localY
-            currentRectInWindow.set(winX, winY, winX + width, winY + height)
-            onBoundsChanged?.invoke()
+            val newRight = winX + width
+            val newBottom = winY + height
+            val rectChanged = currentRectInWindow.left != winX ||
+                currentRectInWindow.top != winY ||
+                currentRectInWindow.right != newRight ||
+                currentRectInWindow.bottom != newBottom
+            if (rectChanged) {
+                currentRectInWindow.set(winX, winY, newRight, newBottom)
+                onBoundsChanged?.invoke()
+            }
             return true
         }
 
@@ -153,6 +172,8 @@ class HardwareOverlayHost(
         layoutParams = null
         currentRectInWindow.setEmpty()
         if (wasCanvas) {
+            v.translationX = 0f
+            v.translationY = 0f
             runCatching { (v.parent as? ViewGroup)?.removeView(v) }
             onBoundsChanged?.invoke()
         } else {

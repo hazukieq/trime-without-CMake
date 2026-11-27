@@ -50,18 +50,18 @@ class HardwareKeyboardController(
     private val popup = HardwareCandidatePopup(service).apply {
         onSelectSlot = { slotIndex -> selectCandidateOnCurrentPage(slotIndex) }
         onNextPage = { sendEngineKey(Event.getRimeEvent(KeyEvent.KEYCODE_PAGE_DOWN, 0)) }
-        setOnBoundsChanged { requestRecomputeInsets() }
+        setOnBoundsChanged { immediate -> requestRecomputeInsets(immediate) }
     }
     private val modeIndicator = HardwareModeIndicatorPopup(service)
     private val symbolPopup = HardwareSymbolPopup(service).apply {
         onCommitSymbol = { sym -> service.activeEditorInstance.commitText(sym, false) }
         onDismissed = { hideAnchorIfIdle() }
-        setOnBoundsChanged { requestRecomputeInsets() }
+        setOnBoundsChanged { requestRecomputeInsets(true) }
     }
     private val clipboardPopup = HardwareClipboardPopup(service, clipboardStore).apply {
         onCommitText = { text -> service.activeEditorInstance.commitText(text, false) }
         onDismissed = { hideAnchorIfIdle() }
-        setOnBoundsChanged { requestRecomputeInsets() }
+        setOnBoundsChanged { requestRecomputeInsets(true) }
     }
 
     private var canvasView: android.widget.FrameLayout? = null
@@ -70,6 +70,12 @@ class HardwareKeyboardController(
     private var composable: Boolean = true
     private var pendingModeIndicatorAscii: Boolean? = null
     private var pendingToolPopup: PendingTool? = null
+    private var transparentWindowKey: Long = 0L
+    private var recomputeInsetsScheduled: Boolean = false
+    private val recomputeInsetsRunnable = Runnable {
+        recomputeInsetsScheduled = false
+        service.window?.window?.decorView?.requestLayout()
+    }
 
     private enum class PendingTool { SYMBOL, CLIPBOARD }
 
@@ -188,9 +194,15 @@ class HardwareKeyboardController(
         if (clipboardPopup.copyTouchableRect(tmpRect)) outInsets.touchableRegion.union(tmpRect)
     }
 
-    private fun requestRecomputeInsets() {
-        canvasView?.requestLayout()
-        service.window?.window?.decorView?.requestLayout()
+    private fun requestRecomputeInsets(immediate: Boolean = true) {
+        handler.removeCallbacks(recomputeInsetsRunnable)
+        recomputeInsetsScheduled = true
+        if (immediate) {
+            handler.post(recomputeInsetsRunnable)
+        } else {
+            // 連續打字期間防抖合併 onComputeInsets，避免每鍵觸發同步 IWindowSession.setInsets Binder IPC
+            handler.postDelayed(recomputeInsetsRunnable, 140L)
+        }
     }
 
     fun applyTheme() {
@@ -201,6 +213,11 @@ class HardwareKeyboardController(
 
     fun applyTransparentHostWindow() {
         val win = service.window?.window ?: return
+        val night = (service.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
+        val key = (System.identityHashCode(win).toLong() shl 1) or (if (night) 1L else 0L)
+        if (key == transparentWindowKey) return
+        transparentWindowKey = key
         runCatching {
             WindowCompat.setDecorFitsSystemWindows(win, false)
             win.navigationBarColor = Color.TRANSPARENT
@@ -211,14 +228,13 @@ class HardwareKeyboardController(
             win.decorView.setBackgroundColor(Color.TRANSPARENT)
             win.decorView.findViewById<View>(android.R.id.navigationBarBackground)?.alpha = 0f
             // 同步設定導航欄淺/深色圖標，與系統深淺模式匹配
-            val night = (service.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
-                Configuration.UI_MODE_NIGHT_YES
-            WindowCompat.getInsetsController(win, win.decorView)?.isAppearanceLightNavigationBars = !night
+            WindowCompat.getInsetsController(win, win.decorView).isAppearanceLightNavigationBars = !night
         }
     }
 
     fun onStartInput(info: EditorInfo?, ic: InputConnection?) {
         Rime.get(service)
+        service.activeEditorInstance.resetInlineComposingCache()
         applyTransparentHostWindow()
         consumedDownKeys.clear()
         cursorRect.setEmpty()
@@ -274,6 +290,9 @@ class HardwareKeyboardController(
         handler.removeCallbacks(retryShowRunnable)
         handler.removeCallbacks(retryIndicatorRunnable)
         handler.removeCallbacks(retryToolRunnable)
+        handler.removeCallbacks(recomputeInsetsRunnable)
+        recomputeInsetsScheduled = false
+        transparentWindowKey = 0L
         pendingModeIndicatorAscii = null
         pendingToolPopup = null
         consumedDownKeys.clear()
@@ -281,7 +300,7 @@ class HardwareKeyboardController(
             val cm = service.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
             cm?.removePrimaryClipChangedListener(clipboardListener)
         }
-        popup.dismiss()
+        popup.detach()
         modeIndicator.dismiss()
         symbolPopup.dismiss()
         clipboardPopup.dismiss()
@@ -330,6 +349,15 @@ class HardwareKeyboardController(
             tmp.left >= -20f && tmp.left <= dm.widthPixels + 20f &&
             tmp.bottom > 0f && tmp.top < dm.heightPixels
         if (!valid) return
+
+        // 過濾亞像素 / 2px 內的游標抖動，避免單次按鍵觸發多次重複重算與重排
+        if (!cursorRect.isEmpty &&
+            kotlin.math.abs(cursorRect.left - tmp.left) < 2f &&
+            kotlin.math.abs(cursorRect.top - tmp.top) < 2f &&
+            kotlin.math.abs(cursorRect.bottom - tmp.bottom) < 2f
+        ) {
+            return
+        }
 
         cursorRect.set(tmp)
         val anchor = resolveAttachedAnchor()
@@ -452,13 +480,15 @@ class HardwareKeyboardController(
         pendingModeIndicatorAscii = null
         modeIndicator.dismiss()
 
-        ic?.requestCursorUpdates(
-            InputConnection.CURSOR_UPDATE_IMMEDIATE or InputConnection.CURSOR_UPDATE_MONITOR,
-        )
+        // 僅當游標尚未就緒時才補拉一次；onStartInput 已開啟 CURSOR_UPDATE_MONITOR 持續監聽
+        if (cursorRect.isEmpty) {
+            ic?.requestCursorUpdates(
+                InputConnection.CURSOR_UPDATE_IMMEDIATE or InputConnection.CURSOR_UPDATE_MONITOR,
+            )
+        }
         if (!service.isInputViewShown) {
             service.requestShowSelf(0)
         }
-        applyTransparentHostWindow()
         val anchor = resolveAttachedAnchor()
         val preedit = buildStructuredPreedit()
         val page = buildEnginePage()
@@ -494,11 +524,12 @@ class HardwareKeyboardController(
 
     private fun sendEngineKey(rimeEvent: IntArray, refreshIfHandled: Boolean = true): Boolean {
         val handled: Boolean
+        val committed: Boolean
         synchronized(Rime.ENGINE_LOCK) {
             handled = Rime.onKey(rimeEvent)
-            service.activeEditorInstance.commitRimeText()
+            committed = service.activeEditorInstance.commitRimeText(updateUi = false)
         }
-        if (handled && refreshIfHandled) {
+        if ((handled || committed) && refreshIfHandled) {
             service.updateComposing()
         }
         return handled
@@ -509,7 +540,7 @@ class HardwareKeyboardController(
         synchronized(Rime.ENGINE_LOCK) {
             ok = Rime.selectCandidate(slotIndex)
             if (ok) {
-                service.activeEditorInstance.commitRimeText()
+                service.activeEditorInstance.commitRimeText(updateUi = false)
             }
         }
         if (ok) {
