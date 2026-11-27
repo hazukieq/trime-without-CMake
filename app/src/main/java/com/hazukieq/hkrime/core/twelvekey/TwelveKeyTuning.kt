@@ -34,9 +34,9 @@ object TwelveKeyTuning {
 
     /**
      * 已確認拼音序列後，右列（推薦組）最多放多少個引擎詞。
-     * 引擎在 600 窗口內已按確認序列過濾；這裡只限制首屏，滾動仍可看長尾。
+     * 與未確認態的 [MAX_CANDIDATES]（600）對齊，避免篩選聲母/音節後把低頻長尾詞（如權重 1 的字詞）截丟。
      */
-    const val CONFIRM_RECOMMEND_LIMIT = 200
+    const val CONFIRM_RECOMMEND_LIMIT = MAX_CANDIDATES
 
     /**
      * 已確認拼音序列時，首段漢字插在多少個引擎詞之後（面板一頁約 3 列 × 4 行）。
