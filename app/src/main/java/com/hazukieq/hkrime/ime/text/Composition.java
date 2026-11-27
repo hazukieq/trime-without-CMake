@@ -305,19 +305,24 @@ public class Composition extends AppCompatTextView {
     int rStart = Math.max(0, Math.min(r.getStart(), raw.length()));
     int rEnd = Math.max(rStart, Math.min(r.getEnd(), raw.length()));
     String s = raw;
-    // 非 26 鍵且非客語 12 鍵的模糊方案（如 9 鍵拼音 t9）：將高亮段原始數字碼替換為首候選讀音 comment，
-    // 保留已選前綴與未匹配尾段，不再裸露原始數字編碼。
-    final String schemaType = Rime.getSchemaKeyboardType(Rime.getSchemaId());
-    if (com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_9KEY.equals(schemaType)
-        || com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_STROKE.equals(schemaType)) {
+    // 統一範式：凡非 26 鍵（且非客語 12 鍵獨立渲染管線）的鍵盤類型，均按首候選讀音具體化已輸入碼位，
+    // 不補出未輸入的韻母或音節（由 KeyboardLayoutResolver.capabilitiesOf 統一控制）。
+    final com.hazukieq.hkrime.data.KeyboardLayoutResolver.KeyboardTypeCapabilities caps =
+        com.hazukieq.hkrime.data.KeyboardLayoutResolver.capabilitiesOf(
+            Rime.getSchemaKeyboardType(Rime.getSchemaId()));
+    if (caps.getMaterializePreeditFromCandidate() && !caps.getUseTwelveKeySession()) {
       final Rime.RimeCandidate[] cands = Rime.getCandidates();
       if (cands != null && cands.length > 0 && cands[0] != null && cands[0].comment != null) {
         final String comment = cands[0].comment.trim();
         if (!comment.isEmpty() && !comment.startsWith("~")) {
           final String prefix = raw.substring(0, rStart);
+          final String active = raw.substring(rStart, rEnd);
           final String tail = raw.substring(rEnd);
-          s = prefix + comment + tail;
-          rEnd = rStart + comment.length();
+          final String materialized =
+              com.hazukieq.hkrime.core.twelvekey.PreeditPresentation.materializeSegmentedPreedit(
+                  active, comment);
+          s = prefix + materialized + tail;
+          rEnd = rStart + materialized.length();
         }
       }
     }

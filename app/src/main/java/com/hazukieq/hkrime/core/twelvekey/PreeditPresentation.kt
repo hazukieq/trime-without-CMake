@@ -39,6 +39,37 @@ object PreeditPresentation {
         state = State(selected, phonetics = phonetics)
     }
 
+    /**
+     * 非 26 鍵模糊方案（如 9 鍵拼音 `t9`）的 preedit 具體化，與 12 鍵保持一致語義：
+     * 僅按首候選讀音具體化**已輸入碼位**，絕不補出未輸入的韻母或音節。
+     * 例：`646 5` + `min jian` → `min j`；`6 4` + `ni hao` → `n h`；`64 426` + `ni hao` → `ni hao`。
+     */
+    @JvmStatic
+    fun materializeSegmentedPreedit(rawSegment: String, comment: String): String {
+        val cleanComment = comment.trim()
+        if (cleanComment.isEmpty() || cleanComment.startsWith("~")) return rawSegment
+        val rawChunks = rawSegment.trim().split(Regex("[\\s']+")).filter { it.isNotEmpty() }
+        val commentTokens = cleanComment.split(Regex("[\\s']+")).filter { it.isNotEmpty() }
+        if (rawChunks.isEmpty() || commentTokens.isEmpty()) return rawSegment
+
+        val sb = StringBuilder(rawSegment.length)
+        for (i in rawChunks.indices) {
+            if (i > 0) sb.append(' ')
+            val chunk = rawChunks[i]
+            val token = commentTokens.getOrNull(i)
+            if (token != null) {
+                val takeLen = chunk.length.coerceAtMost(token.length)
+                sb.append(token, 0, takeLen)
+                if (chunk.length > token.length) {
+                    sb.append(chunk, token.length, chunk.length)
+                }
+            } else {
+                sb.append(chunk)
+            }
+        }
+        return sb.toString()
+    }
+
     fun render(raw: String?, input: String, engineText: String? = null, engineComment: String? = null): String? {
         val current = state
         if (raw.isNullOrEmpty()) return current.selected.takeIf { it.isNotEmpty() }
@@ -49,11 +80,13 @@ object PreeditPresentation {
             TwelveKeyPreedit.rewrite(raw, frame?.text ?: engineText, frame?.comment ?: engineComment, rawInput = input)
                 ?: raw.replace("\u2038", "")
         } else {
+            val rawTail = PhoneticSelection.rawTail(input, current.phonetics)
             val pending = PhoneticSelection.pending(input, current.phonetics)
             val tailReading = TwelveKeyPreedit.parseComment(frame?.comment ?: engineComment.orEmpty())
                 ?.drop(current.phonetics.size)?.joinToString(" ")
-            val tail = if (pending.isEmpty()) "" else TwelveKeyPreedit.rewrite(pending, null, tailReading, rawInput = pending) ?: pending
-            (current.phonetics.map { it.reading } + listOf(tail).filter { it.isNotEmpty() }).joinToString("'")
+            val tail = if (pending.isEmpty()) "" else TwelveKeyPreedit.rewrite(pending, null, tailReading, rawInput = rawTail) ?: pending
+            val joined = (current.phonetics.map { it.reading } + listOf(tail).filter { it.isNotEmpty() }).joinToString("'")
+            if (pending.isEmpty() && rawTail.contains('\'')) "$joined'" else joined
         }
         val rendered = (current.selected + text).takeIf { it.isNotEmpty() }
         cached = Cached(key, rendered)

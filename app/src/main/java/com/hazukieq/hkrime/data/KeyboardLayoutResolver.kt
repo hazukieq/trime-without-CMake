@@ -26,6 +26,50 @@ object KeyboardLayoutResolver {
         val type: String,
     )
 
+    /**
+     * 鍵盤類型統一能力模型：將「非 26 鍵 preedit 具體化、12 鍵確認態會話、後台預熱探針鍵」
+     * 全部收口到單一真源，消除業務層散落的 `TYPE_9KEY / TYPE_STROKE` 特判。
+     */
+    data class KeyboardTypeCapabilities(
+        val materializePreeditFromCandidate: Boolean,
+        val useTwelveKeySession: Boolean,
+        val warmupProbeChar: Char,
+    )
+
+    /** 根據鍵盤類型返回統一能力配置（任意非 26 鍵類型均自動遵循一致的 preedit 具體化範式）。 */
+    @JvmStatic
+    fun capabilitiesOf(schemaType: String?): KeyboardTypeCapabilities {
+        val type = normalizeType(schemaType)
+        return when (type) {
+            TYPE_QWERTY, TYPE_WUBI -> KeyboardTypeCapabilities(
+                materializePreeditFromCandidate = false,
+                useTwelveKeySession = false,
+                warmupProbeChar = 'a',
+            )
+            TYPE_12KEY -> KeyboardTypeCapabilities(
+                materializePreeditFromCandidate = true,
+                useTwelveKeySession = true,
+                warmupProbeChar = 'a',
+            )
+            TYPE_9KEY -> KeyboardTypeCapabilities(
+                materializePreeditFromCandidate = true,
+                useTwelveKeySession = false,
+                warmupProbeChar = '2',
+            )
+            TYPE_STROKE -> KeyboardTypeCapabilities(
+                materializePreeditFromCandidate = true,
+                useTwelveKeySession = false,
+                warmupProbeChar = 'h',
+            )
+            else -> KeyboardTypeCapabilities(
+                // 未來自定義的非 26 鍵類型默認統一走 preedit 具體化範式
+                materializePreeditFromCandidate = true,
+                useTwelveKeySession = false,
+                warmupProbeChar = 'a',
+            )
+        }
+    }
+
     /** 規範化類型名：去空白、小寫；空串時按缺省 `qwerty` 處理。 */
     @JvmStatic
     fun normalizeType(raw: String?): String {

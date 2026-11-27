@@ -340,12 +340,10 @@ class TextInputManager private constructor() :
                     if (autoSelect == true || "true".equals(autoSelect?.toString(), ignoreCase = true)) {
                         return@withEngineLock
                     }
-                    val type = Rime.getSchemaKeyboardType(schemaId)
-                    val probeChar = when (type) {
-                        com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_9KEY -> '2'.code
-                        com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_STROKE -> 'h'.code
-                        else -> 'a'.code
-                    }
+                    val caps = com.hazukieq.hkrime.data.KeyboardLayoutResolver.capabilitiesOf(
+                        Rime.getSchemaKeyboardType(schemaId),
+                    )
+                    val probeChar = caps.warmupProbeChar.code
                     if (Rime.process_key(probeChar, 0)) {
                         Rime.getContexts()
                         Rime.clearComposition()

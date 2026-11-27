@@ -134,4 +134,13 @@ class GenericPanelSnapshotTest {
         assertEquals(listOf("你好", "👋", "拟好", "蜜柑"), snap.groups[0].items.map { it.text })
         assertEquals("表情", snap.groups[0].items[1].comment)
     }
+
+    @Test
+    fun nineKeyPreeditMaterializesOnlyTypedCodePositionsLikeTwelveKey() {
+        assertEquals("min j", PreeditPresentation.materializeSegmentedPreedit("646 5", "min jian"))
+        assertEquals("min ji", PreeditPresentation.materializeSegmentedPreedit("646 54", "min jian"))
+        assertEquals("ni hao", PreeditPresentation.materializeSegmentedPreedit("64 426", "ni hao"))
+        assertEquals("n h", PreeditPresentation.materializeSegmentedPreedit("6 4", "ni hao"))
+        assertEquals("min j 2", PreeditPresentation.materializeSegmentedPreedit("646 5 2", "min jian"))
+    }
 }

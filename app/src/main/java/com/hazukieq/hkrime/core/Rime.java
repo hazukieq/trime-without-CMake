@@ -901,8 +901,8 @@ public class Rime {
   }
 
   public static boolean isTwelveKeySchema() {
-    return com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_12KEY.equals(
-        getSchemaKeyboardType(getSchemaId()));
+    return com.hazukieq.hkrime.data.KeyboardLayoutResolver.capabilitiesOf(
+        getSchemaKeyboardType(getSchemaId())).getUseTwelveKeySession();
   }
 
   private static boolean isEmpty(@NonNull String s) {
