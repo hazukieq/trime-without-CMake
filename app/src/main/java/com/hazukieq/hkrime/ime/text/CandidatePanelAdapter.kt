@@ -13,8 +13,6 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.google.android.flexbox.FlexboxLayoutManager
-import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.hazukieq.hkrime.core.Rime
 import com.hazukieq.hkrime.core.twelvekey.InputCodeSpan
@@ -33,7 +31,11 @@ import com.hazukieq.hkrime.data.Config
 class CandidatePanelAdapter(
     private val context: Context,
     private val onPick: (Item) -> Unit,
-) : ListAdapter<CandidatePanelAdapter.Item, CandidatePanelAdapter.VH>(DIFF) {
+) : RecyclerView.Adapter<CandidatePanelAdapter.VH>() {
+
+    private var items: List<Item> = emptyList()
+
+    override fun getItemCount(): Int = items.size
 
     data class Item(
         val text: String,
@@ -50,31 +52,37 @@ class CandidatePanelAdapter(
     )
 
     private val density = context.resources.displayMetrics.density
-    private val cfg = Config.get(context)
 
-    private val wordSize = sp(20f)
+    private val wordSize = sp(19f)
     private val commentSize = sp(10.5f)
-    private val ink = cfg.getColor("candidate_text_color") ?: 0xFF37474F.toInt()
-    private val commentColor = cfg.getColor("comment_text_color") ?: ink
-    private val canvas = cfg.getColor("keyboard_back_color") ?: 0xFFF2F0EC.toInt()
+    private var ink: Int = 0xFF37474F.toInt()
+    private var commentColor: Int = ink
+    private var canvas: Int = 0xFFF2F0EC.toInt()
 
-    private val wordColor = ink
-    private val subColor = withAlpha(commentColor, 0.62f)
-    private val tileColor = surfaceOf(canvas, ink)
-    private val rippleColor = withAlpha(ink, 0.10f)
+    private var wordColor: Int = ink
+    private var subColor: Int = withAlpha(commentColor, 0.72f)
+    private var tileColor: Int = surfaceOf(canvas, ink)
+    private var tileBorderColor: Int = withAlpha(ink, 0.12f)
+    private var rippleColor: Int = withAlpha(ink, 0.12f)
+    private var wordTypeface: Typeface = Typeface.DEFAULT
 
-    private val padH = dp(10f)
+    private val padH = dp(12f)
     private val padV = dp(6f)
-    private val radius = dp(14f)
-    private val minTileWidth = dp(56f)
+    private val radius = dp(10f)
+    private val borderWidth = dp(1f).coerceAtLeast(1)
+    private val minTileWidth = dp(54f)
 
     /** 格子間距（FlexboxLayoutManager 沒有 gap 參數，用 item 的 margin 實現）。 */
-    private val gap = dp(8f)
+    private val gap = dp(7f)
 
-    private val hideComment = Rime.getOption("_hide_comment")
+    private var hideComment: Boolean = false
 
-    /** 只有組數 >= 2（多個讀音）時才標註拼音；單讀音時留白反而清爽。 */
+    init {
+        refreshThemeTokens()
+    }
+
     private var showComment = true
+    private var listHasAnyComment = false
 
     fun setShowComment(value: Boolean) {
         if (showComment == value) return
@@ -82,27 +90,70 @@ class CandidatePanelAdapter(
         notifyItemRangeChanged(0, itemCount)
     }
 
-    class VH(val box: LinearLayout, val word: TextView, val comment: TextView) :
-        RecyclerView.ViewHolder(box)
+    /** 切換配色/主題/深淺模式時重讀色值並刷新所有已見格子。 */
+    fun applyTheme() {
+        refreshThemeTokens()
+        notifyDataSetChanged()
+    }
 
-    fun submit(list: List<Item>) = submitList(list)
+    private fun refreshThemeTokens() {
+        val cfg = runCatching { Config.get(context) }.getOrNull()
+        ink = cfg?.getColor("candidate_text_color") ?: 0xFF37474F.toInt()
+        commentColor = cfg?.getColor("comment_text_color") ?: ink
+        canvas = cfg?.getColor("keyboard_back_color") ?: 0xFFF2F0EC.toInt()
+        val keyBack = cfg?.getColor("key_back_color")
+        val keyBorder = cfg?.getColor("key_border_color")
 
-    fun clear() = submitList(emptyList())
+        wordColor = ink
+        subColor = withAlpha(commentColor, 0.72f)
+        tileColor = if (keyBack != null && keyBack != canvas) keyBack else surfaceOf(canvas, ink)
+        // Material 3 表面層次靠底色對比承載，描邊僅保留極輕微輪廓（不搶主視覺）。
+        val isDark = androidx.core.graphics.ColorUtils.calculateLuminance(canvas) < 0.4
+        tileBorderColor = keyBorder?.let { withAlpha(it, if (isDark) 0.28f else 0.42f) }
+            ?: withAlpha(ink, 0.08f)
+        rippleColor = withAlpha(ink, 0.12f)
+        wordTypeface = cfg?.getFont("candidate_font") ?: Typeface.DEFAULT
+        hideComment = runCatching { Rime.getOption("_hide_comment") }.getOrDefault(false)
+    }
+
+    class VH(
+        val box: LinearLayout,
+        val word: TextView,
+        val comment: TextView,
+        val shape: GradientDrawable,
+        val ripple: RippleDrawable,
+    ) : RecyclerView.ViewHolder(box)
+
+    fun submit(list: List<Item>) {
+        listHasAnyComment = list.any { it.comment.isNotEmpty() }
+        items = list
+        // 同步刷新：避免 ListAdapter 異步 DiffUtil 在首幀產生短暫空白閃爍
+        notifyDataSetChanged()
+    }
+
+    fun clear() {
+        listHasAnyComment = false
+        if (items.isEmpty()) return
+        items = emptyList()
+        notifyDataSetChanged()
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val shape = GradientDrawable().apply {
             cornerRadius = radius.toFloat()
             setColor(tileColor)
+            setStroke(borderWidth, tileBorderColor)
         }
+        val ripple = RippleDrawable(
+            ColorStateList.valueOf(rippleColor),
+            shape,
+            null,
+        )
         val box = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setPadding(padH, padV, padH, padV)
-            background = RippleDrawable(
-                ColorStateList.valueOf(rippleColor),
-                shape,
-                null,
-            )
+            background = ripple
         }
         val word = TextView(context).apply {
             setTextSize(TypedValue.COMPLEX_UNIT_PX, wordSize)
@@ -110,7 +161,7 @@ class CandidatePanelAdapter(
             gravity = Gravity.CENTER
             isSingleLine = true
             includeFontPadding = false
-            typeface = cfg.getFont("candidate_font") ?: Typeface.DEFAULT
+            typeface = wordTypeface
         }
         val comment = TextView(context).apply {
             setTextColor(subColor)
@@ -118,15 +169,22 @@ class CandidatePanelAdapter(
             isSingleLine = true
             includeFontPadding = false
             setTextSize(TypedValue.COMPLEX_UNIT_PX, commentSize)
-            setPadding(0, dp(1f), 0, 0)
+            setPadding(0, dp(2f), 0, 0)
         }
         box.addView(word)
         box.addView(comment)
-        return VH(box, word, comment)
+        return VH(box, word, comment, shape, ripple)
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
-        val item = getItem(position)
+        val item = items[position]
+        // 複用的 ViewHolder 也必須同步最新配色，避免切換主題色後殘留舊色。
+        holder.shape.setColor(tileColor)
+        holder.shape.setStroke(borderWidth, tileBorderColor)
+        holder.ripple.setColor(ColorStateList.valueOf(rippleColor))
+        holder.word.setTextColor(wordColor)
+        holder.word.typeface = wordTypeface
+        holder.comment.setTextColor(subColor)
         holder.word.text = item.text
         val wordWidth = holder.word.paint.measureText(item.text)
         val commentWidth = if (showComment && !hideComment && item.comment.isNotEmpty()) {
@@ -153,8 +211,12 @@ class CandidatePanelAdapter(
                 bottomMargin = gap
             }
         }
-        if (hideComment || !showComment || item.comment.isEmpty()) {
+        if (hideComment || !showComment || !listHasAnyComment) {
             holder.comment.visibility = View.GONE
+        } else if (item.comment.isEmpty()) {
+            // 同頁其它候選帶注腳時，無注腳項保留同等行高，避免同排卡片高低不齊
+            holder.comment.visibility = View.INVISIBLE
+            holder.comment.text = " "
         } else {
             holder.comment.visibility = View.VISIBLE
             holder.comment.text = item.comment
@@ -192,17 +254,4 @@ class CandidatePanelAdapter(
 
     private fun blend(a: Int, b: Int, ratio: Float): Int =
         (a + (b - a) * ratio).toInt().coerceIn(0, 255)
-
-    companion object {
-        private val DIFF = object : DiffUtil.ItemCallback<Item>() {
-            override fun areItemsTheSame(oldItem: Item, newItem: Item): Boolean =
-                oldItem.text == newItem.text && oldItem.comment == newItem.comment &&
-                    oldItem.index == newItem.index && oldItem.segment == newItem.segment &&
-                    oldItem.restCode == newItem.restCode && oldItem.contextKey == newItem.contextKey &&
-                    oldItem.inputSpan == newItem.inputSpan
-
-            override fun areContentsTheSame(oldItem: Item, newItem: Item): Boolean =
-                oldItem == newItem
-        }
-    }
 }

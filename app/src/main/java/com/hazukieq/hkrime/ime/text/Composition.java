@@ -301,7 +301,26 @@ public class Composition extends AppCompatTextView {
   private void appendComposition(Map<String, ?> m) {
     final Rime.RimeComposition r = Rime.getComposition();
     assert r != null;
-    final String s = r.getText();
+    final String raw = r.getText();
+    int rStart = Math.max(0, Math.min(r.getStart(), raw.length()));
+    int rEnd = Math.max(rStart, Math.min(r.getEnd(), raw.length()));
+    String s = raw;
+    // 非 26 鍵且非客語 12 鍵的模糊方案（如 9 鍵拼音 t9）：將高亮段原始數字碼替換為首候選讀音 comment，
+    // 保留已選前綴與未匹配尾段，不再裸露原始數字編碼。
+    final String schemaType = Rime.getSchemaKeyboardType(Rime.getSchemaId());
+    if (com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_9KEY.equals(schemaType)
+        || com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_STROKE.equals(schemaType)) {
+      final Rime.RimeCandidate[] cands = Rime.getCandidates();
+      if (cands != null && cands.length > 0 && cands[0] != null && cands[0].comment != null) {
+        final String comment = cands[0].comment.trim();
+        if (!comment.isEmpty() && !comment.startsWith("~")) {
+          final String prefix = raw.substring(0, rStart);
+          final String tail = raw.substring(rEnd);
+          s = prefix + comment + tail;
+          rEnd = rStart + comment.length();
+        }
+      }
+    }
     int start, end;
     String sep = Config.getString(m, "start");
     if (!TextUtils.isEmpty(sep)) {
@@ -322,8 +341,8 @@ public class Composition extends AppCompatTextView {
       final float size = ConfigGetter.getFloat(m, "letter_spacing", 0);
       if (size != 0f) ss.setSpan(new LetterSpacingSpan(size), start, end, span);
     }
-    start = composition_pos[0] + r.getStart();
-    end = composition_pos[0] + r.getEnd();
+    start = composition_pos[0] + rStart;
+    end = composition_pos[0] + rEnd;
     ss.setSpan(new ForegroundColorSpan(hilited_text_color), start, end, span);
     ss.setSpan(new BackgroundColorSpan(hilited_back_color), start, end, span);
     sep = Config.getString(m, "end");

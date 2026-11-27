@@ -1,8 +1,13 @@
 package com.hazukieq.hkrime.core.twelvekey
 
 import android.content.Context
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.TextView
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.flexbox.AlignItems
@@ -10,6 +15,8 @@ import com.google.android.flexbox.FlexDirection
 import com.google.android.flexbox.FlexWrap
 import com.google.android.flexbox.FlexboxLayoutManager
 import com.google.android.flexbox.JustifyContent
+import com.hazukieq.hkrime.R
+import com.hazukieq.hkrime.data.Config
 import com.hazukieq.hkrime.ime.keyboard.KeyboardView
 import com.hazukieq.hkrime.ime.text.CandidateGroupAdapter
 import com.hazukieq.hkrime.ime.text.CandidatePanelAdapter
@@ -19,13 +26,15 @@ import com.hazukieq.hkrime.ime.text.CandidatePanelAdapter
  * 新輸入回第 0 組，連續選字盡量保留仍存在的活躍讀音組，不按候選條首選自動滾動。
  */
 class CandidatePanelController(
-    context: Context,
+    private val context: Context,
     private val keyboardView: KeyboardView?,
     private val inputArea: FrameLayout?,
     private val panelRoot: View?,
     groupListView: RecyclerView?,
     private val grid: RecyclerView?,
-    backspaceView: View? = null,
+    private val backspaceView: View? = null,
+    private val topDivider: View? = null,
+    private val railDivider: View? = null,
 ) {
 
     val groupAdapter = CandidateGroupAdapter(context) { group -> pickGroup(group) }
@@ -74,6 +83,74 @@ class CandidatePanelController(
             itemAnimator = null
         }
         backspaceView?.setOnClickListener { onBackspace?.invoke() }
+        applyTheme()
+    }
+
+    /** 切換配色/主題/深淺模式時即時同步展開面板全部區塊（底色、左列、右格、退格鍵）。 */
+    fun applyTheme() {
+        val cfg = runCatching { Config.get(context) }.getOrNull()
+        val fallbackSurface = ContextCompat.getColor(context, R.color.panel_surface_fallback)
+        val fallbackGroup = ContextCompat.getColor(context, R.color.panel_group_bg_fallback)
+        val fallbackInk = ContextCompat.getColor(context, R.color.panel_backspace_ink_fallback)
+
+        val canvas = cfg?.getColor("keyboard_back_color") ?: fallbackSurface
+        val ink = cfg?.getColor("candidate_text_color")
+            ?: cfg?.getColor("key_text_color")
+            ?: fallbackInk
+        val offKey = cfg?.getColor("off_key_back_color")
+        val actionBg = cfg?.getColor("bbs") ?: cfg?.getColor("benter")
+        val railBg = when {
+            offKey != null && offKey != canvas -> offKey
+            actionBg != null && actionBg != canvas -> actionBg
+            cfg != null -> ColorUtils.blendARGB(canvas, ink, 0.05f)
+            else -> fallbackGroup
+        }
+
+        val dividerColor = cfg?.getColor("key_border_color")
+            ?.let { ColorUtils.setAlphaComponent(it, 175) }
+            ?: ColorUtils.setAlphaComponent(ink, 28)
+
+        panelRoot?.setBackgroundColor(canvas)
+        groupList?.setBackgroundColor(railBg)
+        topDivider?.setBackgroundColor(dividerColor)
+        railDivider?.setBackgroundColor(dividerColor)
+
+        backspaceView?.let { bs ->
+            val bsBg = cfg?.getColor("bbs")
+                ?: cfg?.getColor("benter")
+                ?: cfg?.getColor("off_key_back_color")
+                ?: cfg?.getColor("key_back_color")
+                ?: railBg
+            val bsPressed = ColorUtils.blendARGB(bsBg, ink, 0.14f)
+            val bsBorder = cfg?.getColor("key_border_color")
+                ?: ColorUtils.setAlphaComponent(ink, 40)
+            val bsInk = cfg?.getColor("tbs")
+                ?: cfg?.getColor("key_text_color")
+                ?: fallbackInk
+            bs.background = makeBackspaceBackground(bsBg, bsPressed, bsBorder)
+            (bs as? TextView)?.setTextColor(bsInk)
+        }
+
+        groupList?.recycledViewPool?.clear()
+        grid?.recycledViewPool?.clear()
+        groupAdapter.applyTheme()
+        gridAdapter.applyTheme()
+    }
+
+    private fun makeBackspaceBackground(normalColor: Int, pressedColor: Int, borderColor: Int): StateListDrawable {
+        val density = context.resources.displayMetrics.density
+        val corner = 10f * density
+        val stroke = (1f * density).toInt().coerceAtLeast(1)
+        fun shape(fill: Int) = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = corner
+            setColor(fill)
+            setStroke(stroke, borderColor)
+        }
+        return StateListDrawable().apply {
+            addState(intArrayOf(android.R.attr.state_pressed), shape(pressedColor))
+            addState(IntArray(0), shape(normalColor))
+        }
     }
 
     val isShown: Boolean get() = panelRoot?.visibility == View.VISIBLE
@@ -121,6 +198,7 @@ class CandidatePanelController(
     /** 每次按鍵/上屏後由上層調用：整個面板只讀這一份快照。 */
     fun submit(next: TwelveKeySnapshot, preserveReading: Boolean = false) {
         val prevInput = snapshot.input
+        val prevDepth = snapshot.phonetics.size
         val advanced = next.phonetics != snapshot.phonetics
         navigation.submit(next, preserveReading)
         snapshot = next
@@ -129,8 +207,8 @@ class CandidatePanelController(
             return
         }
         if (!isShown) return
-        // 右列內容變了就回頂；左列在確認推進或原碼變化時回頂。
-        render(scrollGrid = advanced, scrollGroups = advanced || next.input != prevInput)
+        // 右列內容變了就回頂；左列僅在原碼或確認層級變化時回頂，同層切換音節（如 pau ↔ sau）保持滾動位置。
+        render(scrollGrid = advanced, scrollGroups = next.input != prevInput || next.phonetics.size != prevDepth)
     }
 
     private fun pickGroup(group: CandidateGroupAdapter.GroupItem) {
@@ -180,24 +258,33 @@ class CandidatePanelController(
         // 12 鍵右列固定是「當前確認序列的候選」，左列不再顯示冗餘的「推荐」行。
         val gridIndex = if (snapshot.phoneticNavigation && recommendIndex >= 0) recommendIndex
         else navigation.activeIndex
+        val lastPhonetic = snapshot.phonetics.lastOrNull()
+        val atTail = lastPhonetic != null &&
+            PhoneticSelection.pending(snapshot.remaining, snapshot.phonetics).isEmpty()
         val leftItems = display.mapIndexedNotNull { index, group ->
             if (group.segment == RECOMMEND_SEGMENT || group.reading.isBlank()) return@mapIndexedNotNull null
+            val isInitialRow = group.segment == INITIAL_LETTER_SEGMENT
+            val isSelected = if (snapshot.phoneticNavigation) {
+                atTail && (
+                    (lastPhonetic!!.initialOnly && isInitialRow && group.reading == lastPhonetic.reading) ||
+                        (!lastPhonetic.initialOnly && !isInitialRow && group.reading == lastPhonetic.reading)
+                    )
+            } else {
+                index == navigation.activeIndex
+            }
             CandidateGroupAdapter.GroupItem(
                 index = index,
                 reading = group.reading,
-                selected = if (snapshot.phoneticNavigation) {
-                    group.segment == INITIAL_LETTER_SEGMENT &&
-                        group.reading == snapshot.initial
-                } else {
-                    index == navigation.activeIndex
-                },
+                selected = isSelected,
                 count = group.items.size,
                 contextKey = snapshot.contextKey,
             )
         }
-        groupList?.visibility = if (leftItems.isEmpty()) View.GONE else View.VISIBLE
+        val showRail = leftItems.isNotEmpty()
+        groupList?.visibility = if (showRail) View.VISIBLE else View.GONE
+        railDivider?.visibility = if (showRail) View.VISIBLE else View.GONE
         groupAdapter.submit(leftItems)
-        gridAdapter.setShowComment(leftItems.isNotEmpty())
+        gridAdapter.setShowComment(showRail)
         gridAdapter.submit(
             display[gridIndex].items.map {
                 CandidatePanelAdapter.Item(

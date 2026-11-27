@@ -1,0 +1,48 @@
+# ==============================================================================
+# hkrime 配色回退链（独立于主主题文件）
+# ==============================================================================
+# 当主主题 hakka.trime.yaml 的配色方案未显式指定某个细粒度色键时，
+# 系统沿此回退链自动推导，无需在每套配色中重复书写数十个色键。
+# 高级用户可在对应配色方案中直接写明任意细粒度色键以覆盖回退结果。
+# ==============================================================================
+
+config_version: "5.0"
+
+fallback_colors:
+  # 背景与边框
+  keyboard_back_color: back_color
+  root_background: keyboard_back_color
+  border_color: keyboard_back_color
+  key_border_color: border_color
+  candidate_separator_color: border_color
+  shadow_color: border_color
+  candidate_background: back_color
+  text_back_color: back_color
+  hilited_back_color: back_color
+  hilited_candidate_back_color: back_color
+
+  # 按键底色与文字
+  key_back_color: back_color
+  long_text_back_color: key_back_color
+  key_symbol_color: key_text_color
+  off_key_back_color: border_color
+  off_key_text_color: key_text_color
+  on_key_back_color: hilited_key_back_color
+  on_key_text_color: hilited_key_text_color
+  hilited_key_symbol_color: hilited_key_text_color
+  hilited_off_key_back_color: hilited_key_back_color
+  hilited_on_key_back_color: hilited_key_back_color
+  hilited_off_key_text_color: hilited_key_text_color
+  hilited_on_key_text_color: hilited_key_text_color
+  preview_back_color: key_back_color
+  preview_text_color: key_text_color
+
+  # 候选栏与编码文字
+  candidate_text_color: key_text_color
+  comment_text_color: key_symbol_color
+  text_color: comment_text_color
+  label_color: comment_text_color
+  hilited_comment_text_color: comment_text_color
+  hilited_candidate_text_color: hilited_key_back_color
+  hilited_text_color: hilited_candidate_text_color
+  hilited_label_color: hilited_candidate_text_color

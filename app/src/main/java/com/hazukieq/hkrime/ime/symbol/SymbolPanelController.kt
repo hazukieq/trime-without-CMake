@@ -5,6 +5,7 @@ import android.content.res.ColorStateList
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.drawable.GradientDrawable
+import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -100,8 +101,7 @@ class SymbolPanelController(
         cellTextColor = cfg.getColor("key_text_color") ?: 0xFF202124.toInt()
         badgeTextColor = cfg.getColor("key_symbol_color")
             ?: ColorUtils.setAlphaComponent(cellTextColor, 140)
-        actionBgColor = cfg.getColor("benter")
-            ?: cfg.getColor("off_key_back_color")
+        actionBgColor = cfg.getColor("off_key_back_color")
             ?: 0xFFE8EAED.toInt()
         tabBarBgColor = cfg.getColor("keyboard_back_color")
             ?: actionBgColor
@@ -251,17 +251,25 @@ class SymbolPanelController(
                 )
                 gravity = Gravity.CENTER
                 maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
                 setPadding(dp(4), 0, dp(4), 0)
             }
-            val badge = TextView(parent.context).apply {
+            val badge = MarqueeBadgeView(parent.context).apply {
                 layoutParams = FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                     Gravity.TOP or Gravity.END,
                 ).apply {
-                    topMargin = dp(3)
+                    topMargin = dp(2)
+                    marginStart = dp(4)
                     marginEnd = dp(4)
                 }
+                isSingleLine = true
+                ellipsize = TextUtils.TruncateAt.MARQUEE
+                marqueeRepeatLimit = -1
+                isHorizontalFadingEdgeEnabled = true
+                setFadingEdgeLength(dp(6))
+                includeFontPadding = false
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f)
             }
             container.addView(label)
@@ -283,27 +291,56 @@ class SymbolPanelController(
             holder.label.setTextColor(cellTextColor)
 
             // Auto-scale font size cleanly for single symbols / emojis / .com / kaomoji
-            val len = item.text.length
             val sp = when {
-                len <= 2 -> 21f
-                len <= 4 -> 16f
-                len <= 7 -> 13f
+                isEmojiCluster(item.text) -> 21f
+                item.text.length <= 2 -> 21f
+                item.text.length <= 4 -> 16f
+                item.text.length <= 7 -> 13f
                 else -> 11f
             }
             holder.label.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
 
-            if (item.badge != null) {
+            if (!item.badge.isNullOrEmpty()) {
                 holder.badge.visibility = View.VISIBLE
                 holder.badge.text = item.badge
                 holder.badge.setTextColor(badgeTextColor)
+                holder.badge.isSelected = true
+                holder.label.setPadding(dp(4), dp(9), dp(4), 0)
             } else {
+                holder.badge.isSelected = false
                 holder.badge.visibility = View.GONE
+                holder.label.setPadding(dp(4), 0, dp(4), 0)
             }
 
             holder.container.setOnClickListener {
                 onCommitSymbol?.invoke(item.text)
                 if (!isLocked) hide()
             }
+        }
+
+        override fun onViewAttachedToWindow(holder: VH) {
+            super.onViewAttachedToWindow(holder)
+            if (holder.badge.visibility == View.VISIBLE) {
+                holder.badge.isSelected = false
+                holder.badge.isSelected = true
+            }
+        }
+
+        private fun isEmojiCluster(text: String): Boolean {
+            if (text.isEmpty()) return false
+            val firstCp = text.codePointAt(0)
+            // Regional indicator flags, SMP emoji blocks, or ZWJ / variation-selector sequences
+            if (firstCp >= 0x1F000) return true
+            if (text.indexOf('\uFE0F') >= 0 || text.indexOf('\u200D') >= 0) return true
+            return false
+        }
+    }
+
+    private class MarqueeBadgeView(context: Context) : TextView(context) {
+        override fun isFocused(): Boolean = visibility == View.VISIBLE
+
+        override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+            // IME windows use FLAG_NOT_FOCUSABLE; ignore window focus loss so marquee keeps running.
         }
     }
 

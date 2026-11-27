@@ -1,22 +1,25 @@
 package com.hazukieq.hkrime.data
 
+import com.hazukieq.hkrime.ime.keyboard.BuiltinKeyboards
+
 /**
- * 方案與主題鍵盤布局的強類型解析器（純邏輯，無 Android/JNI 依賴）。
+ * 方案與鍵盤布局的強類型解析器（Theme v5.0，無舊版無類型主題兼容包袱）。
  *
  * 設計契約：
- * - 方案在 `*.schema.yaml` 聲明 `keyboard/type`（如 `12key`、`qwerty`、`9key`），缺省為 `qwerty`；
- *   可選聲明 `keyboard/default` 推薦默認布局 ID。
- * - 主題在 `preset_keyboards/<id>` 聲明 `type` 與展示名 `name`，在 `style/keyboard_defaults` 聲明各類型的默認布局。
- * - 解析鏈每一步都強制校驗 `layout.type == schemaType`，嚴禁 12 鍵方案落入 26 鍵布局（反之亦然）。
- * - 若加載未升級的第三方舊主題（`preset_keyboards` 中未聲明任何 `type`），安全回退到舊版按方案 ID / alphabet 匹配邏輯。
+ * - 內置 5 種標準鍵盤類型：`qwerty`、`12key`、`9key`、`wubi`、`stroke`（布局由 [BuiltinKeyboards] 按需懶構建）。
+ * - 主題可選在 `keyboards:` 中覆蓋已有布局（同 ID 或同 type）或新建自定義 `type` 並設計布局；
+ *   任何未聲明 `type` 的雜亂鍵盤（除非覆蓋內置工具鍵盤 `english` / `number`）一律拒絕。
+ * - 解析鏈每一步均強制校驗 `layout.type == schemaType`，嚴禁跨類型混選。
  */
 object KeyboardLayoutResolver {
 
     const val TYPE_QWERTY = "qwerty"
     const val TYPE_12KEY = "12key"
     const val TYPE_9KEY = "9key"
+    const val TYPE_WUBI = "wubi"
+    const val TYPE_STROKE = "stroke"
 
-    /** 單個主題內可選布局的輕量描述。 */
+    /** 單個可選主鍵盤布局的輕量描述。 */
     data class LayoutInfo(
         val id: String,
         val name: String,
@@ -30,150 +33,144 @@ object KeyboardLayoutResolver {
         return clean.ifEmpty { TYPE_QWERTY }
     }
 
-    /** 解析某個 preset_keyboard 條目顯式聲明的 type（未聲明返回 null）。 */
+    /**
+     * 解析方案對應的鍵盤類型：
+     * 1) 優先使用方案顯式聲明的 `keyboard/type`；
+     * 2) 未聲明時，自動識別常見第三方方案 ID（如霧凇拼音 `t9` → `9key`、五筆 `wubi*` → `wubi`、
+     *    筆畫 `stroke` / `bihua*` → `stroke`、`hakka_jiugong` → `12key`）；
+     * 3) 其餘（`rime_ice`、`radical_pinyin`、`melt_eng`、`luna_pinyin`、`ipa_yunlong` 等）默認 `qwerty`。
+     */
+    @JvmStatic
+    fun inferSchemaType(schemaId: String?, declaredType: String?): String {
+        val explicit = declaredType?.trim()?.lowercase().orEmpty()
+        if (explicit.isNotEmpty()) return explicit
+        val id = schemaId?.trim()?.lowercase().orEmpty()
+        if (id.isEmpty() || id == ".default") return TYPE_QWERTY
+        return when {
+            id == "hakka_jiugong" -> TYPE_12KEY
+            id == "t9" || id.startsWith("t9_") || id.endsWith("_t9") ||
+                id.contains("9key") -> TYPE_9KEY
+            id == "wubi" || id.startsWith("wubi") || id.contains("_wubi") -> TYPE_WUBI
+            id == "stroke" || id.startsWith("stroke_") || id.endsWith("_stroke") ||
+                id.startsWith("bihua") -> TYPE_STROKE
+            else -> TYPE_QWERTY
+        }
+    }
+
+    /** 解析某個鍵盤配置顯式聲明的 type（未聲明返回 null）。 */
     @JvmStatic
     fun declaredTypeOf(keyboardMap: Map<*, *>?): String? {
         val raw = keyboardMap?.get("type")?.toString()?.trim()?.lowercase()
         return raw?.takeIf { it.isNotEmpty() }
     }
 
-    /** 判斷主題是否已啟用類型標註（任意一個 preset_keyboard 聲明了 `type` 即為新版主題）。 */
-    @JvmStatic
-    fun isTypedTheme(presetKeyboards: Map<String, Map<String, *>>?): Boolean {
-        if (presetKeyboards.isNullOrEmpty()) return false
-        return presetKeyboards.values.any { declaredTypeOf(it) != null }
-    }
-
     /**
-     * 列出當前主題中「與 [schemaType] 嚴格匹配」的所有可選主鍵盤布局（保持主題聲明順序）。
-     * 排除純別名（`import_preset` 轉發項），只返回真實布局。
+     * 過濾主題自定義的 `keyboards:` 條目：
+     * - 必須顯式聲明 `type`（允許覆蓋已有類型或新建自定義類型），或是覆蓋內置工具鍵盤（`english` / `number`）；
+     * - 拒絕無 `type` 的雜亂鍵盤。
      */
     @JvmStatic
-    fun availableLayouts(
-        schemaType: String?,
-        presetKeyboards: Map<String, Map<String, *>>?,
-    ): List<LayoutInfo> {
-        if (presetKeyboards.isNullOrEmpty()) return emptyList()
-        val wantType = normalizeType(schemaType)
-        val out = ArrayList<LayoutInfo>()
-        for ((id, raw) in presetKeyboards) {
-            if (raw.containsKey("import_preset")) continue
-            val type = declaredTypeOf(raw) ?: continue
-            if (type != wantType) continue
-            val displayName = raw["name"]?.toString()?.trim()?.takeIf { it.isNotEmpty() } ?: id
-            out.add(LayoutInfo(id = id, name = displayName, type = type))
+    fun filterCustomKeyboards(
+        rawKeyboards: Map<String, Map<String, *>>?,
+    ): Map<String, Map<String, *>> {
+        if (rawKeyboards.isNullOrEmpty()) return emptyMap()
+        val out = LinkedHashMap<String, Map<String, *>>()
+        for ((rawId, def) in rawKeyboards) {
+            val id = BuiltinKeyboards.canonicalName(rawId)
+            val isUtilityOverride = BuiltinKeyboards.isUtility(id)
+            val declaredType = declaredTypeOf(def)
+            if (declaredType == null && !isUtilityOverride) {
+                continue
+            }
+            out[id] = def
         }
         return out
     }
 
-    /** 檢查指定布局 ID 是否存在於主題且與 [schemaType] 嚴格匹配。 */
+    /**
+     * 合併內置主打字布局與主題自定義打字布局（排除 `english` / `number` 工具鍵盤）。
+     * 同 ID 時以主題自定義覆蓋內置描述。
+     */
+    @JvmStatic
+    fun mergedTypingCatalog(
+        customKeyboards: Map<String, Map<String, *>>?,
+    ): List<LayoutInfo> {
+        val byId = LinkedHashMap<String, LayoutInfo>()
+        for (info in BuiltinKeyboards.typingMetadata()) {
+            byId[info.id] = info
+        }
+        if (!customKeyboards.isNullOrEmpty()) {
+            for ((rawId, def) in customKeyboards) {
+                val id = BuiltinKeyboards.canonicalName(rawId)
+                if (BuiltinKeyboards.isUtility(id)) continue
+                val type = declaredTypeOf(def) ?: continue
+                if (type == "english" || type == "number") continue
+                val displayName = def["name"]?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: byId[id]?.name
+                    ?: id
+                byId[id] = LayoutInfo(id = id, name = displayName, type = type)
+            }
+        }
+        return byId.values.toList()
+    }
+
+    /**
+     * 列出與 [schemaType] 嚴格匹配的所有可選主鍵盤布局（內置 + 主題自定義）。
+     */
+    @JvmStatic
+    fun availableLayouts(
+        schemaType: String?,
+        customKeyboards: Map<String, Map<String, *>>?,
+    ): List<LayoutInfo> {
+        val wantType = normalizeType(schemaType)
+        return mergedTypingCatalog(customKeyboards).filter { it.type == wantType }
+    }
+
+    /** 檢查指定布局 ID 是否與 [schemaType] 嚴格匹配。 */
     @JvmStatic
     fun isCompatible(
         layoutId: String?,
         schemaType: String?,
-        presetKeyboards: Map<String, Map<String, *>>?,
+        customKeyboards: Map<String, Map<String, *>>?,
     ): Boolean {
-        if (layoutId.isNullOrBlank() || presetKeyboards.isNullOrEmpty()) return false
-        val target = resolveImportPreset(layoutId, presetKeyboards) ?: return false
-        val type = declaredTypeOf(presetKeyboards[target]) ?: return false
-        return type == normalizeType(schemaType)
+        if (layoutId.isNullOrBlank()) return false
+        val canonical = BuiltinKeyboards.canonicalName(layoutId.trim())
+        val wantType = normalizeType(schemaType)
+        return mergedTypingCatalog(customKeyboards).any { it.id == canonical && it.type == wantType }
     }
 
     /**
      * 為當前方案解析 `.default` 應使用的主鍵盤布局 ID。
      *
-     * 優先級（新版帶 `type` 主題，每步強制校驗 `layout.type == schemaType`）：
+     * 優先級（每步強制校驗 `layout.type == schemaType`）：
      * 1. 用戶在設置中為當前方案選擇的布局（[userSelectedLayout]）
      * 2. 方案可選推薦的默認布局（[schemaDefaultLayout]）
-     * 3. 主題 `style/keyboard_defaults[schemaType]`
-     * 4. 主題中第一個 `type == schemaType` 的布局
-     * 5. 舊主題兼容回退（僅當主題未聲明任何 `type` 時生效）
+     * 3. 主題 `keyboard.defaults[schemaType]`
+     * 4. 同類型第一個可用布局（內置或自定義）
+     * 5. 安全兜底 `"letter"`（避免空指針）
      */
     @JvmStatic
     fun resolveDefaultLayout(
-        schemaId: String?,
         schemaType: String?,
         schemaDefaultLayout: String?,
         userSelectedLayout: String?,
         themeDefaults: Map<*, *>?,
-        presetKeyboards: Map<String, Map<String, *>>?,
-        spellerAlphabet: String? = null,
+        customKeyboards: Map<String, Map<String, *>>?,
     ): String {
-        if (presetKeyboards.isNullOrEmpty()) return "default"
         val wantType = normalizeType(schemaType)
+        val candidates = availableLayouts(wantType, customKeyboards)
+        val validIds = candidates.map { it.id }.toSet()
 
-        if (isTypedTheme(presetKeyboards)) {
-            // 1) 用戶設置覆蓋（強類型校驗：換主題或類型不符時安全回落）
-            pickIfCompatible(userSelectedLayout, wantType, presetKeyboards)?.let { return it }
-            // 2) 方案顯式推薦布局
-            pickIfCompatible(schemaDefaultLayout, wantType, presetKeyboards)?.let { return it }
-            // 3) 主題 style/keyboard_defaults[type]
-            val themeDefault = themeDefaults?.get(wantType)?.toString()?.trim()
-            pickIfCompatible(themeDefault, wantType, presetKeyboards)?.let { return it }
-            // 4) 主題中第一個同類型布局
-            availableLayouts(wantType, presetKeyboards).firstOrNull()?.let { return it.id }
-            // 5) 最後兜底（主題完全未提供該類型布局）
-            return legacyFallback(schemaId, presetKeyboards, spellerAlphabet)
+        fun pick(raw: String?): String? {
+            if (raw.isNullOrBlank()) return null
+            val canonical = BuiltinKeyboards.canonicalName(raw.trim())
+            return canonical.takeIf { it in validIds }
         }
 
-        // 未標註 type 的第三方舊主題：保持原 Trime 行為
-        return legacyFallback(schemaId, presetKeyboards, spellerAlphabet)
-    }
-
-    private fun pickIfCompatible(
-        candidateId: String?,
-        wantType: String,
-        presetKeyboards: Map<String, Map<String, *>>,
-    ): String? {
-        if (candidateId.isNullOrBlank()) return null
-        val target = resolveImportPreset(candidateId.trim(), presetKeyboards) ?: return null
-        val type = declaredTypeOf(presetKeyboards[target]) ?: return null
-        return if (type == wantType) target else null
-    }
-
-    private fun resolveImportPreset(
-        id: String,
-        presetKeyboards: Map<String, Map<String, *>>,
-    ): String? {
-        var current = id
-        var guard = 0
-        while (guard++ < 4) {
-            val map = presetKeyboards[current] ?: return null
-            val imp = map["import_preset"]?.toString()?.trim()
-            if (imp.isNullOrEmpty() || imp == current) return current
-            current = imp
-        }
-        return if (presetKeyboards.containsKey(current)) current else null
-    }
-
-    private fun legacyFallback(
-        schemaId: String?,
-        presetKeyboards: Map<String, Map<String, *>>,
-        spellerAlphabet: String?,
-    ): String {
-        var name = "default"
-        if (!schemaId.isNullOrEmpty()) {
-            if (presetKeyboards.containsKey(schemaId)) {
-                name = schemaId
-            } else {
-                val prefix = if (schemaId.contains("_")) schemaId.substringBefore("_") else schemaId
-                if (presetKeyboards.containsKey(prefix)) {
-                    name = prefix
-                } else {
-                    var candidate = TYPE_QWERTY
-                    if (!spellerAlphabet.isNullOrEmpty()) {
-                        if (presetKeyboards.containsKey(spellerAlphabet)) {
-                            candidate = spellerAlphabet
-                        } else {
-                            if (spellerAlphabet.contains(",") || spellerAlphabet.contains(";")) candidate += "_"
-                            if (spellerAlphabet.contains("0") || spellerAlphabet.contains("1")) candidate += "0"
-                        }
-                    }
-                    if (presetKeyboards.containsKey(candidate)) name = candidate
-                }
-            }
-        }
-        if (!presetKeyboards.containsKey(name)) name = "default"
-        return resolveImportPreset(name, presetKeyboards) ?: "default"
+        pick(userSelectedLayout)?.let { return it }
+        pick(schemaDefaultLayout)?.let { return it }
+        pick(themeDefaults?.get(wantType)?.toString())?.let { return it }
+        candidates.firstOrNull()?.let { return it.id }
+        return "letter"
     }
 }

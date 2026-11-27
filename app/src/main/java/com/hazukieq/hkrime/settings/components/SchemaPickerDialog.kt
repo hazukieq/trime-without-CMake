@@ -1,6 +1,6 @@
 package com.hazukieq.hkrime.settings.components
 
-import android.app.ProgressDialog
+import android.app.Dialog
 import android.content.Context
 import com.hazukieq.hkrime.R
 import com.hazukieq.hkrime.core.Rime
@@ -29,7 +29,7 @@ class SchemaPickerDialog(
     private var schemaMapList: List<Map<String?, String?>>? = availableSchemaList()
     private lateinit var schemaNames: Array<String?>
 
-    private var progressDialog: ProgressDialog
+    private var progressDialog: Dialog
 
     /** 對話框流程全部結束後的回調（輸入法宿主頁用來結束透明 Activity）。 */
     var onDismiss: (() -> Unit)? = null

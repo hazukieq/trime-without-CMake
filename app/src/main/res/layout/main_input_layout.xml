@@ -17,62 +17,83 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
-        <!-- 展開面板：只覆蓋鍵盤區，候選欄（第一行）保持可見。
-             面板根直接就是橫向 LinearLayout（舊版外面多包一層 FrameLayout）。 -->
+        <!-- 展開面板：只覆蓋鍵盤區，候選欄（第一行）保持可見。 -->
         <LinearLayout
             android:id="@+id/candidate_panel_root"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="@color/panel_surface_fallback"
-            android:orientation="horizontal"
+            android:orientation="vertical"
             android:visibility="gone">
 
-            <!-- 左側：拼音音節組 + 字母行（同一份列表，字母在底部） -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/candidate_group_list"
-                android:layout_width="88dp"
-                android:layout_height="match_parent"
-                android:background="@color/panel_group_bg_fallback"
-                android:clipToPadding="false"
-                android:paddingTop="6dp"
-                android:paddingBottom="6dp" />
+            <!-- 候選條與展開面板之間的細分割線 -->
+            <View
+                android:id="@+id/panel_top_divider"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/modern_hairline" />
 
             <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
                 android:layout_weight="1"
-                android:orientation="vertical">
+                android:orientation="horizontal">
 
+                <!-- 左側：拼音音節組 + 首拼行（同一份列表，首拼在底部） -->
                 <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/candidate_panel"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
+                    android:id="@+id/candidate_group_list"
+                    android:layout_width="78dp"
+                    android:layout_height="match_parent"
+                    android:background="@color/panel_group_bg_fallback"
                     android:clipToPadding="false"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="2dp"
+                    android:overScrollMode="never"
                     android:paddingTop="6dp"
                     android:paddingBottom="6dp" />
 
-                <!-- 底部一條：放退格鍵，候選區不再被它遮住（用戶 2026-11-10）
-                     不用 FrameLayout 包單個 TextView：直接 layout_gravity=end 即可 -->
-                <TextView
-                    android:id="@+id/panel_backspace"
-                    android:layout_width="60dp"
-                    android:layout_height="48dp"
-                    android:layout_gravity="end"
-                    android:layout_marginTop="4dp"
-                    android:layout_marginEnd="14dp"
-                    android:layout_marginBottom="4dp"
-                    android:background="@drawable/panel_backspace_bg"
-                    android:clickable="true"
-                    android:contentDescription="@string/backspace"
-                    android:elevation="2dp"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:text="⌫"
-                    android:textColor="@color/panel_backspace_ink_fallback"
-                    android:textSize="22sp" />
+                <!-- 左列與右側候選區之間的縱向細分割線 -->
+                <View
+                    android:id="@+id/panel_rail_divider"
+                    android:layout_width="1dp"
+                    android:layout_height="match_parent"
+                    android:background="@color/modern_hairline" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/candidate_panel"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:clipToPadding="false"
+                        android:overScrollMode="never"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="3dp"
+                        android:paddingTop="8dp"
+                        android:paddingBottom="4dp" />
+
+                    <!-- 底部緊湊退格區：不遮擋候選格，與鍵盤退格鍵風格統一 -->
+                    <TextView
+                        android:id="@+id/panel_backspace"
+                        android:layout_width="64dp"
+                        android:layout_height="38dp"
+                        android:layout_gravity="end"
+                        android:layout_marginTop="2dp"
+                        android:layout_marginEnd="10dp"
+                        android:layout_marginBottom="6dp"
+                        android:background="@drawable/panel_backspace_bg"
+                        android:clickable="true"
+                        android:contentDescription="@string/backspace"
+                        android:elevation="0dp"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:text="⌫"
+                        android:textColor="@color/panel_backspace_ink_fallback"
+                        android:textSize="20sp" />
+                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
 
@@ -80,6 +101,11 @@
         <include
             android:id="@+id/symbol_panel"
             layout="@layout/symbol_panel" />
+
+        <!-- 原生文字编辑面板（布局固定不接受主题编辑，自动跟随主题配色） -->
+        <include
+            android:id="@+id/edit_panel"
+            layout="@layout/edit_panel" />
     </FrameLayout>
 
 </LinearLayout>

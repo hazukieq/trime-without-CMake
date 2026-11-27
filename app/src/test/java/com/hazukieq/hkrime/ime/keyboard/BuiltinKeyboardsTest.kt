@@ -9,14 +9,18 @@ import org.junit.Test
 class BuiltinKeyboardsTest {
 
     @Test
-    fun builtinIdsBuildValidMaps() {
-        val names = BuiltinKeyboards.allNames()
-        assertEquals(listOf("number", "edit"), names)
+    fun allStandardAndUtilityBuiltinsBuildValidMaps() {
+        assertEquals(listOf("english", "number"), BuiltinKeyboards.utilityNames())
+        assertEquals(
+            listOf("jiugong_simp", "letter", "pinyin_9key", "wubi_qwerty", "stroke_9key"),
+            BuiltinKeyboards.typingMetadata().map { it.id },
+        )
 
-        for (id in names) {
+        for (id in BuiltinKeyboards.allNames()) {
             assertTrue("isBuiltin($id) should be true", BuiltinKeyboards.isBuiltin(id))
-            val map = BuiltinKeyboards.build(id, null)
+            val map = BuiltinKeyboards.build(id)
             assertNotNull("name missing for $id", map["name"])
+            assertNotNull("type missing for $id", map["type"])
             val keys = map["keys"] as? List<*>
             assertNotNull("keys missing for $id", keys)
             assertTrue("keys empty for $id", keys!!.isNotEmpty())
@@ -24,38 +28,30 @@ class BuiltinKeyboardsTest {
     }
 
     @Test
-    fun canonicalAliasesAndOverridesWork() {
-        assertEquals("edit", BuiltinKeyboards.canonicalName("numberb"))
-        assertTrue(BuiltinKeyboards.isBuiltin("numberb"))
-        assertFalse(BuiltinKeyboards.isBuiltin("jiugong_simp"))
+    fun canonicalAliasesMapLegacyIdsCleanly() {
+        assertEquals("english", BuiltinKeyboards.canonicalName("qwerty_cn2en"))
+        assertTrue(BuiltinKeyboards.isUtility("qwerty_cn2en"))
+        assertTrue(BuiltinKeyboards.isUtility("english"))
+        assertTrue(BuiltinKeyboards.isUtility("number"))
+        assertFalse(BuiltinKeyboards.isUtility("jiugong_simp"))
         assertFalse(BuiltinKeyboards.isBuiltin("symbols"))
         assertFalse(BuiltinKeyboards.isBuiltin(null))
-
-        val overrides = mapOf(
-            "number" to mapOf("height" to 52, "width" to 16.5),
-            "edit" to mapOf("height" to 42),
-        )
-        val num = BuiltinKeyboards.build("number", overrides)
-        assertEquals(52, num["height"])
-        assertEquals(16.5, num["width"])
-
-        val edit = BuiltinKeyboards.build("edit", overrides)
-        assertEquals(42, edit["height"])
     }
 
     @Test
-    fun registerPresetKeysAddsDefaultsWithoutOverwritingTheme() {
+    fun registerPresetKeysAddsAllCoreKeysWithoutOverwritingTheme() {
         val custom = linkedMapOf<String, Map<String, String>>(
             "Keyboard_number" to mapOf("label" to "自定义123", "select" to "number"),
         )
         BuiltinKeyboards.registerPresetKeys(custom)
 
         assertEquals("自定义123", custom["Keyboard_number"]?.get("label"))
+        assertEquals("english", custom["Keyboard_en"]?.get("select"))
         assertEquals("edit", custom["Keyboard_edit"]?.get("select"))
         assertEquals("symbols", custom["Keyboard_symbols"]?.get("select"))
-        assertEquals("emoji", custom["Keyboard_emoji"]?.get("select"))
-        assertEquals("kaomoji", custom["Keyboard_kaomoji"]?.get("select"))
+        assertEquals("ng", custom["letter_1"]?.get("label"))
+        assertEquals("ABC", custom["t9_2"]?.get("label"))
+        assertEquals("一", custom["stroke_h"]?.get("label"))
         assertEquals("9", custom["num_9"]?.get("send"))
-        assertEquals("Tab", custom["Tab1"]?.get("send"))
     }
 }

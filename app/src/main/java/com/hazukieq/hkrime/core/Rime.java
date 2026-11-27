@@ -181,17 +181,17 @@ public class Rime {
     public RimeSchema(String schema_id) {
       Timber.d("RimeSchema() start");
       Object o;
-      o = schema_get_value(schema_id, "schema");
+      o = getSchemaValueCached(schema_id, "schema");
       if (o == null || !(o instanceof Map)) return;
       Timber.d("RimeSchema() switch");
       schema = (Map<String, Object>) o;
-      o = schema_get_value(schema_id, "switches");
+      o = getSchemaValueCached(schema_id, "switches");
       if (o == null || !(o instanceof List)) return;
-      switches = (List<Map<String, Object>>) o;
+      switches = new ArrayList<>((List<Map<String, Object>>) o);
       check(); // 檢查不在選單中顯示的選項
       Timber.d("RimeSchema() menu");
-      o = schema_get_value(schema_id, "menu");
-      if (o == null || !(o instanceof HashMap)) return;
+      o = getSchemaValueCached(schema_id, "menu");
+      if (o == null || !(o instanceof Map)) return;
       Timber.d("RimeSchema() menu.page_size=" + ((Map<Object, Object>) o).get("page_size"));
     }
 
@@ -229,7 +229,9 @@ public class Rime {
     private static String switchTitle(String name, List<?> states) {
       switch (name) {
         case "ywz":
-          return "颜文字/表情";
+          return "颜文字";
+        case "emoji":
+          return "表情";
         case "lenth":
           return "联想短语";
         case "simplification":
@@ -527,6 +529,7 @@ public class Rime {
   }
 
   private static void init(boolean full_check) {
+    clearSchemaConfigCache();
     String methodName =
         "\t<TrimeInit>\t" + Thread.currentThread().getStackTrace()[2].getMethodName() + "\t";
     Timber.d(methodName);
@@ -667,9 +670,16 @@ public class Rime {
   }
 
   public static void destroy() {
-    destroy_session();
-    finalize1();
-    self = null;
+    if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
+      // 等在途維護/修復線程收尾再銷毀，避免同進程兩條線程併發搶 LevelDB LOCK 導致 userdb 假死。
+      join_maintenance_thread();
+    }
+    synchronized (ENGINE_LOCK) {
+      maintenancePending = false;
+      destroy_session();
+      finalize1();
+      self = null;
+    }
   }
 
   public static String getCommitText() {
@@ -838,25 +848,56 @@ public class Rime {
     return schema == null ? ".default" : schema;
   }
 
+  private static final Object SCHEMA_CACHE_NULL = new Object();
+  private static final java.util.concurrent.ConcurrentHashMap<String, Object> schemaValueCache =
+      new java.util.concurrent.ConcurrentHashMap<>();
+  private static final java.util.concurrent.ConcurrentHashMap<String, String> schemaKeyboardTypeCache =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
+  /** 清空方案配置內存緩存（僅在部署 / 重新初始化引擎時調用）。 */
+  public static void clearSchemaConfigCache() {
+    schemaValueCache.clear();
+    schemaKeyboardTypeCache.clear();
+  }
+
   /**
-   * 讀取方案聲明的 `keyboard/type`（如 `12key`、`qwerty`、`9key`）。
-   * 缺省為 `qwerty`；對尚未重新部署的舊版 `hakka_jiugong` 兼容視為 `12key`。
+   * 帶內存緩存的方案配置讀取：同一 `(schemaId, key)` 整個進程週期內僅讀盤解析一次
+   * `/sdcard/hkrime/build/<schema>.schema.yaml`（含空值負緩存），切方案與按鍵路徑零重複 IO。
+   */
+  public static Object getSchemaValueCached(String schemaId, String key) {
+    if (schemaId == null || schemaId.isEmpty() || ".default".equals(schemaId) || key == null) {
+      return null;
+    }
+    String cacheKey = schemaId + '\u0000' + key;
+    Object cached = schemaValueCache.get(cacheKey);
+    if (cached != null) {
+      return cached == SCHEMA_CACHE_NULL ? null : cached;
+    }
+    Object value = null;
+    try {
+      value = schema_get_value(schemaId, key);
+    } catch (Throwable ignored) {
+    }
+    schemaValueCache.put(cacheKey, value != null ? value : SCHEMA_CACHE_NULL);
+    return value;
+  }
+
+  /**
+   * 讀取方案聲明的 `keyboard/type`（如 `12key`、`qwerty`、`9key`、`wubi`、`stroke`）；
+   * 未顯式聲明時由 [KeyboardLayoutResolver.inferSchemaType] 自動適配常見方案（如霧凇 `t9` → `9key`）。
+   * 結果按 `schemaId` 緩存，避免每次按鍵反覆打開並解析磁盤上的 `*.schema.yaml`。
    */
   public static String getSchemaKeyboardType(String schemaId) {
     if (schemaId == null || schemaId.isEmpty() || ".default".equals(schemaId)) {
       return com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_QWERTY;
     }
-    try {
-      Object v = schema_get_value(schemaId, "keyboard/type");
-      if (v != null && !v.toString().trim().isEmpty()) {
-        return com.hazukieq.hkrime.data.KeyboardLayoutResolver.normalizeType(v.toString());
-      }
-    } catch (Throwable ignored) {
-    }
-    if ("hakka_jiugong".equals(schemaId)) {
-      return com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_12KEY;
-    }
-    return com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_QWERTY;
+    String cached = schemaKeyboardTypeCache.get(schemaId);
+    if (cached != null) return cached;
+    Object v = getSchemaValueCached(schemaId, "keyboard/type");
+    String declared = v != null ? v.toString() : null;
+    String resolved = com.hazukieq.hkrime.data.KeyboardLayoutResolver.inferSchemaType(schemaId, declared);
+    schemaKeyboardTypeCache.put(schemaId, resolved);
+    return resolved;
   }
 
   public static boolean isTwelveKeySchema() {
@@ -1065,6 +1106,9 @@ public class Rime {
     if (event instanceof RimeEvent.SchemaEvent) {
       initSchema();
       trime.initKeyboard();
+      if (trime.textInputManager != null) {
+        trime.textInputManager.warmUpActiveSchemaAsync();
+      }
       Timber.i("Notification: solve SchemaEvent");
     } else if (event instanceof RimeEvent.OptionEvent) {
       getStatus();

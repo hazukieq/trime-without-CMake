@@ -211,8 +211,8 @@ object TwelveKeySnapshotBuilder {
         // 放在條首與推薦首位，避免 preedit/預覽裸露原碼。
         // 「盡力找」只在**候選條固定窗口**裡找：bar/full 必須用同一窗口判定，
         // 否則窗口外的完整詞會讓兩條路徑一個造詞、一個不造（bar drift）。
-        val fullCodeCovered = barCandidates.any { it.inputSpan?.end == remaining.length } ||
-            barEntries.any { it.inputSpan?.end == remaining.length } ||
+        val fullCodeCovered = barCandidates.any { it.inputSpan?.let { s -> CompositionInput.coversFullCode(remaining, s.end) } == true } ||
+            barEntries.any { it.inputSpan?.let { s -> CompositionInput.coversFullCode(remaining, s.end) } == true } ||
             dictionaryRows.any { it.restCode.isEmpty() }
         // 僅在剩餘碼無法完整切分為合法音節時才按每鍵首拼造詞；
         // 全拼長句（如 7 音節整句）本身可切分成真實音節，不得用逐鍵假詞劫持首選與 preedit。
@@ -377,7 +377,7 @@ object TwelveKeySnapshotBuilder {
         phonetics: List<PhoneticSelection>,
         appRankingEnabled: Boolean,
     ): TwelveKeySnapshot? {
-        if (remaining.isEmpty()) return null
+        if (remaining.isEmpty() || previous.isEmpty || previous.remaining != remaining) return null
         val binder = CandidateSelection.InputBinder(remaining, 0)
         val pool = if (previous.recommend.isNotEmpty()) previous.recommend else previous.barEntries
         val matched = if (phonetics.isEmpty()) {
@@ -407,7 +407,7 @@ object TwelveKeySnapshotBuilder {
             confirmGroups(remaining, phonetics)
         val preview = bar.firstOrNull()?.text.orEmpty()
         return TwelveKeySnapshot(
-            input = previous.input.ifEmpty { remaining },
+            input = remaining,
             consumedEnd = 0,
             remaining = remaining,
             groups = groups,
@@ -449,8 +449,23 @@ object TwelveKeySnapshotBuilder {
             return rows
         }
         val last = phonetics.lastOrNull() ?: return rows
-        if (!last.initialOnly) return rows
-        InitialDisambiguation.choices(last.code).forEach { letter ->
+        val lastCode = last.code.trim { it == '\'' || it.isWhitespace() }
+        if (lastCode.isEmpty()) return rows
+        if (!last.initialOnly) {
+            // 末段已確認為完整音節（含單音節如 pau）：保留左列該段候選音節並高亮當前選中項，
+            // 不再隱藏左列，方便直覺查看已選音節或同段切換（如 pau ↔ sau）。
+            val syllables = TwelveKeyPreedit.syllablesCompletingPrefix(lastCode)
+                .take(TwelveKeyTuning.MAX_CONFIRM_SYLLABLES)
+            val ordered = if (last.reading in syllables) syllables else listOf(last.reading) + syllables
+            ordered.forEach { syllable ->
+                rows.add(SyllableGroup(syllable, listOf(syllable), emptyList()))
+            }
+            InitialDisambiguation.choices(lastCode).forEach { letter ->
+                rows.add(SyllableGroup(letter, emptyList(), emptyList(), INITIAL_LETTER_SEGMENT))
+            }
+            return rows
+        }
+        InitialDisambiguation.choices(lastCode).forEach { letter ->
             rows.add(SyllableGroup(letter, emptyList(), emptyList(), INITIAL_LETTER_SEGMENT))
         }
         return rows
@@ -500,10 +515,18 @@ object TwelveKeySnapshotBuilder {
             }
             for ((rankIdx, ch) in list.withIndex()) {
                 if (!seen.add(ch)) continue
-                val score = if (nativeChars.isNotEmpty()) {
+                val baseScore = if (nativeChars.isNotEmpty()) {
                     100_000 - rankIdx
                 } else {
                     TwelveKeyPreedit.generalScore(ch)
+                }
+                // 首拼確認態（如點 b）：若詞典裡有對應的單字母候選（b/B），確保直接露出在前排不被 120 上限截掉。
+                val score = if (first.initialOnly && unit.length == 1 &&
+                    ch.length == 1 && ch[0].lowercaseChar() == unit[0]
+                ) {
+                    maxOf(baseScore, 100_000)
+                } else {
+                    baseScore
                 }
                 chars.add(Triple(syllable, ch, score))
             }
@@ -558,6 +581,223 @@ object TwelveKeySnapshotBuilder {
             engineOrderOnly = true,
             phoneticNavigation = mapFallbackLetters,
         )
+    }
+
+    /**
+     * 通用非客語 12 鍵方案快照（適用於 26 鍵普通話 rime_ice、朙月拼音、五筆、筆畫、其它方言/語言）：
+     * - 嚴格只讀引擎候選，絕不調用客語 12 鍵詞庫（[buildPanelRows] / [TwelveKeyPreedit]）；
+     * - 始終保留左列分組欄，不隱藏左列：
+     *   1) 候選自帶非空 `comment`（讀音提示 / 輔助碼等）時直接按 `comment` 分組；
+     *   2) 無 `comment` 時（如普通話 `rime_ice`），按候選在 `local.input` 上覆蓋的跨度映射到
+     *      `rawPreedit`（如 `ni hao`、`ni`）或原碼片段分組；
+     *   3) 多組時頂部放「全部」行（完整引擎順序），單組時直接顯示該組音節/編碼。
+     */
+    fun buildGenericSnapshot(
+        local: Local,
+        maxCandidates: Int = MAX_CANDIDATES,
+        candidatesOverride: List<CandidateItem>? = null,
+    ): TwelveKeySnapshot {
+        if (local.isEmpty) return TwelveKeySnapshot.EMPTY
+        var degraded = false
+        val flat: List<CandidateItem> = if (candidatesOverride != null) {
+            candidatesOverride.take(maxCandidates)
+        } else {
+            val snapshot = runCatching { Rime.candidatesSnapshot(maxCandidates) }.getOrNull()
+            if (snapshot != null) {
+                snapshot.mapIndexed { index, row ->
+                    CandidateItem(
+                        text = row.getOrNull(0) ?: "",
+                        comment = cleanComment(row.getOrNull(1)),
+                        index = row.getOrNull(5)?.toIntOrNull() ?: index,
+                        engineSpan = EngineCandidateSpan.fromRow(row),
+                    )
+                }
+            } else {
+                degraded = true
+                singlePageFallback().mapIndexed { index, (text, comment) ->
+                    CandidateItem(text, cleanComment(comment), index)
+                }
+            }
+        }
+        val fallbackReading = local.rawPreedit.trim().ifEmpty { local.remaining }
+        val commented = flat.mapNotNull { it.comment.trim().takeIf { c -> c.isNotEmpty() && c != "…" } }
+        // 僅當 comment 真正起到「多候選同讀音聚合」作用（如拼音/方言 spelling_hints）時才按 comment 分組；
+        // 像 IPA / 五筆等 table_translator 每個候選自帶唯一補全後綴（g/j/q/r…），應按實際匹配的原碼跨度分組，
+        // 同時把每個候選的注腳補全為完整編碼（如 n、ng、nj、nq），首項無後綴也顯示當前編碼 n。
+        val groupByComment = commented.size >= 2 && commented.toSet().size < commented.size
+        val isCompletionSuffix = commented.isNotEmpty() && !groupByComment
+        val displayFlat = ArrayList<CandidateItem>(flat.size)
+        val grouped = LinkedHashMap<String, MutableList<CandidateItem>>()
+        for (item in flat) {
+            val rawComment = item.comment.trim().takeIf { it != "…" }.orEmpty()
+            val prefix = matchedCodeSpan(item, local.input, fallbackReading)
+            // 左列讀音沿用原始 comment（如 ~'ji 允許保留在左列）；
+            // 右側卡片底部注腳把以 `~` 開頭的補全後綴（或唯一補全後綴方案）展開為完整編碼（如 pa'ji、ng、n）。
+            val reading = genericCandidateReading(
+                item = item,
+                input = local.input,
+                rawPreedit = local.rawPreedit,
+                fallbackReading = fallbackReading,
+                preferComment = groupByComment,
+            )
+            val fullComment = when {
+                rawComment.startsWith("~") && prefix.isNotEmpty() ->
+                    prefix + rawComment.removePrefix("~")
+                isCompletionSuffix ->
+                    if (prefix.isNotEmpty()) prefix + rawComment else rawComment
+                rawComment.isEmpty() && groupByComment && isEmojiText(item.text) ->
+                    "表情"
+                else -> rawComment
+            }
+            val displayItem = if (fullComment != item.comment) item.copy(comment = fullComment) else item
+            displayFlat.add(displayItem)
+            if (reading.isNotEmpty()) {
+                grouped.getOrPut(reading) { ArrayList() }.add(displayItem)
+            }
+        }
+        val bar = displayFlat.take(TwelveKeyTuning.BAR_ITEMS)
+        val readingGroups = grouped.entries.take(MAX_GROUPS - 1).map { (reading, items) ->
+            SyllableGroup(
+                reading = reading,
+                syllables = reading.split(' ').filter { it.isNotEmpty() },
+                items = items,
+                segment = 0,
+            )
+        }
+        val groups: List<SyllableGroup> = when {
+            displayFlat.isEmpty() -> emptyList()
+            readingGroups.isEmpty() -> listOf(
+                SyllableGroup(
+                    reading = fallbackReading.ifEmpty { "全部" },
+                    syllables = emptyList(),
+                    items = displayFlat,
+                    segment = 0,
+                ),
+            )
+            readingGroups.size == 1 -> readingGroups
+            else -> listOf(
+                SyllableGroup(
+                    reading = "全部",
+                    syllables = emptyList(),
+                    items = displayFlat,
+                    segment = 0,
+                ),
+            ) + readingGroups
+        }
+        val fallback = if (displayFlat.isEmpty() && local.remaining.isNotEmpty()) {
+            Fallback(rawCode = local.remaining, letters = local.remaining)
+        } else {
+            null
+        }
+        val preview = bar.firstOrNull()?.text.orEmpty()
+        val inline = runCatching { Rime.getCompositionPrefix() }.getOrDefault("") + preview
+        return TwelveKeySnapshot(
+            input = local.input,
+            consumedEnd = local.consumedEnd,
+            remaining = local.remaining,
+            groups = groups,
+            fallback = fallback,
+            degradedToSinglePage = degraded,
+            barEntries = bar,
+            recommend = displayFlat,
+            previewText = preview,
+            inlineText = inline,
+            contextKey = local.contextKey,
+            rawPreedit = local.rawPreedit,
+            initialChoices = emptyList(),
+            initial = null,
+            engineOrderOnly = true,
+            phoneticNavigation = false,
+        )
+    }
+
+    private fun isEmojiText(text: String): Boolean {
+        if (text.isEmpty()) return false
+        var i = 0
+        while (i < text.length) {
+            val cp = text.codePointAt(i)
+            if (cp >= 0x1F000 || cp in 0x2600..0x27BF || cp == 0xFE0F) return true
+            i += Character.charCount(cp)
+        }
+        return false
+    }
+
+    private fun matchedCodeSpan(item: CandidateItem, input: String, fallback: String): String {
+        val span = item.engineSpan
+        if (span != null && input.isNotEmpty()) {
+            val s = span.start.coerceIn(0, input.length)
+            val e = span.end.coerceIn(s, input.length)
+            if (e > s) return input.substring(s, e)
+        }
+        return fallback
+    }
+
+    /**
+     * 為通用非客語候選推導左列標籤：優先使用引擎 `comment`，其次把候選覆蓋的 `input` 跨度
+     * 映射到分詞後的 `rawPreedit`（例如 `nihao` → `ni hao`、`ni`），最後回退到原碼片段。
+     */
+    internal fun genericCandidateReading(
+        item: CandidateItem,
+        input: String,
+        rawPreedit: String,
+        fallbackReading: String,
+        preferComment: Boolean = false,
+    ): String {
+        val comment = item.comment.trim()
+        if (preferComment) {
+            // 方案已提供聚合型讀音 comment（如 t9 拼音）：無 comment 項（如 emoji 👋）僅歸入「全部」，
+            // 不得回退到原始數字編碼（如 64 426）污染左列音節欄。
+            return if (comment.isNotEmpty() && comment != "…") comment else ""
+        }
+        val span = item.engineSpan
+        if (span != null && input.isNotEmpty()) {
+            val s = span.start.coerceIn(0, input.length)
+            val e = span.end.coerceIn(s, input.length)
+            if (e > s) {
+                val mapped = slicePreeditByInputSpan(input, rawPreedit, s, e)
+                if (mapped.isNotEmpty()) return mapped
+                return input.substring(s, e)
+            }
+        }
+        if (comment.isNotEmpty() && comment != "…") return comment
+        return fallbackReading
+    }
+
+    /**
+     * 將 `input[start..end)` 映射到帶有音節分隔符（空格 / `'`）的 `rawPreedit` 子串。
+     * 例：`input="nihao"`, `rawPreedit="ni hao"` → `[0..5)` 得 `"ni hao"`，`[0..2)` 得 `"ni"`。
+     */
+    internal fun slicePreeditByInputSpan(
+        input: String,
+        rawPreedit: String,
+        start: Int,
+        end: Int,
+    ): String {
+        if (rawPreedit.isBlank() || start < 0 || end <= start || end > input.length) return ""
+        val cleanPreedit = rawPreedit.trim()
+        var inIdx = 0
+        var outStart = -1
+        var outEnd = -1
+        var i = 0
+        while (i < cleanPreedit.length && inIdx < input.length) {
+            val ch = cleanPreedit[i]
+            if (ch == ' ' || ch == '\'' || ch == '\u200B') {
+                i++
+                continue
+            }
+            if (ch.lowercaseChar() != input[inIdx].lowercaseChar()) {
+                return ""
+            }
+            if (inIdx == start && outStart < 0) outStart = i
+            inIdx++
+            if (inIdx == end) {
+                outEnd = i + 1
+                break
+            }
+            i++
+        }
+        if (outStart < 0 || outEnd <= outStart) return ""
+        return cleanPreedit.substring(outStart, outEnd).trim()
     }
 
     /**
@@ -1245,11 +1485,13 @@ object TwelveKeySnapshotBuilder {
     internal fun synthesizeLongCode(code: String, initial: String? = null): CandidateItem? {
         if (code.isEmpty()) return null
         val units = ArrayList<String>(code.length)
-        for ((index, ch) in code.withIndex()) {
+        for (ch in code) {
+            if (ch == '\'' || ch.isWhitespace()) continue
             // 末鍵也不取後綴 r：組詞取的是聲母，r 只作兒化尾。
             val unit = TwelveKeyPreedit.keyInitialUnits(ch, isLast = false).firstOrNull() ?: return null
             units.add(unit)
         }
+        if (units.isEmpty()) return null
         if (initial != null && units.firstOrNull() != initial) return null
         val chars = ArrayList<String>(units.size)
         for (unit in units) {
@@ -1334,8 +1576,9 @@ object TwelveKeySnapshotBuilder {
         }
         CandidateRanking.fullBarOrder(engineCandidates).forEach { item ->
             when {
-                // 純漢字詞與混合詞（`b站`）都算詞條；純 ASCII 引擎候選仍不進推薦（見 isWordLike）。
-                CandidateRanking.isWordLike(item.text) -> addWord(item)
+                // 純漢字詞、混合詞（`b站`），以及詞典自帶讀音的英文詞（`GPT`/`gemini`/`deepseek`/`Linux`）都進推薦。
+                CandidateRanking.isWordLike(item.text) ||
+                    (item.text.length >= 2 && item.comment.isNotBlank() && item.text.any { it.isLetter() }) -> addWord(item)
                 CandidateRanking.isSingleCjkChar(item.text) -> addChar(item)
             }
         }

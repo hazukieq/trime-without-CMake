@@ -35,6 +35,7 @@ import com.hazukieq.hkrime.ime.keyboard.Event
 import com.hazukieq.hkrime.ime.keyboard.Keyboard.printModifierKeyState
 import com.hazukieq.hkrime.ime.keyboard.KeyboardSwitcher
 import com.hazukieq.hkrime.ime.keyboard.KeyboardView
+import com.hazukieq.hkrime.ime.edit.EditPanelController
 import com.hazukieq.hkrime.ime.symbol.SymbolPanelController
 import com.hazukieq.hkrime.util.ShortcutUtils
 import com.hazukieq.hkrime.util.startsWithAsciiChar
@@ -42,6 +43,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.Locale
 
@@ -79,6 +81,9 @@ class TextInputManager private constructor() :
     private var twelveKeyController: TwelveKeyController? = null
     private var candidatePanelController: CandidatePanelController? = null
     private var symbolPanelController: SymbolPanelController? = null
+    private var editPanelController: EditPanelController? = null
+    private var legacyExpandJob: kotlinx.coroutines.Job? = null
+    private var schemaWarmupJob: kotlinx.coroutines.Job? = null
     private var candidateBarBinder: CandidateBarBinder? = null
 
 
@@ -94,6 +99,7 @@ class TextInputManager private constructor() :
     var shouldResetAsciiMode: Boolean = false
 
     companion object {
+        private const val FAST_LEGACY_PANEL_CANDIDATES = 60
         /** Delimiter regex for key property group, their format like `{property_1: value_1, property_2: value_2}` */
         private val DELIMITER_PROPERTY_GROUP = """^(\{[^{}]+\}).*$""".toRegex()
         /** Delimiter regex for property key tag, its format like `Escape: ` following a property group like above */
@@ -193,27 +199,6 @@ class TextInputManager private constructor() :
         // 候選展開面板（所有方案都只讀快照：12 鍵由引擎按鍵驅動，全字母方案開面板時現算）
         inputArea = uiBinding.main.inputArea
         candidatePanelRoot = uiBinding.main.candidatePanelRoot
-        runCatching {
-            // 展開面板的三處顏色都跟鍵盤主題色走（XML 裡只留 values/values-night 的兜底 token）：
-            // 根底 = keyboard_back_color、左側音節列 = off_key_back_color、退格字 = key_text_color。
-            val config = Config.get(trime)
-            val fallbackSurface = androidx.core.content.ContextCompat.getColor(
-                trime, com.hazukieq.hkrime.R.color.panel_surface_fallback
-            )
-            val fallbackGroup = androidx.core.content.ContextCompat.getColor(
-                trime, com.hazukieq.hkrime.R.color.panel_group_bg_fallback
-            )
-            val fallbackInk = androidx.core.content.ContextCompat.getColor(
-                trime, com.hazukieq.hkrime.R.color.panel_backspace_ink_fallback
-            )
-            candidatePanelRoot?.setBackgroundColor(config.getColor("keyboard_back_color") ?: fallbackSurface)
-            uiBinding.main.candidateGroupList.setBackgroundColor(
-                config.getColor("off_key_back_color")
-                    ?: config.getColor("key_back_color")
-                    ?: fallbackGroup
-            )
-            uiBinding.main.panelBackspace.setTextColor(config.getColor("key_text_color") ?: fallbackInk)
-        }
         candidatePanelController = CandidatePanelController(
             context = trime,
             keyboardView = mainKeyboardView,
@@ -222,6 +207,8 @@ class TextInputManager private constructor() :
             groupListView = uiBinding.main.candidateGroupList,
             grid = uiBinding.main.candidatePanel,
             backspaceView = uiBinding.main.panelBackspace,
+            topDivider = uiBinding.main.panelTopDivider,
+            railDivider = uiBinding.main.panelRailDivider,
         ).also { controller ->
             controller.onPickCandidate = { item -> onPickPanelCandidate(item) }
             controller.onConfirmPhonetic = { reading, initialOnly, key -> confirmTwelveKeyPhonetic(reading, initialOnly, key) }
@@ -248,6 +235,33 @@ class TextInputManager private constructor() :
             controller.onCommitSymbol = { symbol ->
                 activeEditorInstance.commitText(symbol, false)
             }
+        }
+        val editBinding = uiBinding.main.editPanel
+        editPanelController = EditPanelController(
+            context = trime,
+            keyboardView = uiBinding.main.mainKeyboardView,
+            inputArea = uiBinding.main.inputArea,
+            panelRoot = editBinding.editPanelRoot,
+            btnBack = editBinding.editBtnBack,
+            iconBack = editBinding.editIconBack,
+            titleBack = editBinding.editTitleBack,
+            dpadWheel = editBinding.editDpadWheel,
+            btnUp = editBinding.editBtnUp,
+            btnDown = editBinding.editBtnDown,
+            btnLeft = editBinding.editBtnLeft,
+            btnRight = editBinding.editBtnRight,
+            btnSelect = editBinding.editBtnSelect,
+            btnHome = editBinding.editBtnHome,
+            btnEnd = editBinding.editBtnEnd,
+            btnSelectAll = editBinding.editBtnSelectAll,
+            btnDelete = editBinding.editBtnDelete,
+            btnCopy = editBinding.editBtnCopy,
+            btnCut = editBinding.editBtnCut,
+            btnPaste = editBinding.editBtnPaste,
+            btnUndo = editBinding.editBtnUndo,
+        ).also { controller ->
+            controller.onAction = { action, selecting -> handleEditPanelAction(action, selecting) }
+            controller.onSelectModeChanged = { resetEditSelectionAnchor() }
         }
         candidateBarBinder = CandidateBarBinder(candidateView)
         twelveKeyController = TwelveKeyController(
@@ -304,6 +318,173 @@ class TextInputManager private constructor() :
         if (isTwelveKeyMode()) refreshTwelveKey()
     }
 
+    /** 主題/配色/深淺模式切換時即時同步展開面板、符號面板與編輯面板。 */
+    fun applyTheme() {
+        candidatePanelController?.applyTheme()
+        symbolPanelController?.applyTheme()
+        editPanelController?.applyTheme()
+    }
+
+    /**
+     * 切換方案後在後台預熱 librime 懶加載組件（OpenCC 簡繁/表情詞典、Translator 詞庫 mmap、Lua 翻譯器），
+     * 避免用戶切完方案按下首鍵時在主線程卡頓。
+     */
+    fun warmUpActiveSchemaAsync() {
+        schemaWarmupJob?.cancel()
+        schemaWarmupJob = launch(kotlinx.coroutines.Dispatchers.Default) {
+            runCatching {
+                withEngineLock {
+                    if (Rime.isComposing() || Rime.isAsciiMode() || Rime.isEmpty()) return@withEngineLock
+                    val schemaId = Rime.getSchemaId()
+                    val autoSelect = Rime.getSchemaValueCached(schemaId, "speller/auto_select")
+                    if (autoSelect == true || "true".equals(autoSelect?.toString(), ignoreCase = true)) {
+                        return@withEngineLock
+                    }
+                    val type = Rime.getSchemaKeyboardType(schemaId)
+                    val probeChar = when (type) {
+                        com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_9KEY -> '2'.code
+                        com.hazukieq.hkrime.data.KeyboardLayoutResolver.TYPE_STROKE -> 'h'.code
+                        else -> 'a'.code
+                    }
+                    if (Rime.process_key(probeChar, 0)) {
+                        Rime.getContexts()
+                        Rime.clearComposition()
+                    }
+                }
+            }
+        }
+    }
+
+    private var editSelectionAnchor: Int = -1
+    private var editSelectionFocus: Int = -1
+
+    private fun resetEditSelectionAnchor() {
+        editSelectionAnchor = -1
+        editSelectionFocus = -1
+    }
+
+    private fun handleEditPanelAction(action: EditPanelController.EditAction, selecting: Boolean) {
+        val ic = trime.currentInputConnection ?: return
+        fun sendKey(keyCode: Int, meta: Int = 0) {
+            val now = android.os.SystemClock.uptimeMillis()
+            ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, meta))
+            ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0, meta))
+        }
+        fun sendShiftedKey(keyCode: Int) {
+            val now = android.os.SystemClock.uptimeMillis()
+            val shiftMeta = KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+            ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, 0, shiftMeta))
+            ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, shiftMeta))
+            ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0, shiftMeta))
+            ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_LEFT, 0, 0))
+        }
+        fun extendSelectionByExtractedText(dir: EditPanelController.EditAction): Boolean {
+            val extracted = ic.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)
+                ?: return false
+            val text = extracted.text ?: return false
+            val len = text.length
+            val selStart = extracted.selectionStart.coerceIn(0, len)
+            val selEnd = extracted.selectionEnd.coerceIn(0, len)
+            if (editSelectionAnchor < 0 || editSelectionAnchor > len) {
+                editSelectionAnchor = selStart
+                editSelectionFocus = selEnd
+            } else if (selStart != editSelectionAnchor && selEnd != editSelectionAnchor) {
+                editSelectionAnchor = selStart
+                editSelectionFocus = selEnd
+            }
+            val curFocus = editSelectionFocus.coerceIn(0, len)
+            val nextFocus = when (dir) {
+                EditPanelController.EditAction.LEFT -> (curFocus - 1).coerceAtLeast(0)
+                EditPanelController.EditAction.RIGHT -> (curFocus + 1).coerceAtMost(len)
+                EditPanelController.EditAction.HOME -> {
+                    val nl = text.lastIndexOf('\n', (curFocus - 1).coerceAtLeast(0))
+                    if (nl >= 0) nl + 1 else 0
+                }
+                EditPanelController.EditAction.END -> {
+                    val nl = text.indexOf('\n', curFocus)
+                    if (nl >= 0) nl else len
+                }
+                else -> return false
+            }
+            editSelectionFocus = nextFocus
+            return ic.setSelection(editSelectionAnchor, nextFocus)
+        }
+
+        if (!selecting) resetEditSelectionAnchor()
+
+        when (action) {
+            EditPanelController.EditAction.UP -> {
+                if (selecting) {
+                    resetEditSelectionAnchor()
+                    sendShiftedKey(KeyEvent.KEYCODE_DPAD_UP)
+                } else {
+                    sendKey(KeyEvent.KEYCODE_DPAD_UP)
+                }
+            }
+            EditPanelController.EditAction.DOWN -> {
+                if (selecting) {
+                    resetEditSelectionAnchor()
+                    sendShiftedKey(KeyEvent.KEYCODE_DPAD_DOWN)
+                } else {
+                    sendKey(KeyEvent.KEYCODE_DPAD_DOWN)
+                }
+            }
+            EditPanelController.EditAction.LEFT -> {
+                if (selecting) {
+                    if (!extendSelectionByExtractedText(action)) sendShiftedKey(KeyEvent.KEYCODE_DPAD_LEFT)
+                } else {
+                    sendKey(KeyEvent.KEYCODE_DPAD_LEFT)
+                }
+            }
+            EditPanelController.EditAction.RIGHT -> {
+                if (selecting) {
+                    if (!extendSelectionByExtractedText(action)) sendShiftedKey(KeyEvent.KEYCODE_DPAD_RIGHT)
+                } else {
+                    sendKey(KeyEvent.KEYCODE_DPAD_RIGHT)
+                }
+            }
+            EditPanelController.EditAction.HOME -> {
+                if (selecting) {
+                    if (!extendSelectionByExtractedText(action)) sendShiftedKey(KeyEvent.KEYCODE_MOVE_HOME)
+                } else {
+                    sendKey(KeyEvent.KEYCODE_MOVE_HOME)
+                }
+            }
+            EditPanelController.EditAction.END -> {
+                if (selecting) {
+                    if (!extendSelectionByExtractedText(action)) sendShiftedKey(KeyEvent.KEYCODE_MOVE_END)
+                } else {
+                    sendKey(KeyEvent.KEYCODE_MOVE_END)
+                }
+            }
+            EditPanelController.EditAction.SELECT_ALL -> {
+                resetEditSelectionAnchor()
+                ic.performContextMenuAction(android.R.id.selectAll)
+            }
+            EditPanelController.EditAction.COPY -> ic.performContextMenuAction(android.R.id.copy)
+            EditPanelController.EditAction.CUT -> {
+                resetEditSelectionAnchor()
+                if (!ic.performContextMenuAction(android.R.id.cut)) {
+                    sendKey(KeyEvent.KEYCODE_X, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON)
+                }
+            }
+            EditPanelController.EditAction.PASTE -> {
+                resetEditSelectionAnchor()
+                ic.performContextMenuAction(android.R.id.paste)
+            }
+            EditPanelController.EditAction.UNDO -> {
+                resetEditSelectionAnchor()
+                if (!ic.performContextMenuAction(android.R.id.undo)) {
+                    sendKey(KeyEvent.KEYCODE_Z, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON)
+                }
+            }
+            EditPanelController.EditAction.DELETE -> {
+                resetEditSelectionAnchor()
+                sendKey(KeyEvent.KEYCODE_DEL)
+            }
+        }
+    }
+
     /**
      * 左列音節行：確認一段完整音節（消費實際匹配跨度）。
      * 字母行統一走 [onInitialLetter]：還有待確認碼就確認首拼，否則替換最後一段的首拼。
@@ -311,6 +492,7 @@ class TextInputManager private constructor() :
     private fun confirmTwelveKeyPhonetic(reading: String, initialOnly: Boolean, contextKey: String) {
         withEngineLock {
             if (!isTwelveKeyMode()) return@withEngineLock
+            twelveKeyController?.flushPendingRestoreLocked()
             val local = TwelveKeySnapshotBuilder.local()
             if (!CandidateSelection.isCurrent(contextKey, twelveKeyController?.contextKey(local).orEmpty())) {
                 refreshTwelveKey()
@@ -327,6 +509,7 @@ class TextInputManager private constructor() :
     private fun onInitialLetter(letter: String) {
         withEngineLock {
             if (!isTwelveKeyMode()) return@withEngineLock
+            twelveKeyController?.flushPendingRestoreLocked()
             val local = TwelveKeySnapshotBuilder.local()
             if (!composition.bindEditor(currentEditorIdentity())) return@withEngineLock
             composition.input(local.remaining)
@@ -385,19 +568,35 @@ class TextInputManager private constructor() :
             // 保持鍵盤可見，完整快照到達才展示面板，不在主線程同步枚舉。
             refreshTwelveKey()
         } else {
-            // 非 12 鍵方案在開面板時構建相同模型的引擎快照，不產生 12 鍵本地段組。
-            val snapshot = legacySnapshot()
-            if (snapshot.isEmpty) return
-            candidatePanelController?.submit(snapshot)
+            // 非 12 鍵方案兩段式瞬開：先同步取前 60 條立即上屏（0 空白幀），再後台補齊 600 條。
+            legacyExpandJob?.cancel()
+            val fastSnapshot = legacySnapshot(FAST_LEGACY_PANEL_CANDIDATES)
+            if (fastSnapshot.isEmpty) return
+            candidatePanelController?.submit(fastSnapshot)
             if (candidatePanelController?.isShown != true) candidatePanelController?.show()
+            if (fastSnapshot.recommend.size >= FAST_LEGACY_PANEL_CANDIDATES) {
+                val expectedKey = fastSnapshot.contextKey
+                legacyExpandJob = launch(kotlinx.coroutines.Dispatchers.Default) {
+                    val fullSnapshot = legacySnapshot(TwelveKeySnapshotBuilder.MAX_CANDIDATES)
+                    if (fullSnapshot.isEmpty || fullSnapshot.contextKey != expectedKey) return@launch
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        if (panelWanted && isCandidatePanelShown() && !isTwelveKeyMode()) {
+                            candidatePanelController?.submit(fullSnapshot, preserveReading = true)
+                        }
+                    }
+                }
+            }
         }
         candidateView?.setPanelOpen(candidatePanelController?.isShown == true)
     }
 
     fun hideCandidatePanel() {
         panelWanted = false
+        legacyExpandJob?.cancel()
+        legacyExpandJob = null
         candidatePanelController?.hide()
         symbolPanelController?.hide()
+        editPanelController?.hide()
         candidateView?.setPanelOpen(false)
         if (Rime.isComposing()) {
             runCatching { trime.updateComposing() }
@@ -686,18 +885,39 @@ class TextInputManager private constructor() :
             trime.updateComposing()
             return true
         }
-        if (keyCode == KeyEvent.KEYCODE_DEL && composition.canUndo) {
+        if (keyCode == KeyEvent.KEYCODE_DEL) {
+            var prevRemaining = ""
             var restoredCode: String? = null
+            var shouldUndo = false
             withEngineLock {
-                restoredCode = composition.undo()?.also { restored ->
-                    twelveKeyController?.scheduleRestore(restored, composition.phonetics)
+                twelveKeyController?.flushPendingRestoreLocked()
+                prevRemaining = composition.remaining
+                shouldUndo = composition.shouldUndoOnBackspace
+                if (shouldUndo) {
+                    restoredCode = composition.undo()
+                    val rem = restoredCode ?: composition.remaining
+                    if (rem != prevRemaining) {
+                        // 撤銷了選字（剩餘原碼已變化）：同步還原引擎原碼並使舊緩存失效，
+                        // 防止樂觀快照閃出舊尾碼候選，也避免連按退格或按鍵釋放時讀到過期輸入。
+                        restoreTwelveKeyCode(rem)
+                        twelveKeyController?.invalidateForEngine()
+                    } else {
+                        // 僅撤銷拼音確認（原碼未變）：保留瞬時緩存/樂觀切換體驗，後台重放約束。
+                        twelveKeyController?.scheduleRestore(rem, composition.phonetics)
+                    }
+                    PreeditPresentation.invalidate(composition.selectedText, composition.phonetics)
+                    preservePanelReading = true
                 }
-                PreeditPresentation.invalidate(composition.selectedText, composition.phonetics)
-                preservePanelReading = true
             }
+            if (!shouldUndo) return false
             val rem = restoredCode ?: composition.remaining
             val confirmed = composition.phonetics
             val full = panelWanted || isCandidatePanelShown()
+            if (rem != prevRemaining) {
+                trime.updateComposing()
+                refreshTwelveKey()
+                return true
+            }
             val instant = twelveKeyController?.lookupCached(rem, confirmed, full)
                 ?: TwelveKeySnapshotBuilder.optimisticPhonetic(
                     previous = currentSnapshot,
@@ -724,6 +944,48 @@ class TextInputManager private constructor() :
         val item = currentSnapshot.barItems.firstOrNull()
         if (item != null) chooseTwelveKey(item, currentSnapshot.contextKey, origin) else refreshTwelveKey()
         return true
+    }
+
+    /**
+     * 12 鍵與 26 鍵共用的組字期特殊鍵保護：
+     * 1) 忽略開頭或連續重複的分詞符 `'`；
+     * 2) 若光標前意外存在多個連續 `'`，單次退格一併刪除。
+     */
+    fun handleComposingSpecialKey(keyCode: Int, metaState: Int): Boolean {
+        if (metaState != 0) return false
+        if (keyCode == KeyEvent.KEYCODE_APOSTROPHE && (Rime.isComposing() || composition.active)) {
+            return withEngineLock {
+                if (isTwelveKeyMode()) twelveKeyController?.flushPendingRestoreLocked()
+                val input = Rime.RimeGetInput().orEmpty()
+                val caret = runCatching { Rime.RimeGetCaretPos() }.getOrDefault(input.length)
+                CompositionInput.shouldIgnoreDelimiter(input, caret, allowWhenEmpty = false)
+            }
+        }
+        if (keyCode == KeyEvent.KEYCODE_DEL && Rime.isComposing()) {
+            return withEngineLock {
+                if (isTwelveKeyMode()) twelveKeyController?.flushPendingRestoreLocked()
+                val input = Rime.RimeGetInput().orEmpty()
+                val caret = runCatching { Rime.RimeGetCaretPos() }.getOrDefault(input.length)
+                val count = CompositionInput.backspaceCount(input, caret)
+                if (count <= 1) return@withEngineLock false
+                if (isTwelveKeyMode() && !Rime.isAsciiMode()) {
+                    onEditorSessionChanged()
+                    rawEngineCommitAllowed = false
+                    composition.input(CompositionInput.applyBackspace(input, caret))
+                    twelveKeyController?.phonetics = composition.phonetics
+                    PreeditPresentation.invalidate(composition.selectedText, composition.phonetics)
+                    twelveKeyController?.invalidateForEngine()
+                }
+                val backEvent = Event.getRimeEvent(KeyEvent.KEYCODE_DEL, 0)
+                repeat(count) {
+                    if (!Rime.isComposing()) return@repeat
+                    Rime.onKey(backEvent)
+                }
+                activeEditorInstance.commitRimeText()
+                true
+            }
+        }
+        return false
     }
 
     fun cancelTwelveKeyComposition() {
@@ -885,23 +1147,20 @@ class TextInputManager private constructor() :
     // ---------- 展開面板：非 12 鍵方案（全字母 26 鍵等） ----------
 
     /**
-     * 非 12 鍵方案現算一份快照：候選按 comment（spelling_hints 給的精確讀音）分組，
-     * 面板左列音節索引與 12 鍵完全一樣；點擊照舊走 `select_candidate(全局下標)`。
-     *
-     * - `applyLearning = false`：候選條由 librime 直接提供，面板必須保持引擎順序；
-     * - `mapFallbackLetters = false`：輸入的就是字母，兜底原樣上屏。
+     * 非客語 12 鍵方案（如 26 鍵 rime_ice、朙月拼音、五筆、筆畫、其它方言/語言）的展開面板快照：
+     * - 絕不混入客語 12 鍵詞庫或客語音節分組；
+     * - 始終保留左列：優先按引擎 comment 分組，無 comment 時按候選覆蓋的 preedit 音節/編碼跨度分組。
      */
-    private fun legacySnapshot(): TwelveKeySnapshot = withEngineLock {
+    private fun legacySnapshot(
+        maxCandidates: Int = TwelveKeySnapshotBuilder.MAX_CANDIDATES,
+    ): TwelveKeySnapshot = withEngineLock {
         runCatching {
             Rime.setProperty(com.hazukieq.hkrime.core.twelvekey.InitialDisambiguation.PROPERTY, "")
             val local = TwelveKeySnapshotBuilder.local()
-            if (local.isEmpty) TwelveKeySnapshot.EMPTY
-            else TwelveKeySnapshotBuilder.build(
-                local,
-                TwelveKeySnapshotBuilder.MAX_CANDIDATES,
-                applyLearning = false,
-                mapFallbackLetters = false,
-                appRankingEnabled = prefs.keyboard.candidateAlgorithmEnabled,
+            if (local.isEmpty) return@runCatching TwelveKeySnapshot.EMPTY
+            TwelveKeySnapshotBuilder.buildGenericSnapshot(
+                local = local,
+                maxCandidates = maxCandidates,
             )
         }.getOrDefault(TwelveKeySnapshot.EMPTY)
     }
@@ -1003,6 +1262,7 @@ class TextInputManager private constructor() :
     fun onOptionChanged(option: String, value: Boolean) {
         when (option) {
             "ascii_mode" -> {
+                if (value && composition.active) cancelTwelveKeyComposition()
                 trime.inputFeedbackManager.ttsLanguage =
                     locales[if (value) 1 else 0]
             }
@@ -1056,14 +1316,17 @@ class TextInputManager private constructor() :
         if (needSendUpRimeKey) {
             // 按鍵釋放也會處理引擎與上下文，必須和後台枚舉共用引擎鎖。
             withEngineLock {
+                twelveKeyController?.flushPendingRestoreLocked()
                 if (shouldUpdateRimeOption) {
                     Rime.setOption("soft_cursors", prefs.keyboard.softCursorEnabled)
                     Rime.setOption("_horizontal", trime.imeConfig.getBoolean("horizontal"))
                     shouldUpdateRimeOption = false
                 }
                 // todo 释放按键可能不对
-                Rime.onKey(Event.getRimeEvent(keyEventCode, Rime.META_RELEASE_ON))
-                activeEditorInstance.commitRimeText()
+                val handled = Rime.onKey(Event.getRimeEvent(keyEventCode, Rime.META_RELEASE_ON))
+                if (handled || !isTwelveKeyMode()) {
+                    activeEditorInstance.commitRimeText()
+                }
             }
         }
         Timber.d("\t<TrimeInput>\tonRelease() finish")
@@ -1101,18 +1364,32 @@ class TextInputManager private constructor() :
         }
         when (event.code) {
             KeyEvent.KEYCODE_SWITCH_CHARSET -> { // Switch status
+                if (event.toggle == "ascii_mode" && !Rime.isAsciiMode() && composition.active) {
+                    cancelTwelveKeyComposition()
+                }
                 Rime.toggleOption(event.toggle)
                 activeEditorInstance.commitRimeText()
             }
             KeyEvent.KEYCODE_EISU -> { // Switch keyboard
+                if (EditPanelController.isEditSelect(event.select)) {
+                    if (composition.active) cancelTwelveKeyComposition()
+                    hideCandidatePanel()
+                    editPanelController?.show()
+                    return
+                }
                 val symbolTab = SymbolPanelController.mapSelectToInitialTab(event.select)
                 if (symbolTab != null) {
+                    if (composition.active) cancelTwelveKeyComposition()
                     hideCandidatePanel()
                     symbolPanelController?.show(symbolTab)
                     return
                 }
                 symbolPanelController?.hide()
+                editPanelController?.hide()
                 keyboardSwitcher.switchToKeyboard(event.select)
+                if (!isTwelveKeyMode() && composition.active) {
+                    cancelTwelveKeyComposition()
+                }
                 /** Set ascii mode according to keyboard's settings, can not place into [Rime.handleRimeNotification] */
                 Rime.setOption("ascii_mode", keyboardSwitcher.asciiMode)
                 trime.bindKeyboardToInputView()
@@ -1150,6 +1427,7 @@ class TextInputManager private constructor() :
                     // 12 鍵 /、：在組字中切換候選面板，主題對應 Panel_toggle 事件。
                     toggleCandidatePanel()
                 } else if (event.command == "symbol_panel") {
+                    if (composition.active) cancelTwelveKeyComposition()
                     hideCandidatePanel()
                     symbolPanelController?.show(event.option)
                 } else {
@@ -1196,7 +1474,8 @@ class TextInputManager private constructor() :
 
     private fun onTextLocked(text: CharSequence?) {
         text ?: return
-        if (!text.startsWithAsciiChar() && Rime.isComposing()) {
+        if (isTwelveKeyMode()) twelveKeyController?.flushPendingRestoreLocked()
+        if (!text.startsWithAsciiChar() && Rime.isComposing() && !(isTwelveKeyMode() && !Rime.isAsciiMode())) {
             Rime.commitComposition()
             activeEditorInstance.commitRimeText()
         }
@@ -1208,6 +1487,32 @@ class TextInputManager private constructor() :
             when {
                 escapeTagMatcher.matches() -> {
                     target = escapeTagMatcher.group(1) ?: ""
+                    if (target.isNotEmpty() && target.all { it == '\'' } && (Rime.isComposing() || composition.active)) {
+                        val input = Rime.RimeGetInput().orEmpty()
+                        val caret = runCatching { Rime.RimeGetCaretPos() }.getOrDefault(input.length)
+                        if (CompositionInput.shouldIgnoreDelimiter(input, caret, allowWhenEmpty = false)) {
+                            textToParse = textToParse.substring(target.length)
+                            continue
+                        }
+                        val consumedLen = target.length
+                        target = "'"
+                        if (isTwelveKeyMode() && !Rime.isAsciiMode()) {
+                            onEditorSessionChanged()
+                            val intent = CompositionInput.beforeKey(input, caret, '\''.code, composition.canUndo)
+                            rawEngineCommitAllowed = false
+                            composition.input(intent.code)
+                            twelveKeyController?.phonetics = composition.phonetics
+                            PreeditPresentation.invalidate(composition.selectedText, composition.phonetics)
+                            twelveKeyController?.invalidateForEngine()
+                        }
+                        Rime.onText(target)
+                        if (!activeEditorInstance.commitRimeText() && !Rime.isComposing()) {
+                            activeEditorInstance.commitText(target)
+                        }
+                        trime.updateComposing()
+                        textToParse = textToParse.substring(consumedLen)
+                        continue
+                    }
                     Rime.onText(target)
                     if (!activeEditorInstance.commitRimeText() && !Rime.isComposing()) {
                         activeEditorInstance.commitText(target)

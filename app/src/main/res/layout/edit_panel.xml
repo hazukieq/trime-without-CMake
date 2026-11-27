@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/edit_panel_root"
+    android:layout_width="match_parent"
+    android:layout_height="250dp"
+    android:orientation="vertical"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="10dp"
+    android:visibility="gone">
+
+    <!-- 顶部栏：< 文字编辑 -->
+    <LinearLayout
+        android:id="@+id/edit_btn_back"
+        android:layout_width="wrap_content"
+        android:layout_height="34dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingEnd="12dp">
+
+        <ImageView
+            android:id="@+id/edit_icon_back"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:contentDescription="@string/back"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_edit_back" />
+
+        <TextView
+            android:id="@+id/edit_title_back"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:text="文字编辑"
+            android:textSize="15sp"
+            android:textStyle="normal" />
+    </LinearLayout>
+
+    <!-- 主体：左侧圆形方向盘 + 行首/行尾，右侧 3×2 功能卡片 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:baselineAligned="false"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingTop="2dp">
+
+        <!-- 左侧导航轮盘区 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.05"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingEnd="8dp">
+
+            <!-- 圆形方向盘 -->
+            <FrameLayout
+                android:id="@+id/edit_dpad_wheel"
+                android:layout_width="148dp"
+                android:layout_height="148dp">
+
+                <ImageView
+                    android:id="@+id/edit_btn_up"
+                    android:layout_width="56dp"
+                    android:layout_height="44dp"
+                    android:layout_gravity="top|center_horizontal"
+                    android:clickable="true"
+                    android:contentDescription="上"
+                    android:focusable="true"
+                    android:padding="11dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_edit_up" />
+
+                <ImageView
+                    android:id="@+id/edit_btn_down"
+                    android:layout_width="56dp"
+                    android:layout_height="44dp"
+                    android:layout_gravity="bottom|center_horizontal"
+                    android:clickable="true"
+                    android:contentDescription="下"
+                    android:focusable="true"
+                    android:padding="11dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_edit_down" />
+
+                <ImageView
+                    android:id="@+id/edit_btn_left"
+                    android:layout_width="44dp"
+                    android:layout_height="56dp"
+                    android:layout_gravity="start|center_vertical"
+                    android:clickable="true"
+                    android:contentDescription="左"
+                    android:focusable="true"
+                    android:padding="11dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_edit_left" />
+
+                <ImageView
+                    android:id="@+id/edit_btn_right"
+                    android:layout_width="44dp"
+                    android:layout_height="56dp"
+                    android:layout_gravity="end|center_vertical"
+                    android:clickable="true"
+                    android:contentDescription="右"
+                    android:focusable="true"
+                    android:padding="11dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_edit_right" />
+
+                <TextView
+                    android:id="@+id/edit_btn_select"
+                    android:layout_width="58dp"
+                    android:layout_height="58dp"
+                    android:layout_gravity="center"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="选择"
+                    android:textSize="14sp" />
+            </FrameLayout>
+
+            <!-- 底部两枚圆形按钮：行首 / 行尾 -->
+            <LinearLayout
+                android:layout_width="148dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/edit_btn_home"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:clickable="true"
+                    android:contentDescription="行首"
+                    android:focusable="true"
+                    android:padding="9dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_edit_home" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <ImageView
+                    android:id="@+id/edit_btn_end"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:clickable="true"
+                    android:contentDescription="行尾"
+                    android:focusable="true"
+                    android:padding="9dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/ic_edit_end" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 右侧 3×2 功能卡片区 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.0"
+            android:orientation="vertical"
+            android:paddingStart="4dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+
+            <!-- 第 1 行：全选 | 删除 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginBottom="7dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/edit_btn_select_all"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="7dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="全选"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/edit_btn_delete"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="删除"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+            <!-- 第 2 行：复制 | 换行 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginBottom="7dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/edit_btn_copy"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="7dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="复制"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/edit_btn_cut"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="剪切"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+            <!-- 第 3 行：粘贴 | 撤销 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/edit_btn_paste"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="7dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="粘贴"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/edit_btn_undo"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="撤销"
+                    android:textSize="16sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
