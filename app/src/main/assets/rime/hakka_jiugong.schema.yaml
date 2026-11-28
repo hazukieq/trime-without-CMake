@@ -67,15 +67,15 @@ engine:
     - simplifier@emoji
 
 speller:
-  alphabet: zyxwvutsrqponmlkjihgfedcba
-  initials: zyxwvutsrqponmlkjihgfedcba
+  alphabet: abcdefghijklmnopqrstuvz
+  initials: abcdefghijklmnopqrstuvz
   delimiter: " '"
   multi_key: true
   suffix_only:
     - r
   algebra:
-    # 有限簡拼規則：雙字母原子聲母 (th / nz / ng) + 元音外單輔音（.+ 不為單字母 r 或孤立 ng 造簡拼）
-    - abbrev/^(th|nz|ng|(?!th|nz|ng)[bcdfghjklmnpqrstvwxyz]).+$/$1/
+    # 客語標準聲母簡拼：3 個雙字母聲母 (th/nz/ng) + 17 個單字母聲母 (b c d f g h j k l m n p q s t v z)，不含 r/w/x/y
+    - abbrev/^(th|nz|ng|(?!th|nz|ng)[bcdfghjklmnpqstvz]).+$/$1/
  
 
 translator:
