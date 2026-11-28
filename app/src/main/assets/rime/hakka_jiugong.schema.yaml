@@ -74,10 +74,8 @@ speller:
   suffix_only:
     - r
   algebra:
-    # 有限語音/正字衍生規則（無 xlit、無鍵位替換 hack；q 聲母不省略，與 26 鍵口徑一致）
+    # 僅保留 w->u 韻母衍生，與 26 鍵口徑完全一致
     - derive/w$/u/
-    - derive/am$/an/
-    - derive/an$/am/
     # 有限簡拼規則：雙字母原子聲母 (th / nz / ng) + 元音外單輔音（.+ 不為單字母 r 或孤立 ng 造簡拼）
     - abbrev/^(th|nz|ng|(?!th|nz|ng)[bcdfghjklmnpqrstvwxyz]).+$/$1/
  

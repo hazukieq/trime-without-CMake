@@ -179,15 +179,9 @@ object TwelveKeyPreedit {
         activeTokenBindings[c] ?: listOf(c.toString())
 
     private fun spellingVariants(syllable: String): List<String> {
-        val out = ArrayList<String>(4)
+        val out = ArrayList<String>(2)
         out.add(syllable)
         if (syllable.endsWith("w")) out.add(syllable.dropLast(1) + "u")
-        val base = out.size
-        for (i in 0 until base) {
-            val s = out[i]
-            if (s.endsWith("am")) out.add(s.dropLast(2) + "an")
-            else if (s.endsWith("an")) out.add(s.dropLast(2) + "am")
-        }
         return out
     }
 
