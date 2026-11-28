@@ -22,7 +22,11 @@ class ThemeDefaultsTest {
                 "height" to 32,
                 "text_size" to 24,
                 "comment_on_top" to false,
+                "preedit_text_size" to 99,
+                "max_width" to 999,
             ),
+            "layout" to mapOf("max_width" to 999, "position" to "top_right"),
+            "window" to listOf(mapOf("composition" to "%s")),
         )
         val flat = ThemeDefaults.buildStyleMap(v5Theme)
 
@@ -36,13 +40,14 @@ class ThemeDefaultsTest {
         assertEquals(false, flat["comment_on_top"])
         assertEquals(mapOf("12key" to "my_12key"), flat["keyboard_defaults"])
 
-        // Preserved system behavior defaults
+        // Preserved system behavior defaults & reclaimed popup/preedit knobs
         assertEquals("zh_CN", flat["locale"])
         assertEquals(true, flat["reset_ascii_mode"])
-        assertEquals(true, flat["preedit_disable_touch"])
         assertNotNull(flat["enter_labels"])
-        assertNotNull(flat["layout"])
-        assertNotNull(flat["window"])
+        assertEquals(null, flat["text_size"])
+        assertEquals(null, flat["preedit_disable_touch"])
+        assertEquals(null, flat["layout"])
+        assertEquals(null, flat["window"])
     }
 
     @Test

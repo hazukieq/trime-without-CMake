@@ -3,7 +3,7 @@ customization:
   distribution_version: ""
   generator: "Rime::SwitcherSettings"
   modified_time: "Fri Jun 12 21:39:41 2026"
-  rime_version: 1.7.3
+  rime_version: 1.17.0
 patch:
   "menu/page_size": 5
   schema_list:

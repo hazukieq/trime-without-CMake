@@ -94,7 +94,7 @@ object ThemeDefaults {
             kb["preview_text_size"]?.let { out["preview_text_size"] = it }
         }
 
-        // 2) candidate: block → flat Config keys
+        // 2) candidate: block → flat Config keys（觸屏 preedit 懸浮窗尺寸、字號、佈局與行為均由 TouchPreeditPopupWindow 系統鎖定，不對主題開放）
         val cand = themeRoot["candidate"] as? Map<*, *>
         if (cand != null) {
             cand["height"]?.let { out["candidate_view_height"] = it }
@@ -104,8 +104,6 @@ object ThemeDefaults {
             cand["comment_text_size"]?.let { out["comment_text_size"] = it }
             cand["comment_height"]?.let { out["comment_height"] = it }
             cand["comment_on_top"]?.let { out["comment_on_top"] = it }
-            cand["label_text_size"]?.let { out["label_text_size"] = it }
-            cand["preedit_text_size"]?.let { out["text_size"] = it }
         }
 
         return out
@@ -126,8 +124,6 @@ object ThemeDefaults {
         "root_background" to "keyboard_back_color",
         "color_scheme" to "default",
         "horizontal" to true,
-        "candidate_use_cursor" to false,
-        "preedit_disable_touch" to true,
         "enter_label_mode" to 0,
         "enter_labels" to linkedMapOf(
             "go" to "前往",
@@ -159,41 +155,6 @@ object ThemeDefaults {
         "comment_text_size" to 20,
         "comment_height" to 20,
         "comment_on_top" to true,
-        "label_text_size" to 22,
-        "text_size" to 14,
-        // Fixed composition / floating window layout
-        "layout" to linkedMapOf(
-            "position" to "fixed",
-            "min_length" to 10,
-            "max_length" to 14,
-            "sticky_lines" to 1,
-            "sticky_lines_land" to 0,
-            "max_entries" to 5,
-            "border" to 0,
-            "max_width" to 360,
-            "max_height" to 300,
-            "min_width" to 0,
-            "min_height" to 50,
-            "margin_x" to 5,
-            "margin_y" to 5,
-            "line_spacing" to 0,
-            "line_spacing_multiplier" to 1.2,
-            "real_margin" to 3,
-            "spacing" to 0,
-            "round_corner" to 0,
-            "alpha" to 255,
-            "elevation" to 0,
-            "movable" to false,
-            "all_phrases" to false,
-        ),
-        "window" to listOf(
-            linkedMapOf(
-                "start" to "",
-                "composition" to "%s",
-                "end" to "",
-                "letter_spacing" to 0.12,
-            ),
-        ),
         // Default layout ID per standard keyboard type
         "keyboard_defaults" to linkedMapOf(
             KeyboardLayoutResolver.TYPE_12KEY to "jiugong_simp",
@@ -201,6 +162,7 @@ object ThemeDefaults {
             KeyboardLayoutResolver.TYPE_9KEY to "pinyin_9key",
             KeyboardLayoutResolver.TYPE_WUBI to "wubi_qwerty",
             KeyboardLayoutResolver.TYPE_STROKE to "stroke_9key",
+            KeyboardLayoutResolver.TYPE_BOPOMOFO to "bopomofo_kbd",
         ),
     )
 

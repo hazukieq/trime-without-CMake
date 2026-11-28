@@ -91,30 +91,30 @@ object BuiltinKeyboards {
             target[key] = map
         }
 
-        // 1) Hakka 12-key phonetic code keys
-        putIfAbsent("letter_1", "label" to "ng", "send" to "1", "functional" to "false")
-        putIfAbsent("letter_3", "label" to "vur", "send" to "3", "functional" to "false")
-        putIfAbsent("letter_4", "label" to "mno", "send" to "4", "functional" to "false")
-        putIfAbsent("letter_5", "label" to "kl", "send" to "5", "functional" to "false")
-        putIfAbsent("letter_7", "label" to "ps", "send" to "7", "functional" to "false")
-        putIfAbsent("letter_8", "label" to "zj", "send" to "8", "functional" to "false")
-        putIfAbsent("letter_9", "label" to "qt", "send" to "9", "functional" to "false")
-        putIfAbsent("letter_a", "label" to "abc", "send" to "a", "functional" to "false")
-        putIfAbsent("letter_e", "label" to "def", "send" to "e", "functional" to "false")
-        putIfAbsent("letter_i", "label" to "ghi", "send" to "i", "functional" to "false")
-        putIfAbsent("letter_w", "label" to "th", "send" to "w", "functional" to "false")
-        putIfAbsent("letter_y", "label" to "nz", "send" to "y", "functional" to "false")
+        // 1) Hakka 12-key phonetic code keys (token-set native: zero surrogate encodings)
+        putIfAbsent("letter_1", "label" to "ng", "atoms" to "ng", "functional" to "false")
+        putIfAbsent("letter_3", "label" to "vur", "atoms" to "v,u,r", "functional" to "false")
+        putIfAbsent("letter_4", "label" to "mno", "atoms" to "m,n,o", "functional" to "false")
+        putIfAbsent("letter_5", "label" to "kl", "atoms" to "k,l", "functional" to "false")
+        putIfAbsent("letter_7", "label" to "ps", "atoms" to "p,s", "functional" to "false")
+        putIfAbsent("letter_8", "label" to "zj", "atoms" to "z,j", "functional" to "false")
+        putIfAbsent("letter_9", "label" to "qt", "atoms" to "q,t", "functional" to "false")
+        putIfAbsent("letter_a", "label" to "abc", "atoms" to "a,b,c", "functional" to "false")
+        putIfAbsent("letter_e", "label" to "def", "atoms" to "d,e,f", "functional" to "false")
+        putIfAbsent("letter_i", "label" to "ghi", "atoms" to "g,h,i", "functional" to "false")
+        putIfAbsent("letter_w", "label" to "th", "atoms" to "th", "functional" to "false")
+        putIfAbsent("letter_y", "label" to "nz", "atoms" to "nz", "functional" to "false")
 
-        // 2) Standard T9 9-key Pinyin code keys (compatible with rime_ice t9.schema.yaml)
-        putIfAbsent("t9_1", "label" to "@分词", "send" to "1", "functional" to "false")
-        putIfAbsent("t9_2", "label" to "ABC", "send" to "2", "functional" to "false")
-        putIfAbsent("t9_3", "label" to "DEF", "send" to "3", "functional" to "false")
-        putIfAbsent("t9_4", "label" to "GHI", "send" to "4", "functional" to "false")
-        putIfAbsent("t9_5", "label" to "JKL", "send" to "5", "functional" to "false")
-        putIfAbsent("t9_6", "label" to "MNO", "send" to "6", "functional" to "false")
-        putIfAbsent("t9_7", "label" to "PQRS", "send" to "7", "functional" to "false")
-        putIfAbsent("t9_8", "label" to "TUV", "send" to "8", "functional" to "false")
-        putIfAbsent("t9_9", "label" to "WXYZ", "send" to "9", "functional" to "false")
+        // 2) Standard T9 9-key Pinyin code keys (token-set native: zero digit encodings)
+        putIfAbsent("t9_1", "label" to "@分词", "text" to "@", "functional" to "false")
+        putIfAbsent("t9_2", "label" to "ABC", "atoms" to "a,b,c", "functional" to "false")
+        putIfAbsent("t9_3", "label" to "DEF", "atoms" to "d,e,f", "functional" to "false")
+        putIfAbsent("t9_4", "label" to "GHI", "atoms" to "g,h,i", "functional" to "false")
+        putIfAbsent("t9_5", "label" to "JKL", "atoms" to "j,k,l", "functional" to "false")
+        putIfAbsent("t9_6", "label" to "MNO", "atoms" to "m,n,o", "functional" to "false")
+        putIfAbsent("t9_7", "label" to "PQRS", "atoms" to "p,q,r,s", "functional" to "false")
+        putIfAbsent("t9_8", "label" to "TUV", "atoms" to "t,u,v", "functional" to "false")
+        putIfAbsent("t9_9", "label" to "WXYZ", "atoms" to "w,x,y,z", "functional" to "false")
 
         // 3) Standard 5-stroke keys (h=横 s=竖 p=撇 n=捺/点 z=折)
         putIfAbsent("stroke_h", "label" to "一", "send" to "h", "functional" to "false")
@@ -344,7 +344,7 @@ object BuiltinKeyboards {
             // Row 1
             sp,
             key("click" to "，", "long_click" to "-", "key_back_color" to 0, "width" to 16),
-            key("click" to "t9_1", "long_click" to "1", "width" to 22.66),
+            key("click" to "t9_1", "composing" to "delimiter", "long_click" to "1", "width" to 22.66),
             key("click" to "t9_2", "long_click" to "2", "width" to 22.67),
             key("click" to "t9_3", "long_click" to "3", "width" to 22.67),
             key("click" to "BackSpace", "width" to 16, "key_back_color" to "off_key_back_color", "key_text_color" to "off_key_text_color"),

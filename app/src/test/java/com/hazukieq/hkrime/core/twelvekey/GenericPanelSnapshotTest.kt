@@ -145,6 +145,33 @@ class GenericPanelSnapshotTest {
     }
 
     @Test
+    fun nineKeyTokenSetPreeditDecodesUncoveredHandleTail() {
+        val bindings = mapOf(
+            'A' to listOf("a", "b", "c"),
+            'B' to listOf("d", "e", "f"),
+            'C' to listOf("g", "h", "i"),
+            'D' to listOf("j", "k", "l"),
+            'E' to listOf("m", "n", "o"),
+            'F' to listOf("p", "q", "r", "s"),
+            'G' to listOf("t", "u", "v"),
+            'H' to listOf("w", "x", "y", "z"),
+        )
+        com.hazukieq.hkrime.core.TwelveKeyPreedit.updateTokenBindings(bindings)
+        try {
+            val rendered = MultiKeyProfile.Mandarin9Key.rewritePreedit(
+                raw = "ni haoEC\u2038",
+                firstText = "你好",
+                firstComment = "ni hao",
+                rawInput = "ECAECEC",
+            )!!
+            assertFalse("Raw 9-key handles must not leak: $rendered", rendered.any { it in 'A'..'Z' })
+            assertTrue("Should keep matched prefix and decode tail: $rendered", rendered.startsWith("ni hao "))
+        } finally {
+            com.hazukieq.hkrime.core.TwelveKeyPreedit.updateTokenBindings(emptyMap())
+        }
+    }
+
+    @Test
     fun terraPinyinTonesAndCjkExtBHanziNeverMisclassifiedAsEmoji() {
         val local = TwelveKeySnapshotBuilder.Local(
             input = "wo,men/",

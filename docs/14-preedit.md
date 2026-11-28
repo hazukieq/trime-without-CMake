@@ -12,8 +12,12 @@
 十二键待选内容仅在输入法自己的 preedit 中显示，不调用宿主的 `setComposingText`，
 嵌入式编辑模式只用于其他输入模式。Android 切换焦点时可能自行结束 composing 并保留文字，
 事后清理旧 InputConnection 不能可靠撤回；因此只有全部选完后的 `commitText` 才能写入宿主。
-悬浮 preedit 在 Android 6+ 使用屏幕绝对坐标，与候选条的 `getLocationOnScreen` 一致，
-不再手工扣状态栏高度，避免刘海 inset 使窗口盖住候选条。
+触屏模式的悬浮 preedit 由 `TouchPreeditPopupWindow` 集中管理 Android `PopupWindow` 生命周期、固定位置与纯数据/UI 分离渲染（与外设键盘模式 `ime/hardware/` 的 `Hardware*Overlay` 彻底隔离）：
+不再读取主题中的 `layout/*`、`window`、`preedit_text_size`、`preedit_disable_touch` 等自定义参数；
+展示容器由 `PreeditScrollView` 锁定系统最大宽度（`280dp`），单行裁切溢出并支持用户触摸左右滚动查看；
+输入新编码时自动滚至尾端，主动滑看前缀时不强行复位。
+连续组字编码上限设为 `48`（`CompositionInput.MAX_CODE_LENGTH`），达到上限后忽略追加编码键，
+退格或选词释放空位后恢复输入，避免超长编码引发 UI 测量与候选布局开销退化。
 
 preedit 按首候选的原始读音逐码位具体化已输入内容，不补齐没有输入的拼音。
 例如首候选读音为 `sin ki`：输入 `7i45` 显示 `sin k`，输入 `7i45i` 才显示 `sin ki`。

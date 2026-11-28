@@ -71,30 +71,25 @@ engine:
     - simplifier@emoji
 
 speller:
-  alphabet: zwxyvutsrqponmlkjihgfedcba1234567890;
-  initials: zxywvutsrqponmlkihgfedcba1234567890;
+  alphabet: zyxwvutsrqponmlkjihgfedcba
+  initials: zyxwvutsrqponmlkjihgfedcba
   delimiter: " '"
+  multi_key: true
+  suffix_only:
+    - r
   algebra:
-    #- abbrev/^([bcdfghjklmnpqstvz]).+$/$1$2/
-    # 簡拼：統一的「取聲母」規則（不再逐個手寫）。
-    # 聲母按拼寫長短從長到短匹配：th / nz / ng 是兩個字母，其餘取首字母；
-    # 之後再經 xform/xlit，th→w、nz→y、ng→1、k/l→5、m/n→4… 落到 12 鍵上。
-    # 這樣任意音節都有「聲母縮寫」，兩鍵／多鍵只打聲母也能聯想出組詞。
-    - abbrev/^(th|nz|ng|[a-z]).*$/$1/
-    # 12 鍵沒有獨立韻母 w 鍵（w 鍵為 th），直接歸位到 u（3 鍵）：cw→a3、zw→83
-    - xform/w$/u/
-    - xform/^nz/y/
-    - xform/^th/w/
-    - xform/^ng/1/
-    - xlit/abcdefghiklmnopsuvrzjqt/aaaeeeiii55444773338899/
-    #- derive/[+_*^0]//
-    #- derive/([+_*^0])$//
-    #- derive/^(.*)$/\U$1/
+    # 有限語音/正字衍生規則（無 xlit、無鍵位替換 hack）
+    - derive/w$/u/
+    - derive/^q(.+)$/$1/
+    - derive/am$/an/
+    - derive/an$/am/
+    # 有限簡拼規則：雙字母原子聲母 (th / nz / ng) + 元音外單輔音（.+ 不為單字母 r 或孤立 ng 造簡拼）
+    - abbrev/^(th|nz|ng|(?!th|nz|ng)[bcdfghjklmnpqrstvwxyz]).+$/$1/
  
 
 translator:
   dictionary: hakka
-  prism: hakka
+  prism: hakka_jiugong
   enable_user_dict: true
   # 純全拼長句啟用原生組句；簡拼與超長輸入（>12 音節）由 0001 補丁在引擎內跳過組句以保證性能。
   enable_sentence: true
@@ -103,6 +98,7 @@ translator:
   # App 端據此把候選按「實際讀音」分組（左列音節組），不再自己 DP 切分。
   # 值爲「音節數」上限（cand.code().size()），100 即全量。
   spelling_hints: 100
+  always_show_comments: true
   # preedit_format 由 App 端 TwelveKeyPreedit 依 hakka.dict.yaml 反查（鍵碼→音節）
 
 ywz:

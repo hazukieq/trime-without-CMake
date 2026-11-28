@@ -102,45 +102,72 @@ internal fun mergeRows(rows: List<PanelRow>): List<PanelRow> {
  */
 internal fun collapsePrefixRows(rows: List<PanelRow>): List<PanelRow> {
     if (rows.size < 2) return rows
-    fun tokens(row: PanelRow) = row.reading.split(' ').filter { it.isNotBlank() }
+    fun parseTokens(reading: String): List<String> {
+        if (reading.isEmpty()) return emptyList()
+        val parts = ArrayList<String>(4)
+        var start = 0
+        for (i in reading.indices) {
+            if (reading[i] == ' ') {
+                if (i > start) parts.add(reading.substring(start, i))
+                start = i + 1
+            }
+        }
+        if (start < reading.length) parts.add(reading.substring(start))
+        return parts
+    }
 
     val out = ArrayList<PanelRow>(rows.size)
-    // 1) 單音節/無讀音行原樣保留（順序不變）；學習詞行不參與前綴收斂，
-    //    否則 `bi cam`（B站）會被更長的組合行吸收，推薦組與面板都看不到。
-    rows.forEach { if (tokens(it).size < 2 || it.hasUserWord) out.add(it) }
-    // 2) 多音節行按音節數從短到長處理：短的先就位，長的才有前綴可並
-    rows.filter { tokens(it).size >= 2 && !it.hasUserWord }
-        .sortedBy { tokens(it).size }
-        .forEach { row ->
-            val rowTokens = tokens(row)
-            var target = -1
-            var bestLen = 0
-            out.forEachIndexed { index, candidate ->
-                val candidateTokens = tokens(candidate)
-                if (candidateTokens.size < 2 || candidateTokens.size >= rowTokens.size ||
-                    candidate.hasUserWord
-                ) {
-                    return@forEachIndexed
-                }
-                if (rowTokens.take(candidateTokens.size) == candidateTokens &&
-                    candidateTokens.size > bestLen
-                ) {
-                    bestLen = candidateTokens.size
-                    target = index
-                }
-            }
-            if (target < 0) {
-                out.add(row)
-                return@forEach
-            }
-            val existing = out[target]
-            val texts = existing.items.mapTo(HashSet()) { it.text.lowercase() }
-            val additions = row.items.filter { texts.add(it.text.lowercase()) }
-            out[target] = existing.copy(
-                items = if (additions.isEmpty()) existing.items else existing.items + additions,
-                sources = existing.sources + row.sources,
-            )
+    val outTokens = ArrayList<List<String>>(rows.size)
+    val multiRows = ArrayList<Pair<PanelRow, List<String>>>()
+    // 1) 單音節/無讀音行原樣保留（順序不變）；學習詞行不參與前綴收斂
+    rows.forEach { row ->
+        val t = parseTokens(row.reading)
+        if (t.size < 2 || row.hasUserWord) {
+            out.add(row)
+            outTokens.add(t)
+        } else {
+            multiRows.add(row to t)
         }
+    }
+    if (multiRows.isEmpty()) return out
+    // 2) 多音節行按音節數從短到長處理：短的先就位，長的才有前綴可並
+    multiRows.sortBy { it.second.size }
+    for ((row, rowTokens) in multiRows) {
+        var target = -1
+        var bestLen = 0
+        for (index in out.indices) {
+            val candidate = out[index]
+            val candidateTokens = outTokens[index]
+            if (candidateTokens.size < 2 || candidateTokens.size >= rowTokens.size ||
+                candidate.hasUserWord
+            ) {
+                continue
+            }
+            var prefixMatch = true
+            for (k in candidateTokens.indices) {
+                if (rowTokens[k] != candidateTokens[k]) {
+                    prefixMatch = false
+                    break
+                }
+            }
+            if (prefixMatch && candidateTokens.size > bestLen) {
+                bestLen = candidateTokens.size
+                target = index
+            }
+        }
+        if (target < 0) {
+            out.add(row)
+            outTokens.add(rowTokens)
+            continue
+        }
+        val existing = out[target]
+        val texts = existing.items.mapTo(HashSet(existing.items.size * 2)) { it.text.lowercase() }
+        val additions = row.items.filter { texts.add(it.text.lowercase()) }
+        out[target] = existing.copy(
+            items = if (additions.isEmpty()) existing.items else existing.items + additions,
+            sources = existing.sources + row.sources,
+        )
+    }
     return out
 }
 
@@ -149,26 +176,25 @@ internal fun collapsePrefixRows(rows: List<PanelRow>): List<PanelRow> {
  * BLANK_READING 的省略號是一個 token，實際在單音節檔，用首候選反查讀音排序。
  * 分檔不可使用 syllables 容器長度。
  */
-internal fun tierAndSort(rows: List<PanelRow>): List<PanelRow> = rows.sortedWith(
-    compareBy(
-        {
-            when {
-                RowSource.ISOLATED in it.sources -> -1
-                it.syllableCount == 0 -> 2
-                it.syllableCount == 1 -> 0
-                else -> 1
-            }
-        },
-        {
-            if (it.reading.isBlank() || it.reading == TwelveKeyTuning.BLANK_READING) {
-                TwelveKeyPreedit.pinyinOfText(it.items.firstOrNull()?.text ?: "")
-            } else {
-                it.reading.lowercase()
-            }
-        },
-        { it.items.firstOrNull()?.text ?: "" },
-    ),
-)
+internal fun tierAndSort(rows: List<PanelRow>): List<PanelRow> {
+    if (rows.size < 2) return rows
+    class Keyed(val row: PanelRow, val tier: Int, val readingKey: String, val firstText: String)
+    return rows.map { r ->
+        val tier = when {
+            RowSource.ISOLATED in r.sources -> -1
+            r.syllableCount == 0 -> 2
+            r.syllableCount == 1 -> 0
+            else -> 1
+        }
+        val first = r.items.firstOrNull()?.text ?: ""
+        val rKey = if (r.reading.isBlank() || r.reading == TwelveKeyTuning.BLANK_READING) {
+            TwelveKeyPreedit.pinyinOfText(first)
+        } else {
+            r.reading.lowercase()
+        }
+        Keyed(r, tier, rKey, first)
+    }.sortedWith(compareBy<Keyed>({ it.tier }, { it.readingKey }, { it.firstText })).map { it.row }
+}
 
 /**
  * 全局行數上限（[TwelveKeyTuning.MAX_GROUPS]），超額時**先丟 INITIAL_COMBO 行**

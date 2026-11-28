@@ -51,6 +51,7 @@ object GenericPanelSnapshotBuilder {
                         comment = cleanComment(row.getOrNull(1)),
                         index = row.getOrNull(5)?.toIntOrNull() ?: index,
                         engineSpan = EngineCandidateSpan.fromRow(row),
+                        openccModified = row.getOrNull(6) == "1",
                     )
                 }
             } else {
@@ -328,6 +329,6 @@ object GenericPanelSnapshotBuilder {
     private fun singlePageFallback(): List<CandidateItem> =
         (Rime.getCandidates() ?: emptyArray()).mapIndexedNotNull { idx, c ->
             val t = c?.text ?: return@mapIndexedNotNull null
-            CandidateItem(t, cleanComment(c.comment), idx)
+            CandidateItem(t, cleanComment(c.comment), idx, openccModified = c.opencc_modified)
         }
 }

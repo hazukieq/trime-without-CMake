@@ -338,6 +338,7 @@ class CandidatePanelController(
                     contextKey = snapshot.contextKey,
                     inputSpan = it.inputSpan,
                     engineSpan = it.engineSpan,
+                    openccModified = it.openccModified,
                 ),
             )
         }

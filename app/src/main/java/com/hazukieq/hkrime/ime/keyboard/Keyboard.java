@@ -248,8 +248,9 @@ public class Keyboard {
       List<Integer> rawHeight = new ArrayList<>();
       for (Map<String, Object> mk : lm) {
         int gap = mDefaultHorizontalGap;
+        boolean hasKeyAction = mk.containsKey("click") || mk.containsKey("atoms");
         int w = (int) (ConfigGetter.getDouble(mk, "width", 0) * mDisplayWidth / 100);
-        if (w == 0 && mk.containsKey("click")) w = defaultWidth;
+        if (w == 0 && hasKeyAction) w = defaultWidth;
         w -= gap;
         if (column >= maxColumns || x + w > mDisplayWidth) {
           x = gap / 2;
@@ -263,7 +264,7 @@ public class Keyboard {
           int heightK = ConfigGetter.getPixel(mk, "height", 0);
           rowHeight = (heightK > 0) ? heightK : defaultHeight;
         }
-        if (!mk.containsKey("click")) { // 無按鍵事件
+        if (!hasKeyAction) { // 無按鍵事件
           x += w + gap;
           continue; // 縮進
         }
@@ -332,8 +333,9 @@ public class Keyboard {
     try {
       for (Map<String, Object> mk : lm) {
         int gap = mDefaultHorizontalGap;
+        boolean hasKeyAction = mk.containsKey("click") || mk.containsKey("atoms");
         int w = (int) (ConfigGetter.getDouble(mk, "width", 0) * mDisplayWidth / 100);
-        if (w == 0 && mk.containsKey("click")) w = defaultWidth;
+        if (w == 0 && hasKeyAction) w = defaultWidth;
         w -= gap;
         if (column >= maxColumns || x + w > mDisplayWidth) {
           x = gap / 2;
@@ -350,7 +352,7 @@ public class Keyboard {
             rowHeight = (heightK > 0) ? heightK : defaultHeight;
           }
         }
-        if (!mk.containsKey("click")) { // 無按鍵事件
+        if (!hasKeyAction) { // 無按鍵事件
           x += w + gap;
           continue; // 縮進
         }

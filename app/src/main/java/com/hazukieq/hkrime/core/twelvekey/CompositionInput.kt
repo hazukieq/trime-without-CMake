@@ -2,7 +2,41 @@ package com.hazukieq.hkrime.core.twelvekey
 
 /** 按鍵前保存原碼意圖；無組字時的標點/普通直通文字不受組字提交守衛誤傷。 */
 object CompositionInput {
+    /** 連續組字輸入的最大編碼長度（經實測 12 鍵/9 鍵在此上限內 UI compose 維持單幀且無長句退化）。 */
+    const val MAX_CODE_LENGTH = TwelveKeyTuning.MAX_FALLBACK_CODE
+
+    /** 觸發最大編碼長度提示的最小節流間隔，避免持續連按刷屏。 */
+    const val LIMIT_NOTICE_COOLDOWN_MS = 3000L
+
+    class LimitNoticeGate(private val cooldownMs: Long = LIMIT_NOTICE_COOLDOWN_MS) {
+        private var lastShownMs: Long = Long.MIN_VALUE
+
+        @Synchronized
+        fun tryAcquire(nowMs: Long): Boolean {
+            if (lastShownMs != Long.MIN_VALUE && nowMs - lastShownMs < cooldownMs) {
+                return false
+            }
+            lastShownMs = nowMs
+            return true
+        }
+
+        @Synchronized
+        fun reset() {
+            lastShownMs = Long.MIN_VALUE
+        }
+    }
+
     data class Intent(val code: String, val allowRawCommit: Boolean)
+
+    @JvmStatic
+    fun isCodeLimitReached(code: String?): Boolean =
+        !code.isNullOrEmpty() && code.length >= MAX_CODE_LENGTH
+
+    @JvmStatic
+    fun shouldBlockOverLimit(currentInput: String?, key: Int, allowAppend: Boolean): Boolean {
+        if (!allowAppend || !isCodeLimitReached(currentInput)) return false
+        return (key in 'a'.code..'z'.code) || (key in 'A'.code..'Z'.code) || key == '\''.code
+    }
 
     /** 碼串僅含碼字母、分隔符與空白；標點/符號輸入不走多鍵選擇日誌。 */
     fun isCodeString(input: String): Boolean = MultiKeyProfile.active.isCodeString(input)

@@ -83,6 +83,11 @@
     <string name="keyboard__show_window_summary">在键盘上方显示正在输入的拼音</string>
     <string name="pref_keyboard__hardware">物理键盘</string>
     <string name="pref_keyboard__hardware_entry_summary">桌面式光标跟随候选窗（仅 26 键方案，独立于触屏设置）</string>
+    <string name="pref_keyboard__hardware_manual_section">使用说明</string>
+    <string name="keyboard__hw_manual_title">物理键盘使用说明书</string>
+    <string name="keyboard__hw_manual_summary">点击查看接手条件、按键编修、快捷键悬浮层及候选标记说明</string>
+    <string name="keyboard__hw_manual_close">知道了</string>
+    <string name="keyboard__hw_manual_content">一、自动接手与退出条件\n1. 同时满足「连接物理键盘 + 开启接手模式 + 当前为 26 键方案（如全拼/五笔）」时，自动隐藏软键盘并在光标旁显示桌面式候选悬浮层。\n2. 切回 12 键/九宫格等非 26 键方案，或断开/收起物理键盘时，自动恢复触屏软键盘。\n3. 物理键盘候选排列、每页数量与输入框内预编辑均独立保存，不影响触屏模式。\n\n二、选词、翻页、编修与中英切换\n• 单击 Shift：切换中/英文模式，并在光标旁弹出「中 / 英」状态胶囊。\n• 1–9：选择对应序号候选词上屏。\n• Space / Enter：确认当前高亮候选；未组字时直接交给应用处理。\n• ← / →：移动编码内编辑光标；↑ / ↓：切换高亮候选（跨页自动翻页）。\n• - / = / PageUp / PageDown / , / .：上下翻页。\n• BackSpace / Delete：删除编码；Esc（或组字时按 Back）：清空当前编码。\n• 连续编码上限为 48 键，达到上限时悬浮层顶部会提示「已达 48 键上限」。\n\n三、候选标记说明\n• 候选词右上角出现琥珀色小圆点，表示该词条经过 OpenCC（如繁简或词表滤镜）转换。\n\n四、随光标悬浮工具（连续三键，避开文档冲突）\n• Ctrl + Shift + , ：符号与表情悬浮窗\n  [ ] / - = / PageUp / PageDown 切分类（不冲突应用亦可用 Tab），方向键移动，Enter / Space / 1–9 上屏，Esc 关闭。\n• Ctrl + Shift + . ：剪切板历史悬浮窗\n  ↑ / ↓ 选中，Enter / Space / 1–9 粘贴，P 置顶，BackSpace / Delete 删除，Esc 关闭。\n• Ctrl + Shift + ?（/）：外设菜单悬浮窗\n  ← / → 或 [ ] 切换「方案 / 开关 / 主题 / 说明」，↑ / ↓ 选中，Enter / 1–9 应用；在「方案」页按 Space 可启停支持的 26 键方案并自动部署，Esc 关闭。\n\n五、宿主应用快捷键冲突说明\n部分富文本编辑器（如系统笔记）会抢先拦截 Tab 键；若在浮窗中按 Tab 被宿主抢占，底部会自动高亮提示并引导改用 [ ] 或方向键。</string>
     <string name="pref_keyboard__hardware_mode_section">外设接手</string>
     <string name="pref_keyboard__hardware_candidate_section">候选窗与预编辑</string>
     <string name="keyboard__hw_keyboard_mode_title">物理键盘接手模式</string>
@@ -92,12 +97,12 @@
     <string name="keyboard__hw_inline_preedit_title">输入框内预编辑（外设独立）</string>
     <string name="keyboard__hw_inline_preedit_summary">仅物理键盘模式生效，不干扰触屏模式设置</string>
     <string name="pref_keyboard__hardware_shortcuts_section">快捷键说明</string>
-    <string name="keyboard__hw_shortcut_symbol_title">符号与表情悬浮窗（Ctrl + Shift + E）</string>
-    <string name="keyboard__hw_shortcut_symbol_summary">光标旁弹出；Tab 切分类，方向键选，Enter / 1-9 上屏，Esc 关闭</string>
-    <string name="keyboard__hw_shortcut_clipboard_title">剪切板历史悬浮窗（Ctrl + Shift + V）</string>
+    <string name="keyboard__hw_shortcut_symbol_title">符号与表情悬浮窗（Ctrl + Shift + ,）</string>
+    <string name="keyboard__hw_shortcut_symbol_summary">光标旁弹出；[ ] / - = 切分类，方向键选，Enter / 1-9 上屏，Esc 关闭</string>
+    <string name="keyboard__hw_shortcut_clipboard_title">剪切板历史悬浮窗（Ctrl + Shift + .）</string>
     <string name="keyboard__hw_shortcut_clipboard_summary">光标旁弹出；↑↓ / 1-9 粘贴，P 置顶，Del 删除，Esc 关闭</string>
-    <string name="keyboard__hw_shortcut_menu_title">设置菜单悬浮窗（Ctrl + Shift + M）</string>
-    <string name="keyboard__hw_shortcut_menu_summary">光标旁弹出；Tab 切方案/开关/主题，Enter / 1-9 切换，Space 启停支持的方案，Esc 关闭</string>
+    <string name="keyboard__hw_shortcut_menu_title">设置菜单悬浮窗（Ctrl + Shift + ?）</string>
+    <string name="keyboard__hw_shortcut_menu_summary">光标旁弹出；←→ / [ ] 切方案/开关/主题/说明，Enter / 1-9 切换，Space 启停方案，Esc 关闭</string>
     <string name="keyboard__hw_shortcut_editing_title">选词、翻页与中英切换</string>
     <string name="keyboard__hw_shortcut_editing_summary">Shift 切中英；← / → 编辑编码光标；↑ / ↓ 选候选；- / = 翻页</string>
     <string name="unit__candidate_count"> 个</string>

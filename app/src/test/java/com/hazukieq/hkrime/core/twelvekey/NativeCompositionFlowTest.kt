@@ -21,6 +21,7 @@ class NativeCompositionFlowTest {
 
     private data class NativeState(
         var input: String = "", var preedit: String = "", var commit: String = "",
+        val tokenBindings: MutableMap<Char, List<String>> = LinkedHashMap(),
         val segments: MutableList<String> = ArrayList(), val candidates: MutableList<CandidateItem> = ArrayList(),
     )
 
@@ -47,10 +48,24 @@ class NativeCompositionFlowTest {
             val next = NativeState()
             while (true) {
                 val line = reader.readLine() ?: error("native EOF while $command")
-                if (line == "END") return next.also { state = it }
+                if (line == "END") {
+                    TwelveKeyPreedit.updateTokenBindings(next.tokenBindings)
+                    return next.also { state = it }
+                }
                 val parts = line.split('\t', limit = 5)
                 when (parts[0]) {
                     "I" -> next.input = parts.getOrElse(1) { "" }
+                    "B" -> {
+                        val packed = parts.getOrElse(1) { "" }
+                        packed.split('\u0002').forEach { entry ->
+                            if (entry.isEmpty()) return@forEach
+                            val segs = entry.split('\u0001')
+                            if (segs.size >= 2 && segs[0].isNotEmpty()) {
+                                val atoms = segs.drop(1).filter { it.isNotEmpty() }
+                                if (atoms.isNotEmpty()) next.tokenBindings[segs[0][0]] = atoms
+                            }
+                        }
+                    }
                     "P" -> next.preedit = parts.getOrElse(1) { "" }
                     "K" -> next.commit = parts.getOrElse(1) { "" }
                     "S" -> next.segments.add(line)
@@ -65,7 +80,7 @@ class NativeCompositionFlowTest {
                 }
             }
         }
-        fun type(code: String) { send("clear"); send("type $code"); session.input(state.input) }
+        fun type(code: String): String { send("clear"); send("type $code"); session.input(state.input); return state.input }
         private fun local() = TwelveKeySnapshotBuilder.Local(
             state.input, 0, state.input, state.segments.joinToString("|"), state.preedit,
         )
@@ -85,8 +100,7 @@ class NativeCompositionFlowTest {
         fun confirmSyllable(reading: String) {
             check(session.confirmPhonetic(reading, initialOnly = false))
             send("initial " + PhoneticSelection.constraint(session.phonetics))
-            send("clear")
-            if (session.remaining.isNotEmpty()) send("type " + session.remaining)
+            send("restore " + session.remaining)
             assertEquals(session.remaining, state.input)
             assertTrue(state.commit.isEmpty())
         }
@@ -122,13 +136,12 @@ class NativeCompositionFlowTest {
         fun restore(code: String) {
             // 屬性在重建菜單前寫入（翻譯器建菜單時讀它決定是否保留簡拼分支）。
             send("initial " + PhoneticSelection.constraint(session.phonetics))
-            send("clear"); if (code.isNotEmpty()) send("type $code")
+            send("restore $code")
         }
         fun confirmLetter(letter: Char) {
             check(session.onInitialLetter(letter.toString()))
             send("initial " + PhoneticSelection.constraint(session.phonetics))
-            send("clear")
-            if (session.remaining.isNotEmpty()) send("type " + session.remaining)
+            send("restore " + session.remaining)
             assertEquals(session.remaining, state.input)
             assertTrue(state.commit.isEmpty())
         }
@@ -142,6 +155,7 @@ class NativeCompositionFlowTest {
             assertEquals(expected, state.input)
         }
         override fun close() {
+            TwelveKeyPreedit.updateTokenBindings(emptyMap())
             PreeditPresentation.invalidate("")
             writer.println("quit")
             if (!process.waitFor(5, TimeUnit.SECONDS)) process.destroyForcibly()
@@ -152,8 +166,7 @@ class NativeCompositionFlowTest {
 
     @Test(timeout = 90000) fun engineModeCanBeSwitchedWithoutLosingPartialSelectionOrUndo() {
         Driver().use { d ->
-            val original = "7i4aa4"
-            d.type(original)
+            val original = d.type("7i4aa4")
             val native = d.state.candidates.toList()
             val off = d.snapshot(appRankingEnabled = false)
             val full = d.snapshot(true, appRankingEnabled = false)
@@ -172,13 +185,14 @@ class NativeCompositionFlowTest {
             val restored = d.snapshot(true, appRankingEnabled = false)
             val partial = restored.recommend.first { it.text == "肾" }
             assertTrue(d.choose(restored to partial, CompositionSession.Origin.PANEL))
-            assertEquals("aa4", d.state.input)
+            val tail = original.substring(3)
+            assertEquals(tail, d.state.input)
             assertEquals("肾", d.session.selectedText)
             val picks = d.session.picks
             d.snapshot(true)
             d.snapshot(appRankingEnabled = false)
             assertEquals(picks, d.session.picks)
-            assertEquals("aa4", d.session.remaining)
+            assertEquals(tail, d.session.remaining)
             assertTrue(d.commits.isEmpty())
             d.undo()
             assertEquals(original, d.state.input)
@@ -190,7 +204,7 @@ class NativeCompositionFlowTest {
 
     @Test(timeout = 90000) fun matchingWordRemainsFirstDespiteLearningOfPartialCharacters() {
         Driver().use { d ->
-            d.type("7i4aa4")
+            val original = d.type("7i4aa4")
             assertEquals("平板", d.state.candidates.first().text)
             val bar = d.snapshot()
             val full = d.snapshot(true)
@@ -202,10 +216,10 @@ class NativeCompositionFlowTest {
             assertTrue("segment characters remain selectable", characters.isNotEmpty())
             val character = characters.first()
             assertTrue(d.choose(bar to character, CompositionSession.Origin.BAR))
-            assertEquals("aa4", d.state.input)
+            assertEquals(original.substring(3), d.state.input)
             assertTrue(d.commits.isEmpty())
             d.undo()
-            assertEquals("7i4aa4", d.state.input)
+            assertEquals(original, d.state.input)
             val restored = d.snapshot()
             assertEquals("平板", restored.barItems.first().text)
             assertEquals("pin ban", PreeditPresentation.render(d.state.preedit, d.state.input))
@@ -216,12 +230,12 @@ class NativeCompositionFlowTest {
 
     @Test(timeout = 90000) fun barPanelTransitionsAndEveryUndoKeepAllCodes() {
         Driver().use { d ->
-            val original = "9aii48i5i73"
-            d.type(original)
+            val original = d.type("9aii48i5i73")
             val old = d.barWord("太")
             assertTrue(d.choose(old.first to old.second.copy(comment = "display-only unrelated text"),
                 CompositionSession.Origin.BAR))
-            assertEquals("i48i5i73", d.state.input)
+            val tail = original.substring(3)
+            assertEquals(tail, d.state.input)
             assertEquals("太", d.session.selectedText)
             assertFalse(d.choose(old, CompositionSession.Origin.BAR)) // 過期/重複點擊。
             val beforeOpen = d.snapshot().barItems
@@ -229,8 +243,8 @@ class NativeCompositionFlowTest {
             assertTrue(d.choose(d.panelSyllable("go"), CompositionSession.Origin.PANEL))
             assertTrue(d.commits.isEmpty())
             // 確認音節與選字是兩步：先撤回選字，再撤回確認，最後才是上一個字。
-            d.undo(); assertEquals("i48i5i73", d.state.input); assertEquals("太", d.session.selectedText)
-            d.undo(); assertEquals("i48i5i73", d.state.input); assertEquals("太", d.session.selectedText)
+            d.undo(); assertEquals(tail, d.state.input); assertEquals("太", d.session.selectedText)
+            d.undo(); assertEquals(tail, d.state.input); assertEquals("太", d.session.selectedText)
             d.undo(); assertEquals(original, d.state.input); assertEquals("", d.session.selectedText)
             assertTrue(d.choose(d.panelSyllable("tai"), CompositionSession.Origin.PANEL))
             val expected = StringBuilder(d.session.selectedText)
@@ -247,19 +261,18 @@ class NativeCompositionFlowTest {
 
     @Test(timeout = 90000) fun letterConfirmUsesRealMenuAndFirstSegmentCharConsumesOnlyItsSpan() {
         Driver().use { d ->
-            val original = "5i5i"
-            d.type(original)
+            val original = d.type("5i5i")
             val originalItems = d.state.candidates.toList()
             d.confirmLetter('l')
             assertTrue(d.state.candidates.isNotEmpty())
             assertTrue(d.state.candidates.all { it.engineSpan!!.sourceComment.startsWith('l') })
-            assertEquals("5i5i", d.state.input)
+            assertEquals(original, d.state.input)
             assertTrue(d.commits.isEmpty())
             val snap = d.snapshot(true)
             val firstChar = snap.groups.flatMap { it.items }.first { it.segment == INITIAL_CHAR_SEGMENT }
             assertEquals(1, firstChar.inputSpan?.end)
             assertTrue(d.choose(snap to firstChar, CompositionSession.Origin.PANEL))
-            assertEquals("i5i", d.state.input)
+            assertEquals(original.substring(1), d.state.input)
             assertEquals(emptyList<PhoneticSelection>(), d.session.phonetics)
             assertTrue(d.commits.isEmpty())
             d.undo()
@@ -289,8 +302,7 @@ class NativeCompositionFlowTest {
 
     @Test(timeout = 90000) fun actualNativeAutoCommitIsBlockedAndUndoStillRestoresOriginal() {
         Driver().use { d ->
-            val original = "9aii48i5i73"
-            d.type(original)
+            val original = d.type("9aii48i5i73")
             assertTrue(d.choose(d.barWord("太"), CompositionSession.Origin.RETURN))
             d.forcePrematureNativeCommit()
             assertTrue(d.commits.isEmpty())
@@ -301,14 +313,14 @@ class NativeCompositionFlowTest {
 
     @Test(timeout = 90000) fun failedFinalWriteCanUndoAndReselectWithoutDuplicatePrefix() {
         Driver().use { d ->
-            d.type("9aii4")
+            val original = d.type("9aii4")
             assertTrue(d.choose(d.barWord("太"), CompositionSession.Origin.SPACE))
             val go = d.barWord("哥")
             d.failWrite = true
             assertTrue(d.choose(go, CompositionSession.Origin.BAR))
             assertEquals("太哥", d.session.completed()!!.text)
             assertTrue(d.commits.isEmpty())
-            d.undo(); assertEquals("i4", d.state.input); assertEquals("太", d.session.selectedText)
+            d.undo(); assertEquals(original.substring(3), d.state.input); assertEquals("太", d.session.selectedText)
             d.failWrite = false
             val replacement = d.panelSyllable("go")
             assertTrue(d.choose(replacement, CompositionSession.Origin.PANEL))
@@ -320,7 +332,7 @@ class NativeCompositionFlowTest {
 
     @Test(timeout = 90000) fun isolatedFallbackStayReversible() {
         Driver().use { d ->
-            d.type("55")
+            val original = d.type("55")
             val full = d.snapshot(true)
             assertTrue("左列應有可確認的字母", full.groups.any { it.segment == INITIAL_LETTER_SEGMENT })
             d.confirmLetter('k')
@@ -328,9 +340,9 @@ class NativeCompositionFlowTest {
             val ch = confirmed.recommend.firstOrNull { it.segment == INITIAL_CHAR_SEGMENT }
                 ?: error("確認首拼後應有首段漢字")
             assertTrue(d.choose(confirmed to ch, CompositionSession.Origin.PANEL))
-            assertEquals("5", d.state.input)
+            assertEquals(original.substring(1), d.state.input)
             assertTrue(d.commits.isEmpty())
-            d.undo(); assertEquals("55", d.state.input)
+            d.undo(); assertEquals(original, d.state.input)
         }
     }
 
@@ -351,7 +363,8 @@ class NativeCompositionFlowTest {
         Driver().use { d ->
             d.send("option ywz 1")
             val code = "ia8i3"
-            d.type(code + "9ai")
+            val fullHandles = d.type(code + "9ai")
+            val tailHandles = fullHandles.substring(5)
             val converted = d.state.candidates.filter { it.comment.contains("加油") && it.text != "加油" }
             assertTrue("真實 OpenCC 必須產生加油表情", converted.size >= 2)
             for ((n, emoji) in converted.take(2).withIndex()) {
@@ -361,11 +374,11 @@ class NativeCompositionFlowTest {
                 assertEquals(5, span.end)
                 assertEquals("ga jiu", span.reading)
                 assertTrue(d.choose(full to row, if (n == 0) CompositionSession.Origin.PANEL else CompositionSession.Origin.BAR))
-                assertEquals("9ai", d.state.input)
+                assertEquals(tailHandles, d.state.input)
                 assertEquals(emoji.text, d.session.selectedText)
                 assertTrue(d.commits.isEmpty())
                 d.undo()
-                assertEquals(code + "9ai", d.state.input)
+                assertEquals(fullHandles, d.state.input)
             }
             d.type(code)
             val full = d.snapshot()

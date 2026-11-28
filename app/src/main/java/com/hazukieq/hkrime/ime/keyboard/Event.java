@@ -47,6 +47,7 @@ public class Event {
   private String select;
   private String toggle;
   private String commit;
+  private List<String> atoms;
 
   private String shiftLock;
   private boolean functional;
@@ -81,14 +82,23 @@ public class Event {
       shiftLock = ConfigGetter.getString(presetKey, "shift_lock", "");
       commit = ConfigGetter.getString(presetKey, "commit", "");
       String send = ConfigGetter.getString(presetKey, "send", "");
-      if (TextUtils.isEmpty(send) && !TextUtils.isEmpty(command))
-        send = "function"; // command默認發function
-      int[] sends = Keycode.parseSend(send);
-      code = sends[0];
-      mask = sends[1];
-      parseLabel();
-      text = Config.getString(presetKey, "text");
-      if (code < 0 && TextUtils.isEmpty(text)) text = s;
+      if (presetKey.containsKey("atoms")) {
+        atoms = parseAtoms(presetKey.get("atoms"));
+      }
+      if (atoms != null && !atoms.isEmpty()) {
+        code = 0;
+        mask = 0;
+        text = "";
+      } else {
+        if (TextUtils.isEmpty(send) && !TextUtils.isEmpty(command))
+          send = "function"; // command默認發function
+        int[] sends = Keycode.parseSend(send);
+        code = sends[0];
+        mask = sends[1];
+        parseLabel();
+        text = Config.getString(presetKey, "text");
+        if (code < 0 && TextUtils.isEmpty(text)) text = s;
+      }
       if (presetKey.containsKey("states")) states = (List<?>) presetKey.get("states");
       sticky = ConfigGetter.getBoolean(presetKey, "sticky", false);
       repeatable = ConfigGetter.getBoolean(presetKey, "repeatable", false);
@@ -104,6 +114,28 @@ public class Event {
 
   public Event(String s) {
     this(null, s);
+  }
+
+  /** 從主題按鍵條目的內聯 `atoms` 屬性直接構建多鍵 Token-Set 事件。 */
+  @NonNull
+  public static Event fromAtoms(
+      Keyboard keyboard,
+      @NonNull Object rawAtoms,
+      String label,
+      String preview,
+      boolean functional) {
+    Event e = new Event(keyboard, "");
+    List<String> parsed = parseAtoms(rawAtoms);
+    if (parsed != null && !parsed.isEmpty()) {
+      e.atoms = parsed;
+      e.code = 0;
+      e.mask = 0;
+      e.text = "";
+    }
+    if (!TextUtils.isEmpty(label)) e.label = label;
+    if (!TextUtils.isEmpty(preview)) e.preview = preview;
+    e.functional = functional;
+    return e;
   }
 
   public int getCode() {
@@ -205,6 +237,37 @@ public class Event {
 
   public String getCommit() {
     return commit;
+  }
+
+  public boolean hasAtoms() {
+    return atoms != null && !atoms.isEmpty();
+  }
+
+  @NonNull
+  public String[] getAtoms() {
+    if (atoms == null || atoms.isEmpty()) return new String[0];
+    return atoms.toArray(new String[0]);
+  }
+
+  private static List<String> parseAtoms(Object raw) {
+    if (raw == null) return null;
+    List<String> out = new java.util.ArrayList<>();
+    if (raw instanceof List<?>) {
+      for (Object item : (List<?>) raw) {
+        if (item == null) continue;
+        String t = item.toString().trim();
+        if (!t.isEmpty() && !out.contains(t)) out.add(t);
+      }
+    } else {
+      String s = raw.toString().trim();
+      if (!s.isEmpty()) {
+        for (String part : s.split("[,\\s]+")) {
+          String t = part.trim();
+          if (!t.isEmpty() && !out.contains(t)) out.add(t);
+        }
+      }
+    }
+    return out.isEmpty() ? null : java.util.Collections.unmodifiableList(out);
   }
 
   private void parseLabel() {

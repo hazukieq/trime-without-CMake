@@ -85,6 +85,11 @@
     <string name="keyboard__show_window_summary">Show composing pinyin above the keyboard</string>
     <string name="pref_keyboard__hardware">Physical Keyboard</string>
     <string name="pref_keyboard__hardware_entry_summary">Desktop-style cursor-following candidate window (26-key schemas only)</string>
+    <string name="pref_keyboard__hardware_manual_section">User Guide</string>
+    <string name="keyboard__hw_manual_title">Physical Keyboard User Manual</string>
+    <string name="keyboard__hw_manual_summary">Tap to view activation rules, editing keys, shortcut overlays, and candidate markers</string>
+    <string name="keyboard__hw_manual_close">Got it</string>
+    <string name="keyboard__hw_manual_content">1. Activation &amp; Exit\n• Takeover mode activates when a physical keyboard is attached, takeover mode is enabled, and the active schema is a 26-key layout (such as Qwerty/Wubi).\n• Switching to a 12-key/9-key schema or detaching the physical keyboard automatically restores the touch soft keyboard.\n• Physical keyboard candidate layout, page size, and inline preedit settings are stored independently from touch settings.\n\n2. Candidate Selection, Paging &amp; Mode Switching\n• Tap Shift: toggle Chinese / English mode and show the cursor-side status pill.\n• 1–9: commit the corresponding candidate.\n• Space / Enter: commit highlighted candidate (passed through when idle).\n• ← / →: move the preedit caret; ↑ / ↓: move candidate highlight (auto-flips pages).\n• - / = / PageUp / PageDown / , / .: previous / next page.\n• BackSpace / Delete: edit code; Esc (or Back while composing): clear composition.\n• Continuous code length is capped at 48 keys; exceeding it shows an amber cap notice in the overlay header.\n\n3. Candidate Markers\n• An amber dot at the top-right of a candidate indicates the text was converted by OpenCC.\n\n4. Floating Tool Overlays (Adjacent Conflict-Free Keys)\n• Ctrl + Shift + , : Symbols &amp; Emoji overlay\n  [ ] / - = / PageUp / PageDown switches categories (Tab also works when not intercepted), arrows move, Enter / Space / 1–9 commits, Esc closes.\n• Ctrl + Shift + . : Clipboard history overlay\n  ↑ / ↓ selects, Enter / Space / 1–9 pastes, P pins, BackSpace / Delete removes, Esc closes.\n• Ctrl + Shift + ? (/): Hardware menu overlay\n  ← / → or [ ] switches Schema / Switches / Theme / Guide, ↑ / ↓ selects, Enter / 1–9 applies; Space on Schema toggles supported 26-key schemas, Esc closes.</string>
     <string name="pref_keyboard__hardware_mode_section">Takeover Mode</string>
     <string name="pref_keyboard__hardware_candidate_section">Candidate Window &amp; Preedit</string>
     <string name="keyboard__hw_keyboard_mode_title">Physical keyboard takeover mode</string>
@@ -94,12 +99,12 @@
     <string name="keyboard__hw_inline_preedit_title">Inline preedit (physical keyboard)</string>
     <string name="keyboard__hw_inline_preedit_summary">Independent from touch keyboard preedit setting</string>
     <string name="pref_keyboard__hardware_shortcuts_section">Shortcuts</string>
-    <string name="keyboard__hw_shortcut_symbol_title">Symbols &amp; Emoji popup (Ctrl + Shift + E)</string>
-    <string name="keyboard__hw_shortcut_symbol_summary">Shows near cursor; Tab switches tabs, arrows move, Enter / 1-9 commits, Esc closes</string>
-    <string name="keyboard__hw_shortcut_clipboard_title">Clipboard history popup (Ctrl + Shift + V)</string>
+    <string name="keyboard__hw_shortcut_symbol_title">Symbols &amp; Emoji overlay (Ctrl + Shift + ,)</string>
+    <string name="keyboard__hw_shortcut_symbol_summary">Shows near cursor; [ ] / - = switches tabs, arrows move, Enter / 1-9 commits, Esc closes</string>
+    <string name="keyboard__hw_shortcut_clipboard_title">Clipboard history overlay (Ctrl + Shift + .)</string>
     <string name="keyboard__hw_shortcut_clipboard_summary">Shows near cursor; ↑↓ / 1-9 pastes, P pins, Del deletes, Esc closes</string>
-    <string name="keyboard__hw_shortcut_menu_title">Settings menu popup (Ctrl + Shift + M)</string>
-    <string name="keyboard__hw_shortcut_menu_summary">Shows near cursor; Tab switches Schema / Switches / Theme, Enter / 1-9 selects, Space enables/disables schemas, Esc closes</string>
+    <string name="keyboard__hw_shortcut_menu_title">Settings menu overlay (Ctrl + Shift + ?)</string>
+    <string name="keyboard__hw_shortcut_menu_summary">Shows near cursor; ←→ / [ ] switches Schema / Switches / Theme / Guide, Enter / 1-9 selects, Space toggles schemas, Esc closes</string>
     <string name="keyboard__hw_shortcut_editing_title">Selection, paging &amp; mode switch</string>
     <string name="keyboard__hw_shortcut_editing_summary">Shift toggles CN/EN; ← / → edits preedit caret; ↑ / ↓ selects; - / = flips page</string>
     <string name="unit__candidate_count"> items</string>

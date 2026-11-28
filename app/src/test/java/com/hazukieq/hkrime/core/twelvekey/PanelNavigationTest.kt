@@ -53,4 +53,49 @@ class PanelNavigationTest {
         assertEquals(RECOMMEND_SEGMENT, navigation.groups[navigation.activeIndex].segment)
         assertFalse(navigation.select(ho, "ho", first.contextKey))
     }
+
+    @Test fun multiSyllableConfirmAdvancesPastNzinAndRetainsKoPaPhrase() {
+        val bindings = mapOf(
+            'A' to listOf("z", "j"),
+            'B' to listOf("v", "u", "r"),
+            'C' to listOf("m", "n", "o"),
+            'D' to listOf("g", "h", "i"),
+            'E' to listOf("d", "e", "f"),
+            'F' to listOf("a", "b", "c"),
+            'G' to listOf("nz"),
+            'H' to listOf("k", "l"),
+            'I' to listOf("q", "t"),
+            'J' to listOf("p", "s"),
+        )
+        com.hazukieq.hkrime.core.TwelveKeyPreedit.updateTokenBindings(bindings)
+        try {
+            // zung(ABCD) fa(EF) nzin(GDC) min(CDC) kiung(HDBCD) fo(EC) get(DEI)
+            val fullCode = "ABCDEFGDCCDCHDBCDECDEI"
+            val session = CompositionSession()
+            session.input(fullCode)
+            for (syll in listOf("zung", "fa", "nzin", "min", "kiung", "fo", "get")) {
+                assertTrue("確認音節 $syll 應成功推進", session.confirmPhonetic(syll, initialOnly = false))
+            }
+            assertEquals(listOf("zung", "fa", "nzin", "min", "kiung", "fo", "get"), session.phonetics.map { it.reading })
+            assertEquals("", session.pending)
+
+            // ko(HC) pa(JF): 兩段確認後仍應保留「可怕」(ko pa) 完整詞組推薦
+            val kopaCode = "HCJF"
+            val snap = TwelveKeySnapshotBuilder.build(
+                TwelveKeySnapshotBuilder.Local(kopaCode, 0, kopaCode, "", kopaCode),
+                wantGroups = true,
+                candidatesOverride = listOf(
+                    CandidateItem("可怕", "ko pa", 0, engineSpan = EngineCandidateSpan(0, 4, "ko pa")),
+                ),
+                phonetics = listOf(
+                    PhoneticSelection("ko", "HC", initialOnly = false),
+                    PhoneticSelection("pa", "JF", initialOnly = false),
+                ),
+            )
+            assertTrue(snap.recommend.any { it.text == "可怕" })
+            assertTrue(snap.barEntries.any { it.text == "可怕" })
+        } finally {
+            com.hazukieq.hkrime.core.TwelveKeyPreedit.updateTokenBindings(emptyMap())
+        }
+    }
 }

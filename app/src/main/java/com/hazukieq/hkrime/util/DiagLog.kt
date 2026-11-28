@@ -42,18 +42,52 @@ object DiagLog {
     fun e(tag: String, message: String, t: Throwable? = null) =
         write("E", tag, message + (t?.let { " | ${it.javaClass.simpleName}: ${it.message}" } ?: ""))
 
+    private val writeQueue = java.util.concurrent.LinkedBlockingQueue<String>(2048)
+
+    @Volatile
+    private var writerStarted = false
+
+    private fun ensureWriter() {
+        if (writerStarted) return
+        synchronized(this) {
+            if (writerStarted) return
+            writerStarted = true
+            Thread({
+                val batch = StringBuilder(4096)
+                while (true) {
+                    try {
+                        val first = writeQueue.take()
+                        batch.setLength(0)
+                        batch.append(first)
+                        var drained = 0
+                        while (drained < 64) {
+                            val next = writeQueue.poll() ?: break
+                            batch.append(next)
+                            drained++
+                        }
+                        val file = runCatching { logDir()?.resolve("diag.log") }.getOrNull() ?: continue
+                        runCatching { file.appendText(batch.toString()) }
+                    } catch (_: Throwable) {
+                    }
+                }
+            }, "diaglog-writer").apply {
+                isDaemon = true
+                start()
+            }
+        }
+    }
+
     private fun write(level: String, tag: String, message: String) {
         if (!ENABLED) return
-        val file = runCatching { logDir()?.resolve("diag.log") }.getOrNull() ?: return
+        ensureWriter()
         val line = "${timeFormat.format(Date())} $level/$tag[${Thread.currentThread().name}] $message\n"
-        runCatching {
-            file.appendText(line)
-        }
+        writeQueue.offer(line)
     }
 
     /** 一次性把「本進程」的診斷檔清空（每次進程啟動調一次，避免越滾越大）。 */
     fun reset() {
         if (!ENABLED) return
+        writeQueue.clear()
         runCatching { logDir()?.resolve("diag.log")?.writeText("") }
     }
 }

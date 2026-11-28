@@ -98,6 +98,193 @@ object TwelveKeyPreedit {
 
     private var initialPatternIndex: Map<String, List<Pair<String, List<String>>>> = emptyMap()
 
+    private class SyllableTrieNode {
+        val children = arrayOfNulls<SyllableTrieNode>(26)
+        var exactMain: ArrayList<Entry>? = null
+        var exactUniverseNonSuffix: Boolean = false
+        var exactUniverseAny: Boolean = false
+    }
+
+    @Volatile
+    private var variantTrieRoot: SyllableTrieNode = SyllableTrieNode()
+
+    @Volatile
+    private var validInitialUnits: Set<String> = emptySet()
+
+    @Volatile
+    private var syllablesByInitialMap: Map<String, List<String>> = emptyMap()
+
+    @Volatile
+    private var bestCharByInitial: java.util.concurrent.ConcurrentHashMap<String, String> =
+        java.util.concurrent.ConcurrentHashMap()
+
+    // [hkrime] 會話動態按鍵句柄映射（handleChar -> 鍵面音素集合，零 schema xlit 硬編碼）
+    @Volatile
+    private var activeTokenBindings: Map<Char, List<String>> = emptyMap()
+    @Volatile
+    private var sortedTokenAtoms: List<Pair<String, Char>> = emptyList()
+    @Volatile
+    private var tokenLettersByHandle: Map<Char, String> = emptyMap()
+    @Volatile
+    private var tokenCodeCache: java.util.concurrent.ConcurrentHashMap<String, String> =
+        java.util.concurrent.ConcurrentHashMap()
+    @Volatile
+    private var rawTokenCodeCache: java.util.concurrent.ConcurrentHashMap<String, String> =
+        java.util.concurrent.ConcurrentHashMap()
+
+    internal fun updateTokenBindings(bindings: Map<Char, List<String>>) {
+        if (bindings.isEmpty()) {
+            if (activeTokenBindings.isEmpty()) return
+            activeTokenBindings = emptyMap()
+            sortedTokenAtoms = emptyList()
+            tokenLettersByHandle = emptyMap()
+            tokenCodeCache = java.util.concurrent.ConcurrentHashMap()
+            rawTokenCodeCache = java.util.concurrent.ConcurrentHashMap()
+            return
+        }
+        val copy = LinkedHashMap<Char, List<String>>(bindings.size)
+        val atomsList = ArrayList<Pair<String, Char>>(bindings.size * 3)
+        val lettersMap = HashMap<Char, String>(bindings.size * 2)
+        bindings.forEach { (handle, rawTokens) ->
+            val clean = rawTokens.filter { it.isNotEmpty() }.distinct()
+            if (clean.isNotEmpty()) {
+                copy[handle] = clean
+                lettersMap[handle] = clean.joinToString("")
+                clean.forEach { tok -> atomsList.add(tok to handle) }
+            }
+        }
+        if (copy == activeTokenBindings) return
+        // 多字母聲母單元（th / nz / ng）必須優先於單字母（t / n）
+        atomsList.sortWith(compareByDescending<Pair<String, Char>> { it.first.length }.thenBy { it.first })
+        activeTokenBindings = copy
+        sortedTokenAtoms = atomsList
+        tokenLettersByHandle = lettersMap
+        tokenCodeCache = java.util.concurrent.ConcurrentHashMap()
+        rawTokenCodeCache = java.util.concurrent.ConcurrentHashMap()
+    }
+
+    internal fun hasTokenBindings(): Boolean = activeTokenBindings.isNotEmpty()
+
+    internal fun tokenBindingsSnapshot(): Map<Char, List<String>> = activeTokenBindings
+
+    internal fun isBoundHandle(c: Char): Boolean = c in activeTokenBindings
+
+    internal fun fallbackTokenLetter(codeChar: Char): String {
+        val tokens = activeTokenBindings[codeChar] ?: return codeChar.toString()
+        val vowels = TwelveKeyTuning.VOWEL_LETTERS
+        return tokens.firstOrNull { it.length == 1 && it[0] in vowels } ?: tokens.first()
+    }
+
+    private fun tokensForHandle(c: Char): List<String> =
+        activeTokenBindings[c] ?: listOf(c.toString())
+
+    private fun spellingVariants(syllable: String): List<String> {
+        val out = ArrayList<String>(4)
+        out.add(syllable)
+        if (syllable.endsWith("w")) out.add(syllable.dropLast(1) + "u")
+        if (syllable.startsWith("q") && syllable.length > 1) out.add(syllable.substring(1))
+        val base = out.size
+        for (i in 0 until base) {
+            val s = out[i]
+            if (s.endsWith("am")) out.add(s.dropLast(2) + "an")
+            else if (s.endsWith("an")) out.add(s.dropLast(2) + "am")
+        }
+        return out
+    }
+
+    private fun matchStepsNextChars(
+        variant: String,
+        steps: List<List<String>>,
+        stepIdx: Int,
+        pos: Int,
+        exact: Boolean,
+        outNext: MutableSet<Char>?,
+    ): Boolean {
+        if (stepIdx == steps.size) {
+            if (exact) return pos == variant.length
+            if (pos < variant.length) {
+                outNext?.add(variant[pos])
+                return true
+            }
+            return false
+        }
+        var any = false
+        for (tok in steps[stepIdx]) {
+            if (tok.isEmpty()) continue
+            if (variant.startsWith(tok, pos)) {
+                if (matchStepsNextChars(variant, steps, stepIdx + 1, pos + tok.length, exact, outNext)) {
+                    any = true
+                    if (exact) return true
+                }
+            }
+        }
+        return any
+    }
+
+    private fun matchesStepsExact(syllable: String, steps: List<List<String>>): Boolean =
+        spellingVariants(syllable).any { v -> matchStepsNextChars(v, steps, 0, 0, exact = true, null) }
+
+    private fun prefixStepNextChars(syllable: String, steps: List<List<String>>): Set<Char> {
+        val next = LinkedHashSet<Char>(2)
+        spellingVariants(syllable).forEach { v ->
+            matchStepsNextChars(v, steps, 0, 0, exact = false, next)
+        }
+        return next
+    }
+
+    private fun encodeByBindings(syllable: String): String {
+        tokenCodeCache[syllable]?.let { return it }
+        val s = canonicalSpelling(syllable)
+        val atoms = sortedTokenAtoms
+        val sb = StringBuilder(s.length)
+        var i = 0
+        while (i < s.length) {
+            var matchedHandle: Char? = null
+            var matchedLen = 1
+            for ((tok, handle) in atoms) {
+                if (s.startsWith(tok, i)) {
+                    matchedHandle = handle
+                    matchedLen = tok.length
+                    break
+                }
+            }
+            sb.append(matchedHandle ?: '?')
+            i += matchedLen
+        }
+        val encoded = sb.toString()
+        tokenCodeCache[syllable] = encoded
+        return encoded
+    }
+
+    /** 通用（無客家話拼寫別名變換）的音素句柄編碼，供 9 鍵等通用多鍵方案復用快取。 */
+    internal fun encodeRawByBindings(lower: String): String {
+        if (lower.isEmpty()) return ""
+        rawTokenCodeCache[lower]?.let { return it }
+        val atoms = sortedTokenAtoms
+        val sb = StringBuilder(lower.length)
+        var pos = 0
+        while (pos < lower.length) {
+            var matchedHandle: Char? = null
+            var matchedLen = 1
+            for ((tok, handle) in atoms) {
+                if (lower.startsWith(tok, pos)) {
+                    matchedHandle = handle
+                    matchedLen = tok.length
+                    break
+                }
+            }
+            val handle = matchedHandle ?: run {
+                rawTokenCodeCache[lower] = ""
+                return ""
+            }
+            sb.append(handle)
+            pos += matchedLen
+        }
+        val encoded = sb.toString()
+        rawTokenCodeCache[lower] = encoded
+        return encoded
+    }
+
     /**
      * 簡拼+完整末音節的模式索引，如 b|can；末節按完整音節匹配。
      */
@@ -301,6 +488,7 @@ object TwelveKeyPreedit {
         if (parsed.isEmpty()) return 0
         syllableSet.clear()
         syllableSet.addAll(parsed)
+        rebuildVariantTrie()
         return parsed.size
     }
 
@@ -547,13 +735,45 @@ object TwelveKeyPreedit {
         val entries = wordCodeIndex
         if (prefix.isEmpty() || entries.isEmpty()) return emptyList()
         val rows = LinkedHashMap<String, LinkedHashSet<String>>()
-        for (entry in entries) {
-            if (entry.tokens.size < 2 || (initial != null && initialUnit(entry.tokens[0]) != initial)) continue
-            // 整串前綴詞查詢要求第一音節完整編碼已包含在輸入中。
-            val firstCode = codeOf(entry.tokens[0])
-            if (firstCode.isEmpty() || !prefix.startsWith(firstCode)) continue
-            if (!entry.code.startsWith(prefix)) continue
-            rows.getOrPut(entry.tokens.joinToString(" ")) { LinkedHashSet() }.add(entry.word)
+        if (hasTokenBindings()) {
+            val steps = prefix.map { tokensForHandle(it) }
+            for (entry in entries) {
+                if (entry.tokens.size < 2 || (initial != null && initialUnit(entry.tokens[0]) != initial)) continue
+                val firstStepsLen = (1..minOf(6, steps.size)).firstOrNull { len ->
+                    matchesStepsExact(entry.tokens[0], steps.subList(0, len))
+                } ?: continue
+                var stepPos = firstStepsLen
+                var tokIdx = 1
+                var ok = true
+                while (stepPos < steps.size && tokIdx < entry.tokens.size) {
+                    val tok = entry.tokens[tokIdx]
+                    val rem = steps.size - stepPos
+                    val fullMatch = (1..minOf(6, rem)).firstOrNull { len ->
+                        matchesStepsExact(tok, steps.subList(stepPos, stepPos + len))
+                    }
+                    if (fullMatch != null) {
+                        stepPos += fullMatch
+                        tokIdx++
+                    } else if (prefixStepNextChars(tok, steps.subList(stepPos, steps.size)).isNotEmpty()) {
+                        stepPos = steps.size
+                        tokIdx++
+                    } else {
+                        ok = false
+                        break
+                    }
+                }
+                if (!ok || stepPos < steps.size) continue
+                rows.getOrPut(entry.tokens.joinToString(" ")) { LinkedHashSet() }.add(entry.word)
+            }
+        } else {
+            for (entry in entries) {
+                if (entry.tokens.size < 2 || (initial != null && initialUnit(entry.tokens[0]) != initial)) continue
+                // 整串前綴詞查詢要求第一音節完整編碼已包含在輸入中。
+                val firstCode = codeOf(entry.tokens[0])
+                if (firstCode.isEmpty() || !prefix.startsWith(firstCode)) continue
+                if (!entry.code.startsWith(prefix)) continue
+                rows.getOrPut(entry.tokens.joinToString(" ")) { LinkedHashSet() }.add(entry.word)
+            }
         }
         if (rows.isEmpty()) return emptyList()
         return rows.entries
@@ -630,6 +850,15 @@ object TwelveKeyPreedit {
      */
     fun syllableCountForCode(code: String): Int {
         if (code.isEmpty()) return 0
+        if (hasTokenBindings()) {
+            val steps = code.map { tokensForHandle(it) }
+            val seen = HashSet<String>()
+            var n = 0
+            for (node in walkSteps(steps)) {
+                collectSubtreeUnique(node, seen) { n++ }
+            }
+            return n
+        }
         var n = 0
         codeToSyllables.forEach { (syllableCode, list) ->
             if (syllableCode == code || syllableCode.startsWith(code)) n += list.size
@@ -640,6 +869,21 @@ object TwelveKeyPreedit {
     /** 碼段的所有可能「下一個音節首字母」（去重、保持輪轉順序），用於決定列哪幾行聯想詞。 */
     fun initialsForPrefix(code: String, limit: Int = 2): List<Char> {
         if (code.isEmpty()) return emptyList()
+        if (hasTokenBindings()) {
+            val steps = code.map { tokensForHandle(it) }
+            val weightByInitial = LinkedHashMap<Char, Int>()
+            val seen = HashSet<String>()
+            for (node in walkSteps(steps)) {
+                collectSubtreeUnique(node, seen) { e ->
+                    val initial = e.syllable.firstOrNull() ?: return@collectSubtreeUnique
+                    weightByInitial[initial] = (weightByInitial[initial] ?: 0) + e.freq
+                }
+            }
+            return weightByInitial.entries
+                .sortedByDescending { it.value }
+                .map { it.key }
+                .take(limit)
+        }
         // 按「音節首字母」聚合前綴匹配到的音節（按詞典字數加權排序）；不要從
         // syllablesForSegment 前 N 條裡找——那種取法可能前 8 條全是同一首字母。
         val weightByInitial = LinkedHashMap<Char, Int>()
@@ -674,14 +918,18 @@ object TwelveKeyPreedit {
         val normal = HashMap<Char, MutableSet<String>>()
         val last = HashMap<Char, MutableSet<String>>()
         val vowels = TwelveKeyTuning.VOWEL_LETTERS
+        val validInitials = HashSet<String>(32)
         syllableSet.forEach { syllable ->
             val unit = initialUnit(syllable)
-            if (unit.isEmpty() || (unit.length == 1 && unit[0] in vowels)) return@forEach
+            if (unit.isEmpty()) return@forEach
+            validInitials.add(unit)
+            if (unit.length == 1 && unit[0] in vowels) return@forEach
             val suffixOnly = isSuffixOnlySyllable(syllable)
             val code = codeOf(syllable).firstOrNull() ?: return@forEach
             if (!suffixOnly) normal.getOrPut(code) { LinkedHashSet() }.add(unit)
             last.getOrPut(code) { LinkedHashSet() }.add(unit)
         }
+        validInitialUnits = validInitials
         initialUnitsByCode = normal.mapValues { it.value.sorted() }
         initialUnitsByCodeLast = last.mapValues { it.value.sorted() }
         // 首字母索引只收主詞典音節，按字典序固定以與腳本逐行對拍。
@@ -698,11 +946,65 @@ object TwelveKeyPreedit {
     internal fun syllablesCompletingPrefix(code: String): List<String> {
         if (code.isEmpty()) return emptyList()
         val out = LinkedHashSet<String>()
+        if (hasTokenBindings()) {
+            val steps = code.map { tokensForHandle(it) }
+            val maxLen = minOf(6, steps.size)
+            fun walkPrefix(idx: Int, node: SyllableTrieNode) {
+                if (idx > 0) {
+                    node.exactMain?.forEach { e ->
+                        if (e.syllable in syllableSet) out.add(e.syllable)
+                    }
+                }
+                if (idx >= maxLen) return
+                for (tok in steps[idx]) {
+                    val next = stepTrieNode(node, tok) ?: continue
+                    walkPrefix(idx + 1, next)
+                }
+            }
+            walkPrefix(0, variantTrieRoot)
+            return out.sorted()
+        }
         codeToSyllables.forEach { (syllableCode, list) ->
             if (syllableCode.isEmpty() || !code.startsWith(syllableCode)) return@forEach
             list.forEach { entry -> out.add(entry.syllable) }
         }
         return out.sorted()
+    }
+
+    /**
+     * 解析完整音節 [syllable] 在 [effectiveCode] 開頭消耗的精確原碼鍵數。
+     * 與 [syllablesCompletingPrefix] 同口徑走完整前綴集合，不受分段兜底上限（limit=2/quota）截斷。
+     */
+    internal fun exactCodeLengthForSyllable(syllable: String, effectiveCode: String): Int? {
+        if (syllable.isEmpty() || effectiveCode.isEmpty() || syllable !in syllableSet) return null
+        val segLen = effectiveCode.indexOfFirst { it == '\'' || it.isWhitespace() }
+            .let { if (it < 0) effectiveCode.length else it }
+        if (segLen <= 0) return null
+        if (hasTokenBindings()) {
+            val steps = (0 until segLen).map { tokensForHandle(effectiveCode[it]) }
+            val maxLen = minOf(6, steps.size)
+            fun matchAt(idx: Int, node: SyllableTrieNode): Int? {
+                if (idx > 0 && node.exactMain?.any { it.syllable == syllable } == true) {
+                    return idx
+                }
+                if (idx >= maxLen) return null
+                for (tok in steps[idx]) {
+                    val next = stepTrieNode(node, tok) ?: continue
+                    matchAt(idx + 1, next)?.let { return it }
+                }
+                return null
+            }
+            return matchAt(0, variantTrieRoot)
+        }
+        val seg = effectiveCode.substring(0, segLen)
+        val exact = codeOf(syllable)
+        if (exact.isNotEmpty() && seg.startsWith(exact)) return exact.length
+        codeToSyllables.forEach { (syllableCode, list) ->
+            if (syllableCode.isNotEmpty() && seg.startsWith(syllableCode) && list.any { it.syllable == syllable }) {
+                return syllableCode.length
+            }
+        }
+        return null
     }
 
     /**
@@ -728,14 +1030,37 @@ object TwelveKeyPreedit {
      */
     internal fun syllablesByInitials(initials: Collection<String>): List<String> {
         if (initials.isEmpty()) return emptyList()
+        val map = syllablesByInitialMap
+        if (initials.size == 1 && map.isNotEmpty()) {
+            return map[initials.first()].orEmpty()
+        }
         val out = ArrayList<String>()
         val seen = HashSet<String>()
         initials.forEach { initial ->
-            syllableSet.filter { initialUnit(it) == initial }.sorted().forEach { syllable ->
+            val list = map[initial] ?: syllableSet.filter { initialUnit(it) == initial }.sorted()
+            list.forEach { syllable ->
                 if (seen.add(syllable)) out.add(syllable)
             }
         }
         return out
+    }
+
+    /** 長編碼造詞兜底：首拼單元下最常用單字（按音節列表與綜合字頻快取，表重建時清空）。 */
+    internal fun bestCharForInitial(initial: String): String? {
+        bestCharByInitial[initial]?.let { return it }
+        var best: String? = null
+        var bestScore = Int.MIN_VALUE
+        for (syll in syllablesByInitialMap[initial].orEmpty()) {
+            for (ch in charsForSyllable(syll, 2)) {
+                val score = generalScore(ch)
+                if (best == null || score > bestScore) {
+                    best = ch
+                    bestScore = score
+                }
+            }
+        }
+        if (best != null) bestCharByInitial[initial] = best
+        return best
     }
 
     /**
@@ -744,8 +1069,23 @@ object TwelveKeyPreedit {
      * 與 `tools/panel_probe.py` 的 `key_initial_letters()` 同口徑；首字母集合取自
      * 客家話音節集合（主詞典），不讀任何外部資產。
      */
-    internal fun keyInitialUnits(codeChar: Char, isLast: Boolean): List<String> =
-        (if (isLast) initialUnitsByCodeLast else initialUnitsByCode)[codeChar] ?: emptyList()
+    internal fun keyInitialUnits(codeChar: Char, isLast: Boolean): List<String> {
+        if (hasTokenBindings()) {
+            val tokens = activeTokenBindings[codeChar]
+            if (tokens != null) {
+                val vowels = TwelveKeyTuning.VOWEL_LETTERS
+                val out = LinkedHashSet<String>(tokens.size)
+                tokens.forEach { tok ->
+                    if (tok.isEmpty()) return@forEach
+                    if (tok.length == 1 && tok[0] in vowels) return@forEach
+                    if (!isLast && isSuffixOnlySyllable(tok)) return@forEach
+                    if (tok in validInitialUnits || syllableSet.any { initialUnit(it) == tok }) out.add(tok)
+                }
+                return out.sorted()
+            }
+        }
+        return (if (isLast) initialUnitsByCodeLast else initialUnitsByCode)[codeChar] ?: emptyList()
+    }
 
     /**
      * 每鍵取一個音節首字母的笛卡爾積（`ia8` → `(g|h)(z|j)` 4 組）。
@@ -935,11 +1275,109 @@ object TwelveKeyPreedit {
         }
         buildGeneralScores()
         rebuildInitialLetters()
+        rebuildVariantTrie()
         Timber.i("TwelveKeyPreedit: syllables=%d codes=%d scores=%d", counts.size, table.size, generalScores.size)
     }
 
-    /** 拼音 → 12 鍵碼（對應 `hakka_jiugong.schema.yaml` 的 xform/xlit）。internal 供單測做鍵位覆蓋校驗。 */
+    private fun insertVariantToTrie(root: SyllableTrieNode, variant: String, entry: Entry?, inUniverse: Boolean, nonSuffix: Boolean) {
+        if (variant.isEmpty()) return
+        var cur = root
+        for (i in 0 until variant.length) {
+            val ch = variant[i]
+            if (ch !in 'a'..'z') return
+            val idx = ch - 'a'
+            var next = cur.children[idx]
+            if (next == null) {
+                next = SyllableTrieNode()
+                cur.children[idx] = next
+            }
+            cur = next
+        }
+        if (entry != null) {
+            val list = cur.exactMain ?: ArrayList<Entry>(2).also { cur.exactMain = it }
+            if (list.none { it.syllable == entry.syllable }) list.add(entry)
+        }
+        if (inUniverse) {
+            cur.exactUniverseAny = true
+            if (nonSuffix) cur.exactUniverseNonSuffix = true
+        }
+    }
+
+    private fun rebuildVariantTrie() {
+        val root = SyllableTrieNode()
+        syllableFreq.forEach { (syll, freq) ->
+            val entry = Entry(syll, freq)
+            val nonSuffix = !isSuffixOnlySyllable(syll)
+            val inUniverse = syll in syllableSet || syll in standardSyllables
+            for (v in spellingVariants(syll)) {
+                insertVariantToTrie(root, v, entry, inUniverse, nonSuffix)
+            }
+        }
+        syllableSet.forEach { syll ->
+            if (syll !in syllableFreq) {
+                val entry = Entry(syll, 0)
+                val nonSuffix = !isSuffixOnlySyllable(syll)
+                for (v in spellingVariants(syll)) {
+                    insertVariantToTrie(root, v, entry, inUniverse = true, nonSuffix = nonSuffix)
+                }
+            }
+        }
+        standardSyllables.forEach { syll ->
+            if (syll !in syllableFreq && syll !in syllableSet) {
+                val nonSuffix = !isSuffixOnlySyllable(syll)
+                for (v in spellingVariants(syll)) {
+                    insertVariantToTrie(root, v, entry = null, inUniverse = true, nonSuffix = nonSuffix)
+                }
+            }
+        }
+        variantTrieRoot = root
+        val byInit = HashMap<String, MutableList<String>>(32)
+        syllableSet.forEach { syll ->
+            byInit.getOrPut(initialUnit(syll)) { ArrayList() }.add(syll)
+        }
+        syllablesByInitialMap = byInit.mapValues { (_, list) -> list.sorted() }
+        bestCharByInitial = java.util.concurrent.ConcurrentHashMap()
+    }
+
+    private fun stepTrieNode(node: SyllableTrieNode, tok: String): SyllableTrieNode? {
+        var cur: SyllableTrieNode = node
+        for (i in 0 until tok.length) {
+            val ch = tok[i]
+            if (ch !in 'a'..'z') return null
+            cur = cur.children[ch - 'a'] ?: return null
+        }
+        return cur
+    }
+
+    private fun walkSteps(steps: List<List<String>>): List<SyllableTrieNode> {
+        if (steps.isEmpty()) return emptyList()
+        val out = ArrayList<SyllableTrieNode>(8)
+        fun walk(idx: Int, node: SyllableTrieNode) {
+            if (idx == steps.size) {
+                out.add(node)
+                return
+            }
+            for (tok in steps[idx]) {
+                val next = stepTrieNode(node, tok) ?: continue
+                walk(idx + 1, next)
+            }
+        }
+        walk(0, variantTrieRoot)
+        return out
+    }
+
+    private fun collectSubtreeUnique(node: SyllableTrieNode, seen: HashSet<String>, onEntry: (Entry) -> Unit) {
+        node.exactMain?.forEach { e ->
+            if (seen.add(e.syllable)) onEntry(e)
+        }
+        for (child in node.children) {
+            if (child != null) collectSubtreeUnique(child, seen, onEntry)
+        }
+    }
+
+    /** 拼音 → 12 鍵碼（有動態會話句柄時走會話映射，離線單測走默認鍵碼表）。 */
     internal fun codeOf(syllable: String): String {
+        if (hasTokenBindings()) return encodeByBindings(syllable)
         var s = if (syllable.endsWith("w")) syllable.dropLast(1) + "u" else syllable
         s = when {
             s.startsWith("nz") -> "y" + s.substring(2)
@@ -967,21 +1405,26 @@ object TwelveKeyPreedit {
         return sb.toString()
     }
 
-    /** 單鍵碼 → 該鍵覆蓋的字母（與鍵盤 12 鍵的分組一致）。 */
-    internal fun keyLetters(c: Char): String = when (c) {
-        'a' -> "abc"
-        'e' -> "def"
-        'i' -> "ghi"
-        '5' -> "kl"
-        '4' -> "mn"
-        '7' -> "ps"
-        '9' -> "qt"
-        '3' -> "vur"
-        '8' -> "zj"
-        '1' -> "ng"
-        'w' -> "th"
-        'y' -> "nz"
-        else -> c.toString()
+    /** 單鍵碼 → 該鍵覆蓋的字母（有動態會話句柄時直讀按鍵音素集）。 */
+    internal fun keyLetters(c: Char): String {
+        if (hasTokenBindings()) {
+            tokenLettersByHandle[c]?.let { return it }
+        }
+        return when (c) {
+            'a' -> "abc"
+            'e' -> "def"
+            'i' -> "ghi"
+            '5' -> "kl"
+            '4' -> "mn"
+            '7' -> "ps"
+            '9' -> "qt"
+            '3' -> "vur"
+            '8' -> "zj"
+            '1' -> "ng"
+            'w' -> "th"
+            'y' -> "nz"
+            else -> c.toString()
+        }
     }
 
     /**
@@ -1001,14 +1444,35 @@ object TwelveKeyPreedit {
         fun allowed(e: Entry): Boolean = (allowSuffixOnly || !isSuffixOnlySyllable(e.syllable)) &&
             (initial == null || initialUnit(e.syllable) == initial)
         val exact = ArrayList<Entry>()
-        // 前綴命中記住「code 之後的下一個碼位」：分桶時用它，`w`（th 鍵）才能同時給出
-        // than（下一個 a）與 the（下一個 e）；只按音節首字母分桶時 th* 全是 t、the 系列會擠掉 than。
         val prefix = ArrayList<Pair<Char, Entry>>()
-        codeToSyllables.forEach { (syllableCode, list) ->
-            when {
-                syllableCode == code -> exact.addAll(list.filter(::allowed))
-                !exactOnly && syllableCode.length > code.length && syllableCode.startsWith(code) ->
-                    list.filter(::allowed).forEach { prefix.add(syllableCode[code.length] to it) }
+        if (hasTokenBindings()) {
+            val steps = code.map { tokensForHandle(it) }
+            val exactSeen = HashSet<String>()
+            val reached = walkSteps(steps)
+            for (node in reached) {
+                node.exactMain?.forEach { e ->
+                    if (allowed(e) && exactSeen.add(e.syllable)) exact.add(e)
+                }
+            }
+            if (!exactOnly) {
+                for (cIdx in 0 until 26) {
+                    val nextChar = ('a' + cIdx)
+                    val charSeen = HashSet<String>()
+                    for (node in reached) {
+                        val child = node.children[cIdx] ?: continue
+                        collectSubtreeUnique(child, charSeen) { e ->
+                            if (allowed(e)) prefix.add(nextChar to e)
+                        }
+                    }
+                }
+            }
+        } else {
+            codeToSyllables.forEach { (syllableCode, list) ->
+                when {
+                    syllableCode == code -> exact.addAll(list.filter(::allowed))
+                    !exactOnly && syllableCode.length > code.length && syllableCode.startsWith(code) ->
+                        list.filter(::allowed).forEach { prefix.add(syllableCode[code.length] to it) }
+                }
             }
         }
         // 同頻時按音節字典序（不能用插入順序，HashMap 的迭代順序不可依賴；
@@ -1091,11 +1555,25 @@ object TwelveKeyPreedit {
     internal fun isKnownSyllable(syllable: String): Boolean = syllable in syllableSet
 
     internal fun exactSyllables(code: String): List<String> =
-        codeToSyllables[code].orEmpty().map { it.syllable }
+        if (hasTokenBindings()) {
+            if (code.isEmpty()) emptyList()
+            else {
+                val steps = code.map { tokensForHandle(it) }
+                val out = LinkedHashSet<String>()
+                for (node in walkSteps(steps)) {
+                    node.exactMain?.forEach { e ->
+                        if (e.syllable in syllableSet) out.add(e.syllable)
+                    }
+                }
+                out.sorted()
+            }
+        } else {
+            codeToSyllables[code].orEmpty().map { it.syllable }
+        }
 
-    fun isSingleSyllable(codes: String): Boolean {
-        return codeToSyllables.containsKey(codes)
-    }
+    fun isSingleSyllable(codes: String): Boolean =
+        if (hasTokenBindings()) exactSyllables(codes).isNotEmpty()
+        else codeToSyllables.containsKey(codes)
 
     /**
      * 載入標準音節集；只用於孤單聯想的完整音節判定與通配列表，不擴大運行時集合。
@@ -1112,6 +1590,7 @@ object TwelveKeyPreedit {
             standardSyllableCodes.add(code)
             if (!isSuffixOnlySyllable(syllable)) standardNonSuffixCodes.add(code)
         }
+        rebuildVariantTrie()
     }
 
     /** 標準音節集快照（只讀；測試與診斷用）。 */
@@ -1123,6 +1602,27 @@ object TwelveKeyPreedit {
         if (clean.isEmpty()) return false
         val reachable = BooleanArray(clean.length + 1)
         reachable[0] = true
+        if (hasTokenBindings()) {
+            val steps = clean.map { tokensForHandle(it) }
+            val root = variantTrieRoot
+            fun dfs(pos: Int, stepIdx: Int, node: SyllableTrieNode) {
+                if (stepIdx > 0) {
+                    val end = pos + stepIdx
+                    if (node.exactUniverseAny && (end == clean.length || node.exactUniverseNonSuffix)) {
+                        reachable[end] = true
+                    }
+                }
+                if (pos + stepIdx >= clean.length || stepIdx >= 6) return
+                for (tok in steps[pos + stepIdx]) {
+                    val next = stepTrieNode(node, tok) ?: continue
+                    dfs(pos, stepIdx + 1, next)
+                }
+            }
+            for (start in clean.indices) {
+                if (reachable[start]) dfs(start, 0, root)
+            }
+            return reachable[clean.length]
+        }
         for (start in clean.indices) {
             if (!reachable[start]) continue
             for (length in 1..minOf(6, clean.length - start)) {
@@ -1294,7 +1794,7 @@ object TwelveKeyPreedit {
         while (split > 0 && clean[split - 1].code < 128) split--
         if (split == clean.length) return null          // 尾端沒有碼段：已選完
         val prefix = clean.substring(0, split)
-        val codes = clean.substring(split)
+        val codes = if (hasTokenBindings() && !rawInput.isNullOrEmpty()) rawInput else clean.substring(split)
         // 去掉 librime 的分段分隔符（`5i34i wa4`），但記錄用戶顯式按下的分詞鍵 `'` 位置。
         val cleanCodes = codes.replace(CODE_SEPARATORS, "")
         val quotePositions = collectQuotePositions(rawInput, codes, cleanCodes.length)
@@ -1316,11 +1816,18 @@ object TwelveKeyPreedit {
                 }
                 val tail = cleanCodes.substring(coverage.first)
                 if (tail.isNotEmpty()) {
-                    out.append(formatTailWithQuotes(tail, coverage.first, quotePositions))
+                    if (hasTokenBindings()) {
+                        out.append(decodeTokenTailWithQuotes(tail, coverage.first, quotePositions))
+                    } else {
+                        out.append(formatTailWithQuotes(tail, coverage.first, quotePositions))
+                    }
                 } else if (cleanCodes.length in quotePositions) {
                     out.append('\'')
                 }
                 return prefix + out.toString()
+            }
+            if (hasTokenBindings()) {
+                return prefix + decodeTokenTailWithQuotes(cleanCodes, 0, quotePositions)
             }
             return prefix + formatTailWithQuotes(cleanCodes, 0, quotePositions)
         }
@@ -1328,7 +1835,7 @@ object TwelveKeyPreedit {
             return prefix + decodeSegmentsWithQuotes(cleanCodes, quotePositions, hint)
         }
         return decodeWithPartialTail(codes, hint)?.split(' ')?.joinToString(" ") {
-            if (it.isNotEmpty() && it.all { ch -> ch in CODE_LETTERS }) codeLetters(it) else it
+            if (it.isNotEmpty() && (it.all { ch -> ch in CODE_LETTERS } || hasTokenBindings())) codeLetters(it) else it
         }?.let { prefix + it }
     }
 
@@ -1366,6 +1873,37 @@ object TwelveKeyPreedit {
         return out.toString()
     }
 
+    /** Token-Set 模式下解碼候選未覆蓋到的尾碼，避免原碼句柄字母（A/B/C…）直接裸露進 preedit。 */
+    private fun decodeTokenTailWithQuotes(
+        tail: String,
+        baseOffset: Int,
+        quotePositions: Set<Int>,
+    ): String {
+        val cuts = quotePositions
+            .map { it - baseOffset }
+            .filter { it in 1 until tail.length }
+            .sorted()
+        val parts = ArrayList<String>(cuts.size + 1)
+        var start = 0
+        for (cut in cuts) {
+            parts.add(tail.substring(start, cut))
+            start = cut
+        }
+        if (start < tail.length) parts.add(tail.substring(start))
+        val decoded = parts.joinToString("'") { part ->
+            val rawOrDecoded = decodeOne(part, null) ?: part
+            rawOrDecoded.split(' ').joinToString(" ") { seg ->
+                if (seg.isNotEmpty() && seg.any { isBoundHandle(it) }) {
+                    seg.map { ch -> if (isBoundHandle(ch)) fallbackTokenLetter(ch) else ch.toString() }
+                        .joinToString("")
+                } else {
+                    seg
+                }
+            }
+        }
+        return if ((baseOffset + tail.length) in quotePositions) "$decoded'" else decoded
+    }
+
     private fun decodeSegmentsWithQuotes(
         cleanCodes: String,
         quotePositions: Set<Int>,
@@ -1383,7 +1921,7 @@ object TwelveKeyPreedit {
             decodeWithPartialTail(part, if (parts.size == 1) hint else null)
                 ?.split(' ')
                 ?.joinToString(" ") {
-                    if (it.isNotEmpty() && it.all { ch -> ch in CODE_LETTERS }) codeLetters(it) else it
+                    if (it.isNotEmpty() && (it.all { ch -> ch in CODE_LETTERS } || hasTokenBindings())) codeLetters(it) else it
                 }
                 ?: codeLetters(part)
         }
@@ -1504,7 +2042,11 @@ object TwelveKeyPreedit {
     )
 
     private fun codeLetters(code: String) = buildString {
-        for (ch in code) append(CODE_LETTERS[ch] ?: ch.toString())
+        if (hasTokenBindings()) {
+            for (ch in code) append(if (isBoundHandle(ch)) fallbackTokenLetter(ch) else ch.toString())
+        } else {
+            for (ch in code) append(CODE_LETTERS[ch] ?: ch.toString())
+        }
     }
 
     /**
@@ -1540,10 +2082,21 @@ object TwelveKeyPreedit {
         return out.toString()
     }
 
+    private val COMMENT_SEP = Regex("[\\s\u3000]+")
+
     internal fun parseComment(comment: String?): List<String>? {
-        val text = comment?.replace("\uFF3B", "")?.replace("\uFF3D", "")?.trim()
-        if (text.isNullOrEmpty()) return null
-        return text.split(Regex("[\\s\u3000]+" )).filter { it.isNotEmpty() }.ifEmpty { null }
+        if (comment.isNullOrEmpty()) return null
+        val cleaned = if ('\uFF3B' in comment || '\uFF3D' in comment) {
+            comment.replace("\uFF3B", "").replace("\uFF3D", "")
+        } else {
+            comment
+        }
+        val text = cleaned.trim()
+        if (text.isEmpty()) return null
+        if ('\u3000' !in text && '\t' !in text && '\n' !in text && "  " !in text) {
+            return text.split(' ').ifEmpty { null }
+        }
+        return text.split(COMMENT_SEP).filter { it.isNotEmpty() }.ifEmpty { null }
     }
 
     private val MULTI_DELIMITER = Regex("[\u0027\\s]+")
@@ -1564,22 +2117,57 @@ object TwelveKeyPreedit {
         val prev = IntArray(n + 1) { -1 }
         val pick = arrayOfNulls<String>(n + 1)
         bestSeg[0] = 0
+        val steps = if (hasTokenBindings()) input.map { tokensForHandle(it) } else null
+        val root = variantTrieRoot
         for (i in 0 until n) {
             if (bestSeg[i] == Int.MAX_VALUE) continue
             val maxLen = minOf(6, n - i)
-            for (len in 1..maxLen) {
-                val entry = table[input.substring(i, i + len)] ?: continue
-                // 兒化後綴 `r` 只能落在整串的最後（見 [SUFFIX_ONLY_SYLLABLES]）。
-                if (isSuffixOnlySyllable(entry.syllable) && i + len != n) continue
-                val seg = bestSeg[i] + 1
-                val freq = bestFreq[i] + entry.freq
-                val better = seg < bestSeg[i + len] ||
-                    (seg == bestSeg[i + len] && freq > bestFreq[i + len])
-                if (better) {
-                    bestSeg[i + len] = seg
-                    bestFreq[i + len] = freq
-                    prev[i + len] = i
-                    pick[i + len] = entry.syllable
+            if (steps != null) {
+                val bestByLen = arrayOfNulls<Entry>(maxLen + 1)
+                fun dfsDecode(stepOffset: Int, node: SyllableTrieNode) {
+                    if (stepOffset > 0) {
+                        node.exactMain?.forEach { e ->
+                            if (!isSuffixOnlySyllable(e.syllable) || i + stepOffset == n) {
+                                val cur = bestByLen[stepOffset]
+                                if (cur == null || e.freq > cur.freq) bestByLen[stepOffset] = e
+                            }
+                        }
+                    }
+                    if (stepOffset >= maxLen) return
+                    for (tok in steps[i + stepOffset]) {
+                        val next = stepTrieNode(node, tok) ?: continue
+                        dfsDecode(stepOffset + 1, next)
+                    }
+                }
+                dfsDecode(0, root)
+                for (len in 1..maxLen) {
+                    val entry = bestByLen[len] ?: continue
+                    val seg = bestSeg[i] + 1
+                    val freq = bestFreq[i] + entry.freq
+                    val better = seg < bestSeg[i + len] ||
+                        (seg == bestSeg[i + len] && freq > bestFreq[i + len])
+                    if (better) {
+                        bestSeg[i + len] = seg
+                        bestFreq[i + len] = freq
+                        prev[i + len] = i
+                        pick[i + len] = entry.syllable
+                    }
+                }
+            } else {
+                for (len in 1..maxLen) {
+                    val entry = table[input.substring(i, i + len)] ?: continue
+                    // 兒化後綴 `r` 只能落在整串的最後（見 [SUFFIX_ONLY_SYLLABLES]）。
+                    if (isSuffixOnlySyllable(entry.syllable) && i + len != n) continue
+                    val seg = bestSeg[i] + 1
+                    val freq = bestFreq[i] + entry.freq
+                    val better = seg < bestSeg[i + len] ||
+                        (seg == bestSeg[i + len] && freq > bestFreq[i + len])
+                    if (better) {
+                        bestSeg[i + len] = seg
+                        bestFreq[i + len] = freq
+                        prev[i + len] = i
+                        pick[i + len] = entry.syllable
+                    }
                 }
             }
         }

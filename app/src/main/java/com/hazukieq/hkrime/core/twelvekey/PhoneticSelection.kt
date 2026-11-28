@@ -17,18 +17,29 @@ data class PhoneticSelection(val reading: String, val code: String, val initialO
             (if (it.initialOnly) "~" else "=") + it.reading
         }
 
-        fun matches(reading: String, selections: List<PhoneticSelection>): Boolean {
+        fun matches(
+            reading: String,
+            selections: List<PhoneticSelection>,
+            parsedTokens: List<String>? = null,
+        ): Boolean {
             if (selections.isEmpty()) return true
-            val tokens = TwelveKeyPreedit.parseComment(reading) ?: return false
+            val tokens = parsedTokens ?: TwelveKeyPreedit.parseComment(reading) ?: return false
             // 部分選字可以只覆蓋已確認序列的前幾段。
             return tokens.isNotEmpty() && selections.take(tokens.size).zip(tokens).all { (selection, token) ->
                 if (selection.initialOnly) token.startsWith(selection.reading) else token == selection.reading
             }
         }
 
-        fun matchesInput(reading: String, code: String, end: Int, selections: List<PhoneticSelection>): Boolean {
-            if (!matches(reading, selections)) return false
-            val tokens = TwelveKeyPreedit.parseComment(reading) ?: return false
+        fun matchesInput(
+            reading: String,
+            code: String,
+            end: Int,
+            selections: List<PhoneticSelection>,
+            parsedTokens: List<String>? = null,
+            plan: CandidateInputBoundary.InputPlan? = null,
+        ): Boolean {
+            val tokens = parsedTokens ?: TwelveKeyPreedit.parseComment(reading) ?: return false
+            if (!matches(reading, selections, tokens)) return false
             val confirmedEnd = selections.take(tokens.size).sumOf { it.code.length }.coerceAtMost(code.length)
             if (tokens.size <= selections.size) {
                 var coreEnd = confirmedEnd
@@ -38,27 +49,47 @@ data class PhoneticSelection(val reading: String, val code: String, val initialO
                 else code.substring(confirmedEnd, end).all { it == '\'' || it.isWhitespace() }
             }
             val profile = MultiKeyProfile.active
-            val tail = code.drop(confirmedEnd)
-            val offsets = tail.indices.filter { tail[it] != '\'' && !tail[it].isWhitespace() }
-            val raw = offsets.map { tail[it] }.joinToString("")
+            val allOffsets: IntArray
+            val startIdx: Int
+            val raw: String
+            if (plan != null) {
+                allOffsets = plan.offsets
+                var idx = 0
+                while (idx < allOffsets.size && allOffsets[idx] < confirmedEnd) idx++
+                startIdx = idx
+                raw = if (startIdx == 0) plan.codes else plan.codes.substring(startIdx)
+            } else {
+                val tail = code.drop(confirmedEnd)
+                val list = tail.indices.filter { tail[it] != '\'' && !tail[it].isWhitespace() }
+                allOffsets = IntArray(list.size) { i -> confirmedEnd + list[i] }
+                startIdx = 0
+                raw = list.map { tail[it] }.joinToString("")
+            }
             var position = 0
             for (token in tokens.drop(selections.size)) {
                 if (position == raw.length) break
                 val full = profile.codeOf(token)
+                if (full.isNotEmpty() && raw.startsWith(full, position)) {
+                    position += full.length
+                    continue
+                }
                 val aliasLength = (minOf(6, raw.length - position) downTo 1).firstOrNull { length ->
                     profile.exactSyllables(raw.substring(position, position + length)).any {
                         profile.isSpellingAlias(token, it)
                     }
                 }
                 when {
-                    full.isNotEmpty() && raw.startsWith(full, position) -> position += full.length
                     aliasLength != null -> position += aliasLength
                     token.first() in profile.keyLetters(raw[position]) && profile.allowsAbbrevInitial(token.first()) -> position++
                     full.isNotEmpty() && full.startsWith(raw.substring(position)) -> position = raw.length
                     else -> return false
                 }
             }
-            val matchedEnd = confirmedEnd + (offsets.getOrNull(position - 1)?.plus(1) ?: 0)
+            val matchedEnd = if (position <= 0) {
+                confirmedEnd
+            } else {
+                allOffsets[startIdx + position - 1] + 1
+            }
             return end >= matchedEnd && end <= code.length &&
                 code.substring(matchedEnd, end).all { it == '\'' || it.isWhitespace() }
         }

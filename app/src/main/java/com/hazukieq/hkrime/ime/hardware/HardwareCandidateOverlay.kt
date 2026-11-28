@@ -7,6 +7,8 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.os.Handler
+import android.os.Looper
 import android.text.TextPaint
 import android.text.TextUtils
 import android.util.TypedValue
@@ -32,6 +34,7 @@ data class HardwareEnginePage(
     data class Item(
         val text: String,
         val comment: String,
+        val openccModified: Boolean = false,
     )
 
     val isEmpty: Boolean get() = items.isEmpty()
@@ -64,17 +67,19 @@ data class HardwarePreedit(
 )
 
 /**
- * 物理鍵盤接手模式下的「極速單視圖 Canvas 懸浮候選窗」（類桌面端 ibus-rime / 小狼毫體驗）：
+ * 物理鍵盤接手模式下的「極速單視圖 Canvas 懸浮候選層」（類桌面端 ibus-rime / 小狼毫體驗）：
  * - 直接渲染 librime 引擎當前頁（`RimeMenu`），完全忠實反映引擎的翻頁、高亮與 preedit 游標；
- * - 單一自繪 `Canvas` View 掛載在 `InputMethod` 窗口 `decorView` 上：
+ * - 單一自繪 `Canvas` View 掛載在 `InputMethod` 窗口 `decorView` 上（與觸屏 `TouchPreeditPopupWindow` 徹底隔離）：
  *   打字過程中 **零 View 分配、零 `requestLayout()`、零 `measure()`**，只觸發單次 `invalidate()`，
  *   將 UI 線程每幀耗時從 ~18ms 降至 <1ms（鎖定 120/144Hz 零掉幀）；
- * - 若 `decorView` 尚未就緒，自動回退 `HardwareOverlayHost`（`TYPE_APPLICATION_OVERLAY` 兜底）；
+ * - 若 `decorView` 尚未就緒，自動回退 [HardwareOverlayHost]（`TYPE_APPLICATION_OVERLAY` 兜底）；
  * - 支援橫排（horizontal）與豎排（vertical）兩種排布，自動跟隨 IME 主題配色與光標位置。
  */
-class HardwareCandidatePopup(
+class HardwareCandidateOverlay(
     private val context: Context,
 ) {
+    private val handler = Handler(Looper.getMainLooper())
+
     /** 點擊當前頁第 slotIndex（0-based）個候選時回調，直接轉給 `Rime.selectCandidate(slotIndex)`。 */
     var onSelectSlot: ((Int) -> Unit)? = null
 
@@ -90,6 +95,7 @@ class HardwareCandidatePopup(
     private var verticalMode: Boolean = false
     private var currentPreedit: HardwarePreedit = HardwarePreedit("")
     private var currentPage: HardwareEnginePage = HardwareEnginePage.EMPTY
+    private var limitNoticeText: String = ""
     private var lastAnchorView: View? = null
     private val lastCursorRect = RectF()
     private val anchorScreenLoc = IntArray(2)
@@ -97,6 +103,14 @@ class HardwareCandidatePopup(
 
     private var showing: Boolean = false
     private val touchableRectInWindow = Rect()
+
+    private val hideLimitHintRunnable = Runnable {
+        if (limitNoticeText.isEmpty()) return@Runnable
+        limitNoticeText = ""
+        if (showing) {
+            renderAndPosition(lastAnchorView, lastCursorRect, contentChanged = true)
+        }
+    }
 
     // Theme tokens
     private var cardBgColor: Int = 0xFFFFFFFF.toInt()
@@ -219,7 +233,18 @@ class HardwareCandidatePopup(
         renderAndPosition(lastAnchorView, lastCursorRect, contentChanged = false)
     }
 
+    fun showLimitNotice(limit: Int): Boolean {
+        if (!showing && currentPreedit.text.isEmpty() && currentPage.isEmpty) return false
+        limitNoticeText = "已达 $limit 键上限"
+        handler.removeCallbacks(hideLimitHintRunnable)
+        handler.postDelayed(hideLimitHintRunnable, LIMIT_NOTICE_DURATION_MS)
+        renderAndPosition(lastAnchorView, lastCursorRect, contentChanged = true)
+        return showing
+    }
+
     fun dismiss() {
+        handler.removeCallbacks(hideLimitHintRunnable)
+        limitNoticeText = ""
         val wasShowing = showing
         showing = false
         currentPage = HardwareEnginePage.EMPTY
@@ -237,8 +262,13 @@ class HardwareCandidatePopup(
 
     fun detach() {
         dismiss()
-        val v = canvasView ?: return
-        (v.parent as? ViewGroup)?.removeView(v)
+        val v = canvasView
+        canvasView = null
+        if (v != null) {
+            v.onSlotTap = null
+            v.onPageTap = null
+            (v.parent as? ViewGroup)?.removeView(v)
+        }
         attachedToDecor = false
         fallbackOverlay.dismiss()
     }
@@ -276,7 +306,7 @@ class HardwareCandidatePopup(
             } else {
                 (screenW - margin * 2).coerceAtLeast(dp(120))
             }
-            view.updateModel(currentPreedit, currentPage, verticalMode, maxCardW.toFloat())
+            view.updateModel(currentPreedit, currentPage, verticalMode, maxCardW.toFloat(), limitNoticeText)
         }
 
         val cardW = view.cardWidth.toInt()
@@ -433,6 +463,13 @@ class HardwareCandidatePopup(
             style = Paint.Style.STROKE
             strokeWidth = underlineStroke
         }
+        private val openccDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+        }
+        private val limitHintPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = spf(11f)
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
         private val preeditPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             textSize = spf(14f)
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
@@ -466,6 +503,8 @@ class HardwareCandidatePopup(
         private var page: HardwareEnginePage = HardwareEnginePage.EMPTY
         private var pageLabelText: String = ""
         private var pageTextWidth: Float = 0f
+        private var limitHintText: String = ""
+        private var limitHintWidth: Float = 0f
 
         // 預計算繪製與點擊區域（相對於 card 原點）
         private val cardRect = RectF()
@@ -475,6 +514,7 @@ class HardwareCandidatePopup(
         private val slotLabelWidths = FloatArray(10)
         private val slotTexts = Array(10) { "" }
         private val slotComments = Array(10) { "" }
+        private val slotOpenccModified = BooleanArray(10)
         private var slotCount: Int = 0
         private var headerHeight: Float = 0f
         private var dividerY: Float = 0f
@@ -519,14 +559,17 @@ class HardwareCandidatePopup(
             newPage: HardwareEnginePage,
             isVertical: Boolean,
             maxCardW: Float,
+            newLimitHint: String = "",
         ) {
             preedit = newPreedit
             page = newPage
             vertical = isVertical
+            limitHintText = newLimitHint
+            limitHintWidth = if (newLimitHint.isNotEmpty()) limitHintPaint.measureText(newLimitHint) else 0f
 
             val innerMaxW = (maxCardW - cardPadH * 2f).coerceAtLeast(dpf(80f))
 
-            // 1. Header（preedit + 頁碼）
+            // 1. Header（preedit + 編碼上限提示 + 頁碼）
             if (page.hasMultiplePages) {
                 val leftArrow = if (page.pageNo > 0) "‹" else "·"
                 val rightArrow = if (!page.isLastPage) "›" else "·"
@@ -537,11 +580,12 @@ class HardwareCandidatePopup(
                 pageTextWidth = 0f
             }
 
+            val limitReserve = if (limitHintWidth > 0f) limitHintWidth + dpf(8f) else 0f
             val pageReserve = if (pageTextWidth > 0f) pageTextWidth + pagePadLeft else 0f
-            val maxPreeditW = (innerMaxW - pageReserve).coerceAtLeast(dpf(40f))
+            val maxPreeditW = (innerMaxW - limitReserve - pageReserve).coerceAtLeast(dpf(40f))
             preparePreeditText(newPreedit, maxPreeditW)
             val preeditW = preeditPaint.measureText(preeditDisplayText)
-            val headerContentW = preeditW + pageReserve
+            val headerContentW = preeditW + limitReserve + pageReserve
             headerHeight = preeditLineH
 
             // 2. 候選列表排版（全部只用 Paint.measureText，零 View 分配）
@@ -569,6 +613,7 @@ class HardwareCandidatePopup(
                         val ellipsized = TextUtils.ellipsize(item.text, candPaint, availTextW, TextUtils.TruncateAt.END).toString()
                         slotTexts[i] = ellipsized
                         slotComments[i] = cmt
+                        slotOpenccModified[i] = item.openccModified
                         val rowW = vItemPadH * 2f + lblW + labelGap + candPaint.measureText(ellipsized) + cmtW
                         if (rowW > maxRowW) maxRowW = rowW
                     }
@@ -585,6 +630,7 @@ class HardwareCandidatePopup(
                         slotLabelWidths[i] = lblW
                         slotTexts[i] = item.text
                         slotComments[i] = ""
+                        slotOpenccModified[i] = item.openccModified
                         val itemW = hItemPadH * 2f + lblW + labelGap + candPaint.measureText(item.text)
                         slotHitRects[i].set(curX, bodyTop, curX + itemW, bodyTop + rowH)
                         curX += itemW + hItemGap
@@ -694,6 +740,19 @@ class HardwareCandidatePopup(
             val headerBaseline = cardPadV - preeditFm.ascent
             drawPreedit(canvas, cardPadH, headerBaseline)
 
+            // 2.5 編碼上限提示（外設 Canvas 自繪，不共用觸屏 PopupWindow 或系統 Toast）
+            if (limitHintWidth > 0f && limitHintText.isNotEmpty()) {
+                val amber = if (ColorUtils.calculateLuminance(textColor) > 0.5) {
+                    0xFFFBBF24.toInt()
+                } else {
+                    0xFFD97706.toInt()
+                }
+                limitHintPaint.color = amber
+                val pageRight = if (pageTextWidth > 0f) cardWidth - cardPadH - pageTextWidth - pagePadLeft else cardWidth - cardPadH
+                val hintX = (pageRight - limitHintWidth).coerceAtLeast(cardPadH + preeditPaint.measureText(preeditDisplayText) + dpf(6f))
+                canvas.drawText(limitHintText, hintX, headerBaseline, limitHintPaint)
+            }
+
             // 3. 頁碼指示器
             if (pageTextWidth > 0f) {
                 val pageX = cardWidth - cardPadH - pageTextWidth
@@ -728,10 +787,23 @@ class HardwareCandidatePopup(
                     candPaint.color = primaryInk
                     val txt = slotTexts[i]
                     canvas.drawText(txt, x, candBaseline, candPaint)
+                    val txtW = candPaint.measureText(txt)
+
+                    if (slotOpenccModified[i]) {
+                        val markColor = if (ColorUtils.calculateLuminance(primaryInk) > 0.5) {
+                            0xFFFBBF24.toInt()
+                        } else {
+                            0xFFD97706.toInt()
+                        }
+                        openccDotPaint.color = ColorUtils.setAlphaComponent(markColor, 235)
+                        val dotX = (x + txtW + dpf(3f)).coerceAtMost(r.right - dpf(4f))
+                        val dotY = (candBaseline + candFm.ascent + dpf(2f)).coerceAtLeast(r.top + dpf(4f))
+                        canvas.drawCircle(dotX, dotY, dpf(2f), openccDotPaint)
+                    }
 
                     val cmt = slotComments[i]
                     if (vertical && cmt.isNotEmpty()) {
-                        x += candPaint.measureText(txt) + commentGap
+                        x += txtW + commentGap
                         commentPaint.color = secondaryInk
                         val cmtBaseline = cy - (commentFm.ascent + commentFm.descent) * 0.5f
                         canvas.drawText(cmt, x, cmtBaseline, commentPaint)
@@ -812,5 +884,6 @@ class HardwareCandidatePopup(
 
     companion object {
         private const val SHADOW_PAD_DP = 10
+        private const val LIMIT_NOTICE_DURATION_MS = 1600L
     }
 }

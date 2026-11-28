@@ -24,9 +24,29 @@
   android:layout_width="wrap_content"
   android:layout_height="wrap_content">
 
-  <com.hazukieq.hkrime.ime.text.Composition
-    android:id="@+id/compositions"
-    android:ellipsize="none"
+  <TextView
+    android:id="@+id/code_limit_hint"
     android:layout_width="wrap_content"
-    android:layout_height="wrap_content"/>
+    android:layout_height="wrap_content"
+    android:singleLine="true"
+    android:includeFontPadding="false"
+    android:textSize="11.5sp"
+    android:visibility="gone"/>
+
+  <com.hazukieq.hkrime.ime.text.PreeditScrollView
+    android:id="@+id/composition_scroller"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:scrollbars="none"
+    android:overScrollMode="never"
+    android:clipChildren="true"
+    android:clipToPadding="true">
+
+    <com.hazukieq.hkrime.ime.text.Composition
+      android:id="@+id/compositions"
+      android:ellipsize="none"
+      android:singleLine="true"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"/>
+  </com.hazukieq.hkrime.ime.text.PreeditScrollView>
 </LinearLayout>

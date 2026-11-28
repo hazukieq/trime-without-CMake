@@ -2,6 +2,8 @@ package com.hazukieq.hkrime.core.twelvekey
 
 import com.hazukieq.hkrime.core.TwelveKeyPreedit
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.BeforeClass
 import org.junit.Test
 
@@ -41,5 +43,47 @@ class PreeditDelimiterTest {
         assertEquals("tai'", PreeditPresentation.render("9ai ‸", "9ai'"))
         assertEquals("tai'go", PreeditPresentation.render("9ai i4‸", "9ai'i4", "太哥", "tai go"))
         PreeditPresentation.invalidate("")
+    }
+
+    @Test
+    fun composingCodeCapBlocksExtraAppendsAboveLimitWhileAllowingControlKeys() {
+        val under = "a".repeat(CompositionInput.MAX_CODE_LENGTH - 1)
+        val atLimit = "a".repeat(CompositionInput.MAX_CODE_LENGTH)
+        assertFalse(CompositionInput.isCodeLimitReached(under))
+        assertTrue(CompositionInput.isCodeLimitReached(atLimit))
+        assertFalse(CompositionInput.shouldBlockOverLimit(under, 'b'.code, allowAppend = true))
+        assertTrue(CompositionInput.shouldBlockOverLimit(atLimit, 'b'.code, allowAppend = true))
+        assertTrue(CompositionInput.shouldBlockOverLimit(atLimit, '\''.code, allowAppend = true))
+        // 退格、回車、空格及控制組合鍵不受編碼上限阻斷
+        assertFalse(CompositionInput.shouldBlockOverLimit(atLimit, 0xff08, allowAppend = true))
+        assertFalse(CompositionInput.shouldBlockOverLimit(atLimit, ' '.code, allowAppend = true))
+        assertFalse(CompositionInput.shouldBlockOverLimit(atLimit, 'b'.code, allowAppend = false))
+    }
+
+    @Test
+    fun tokenSetRewriteDecodesUncoveredTailWithoutLeakingRawHandles() {
+        val bindings = mapOf(
+            'A' to listOf("g", "h", "i"),
+            'B' to listOf("m", "n", "o"),
+            'C' to listOf("k", "l"),
+            'D' to listOf("ng"),
+            'E' to listOf("a", "b", "c"),
+            'F' to listOf("d", "e", "f"),
+        )
+        TwelveKeyPreedit.updateTokenBindings(bindings)
+        try {
+            // ABCBA -> go loi (Candidate 0 = 过来), tail DEFAB -> nga di m (not raw "DEFAB")
+            val rendered = TwelveKeyPreedit.rewrite(
+                preedit = "go loiDEFAB‸",
+                hint = "过来",
+                preferred = "go loi",
+                rawInput = "ABCBADEFAB",
+            )!!
+            assertTrue("Expected go loi prefix: $rendered", rendered.startsWith("go loi "))
+            assertFalse("Raw handle letters must not leak into preedit: $rendered", rendered.any { it in 'A'..'Z' })
+            assertTrue("Decoded tail should contain decoded syllable/letter: $rendered", rendered.contains("nga"))
+        } finally {
+            TwelveKeyPreedit.updateTokenBindings(emptyMap())
+        }
     }
 }

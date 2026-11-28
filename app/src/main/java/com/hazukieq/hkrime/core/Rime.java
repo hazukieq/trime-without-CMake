@@ -116,6 +116,7 @@ public class Rime {
   public static class RimeCandidate {
     public String text;
     public String comment;
+    public boolean opencc_modified;
   }
 
   /** Rime候選區，包含多個{@link RimeCandidate 候選項} */
@@ -525,9 +526,42 @@ public class Rime {
     self = this;
   }
 
+  private static void notifyRejectedSchema(@NonNull String message) {
+    final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+    handler.post(() -> com.blankj.utilcode.util.ToastUtils.showLong(message));
+  }
+
   private static void initSchema() {
     mSchemaList = get_schema_list();
     String schema_id = getSchemaId();
+    if (!isEmpty(schema_id)) {
+      com.hazukieq.hkrime.util.SchemaSpecValidator.ValidationResult validation =
+          com.hazukieq.hkrime.util.SchemaSpecValidator.logAndCheckLoaded(schema_id);
+      if (!validation.getValid()) {
+        notifyRejectedSchema(validation.formatMessage());
+        String fallbackId = null;
+        if (mSchemaList != null) {
+          for (Object o : mSchemaList) {
+            if (!(o instanceof Map<?, ?>)) continue;
+            Map<?, ?> m = (Map<?, ?>) o;
+            Object idObj = m.get("schema_id");
+            String candidate = idObj != null ? idObj.toString() : "";
+            if (!candidate.isEmpty()
+                && !candidate.equals(schema_id)
+                && com.hazukieq.hkrime.util.SchemaSpecValidator.logAndCheckLoaded(candidate).getValid()) {
+              fallbackId = candidate;
+              break;
+            }
+          }
+        }
+        if (fallbackId != null && select_schema(fallbackId)) {
+          schema_id = getSchemaId();
+        } else {
+          Timber.e("initSchema: no compliant schema available, refusing legacy %s", schema_id);
+          schema_id = ".default";
+        }
+      }
+    }
     Timber.d("initSchema() RimeSchema");
     mSchema = new RimeSchema(schema_id);
     Timber.d("initSchema() getStatus");
@@ -759,6 +793,85 @@ public class Rime {
     return b;
   }
 
+  /** [hkrime] 原生多鍵按鍵分發：把按鍵的語義音素集直接送給引擎，不經 ASCII 佔位或 xlit。 */
+  public static boolean pushTokenKey(@NonNull String[] tokens) {
+    synchronized (ENGINE_LOCK) {
+      if (!isEngineReady() || tokens.length == 0) return false;
+      boolean ok = push_token_key(tokens);
+      getContexts();
+      return ok;
+    }
+  }
+
+  /** [hkrime] 細化指定碼位上的候選音素集（保留同會話其餘碼位）。 */
+  public static boolean narrowTokenAtom(int index, @NonNull String[] tokens) {
+    synchronized (ENGINE_LOCK) {
+      if (!isEngineReady() || index < 0 || tokens.length == 0) return false;
+      boolean ok = narrow_token_atom(index, tokens);
+      getContexts();
+      return ok;
+    }
+  }
+
+  /** [hkrime] 使用會話內部句柄串恢復待選輸入與對應音素集（部分選字後重放剩餘碼）。 */
+  public static boolean setTokenInput(@NonNull String handles) {
+    synchronized (ENGINE_LOCK) {
+      if (!isEngineReady()) return false;
+      boolean ok = set_token_input(handles);
+      getContexts();
+      return ok;
+    }
+  }
+
+  /** [hkrime] 讀取當前引擎會話自動分配的「內部句柄 → 音素集」映射表。 */
+  @NonNull
+  public static Map<Character, List<String>> getTokenBindings() {
+    synchronized (ENGINE_LOCK) {
+      if (!isEngineReady()) return java.util.Collections.emptyMap();
+      String packed = get_token_bindings();
+      if (packed == null || packed.isEmpty()) return java.util.Collections.emptyMap();
+      Map<Character, List<String>> out = new java.util.LinkedHashMap<>();
+      String[] entries = packed.split("\u0002");
+      for (String entry : entries) {
+        if (entry.isEmpty()) continue;
+        String[] parts = entry.split("\u0001");
+        if (parts.length < 2 || parts[0].isEmpty()) continue;
+        char handle = parts[0].charAt(0);
+        List<String> atoms = new ArrayList<>(parts.length - 1);
+        for (int i = 1; i < parts.length; i++) {
+          if (!parts[i].isEmpty()) atoms.add(parts[i]);
+        }
+        if (!atoms.isEmpty()) out.put(handle, atoms);
+      }
+      return out;
+    }
+  }
+
+  public static boolean isMultiKeySpeller() {
+    Object v = getSchemaValueCached(getSchemaId(), "speller/multi_key");
+    if (v instanceof Boolean) return (Boolean) v;
+    if (v != null) return Boolean.parseBoolean(v.toString());
+    return false;
+  }
+
+  @NonNull
+  @SuppressWarnings("unchecked")
+  public static List<String> getSchemaSuffixOnly() {
+    Object v = getSchemaValueCached(getSchemaId(), "speller/suffix_only");
+    if (v instanceof List<?>) {
+      List<?> raw = (List<?>) v;
+      List<String> out = new ArrayList<>(raw.size());
+      for (Object item : raw) {
+        if (item != null) {
+          String s = item.toString().trim();
+          if (!s.isEmpty()) out.add(s);
+        }
+      }
+      return out;
+    }
+    return java.util.Collections.emptyList();
+  }
+
   /**
    * 候選條數據源。方案開關不再渲染到候選區（改由候選條左側 ☰ 菜單提供），
    * 因此這裡永遠返回真正的候選；未組字時為空，候選條顯示 ☰ / 配色 / ⌄。
@@ -957,6 +1070,12 @@ public class Rime {
 
   private static boolean selectSchema(String schema_id) {
     Timber.d("selectSchema() schema_id=" + schema_id);
+    com.hazukieq.hkrime.util.SchemaSpecValidator.ValidationResult validation =
+        com.hazukieq.hkrime.util.SchemaSpecValidator.logAndCheckLoaded(schema_id);
+    if (!validation.getValid()) {
+      notifyRejectedSchema(validation.formatMessage());
+      return false;
+    }
     overWriteSchema(schema_id);
     boolean b = select_schema(schema_id);
     getContexts();
@@ -1386,6 +1505,15 @@ public class Rime {
 
   /** [hkrime] 查詢單音節常用字（用戶詞庫優先 + 主詞典烘焙字頻降序）。 */
   public static native String[] query_syllable_chars(String syllable, int limit);
+
+  /** [hkrime] 原生多鍵 TokenSet 輸入原語。 */
+  public static native boolean push_token_key(String[] tokens);
+
+  public static native boolean narrow_token_atom(int index, String[] tokens);
+
+  public static native boolean set_token_input(String handles);
+
+  public static native String get_token_bindings();
 
   public static native void set_caret_pos(int caret_pos);
 

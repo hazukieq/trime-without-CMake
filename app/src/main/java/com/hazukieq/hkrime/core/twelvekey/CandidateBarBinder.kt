@@ -9,21 +9,21 @@ import com.hazukieq.hkrime.ime.text.Candidate
 class CandidateBarBinder(private val candidateView: Candidate?) {
 
     /** 上次綁定的條目；同一份快照會被多次 updateComposing 重複綁定，內容沒變就跳過重繪。 */
-    private var lastEntries: List<Pair<String, String>>? = null
+    private var lastEntries: List<Triple<String, String, Boolean>>? = null
 
-    /** 當前條目 → (text, comment)；fallback 時只有一條字母原文。 */
+    /** 當前條目 → (text, comment, openccModified)；fallback 時只有一條字母原文。 */
     fun bind(snapshot: TwelveKeySnapshot) {
         val view = candidateView ?: return
         val entries = ArrayList<Candidate.BarEntry>(snapshot.barItems.size + 1)
-        val keys = ArrayList<Pair<String, String>>(snapshot.barItems.size + 1)
+        val keys = ArrayList<Triple<String, String, Boolean>>(snapshot.barItems.size + 1)
         snapshot.barItems.forEach { item ->
-            entries.add(Candidate.BarEntry(item.text, item.comment))
-            keys.add(item.text to item.comment)
+            entries.add(Candidate.BarEntry(item.text, item.comment, item.openccModified))
+            keys.add(Triple(item.text, item.comment, item.openccModified))
         }
         val fallback = snapshot.fallback
         if (entries.isEmpty() && fallback != null) {
-            entries.add(Candidate.BarEntry(fallback.letters, fallback.rawCode))
-            keys.add(fallback.letters to fallback.rawCode)
+            entries.add(Candidate.BarEntry(fallback.letters, fallback.rawCode, false))
+            keys.add(Triple(fallback.letters, fallback.rawCode, false))
         }
         if (keys == lastEntries) return
         lastEntries = keys

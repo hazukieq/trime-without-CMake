@@ -27,6 +27,7 @@ import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.PaintDrawable;
+import android.text.TextPaint;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
@@ -34,6 +35,7 @@ import android.view.ViewConfiguration;
 import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.graphics.ColorUtils;
 import com.hazukieq.hkrime.core.Rime;
 import com.hazukieq.hkrime.data.AppPrefs;
 import com.hazukieq.hkrime.data.Config;
@@ -52,10 +54,16 @@ public class Candidate extends View {
   public static class BarEntry {
     public final String text;
     public final String comment;
+    public final boolean openccModified;
 
     public BarEntry(String text, String comment) {
+      this(text, comment, false);
+    }
+
+    public BarEntry(String text, String comment, boolean openccModified) {
       this.text = text;
       this.comment = comment;
+      this.openccModified = openccModified;
     }
   }
 
@@ -111,8 +119,10 @@ public class Candidate extends View {
   private PaintDrawable candidateHighlight;
   private final Paint separatorPaint;
   private final Paint candidatePaint;
+  private final TextPaint ellipsizePaint = new TextPaint();
   private final Paint symbolPaint;
   private final Paint commentPaint;
+  private final Paint openccDotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
   private Typeface candidateFont, symbolFont, commentFont;
   private int candidateTextColor, hilitedCandidateTextColor;
   private int commentTextColor, hilitedCommentTextColor;
@@ -126,7 +136,7 @@ public class Candidate extends View {
   public void reset(Context context) {
     Config config = Config.get(context);
     candidateHighlight = new PaintDrawable(config.getColor("hilited_candidate_back_color"));
-    candidateHighlight.setCornerRadius(config.getFloat("layout/round_corner"));
+    candidateHighlight.setCornerRadius(0f);
     separatorPaint.setColor(config.getColor("candidate_separator_color"));
     candidateSpacing = config.getPixel("candidate_spacing");
     candidatePadding = config.getPixel("candidate_padding");
@@ -148,6 +158,8 @@ public class Candidate extends View {
 
     candidatePaint.setTextSize(candidate_text_size);
     candidatePaint.setTypeface(candidateFont);
+    ellipsizePaint.set(candidatePaint);
+    ellipsizePaint.setTypeface(candidateFont);
     symbolPaint.setTextSize(candidate_text_size);
     symbolPaint.setTypeface(symbolFont);
     commentPaint.setTextSize(comment_text_size);
@@ -178,6 +190,7 @@ public class Candidate extends View {
 
     separatorPaint = new Paint();
     separatorPaint.setColor(Color.BLACK);
+    openccDotPaint.setStyle(Paint.Style.FILL);
 
     graphicUtils = new GraphicUtils(context);
 
@@ -339,7 +352,10 @@ public class Candidate extends View {
       }
       // Draw candidates
       if (computedCandidate instanceof ComputedCandidate.Word) {
-        float wordX = computedCandidate.getGeometry().centerX();
+        final Rect geom = computedCandidate.getGeometry();
+        canvas.save();
+        canvas.clipRect(geom);
+        float wordX = geom.centerX();
         float wordY =
             computedCandidates.get(0).getGeometry().centerY()
                 - (candidatePaint.ascent() + candidatePaint.descent()) / 2;
@@ -351,7 +367,7 @@ public class Candidate extends View {
         if (showCommentRow && i == 0) {
           String comment = ((ComputedCandidate.Word) computedCandidate).getComment();
           if (comment != null && !comment.isEmpty()) {
-            float commentX = computedCandidate.getGeometry().centerX();
+            float commentX = geom.centerX();
             float commentY =
                 commentHeight / 2.0f - (commentPaint.ascent() + commentPaint.descent()) / 2;
             if (!isCommentOnTop) {
@@ -362,8 +378,20 @@ public class Candidate extends View {
           }
         }
         String word = ((ComputedCandidate.Word) computedCandidate).getWord();
-        candidatePaint.setColor(isHighlighted(i) ? hilitedCandidateTextColor : candidateTextColor);
+        final boolean openccModified = ((ComputedCandidate.Word) computedCandidate).getOpenccModified();
+        final float maxWordW = Math.max(1f, geom.width() - 2f * candidatePadding);
+        if (graphicUtils.measureText(candidatePaint, word, candidateFont) > maxWordW) {
+          word =
+              TextUtils.ellipsize(word, ellipsizePaint, maxWordW, TextUtils.TruncateAt.END)
+                  .toString();
+        }
+        final boolean highlighted = isHighlighted(i);
+        candidatePaint.setColor(highlighted ? hilitedCandidateTextColor : candidateTextColor);
         graphicUtils.drawText(canvas, word, wordX, wordY, candidatePaint, candidateFont);
+        if (openccModified) {
+          drawOpenccMarker(canvas, geom, wordY, highlighted);
+        }
+        canvas.restore();
       } else if (computedCandidate instanceof ComputedCandidate.Symbol) {
         String arrow = ((ComputedCandidate.Symbol) computedCandidate).getArrow();
         // 圖標與候選文字同色（不再用拼音註釋的藍色），視覺重量才一致
@@ -398,6 +426,21 @@ public class Candidate extends View {
             separatorPaint);
       }
     }
+  }
+
+  /** OpenCC 改寫候選的輕標記：固定候選欄僅保留右上角微角標圓點（無橫向佔位）。 */
+  private void drawOpenccMarker(Canvas canvas, Rect geom, float wordY, boolean highlighted) {
+    final float d = dp();
+    final int refInk = highlighted ? hilitedCandidateTextColor : candidateTextColor;
+    final int markColor =
+        ColorUtils.calculateLuminance(refInk) > 0.5 ? 0xFFFBBF24 : 0xFFD97706;
+    openccDotPaint.setColor(ColorUtils.setAlphaComponent(markColor, 235));
+
+    final float dotR = 2.3f * d;
+    final float dotX = geom.right - Math.max(5.5f * d, candidatePadding * 0.6f);
+    final float dotY =
+        Math.max(geom.top + 5.5f * d, wordY + candidatePaint.ascent() + 2.0f * d);
+    canvas.drawCircle(dotX, dotY, dotR, openccDotPaint);
   }
 
   /**
@@ -580,13 +623,20 @@ public class Candidate extends View {
                   : candidateWidth + commentWidth;
         }
       }
+      final boolean openccModified = candidates[n].openccModified;
       if (x + candidateWidth > limit) {
+        if (computedCandidates.isEmpty() && limit > x + 2 * candidatePadding) {
+          computedCandidates.add(
+              new ComputedCandidate.Word(
+                  text, comment, new Rect(x, 0, limit, getMeasuredHeight()), openccModified));
+        }
         truncated = true;
         break;
       }
       computedCandidates.add(
           new ComputedCandidate.Word(
-              text, comment, new Rect(x, 0, (int) (x + candidateWidth), getMeasuredHeight())));
+              text, comment, new Rect(x, 0, (int) (x + candidateWidth), getMeasuredHeight()),
+              openccModified));
       x += candidateWidth + candidateSpacing;
     }
 
@@ -703,7 +753,8 @@ public class Candidate extends View {
       entries[i] =
           new BarEntry(
               candidate == null ? "" : candidate.text,
-              candidate == null ? "" : candidate.comment);
+              candidate == null ? "" : candidate.comment,
+              candidate != null && candidate.opencc_modified);
     }
     candidates = entries;
     highlightIndex = Rime.getCandHighlightIndex() - startNum;

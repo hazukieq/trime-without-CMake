@@ -4,9 +4,7 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.RectF
 import android.graphics.Typeface
-import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
@@ -14,20 +12,19 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
-import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.core.graphics.ColorUtils
 import com.hazukieq.hkrime.data.Config
 
 /**
- * 仿 macOS Sonoma / Sequoia 的光標旁輸入法狀態膠囊指示器（僅用於物理鍵盤模式）：
+ * 仿 macOS Sonoma / Sequoia 的光標旁輸入法狀態膠囊懸浮層（僅用於物理鍵盤接手模式）：
+ * - 透過 [HardwareOverlayHost] 渲染於透明畫布 / Overlay，不用觸屏 `PopupWindow`；
  * - 點擊進入輸入框時短暫浮出（顯示當前「中」或「英」狀態）；
  * - 按 Shift 切換中英文模式時即時浮出提醒；
- * - 1.4 秒後自動淡出，開始組字時立即讓位給候選窗。
+ * - 淡出後自動隱藏，開始組字時立即讓位給候選懸浮層。
  */
-class HardwareModeIndicatorPopup(
+class HardwareModeIndicatorOverlay(
     private val context: Context,
 ) {
     private val handler = Handler(Looper.getMainLooper())

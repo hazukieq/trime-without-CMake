@@ -25,22 +25,27 @@ object CandidateSelection {
     class InputBinder(private val code: String, private val inputOffset: Int = 0) {
         private data class Key(val reading: String, val segment: Int, val restCode: String)
         private val spans = HashMap<Key, InputCodeSpan?>()
+        private val nativeSpans = HashMap<Pair<String, Int>, InputCodeSpan?>()
         private val isCode = CompositionInput.isCodeString(code)
+        private val inputPlan by lazy(LazyThreadSafetyMode.NONE) { CandidateInputBoundary.InputPlan(code) }
         private val dictionarySplits by lazy { TwelveKeySnapshotBuilder.splitParts(code) }
         fun bind(item: CandidateItem): CandidateItem {
             if (item.text.isEmpty() || !isCode) return item.copy(inputSpan = null)
             item.engineSpan?.let { native ->
-                val rawEnd = native.end - inputOffset
-                val reading = TwelveKeySnapshotBuilder.cleanCommentForSelection(native.sourceComment)
-                val tokens = TwelveKeyPreedit.parseComment(reading)
-                val knownReading = reading.takeIf { !tokens.isNullOrEmpty() &&
-                    tokens.all { token -> MultiKeyProfile.active.isKnownSyllable(token) } }.orEmpty()
-                val parsedEnd = if (knownReading.isNotEmpty()) {
-                    CandidateInputBoundary.selectedInputEnd(knownReading, code)
-                } else null
-                val end = if (parsedEnd != null && parsedEnd < rawEnd) parsedEnd else rawEnd
-                val span = if (item.index >= 0 && native.start == inputOffset && end in 1..code.length)
-                    InputCodeSpan(code, end, knownReading) else null
+                if (item.index < 0 || native.start != inputOffset) return item.copy(inputSpan = null)
+                val cacheKey = native.sourceComment to native.end
+                val span = nativeSpans.getOrPut(cacheKey) {
+                    val rawEnd = native.end - inputOffset
+                    val reading = TwelveKeySnapshotBuilder.cleanCommentForSelection(native.sourceComment)
+                    val tokens = TwelveKeyPreedit.parseComment(reading)
+                    val knownReading = reading.takeIf { !tokens.isNullOrEmpty() &&
+                        tokens.all { token -> MultiKeyProfile.active.isKnownSyllable(token) } }.orEmpty()
+                    val parsedEnd = if (knownReading.isNotEmpty()) {
+                        CandidateInputBoundary.selectedInputEnd(knownReading, inputPlan)
+                    } else null
+                    val end = if (parsedEnd != null && parsedEnd < rawEnd) parsedEnd else rawEnd
+                    if (end in 1..code.length) InputCodeSpan(code, end, knownReading) else null
+                }
                 return item.copy(inputSpan = span)
             }
             val key = Key(item.comment, item.segment, item.restCode)

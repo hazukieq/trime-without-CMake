@@ -10,6 +10,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.google.android.flexbox.FlexboxLayoutManager
@@ -54,6 +55,8 @@ class CandidatePanelAdapter(
         /** 末尾「全部」懶加載按鈕佔位項。 */
         val isLoadAll: Boolean = false,
         val isLoading: Boolean = false,
+        /** 是否經 OpenCC 簡繁/聯想濾鏡改寫，面板磁貼以虛線框 + 右上角微圓點區分。 */
+        val openccModified: Boolean = false,
     )
 
     private val density = context.resources.displayMetrics.density
@@ -69,6 +72,8 @@ class CandidatePanelAdapter(
     private var subColor: Int = withAlpha(commentColor, 0.72f)
     private var tileColor: Int = surfaceOf(canvas, ink)
     private var tileBorderColor: Int = withAlpha(ink, 0.12f)
+    private var openccMarkColor: Int = 0xFFD97706.toInt()
+    private var openccBorderColor: Int = withAlpha(openccMarkColor, 0.72f)
     private var rippleColor: Int = withAlpha(ink, 0.12f)
     private var wordTypeface: Typeface = Typeface.DEFAULT
 
@@ -76,6 +81,10 @@ class CandidatePanelAdapter(
     private val padV = dp(6f)
     private val radius = dp(10f)
     private val borderWidth = dp(1f).coerceAtLeast(1)
+    private val openccDashWidth = dp(4f).toFloat().coerceAtLeast(2f)
+    private val openccDashGap = dp(2.5f).toFloat().coerceAtLeast(1.5f)
+    private val dotSize = dp(5f).coerceAtLeast(4)
+    private val dotMargin = dp(4f)
     private val minTileWidth = dp(54f)
 
     /** 格子間距（FlexboxLayoutManager 沒有 gap 參數，用 item 的 margin 實現）。 */
@@ -117,15 +126,19 @@ class CandidatePanelAdapter(
         val isDark = androidx.core.graphics.ColorUtils.calculateLuminance(canvas) < 0.4
         tileBorderColor = keyBorder?.let { withAlpha(it, if (isDark) 0.28f else 0.42f) }
             ?: withAlpha(ink, 0.08f)
+        openccMarkColor = if (isDark) 0xFFFBBF24.toInt() else 0xFFD97706.toInt()
+        openccBorderColor = withAlpha(openccMarkColor, if (isDark) 0.78f else 0.72f)
         rippleColor = withAlpha(ink, 0.12f)
         wordTypeface = cfg?.getFont("candidate_font") ?: Typeface.DEFAULT
         hideComment = runCatching { Rime.getOption("_hide_comment") }.getOrDefault(false)
     }
 
     class VH(
-        val box: LinearLayout,
+        val box: FrameLayout,
         val word: TextView,
         val comment: TextView,
+        val dot: View,
+        val dotShape: GradientDrawable,
         val shape: GradientDrawable,
         val ripple: RippleDrawable,
     ) : RecyclerView.ViewHolder(box)
@@ -155,11 +168,10 @@ class CandidatePanelAdapter(
             shape,
             null,
         )
-        val box = LinearLayout(context).apply {
+        val inner = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setPadding(padH, padV, padH, padV)
-            background = ripple
         }
         val word = TextView(context).apply {
             setTextSize(TypedValue.COMPLEX_UNIT_PX, wordSize)
@@ -177,15 +189,41 @@ class CandidatePanelAdapter(
             setTextSize(TypedValue.COMPLEX_UNIT_PX, commentSize)
             setPadding(0, dp(2f), 0, 0)
         }
-        box.addView(word)
-        box.addView(comment)
-        return VH(box, word, comment, shape, ripple)
+        inner.addView(word)
+        inner.addView(comment)
+        val dotShape = GradientDrawable().apply {
+            this.shape = GradientDrawable.OVAL
+            setColor(openccMarkColor)
+        }
+        val dot = View(context).apply {
+            background = dotShape
+            visibility = View.GONE
+        }
+        val box = FrameLayout(context).apply {
+            background = ripple
+            addView(
+                inner,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+            addView(
+                dot,
+                FrameLayout.LayoutParams(dotSize, dotSize, Gravity.TOP or Gravity.END).apply {
+                    topMargin = dotMargin
+                    marginEnd = dotMargin
+                },
+            )
+        }
+        return VH(box, word, comment, dot, dotShape, shape, ripple)
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
         // 複用的 ViewHolder 也必須同步最新配色與狀態，避免切換主題色或按鈕複用殘留舊態。
         if (item.isLoadAll) {
+            holder.dot.visibility = View.GONE
             val actionBg = androidx.core.graphics.ColorUtils.blendARGB(tileColor, ink, 0.08f)
             val actionBorder = withAlpha(ink, 0.24f)
             holder.shape.setColor(actionBg)
@@ -224,7 +262,14 @@ class CandidatePanelAdapter(
             return
         }
         holder.shape.setColor(tileColor)
-        holder.shape.setStroke(borderWidth, tileBorderColor)
+        if (item.openccModified) {
+            holder.shape.setStroke(borderWidth, openccBorderColor, openccDashWidth, openccDashGap)
+            holder.dotShape.setColor(openccMarkColor)
+            holder.dot.visibility = View.VISIBLE
+        } else {
+            holder.shape.setStroke(borderWidth, tileBorderColor)
+            holder.dot.visibility = View.GONE
+        }
         holder.ripple.setColor(ColorStateList.valueOf(rippleColor))
         holder.word.setTextSize(TypedValue.COMPLEX_UNIT_PX, wordSize)
         holder.word.setTextColor(wordColor)

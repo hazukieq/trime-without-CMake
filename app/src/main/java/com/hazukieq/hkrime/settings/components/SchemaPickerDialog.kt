@@ -2,11 +2,14 @@ package com.hazukieq.hkrime.settings.components
 
 import android.app.Dialog
 import android.content.Context
+import com.blankj.utilcode.util.ToastUtils
 import com.hazukieq.hkrime.R
 import com.hazukieq.hkrime.core.Rime
+import com.hazukieq.hkrime.data.AppPrefs
 import com.hazukieq.hkrime.data.Config
 import com.hazukieq.hkrime.ime.core.Trime
 import com.hazukieq.hkrime.util.RimeUtils
+import com.hazukieq.hkrime.util.SchemaSpecValidator
 import com.hazukieq.hkrime.util.createLoadingDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -137,9 +140,26 @@ class SchemaPickerDialog(
         for ((i, b) in checkedStatus.withIndex()) {
             if (b) schemaItems[i]?.let { checkedIds.add(it) }
         }
-        if (checkedIds.size > 0) {
-            val schemaIdList = arrayOfNulls<String>(checkedIds.size)
-            checkedIds.toArray(schemaIdList)
+        val userDir = runCatching { java.io.File(AppPrefs.defaultInstance().conf.userDataDir) }.getOrNull()
+        val sharedDir = runCatching { java.io.File(AppPrefs.defaultInstance().conf.sharedDataDir) }.getOrNull()
+        val validIds = ArrayList<String>(checkedIds.size)
+        val rejectedMessages = ArrayList<String>()
+        for (id in checkedIds) {
+            val check = SchemaSpecValidator.validateSchemaFiles(userDir, sharedDir, id)
+            if (check.valid) {
+                validIds.add(id)
+            } else {
+                Timber.w("SchemaPickerDialog rejected %s: %s", id, check.formatMessage())
+                rejectedMessages.add(check.formatMessage())
+            }
+        }
+        if (rejectedMessages.isNotEmpty()) {
+            withContext(Dispatchers.Main) {
+                ToastUtils.showLong(rejectedMessages.joinToString("\n"))
+            }
+        }
+        if (validIds.isNotEmpty()) {
+            val schemaIdList = validIds.toTypedArray()
             Rime.select_schemas(schemaIdList)
             RimeUtils.deploy(context)
             // 部署後方案清單可能變了（當前方案被停用時引擎會回退到清單第一項），

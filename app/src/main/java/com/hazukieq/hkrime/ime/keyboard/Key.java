@@ -122,6 +122,14 @@ public class Key {
         if (!TextUtils.isEmpty(s)) {
           events[i] = new Event(mKeyboard, s);
           if (i < KeyEventType.COMBO.ordinal()) hasComposingKey = true;
+        } else if (i == KeyEventType.CLICK.ordinal() && mk.containsKey("atoms")) {
+          events[i] = Event.fromAtoms(
+              mKeyboard,
+              mk.get("atoms"),
+              ConfigGetter.getString(mk, "label", ""),
+              ConfigGetter.getString(mk, "preview", ""),
+              ConfigGetter.getBoolean(mk, "functional", false));
+          if (events[i].hasAtoms()) hasComposingKey = true;
         } else if (i == KeyEventType.CLICK.ordinal()) events[i] = new Event(mKeyboard, "");
       }
       if (hasComposingKey) mKeyboard.getComposingKeys().add(this);

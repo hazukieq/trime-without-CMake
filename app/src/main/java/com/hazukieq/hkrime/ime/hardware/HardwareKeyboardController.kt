@@ -9,6 +9,7 @@ import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.text.InputType
 import android.view.KeyEvent
 import android.view.View
@@ -18,6 +19,7 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import androidx.core.view.WindowCompat
 import com.hazukieq.hkrime.core.Rime
+import com.hazukieq.hkrime.core.twelvekey.CompositionInput
 import com.hazukieq.hkrime.data.AppPrefs
 import com.hazukieq.hkrime.data.KeyboardLayoutResolver
 import com.hazukieq.hkrime.ime.clipboard.ClipboardStore
@@ -47,23 +49,23 @@ class HardwareKeyboardController(
         clipboardStore.syncFromSystem(service)
     }
 
-    private val popup = HardwareCandidatePopup(service).apply {
+    private val candidateOverlay = HardwareCandidateOverlay(service).apply {
         onSelectSlot = { slotIndex -> selectCandidateOnCurrentPage(slotIndex) }
         onNextPage = { sendEngineKey(Event.getRimeEvent(KeyEvent.KEYCODE_PAGE_DOWN, 0)) }
         setOnBoundsChanged { immediate -> requestRecomputeInsets(immediate) }
     }
-    private val modeIndicator = HardwareModeIndicatorPopup(service)
-    private val symbolPopup = HardwareSymbolPopup(service).apply {
+    private val modeIndicatorOverlay = HardwareModeIndicatorOverlay(service)
+    private val symbolOverlay = HardwareSymbolOverlay(service).apply {
         onCommitSymbol = { sym -> service.activeEditorInstance.commitText(sym, false) }
         onDismissed = { hideAnchorIfIdle() }
         setOnBoundsChanged { requestRecomputeInsets(true) }
     }
-    private val clipboardPopup = HardwareClipboardPopup(service, clipboardStore).apply {
+    private val clipboardOverlay = HardwareClipboardOverlay(service, clipboardStore).apply {
         onCommitText = { text -> service.activeEditorInstance.commitText(text, false) }
         onDismissed = { hideAnchorIfIdle() }
         setOnBoundsChanged { requestRecomputeInsets(true) }
     }
-    private val menuPopup = HardwareMenuPopup(
+    private val menuOverlay = HardwareMenuOverlay(
         context = service,
         isSchemaSupported = { sid -> isSchemaSupportedForHardware(sid) },
     ).apply {
@@ -82,7 +84,8 @@ class HardwareKeyboardController(
     private val tmpRect = android.graphics.Rect()
     private var composable: Boolean = true
     private var pendingModeIndicatorAscii: Boolean? = null
-    private var pendingToolPopup: PendingTool? = null
+    private var pendingToolOverlay: PendingOverlayTool? = null
+    private val codeLimitNoticeGate = CompositionInput.LimitNoticeGate(CompositionInput.LIMIT_NOTICE_COOLDOWN_MS)
     private var transparentWindowKey: Long = 0L
     private var recomputeInsetsScheduled: Boolean = false
     private val recomputeInsetsRunnable = Runnable {
@@ -90,7 +93,26 @@ class HardwareKeyboardController(
         service.window?.window?.decorView?.requestLayout()
     }
 
-    private enum class PendingTool { SYMBOL, CLIPBOARD, MENU }
+    private enum class PendingOverlayTool { SYMBOL, CLIPBOARD, MENU }
+
+    // 在 Dialog.dispatchKeyEvent 進入 mWindow.superDispatchKeyEvent(ViewGroup 焦點導航) 前先接手工具懸浮層按鍵，
+    // 防止 Tab / 方向鍵被 DecorView 的 FocusFinder 在 ACTION_DOWN 吞掉導致僅剩下 ACTION_UP。
+    private val windowKeyListener = android.content.DialogInterface.OnKeyListener { _, keyCode, event ->
+        if (!isActive() || !composable) return@OnKeyListener false
+        if (!symbolOverlay.isShowing && !clipboardOverlay.isShowing && !menuOverlay.isShowing) {
+            return@OnKeyListener false
+        }
+        if (Key.isTrimeModifierKey(keyCode)) return@OnKeyListener false
+        when (event.action) {
+            KeyEvent.ACTION_DOWN -> onKeyDown(event)
+            KeyEvent.ACTION_UP -> onKeyUp(event)
+            else -> false
+        }
+    }
+
+    private fun syncWindowKeyInterceptor() {
+        runCatching { service.window?.setOnKeyListener(windowKeyListener) }
+    }
 
     init {
         runCatching {
@@ -106,8 +128,8 @@ class HardwareKeyboardController(
         showModeIndicatorNow(ascii)
     }
     private val retryToolRunnable = Runnable {
-        val tool = pendingToolPopup ?: return@Runnable
-        showToolPopupNow(tool)
+        val tool = pendingToolOverlay ?: return@Runnable
+        showToolOverlayNow(tool)
     }
 
     fun hasHardwareKeyboard(): Boolean {
@@ -170,28 +192,32 @@ class HardwareKeyboardController(
             setBackgroundColor(Color.TRANSPARENT)
             clipChildren = false
             clipToPadding = false
+            isFocusable = false
+            isFocusableInTouchMode = false
+            descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
             setOnTouchListener { _, ev ->
                 if (ev.action == android.view.MotionEvent.ACTION_DOWN) {
-                    if (symbolPopup.isShowing) {
-                        symbolPopup.dismiss()
+                    if (symbolOverlay.isShowing) {
+                        symbolOverlay.dismiss()
                         return@setOnTouchListener true
                     }
-                    if (clipboardPopup.isShowing) {
-                        clipboardPopup.dismiss()
+                    if (clipboardOverlay.isShowing) {
+                        clipboardOverlay.dismiss()
                         return@setOnTouchListener true
                     }
-                    if (menuPopup.isShowing) {
-                        menuPopup.dismiss()
+                    if (menuOverlay.isShowing) {
+                        menuOverlay.dismiss()
                         return@setOnTouchListener true
                     }
                 }
                 false
             }
-        }.also { canvasView = it }
+        }.also { canvasView = it }.also { syncWindowKeyInterceptor() }
     }
 
     /** 退出物理鍵盤接手模式（切回觸屏軟鍵盤時呼叫）：釋放畫布附著並還原系統欄 fitsSystemWindows。 */
     fun onExitHardwareMode() {
+        runCatching { service.window?.setOnKeyListener(null) }
         handler.removeCallbacks(retryShowRunnable)
         handler.removeCallbacks(retryIndicatorRunnable)
         handler.removeCallbacks(retryToolRunnable)
@@ -199,14 +225,15 @@ class HardwareKeyboardController(
         recomputeInsetsScheduled = false
         transparentWindowKey = 0L
         pendingModeIndicatorAscii = null
-        pendingToolPopup = null
+        pendingToolOverlay = null
+        codeLimitNoticeGate.reset()
+        cursorRect.setEmpty()
         consumedDownKeys.clear()
-        popup.detach()
-        modeIndicator.dismiss()
-        symbolPopup.dismiss()
-        clipboardPopup.dismiss()
-        menuPopup.dismiss()
-        menuPopup.dismiss()
+        candidateOverlay.detach()
+        modeIndicatorOverlay.dismiss()
+        symbolOverlay.dismiss()
+        clipboardOverlay.dismiss()
+        menuOverlay.dismiss()
         val win = service.window?.window ?: return
         runCatching {
             WindowCompat.setDecorFitsSystemWindows(win, true)
@@ -214,13 +241,20 @@ class HardwareKeyboardController(
         }
     }
 
-    /** 僅收起外設懸浮窗，不干涉觸屏模式的 candidatesView 狀態。 */
+    /** 僅收起外設懸浮層，不干涉觸屏模式的 candidatesView / TouchPreeditPopupWindow 狀態。 */
     fun dismissOverlaysOnly() {
-        if (popup.isShowing) popup.dismiss()
-        if (modeIndicator.isShowing) modeIndicator.dismiss()
-        if (symbolPopup.isShowing) symbolPopup.dismiss()
-        if (clipboardPopup.isShowing) clipboardPopup.dismiss()
-        if (menuPopup.isShowing) menuPopup.dismiss()
+        if (candidateOverlay.isShowing) candidateOverlay.dismiss()
+        if (modeIndicatorOverlay.isShowing) modeIndicatorOverlay.dismiss()
+        if (symbolOverlay.isShowing) symbolOverlay.dismiss()
+        if (clipboardOverlay.isShowing) clipboardOverlay.dismiss()
+        if (menuOverlay.isShowing) menuOverlay.dismiss()
+    }
+
+    /** 螢幕方向或顯示配置變化時清掉舊光標座標並收起懸浮層，避免殘留於旋轉前座標。 */
+    fun onConfigurationChanged() {
+        cursorRect.setEmpty()
+        transparentWindowKey = 0L
+        dismissOverlaysOnly()
     }
 
     fun applyInsets(outInsets: InputMethodService.Insets) {
@@ -234,10 +268,10 @@ class HardwareKeyboardController(
         outInsets.visibleTopInsets = topInset
         outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_REGION
         outInsets.touchableRegion.setEmpty()
-        if (popup.copyTouchableRect(tmpRect)) outInsets.touchableRegion.union(tmpRect)
-        if (symbolPopup.copyTouchableRect(tmpRect)) outInsets.touchableRegion.union(tmpRect)
-        if (clipboardPopup.copyTouchableRect(tmpRect)) outInsets.touchableRegion.union(tmpRect)
-        if (menuPopup.copyTouchableRect(tmpRect)) outInsets.touchableRegion.union(tmpRect)
+        if (candidateOverlay.copyTouchableRect(tmpRect)) outInsets.touchableRegion.union(tmpRect)
+        if (symbolOverlay.copyTouchableRect(tmpRect)) outInsets.touchableRegion.union(tmpRect)
+        if (clipboardOverlay.copyTouchableRect(tmpRect)) outInsets.touchableRegion.union(tmpRect)
+        if (menuOverlay.copyTouchableRect(tmpRect)) outInsets.touchableRegion.union(tmpRect)
     }
 
     private fun requestRecomputeInsets(immediate: Boolean = true) {
@@ -252,10 +286,10 @@ class HardwareKeyboardController(
     }
 
     fun applyTheme() {
-        popup.applyTheme()
-        symbolPopup.applyTheme()
-        clipboardPopup.applyTheme()
-        menuPopup.applyTheme()
+        candidateOverlay.applyTheme()
+        symbolOverlay.applyTheme()
+        clipboardOverlay.applyTheme()
+        menuOverlay.applyTheme()
     }
 
     fun applyTransparentHostWindow() {
@@ -281,6 +315,8 @@ class HardwareKeyboardController(
 
     fun onStartInput(info: EditorInfo?, ic: InputConnection?) {
         Rime.get(service)
+        syncWindowKeyInterceptor()
+        symbolOverlay.prewarm()
         service.activeEditorInstance.resetInlineComposingCache()
         applyTransparentHostWindow()
         consumedDownKeys.clear()
@@ -288,8 +324,9 @@ class HardwareKeyboardController(
         handler.removeCallbacks(retryShowRunnable)
         handler.removeCallbacks(retryIndicatorRunnable)
         pendingModeIndicatorAscii = null
-        popup.dismiss()
-        modeIndicator.dismiss()
+        codeLimitNoticeGate.reset()
+        candidateOverlay.dismiss()
+        modeIndicatorOverlay.dismiss()
         service.setCandidatesViewShown(false)
 
         ic?.requestCursorUpdates(
@@ -324,17 +361,19 @@ class HardwareKeyboardController(
         handler.removeCallbacks(retryIndicatorRunnable)
         handler.removeCallbacks(retryToolRunnable)
         pendingModeIndicatorAscii = null
-        pendingToolPopup = null
+        pendingToolOverlay = null
+        codeLimitNoticeGate.reset()
         consumedDownKeys.clear()
-        popup.dismiss()
-        modeIndicator.dismiss()
-        symbolPopup.dismiss()
-        clipboardPopup.dismiss()
-        menuPopup.dismiss()
+        candidateOverlay.dismiss()
+        modeIndicatorOverlay.dismiss()
+        symbolOverlay.dismiss()
+        clipboardOverlay.dismiss()
+        menuOverlay.dismiss()
         service.setCandidatesViewShown(false)
     }
 
     fun destroy() {
+        runCatching { service.window?.setOnKeyListener(null) }
         handler.removeCallbacks(retryShowRunnable)
         handler.removeCallbacks(retryIndicatorRunnable)
         handler.removeCallbacks(retryToolRunnable)
@@ -342,18 +381,18 @@ class HardwareKeyboardController(
         recomputeInsetsScheduled = false
         transparentWindowKey = 0L
         pendingModeIndicatorAscii = null
-        pendingToolPopup = null
+        pendingToolOverlay = null
+        codeLimitNoticeGate.reset()
         consumedDownKeys.clear()
         runCatching {
             val cm = service.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
             cm?.removePrimaryClipChangedListener(clipboardListener)
         }
-        popup.detach()
-        modeIndicator.dismiss()
-        symbolPopup.dismiss()
-        clipboardPopup.dismiss()
-        menuPopup.dismiss()
-        menuPopup.dismiss()
+        candidateOverlay.detach()
+        modeIndicatorOverlay.dismiss()
+        symbolOverlay.dismiss()
+        clipboardOverlay.dismiss()
+        menuOverlay.dismiss()
         canvasView = null
         anchorView = null
     }
@@ -411,11 +450,11 @@ class HardwareKeyboardController(
 
         cursorRect.set(tmp)
         val anchor = resolveAttachedAnchor()
-        popup.updateCursorPosition(anchor, cursorRect)
-        modeIndicator.updateCursorPosition(anchor, cursorRect)
-        symbolPopup.updateCursorPosition(anchor, cursorRect)
-        clipboardPopup.updateCursorPosition(anchor, cursorRect)
-        menuPopup.updateCursorPosition(anchor, cursorRect)
+        candidateOverlay.updateCursorPosition(anchor, cursorRect)
+        modeIndicatorOverlay.updateCursorPosition(anchor, cursorRect)
+        symbolOverlay.updateCursorPosition(anchor, cursorRect)
+        clipboardOverlay.updateCursorPosition(anchor, cursorRect)
+        menuOverlay.updateCursorPosition(anchor, cursorRect)
     }
 
     /**
@@ -423,50 +462,56 @@ class HardwareKeyboardController(
      * - 修飾鍵（Shift_L / Shift_R / Ctrl / Alt）：按下傳 `(keysym, 0)` 給引擎 `ascii_composer`，
      *   並返回 `false` 讓 Android 維持修飾狀態以支援組合鍵。
      * - 一般按鍵：直接轉為 X11/Rime `(keysym, mask)` 交由 librime 處理；
-     *   若引擎消費（返回 `true`），則提交引擎產出的文字並刷新懸浮候選窗。
+     *   若引擎消費（返回 `true`），則提交引擎產出的文字並刷新懸浮候選層。
      */
     fun onKeyDown(event: KeyEvent): Boolean {
         val keyCode = event.keyCode
         if (isSystemIgnoredKey(keyCode)) return false
         if (!composable) return false
 
-        // 外設專屬桌面懸浮工具快捷鍵：
-        // - Ctrl+Shift+E：符號 / 表情懸浮窗
-        // - Ctrl+Shift+V：剪切板歷史懸浮窗
-        // - Ctrl+Shift+M：方案切換 / 啟停 & Rime 開關懸浮窗
-        if (event.isCtrlPressed && event.isShiftPressed && !event.isAltPressed && event.repeatCount == 0) {
-            if (keyCode == KeyEvent.KEYCODE_E) {
-                if (symbolPopup.isShowing) symbolPopup.dismiss() else openToolPopup(PendingTool.SYMBOL)
+        // 外設專屬桌面懸浮工具快捷鍵（底部相鄰三鍵，避開筆記/文檔的 Ctrl+Shift+E/V/M）：
+        // - Ctrl+Shift+, ：符號與表情懸浮層
+        // - Ctrl+Shift+. ：剪切板歷史懸浮層
+        // - Ctrl+Shift+?（/）：外設設置菜單懸浮層
+        if (event.repeatCount == 0) {
+            val toolKey = resolveToolShortcut(
+                keyCode = keyCode,
+                isCtrl = event.isCtrlPressed,
+                isShift = event.isShiftPressed,
+                isAlt = event.isAltPressed,
+            )
+            if (toolKey != null) {
                 consumedDownKeys.add(keyCode)
-                return true
-            }
-            if (keyCode == KeyEvent.KEYCODE_V) {
-                if (clipboardPopup.isShowing) clipboardPopup.dismiss() else openToolPopup(PendingTool.CLIPBOARD)
-                consumedDownKeys.add(keyCode)
-                return true
-            }
-            if (keyCode == KeyEvent.KEYCODE_M) {
-                if (menuPopup.isShowing) menuPopup.dismiss() else openToolPopup(PendingTool.MENU)
-                consumedDownKeys.add(keyCode)
+                // 異步切換懸浮層，讓 onKeyDown 在 <1ms 內返回 true，避免阻塞 IME 導致系統丟棄 ACTION_UP
+                handler.post {
+                    when (toolKey) {
+                        TOOL_SYMBOL ->
+                            if (symbolOverlay.isShowing) symbolOverlay.dismiss() else openToolOverlay(PendingOverlayTool.SYMBOL)
+                        TOOL_CLIPBOARD ->
+                            if (clipboardOverlay.isShowing) clipboardOverlay.dismiss() else openToolOverlay(PendingOverlayTool.CLIPBOARD)
+                        TOOL_MENU ->
+                            if (menuOverlay.isShowing) menuOverlay.dismiss() else openToolOverlay(PendingOverlayTool.MENU)
+                    }
+                }
                 return true
             }
         }
 
-        // 若符號、剪切板或方案/開關懸浮窗打開，優先由懸浮窗獨佔鍵盤導航（修飾鍵放行以維持 meta 狀態）
-        if (symbolPopup.isShowing) {
+        // 若符號、剪切板或方案/開關懸浮層打開，優先由懸浮層獨佔鍵盤導航（修飾鍵放行以維持 meta 狀態）
+        if (symbolOverlay.isShowing) {
             if (Key.isTrimeModifierKey(keyCode)) return false
             consumedDownKeys.add(keyCode)
-            return symbolPopup.handleKeyDown(event)
+            return symbolOverlay.handleKeyDown(event)
         }
-        if (clipboardPopup.isShowing) {
+        if (clipboardOverlay.isShowing) {
             if (Key.isTrimeModifierKey(keyCode)) return false
             consumedDownKeys.add(keyCode)
-            return clipboardPopup.handleKeyDown(event)
+            return clipboardOverlay.handleKeyDown(event)
         }
-        if (menuPopup.isShowing) {
+        if (menuOverlay.isShowing) {
             if (Key.isTrimeModifierKey(keyCode)) return false
             consumedDownKeys.add(keyCode)
-            return menuPopup.handleKeyDown(event)
+            return menuOverlay.handleKeyDown(event)
         }
 
         // 修飾鍵（含 Shift_L / Shift_R）：直傳給 librime ascii_composer
@@ -526,21 +571,37 @@ class HardwareKeyboardController(
         if (consumedDownKeys.remove(keyCode)) {
             return true
         }
+        val activeOverlay = symbolOverlay.isShowing || clipboardOverlay.isShowing || menuOverlay.isShowing
+        if (isOrphanHostInterceptedTabUp(keyCode, wasConsumedOnDown = false, hasActiveToolOverlay = activeOverlay)) {
+            notifyHostInterceptedTab()
+            return true
+        }
         return false
+    }
+
+    private fun notifyHostInterceptedTab() {
+        when {
+            symbolOverlay.isShowing ->
+                symbolOverlay.showTemporaryHint("当前应用已抢占 Tab 键，请改用 [ ] 或 - = 切分类")
+            menuOverlay.isShowing ->
+                menuOverlay.showTemporaryHint("当前应用已抢占 Tab 键，请改用 ←→ 或 [ ] 切页")
+            clipboardOverlay.isShowing ->
+                clipboardOverlay.showTemporaryHint("当前应用已抢占 Tab 键，请改用 ↑↓ 或 [ ] 选择")
+        }
     }
 
     fun refreshComposing(ic: InputConnection?) {
         handler.removeCallbacks(retryShowRunnable)
         if (!Rime.isComposing()) {
-            popup.dismiss()
-            // 關鍵守衛：狀態膠囊或工具懸浮窗正在顯示/等待附著時，絕不可誤殺錨點窗口。
+            candidateOverlay.dismiss()
+            // 關鍵守衛：狀態膠囊或工具懸浮層正在顯示/等待附著時，絕不可誤殺錨點窗口。
             hideAnchorIfIdle()
             return
         }
-        // 開始組字時立即收起狀態膠囊，讓位給候選窗
+        // 開始組字時立即收起狀態膠囊，讓位給候選懸浮層
         handler.removeCallbacks(retryIndicatorRunnable)
         pendingModeIndicatorAscii = null
-        modeIndicator.dismiss()
+        modeIndicatorOverlay.dismiss()
 
         // 僅當游標尚未就緒時才補拉一次；onStartInput 已開啟 CURSOR_UPDATE_MONITOR 持續監聽
         if (cursorRect.isEmpty) {
@@ -555,14 +616,14 @@ class HardwareKeyboardController(
         val preedit = buildStructuredPreedit()
         val page = buildEnginePage()
         val prefs = AppPrefs.defaultInstance().keyboard
-        popup.updateAndShow(
+        candidateOverlay.updateAndShow(
             anchorView = anchor,
             cursorRect = cursorRect,
             preedit = preedit,
             page = page,
             vertical = prefs.hwCandidateOrientation == "vertical",
         )
-        if (!popup.isShowing) {
+        if (!candidateOverlay.isShowing) {
             handler.postDelayed(retryShowRunnable, 24L)
         }
     }
@@ -588,6 +649,19 @@ class HardwareKeyboardController(
         val handled: Boolean
         val committed: Boolean
         synchronized(Rime.ENGINE_LOCK) {
+            if (!Rime.isAsciiMode() && Rime.isComposing()) {
+                val allowAppend =
+                    (rimeEvent[1] and (Rime.META_RELEASE_ON or Rime.META_CTRL_ON or Rime.META_ALT_ON)) == 0
+                if (CompositionInput.shouldBlockOverLimit(
+                        Rime.RimeGetInput(),
+                        rimeEvent[0],
+                        allowAppend,
+                    )
+                ) {
+                    notifyCodeLimitReached()
+                    return true
+                }
+            }
             handled = Rime.onKey(rimeEvent)
             committed = service.activeEditorInstance.commitRimeText(updateUi = false)
         }
@@ -637,6 +711,7 @@ class HardwareKeyboardController(
                 HardwareEnginePage.Item(
                     text = c.text.orEmpty(),
                     comment = c.comment?.trim().orEmpty(),
+                    openccModified = c.opencc_modified,
                 ),
             )
         }
@@ -663,6 +738,13 @@ class HardwareKeyboardController(
         showModeIndicatorNow(asciiMode)
     }
 
+    fun notifyCodeLimitReached() {
+        if (!codeLimitNoticeGate.tryAcquire(SystemClock.uptimeMillis())) return
+        handler.post {
+            candidateOverlay.showLimitNotice(CompositionInput.MAX_CODE_LENGTH)
+        }
+    }
+
     private fun showModeIndicatorNow(asciiMode: Boolean) {
         if (!isActive() || Rime.isComposing()) {
             pendingModeIndicatorAscii = null
@@ -671,62 +753,64 @@ class HardwareKeyboardController(
         if (!service.isInputViewShown) {
             service.requestShowSelf(0)
         }
+        syncWindowKeyInterceptor()
         applyTransparentHostWindow()
         val anchor = resolveAttachedAnchor()
         pendingModeIndicatorAscii = null
-        modeIndicator.show(
+        modeIndicatorOverlay.show(
             anchorView = anchor,
             cursorRect = cursorRect,
             isAsciiMode = asciiMode,
             onHidden = { hideAnchorIfIdle() },
         )
-        if (!modeIndicator.isShowing && anchor == null) {
+        if (!modeIndicatorOverlay.isShowing && anchor == null) {
             pendingModeIndicatorAscii = asciiMode
             handler.postDelayed(retryIndicatorRunnable, 24L)
         }
     }
 
-    private fun openToolPopup(tool: PendingTool) {
+    private fun openToolOverlay(tool: PendingOverlayTool) {
         handler.removeCallbacks(retryIndicatorRunnable)
         handler.removeCallbacks(retryToolRunnable)
         pendingModeIndicatorAscii = null
-        modeIndicator.dismiss()
+        modeIndicatorOverlay.dismiss()
         if (Rime.isComposing()) {
             Rime.clearComposition()
-            popup.dismiss()
+            candidateOverlay.dismiss()
             service.activeEditorInstance.updateComposingText()
         }
-        if (tool != PendingTool.SYMBOL) symbolPopup.dismiss()
-        if (tool != PendingTool.CLIPBOARD) clipboardPopup.dismiss()
-        if (tool != PendingTool.MENU) menuPopup.dismiss()
+        if (tool != PendingOverlayTool.SYMBOL) symbolOverlay.dismiss()
+        if (tool != PendingOverlayTool.CLIPBOARD) clipboardOverlay.dismiss()
+        if (tool != PendingOverlayTool.MENU) menuOverlay.dismiss()
 
-        pendingToolPopup = tool
-        showToolPopupNow(tool)
+        pendingToolOverlay = tool
+        showToolOverlayNow(tool)
     }
 
-    private fun showToolPopupNow(tool: PendingTool) {
+    private fun showToolOverlayNow(tool: PendingOverlayTool) {
         if (!isActive()) {
-            pendingToolPopup = null
+            pendingToolOverlay = null
             return
         }
         if (!service.isInputViewShown) {
             service.requestShowSelf(0)
         }
+        syncWindowKeyInterceptor()
         applyTransparentHostWindow()
         val anchor = resolveAttachedAnchor()
-        pendingToolPopup = null
+        pendingToolOverlay = null
         when (tool) {
-            PendingTool.SYMBOL -> symbolPopup.show(anchor, cursorRect)
-            PendingTool.CLIPBOARD -> clipboardPopup.show(anchor, cursorRect)
-            PendingTool.MENU -> menuPopup.show(anchor, cursorRect)
+            PendingOverlayTool.SYMBOL -> symbolOverlay.show(anchor, cursorRect)
+            PendingOverlayTool.CLIPBOARD -> clipboardOverlay.show(anchor, cursorRect)
+            PendingOverlayTool.MENU -> menuOverlay.show(anchor, cursorRect)
         }
         val shown = when (tool) {
-            PendingTool.SYMBOL -> symbolPopup.isShowing
-            PendingTool.CLIPBOARD -> clipboardPopup.isShowing
-            PendingTool.MENU -> menuPopup.isShowing
+            PendingOverlayTool.SYMBOL -> symbolOverlay.isShowing
+            PendingOverlayTool.CLIPBOARD -> clipboardOverlay.isShowing
+            PendingOverlayTool.MENU -> menuOverlay.isShowing
         }
         if (!shown && anchor == null) {
-            pendingToolPopup = tool
+            pendingToolOverlay = tool
             handler.postDelayed(retryToolRunnable, 24L)
         }
     }
@@ -762,6 +846,22 @@ class HardwareKeyboardController(
         if (!isSchemaSupportedForHardware(schemaId)) {
             onDone()
             return
+        }
+        if (enable) {
+            val conf = AppPrefs.defaultInstance().conf
+            val validation = com.hazukieq.hkrime.util.SchemaSpecValidator.validateSchemaFiles(
+                java.io.File(conf.userDataDir),
+                java.io.File(conf.sharedDataDir),
+                schemaId,
+            )
+            if (!validation.valid) {
+                timber.log.Timber.w("HardwareKeyboardController rejected %s: %s", schemaId, validation.formatMessage())
+                handler.post {
+                    com.blankj.utilcode.util.ToastUtils.showLong(validation.formatMessage())
+                    onDone()
+                }
+                return
+            }
         }
         Thread({
             val ids = LinkedHashSet<String>()
@@ -888,5 +988,44 @@ class HardwareKeyboardController(
         KeyEvent.KEYCODE_MOVE_END,
         KeyEvent.KEYCODE_TAB -> true
         else -> false
+    }
+
+    companion object {
+        const val TOOL_SYMBOL = "SYMBOL"
+        const val TOOL_CLIPBOARD = "CLIPBOARD"
+        const val TOOL_MENU = "MENU"
+
+        /**
+         * 解析外設浮窗工具快捷鍵（連續三鍵，棄用易與富文本編輯器衝突的 Ctrl+Shift+E/V/M）：
+         * - `Ctrl + Shift + ,`：符號與表情懸浮層
+         * - `Ctrl + Shift + .`：剪切板歷史懸浮層
+         * - `Ctrl + Shift + ?`（`KEYCODE_SLASH`）：外設設置菜單懸浮層
+         */
+        @JvmStatic
+        fun resolveToolShortcut(
+            keyCode: Int,
+            isCtrl: Boolean,
+            isShift: Boolean,
+            isAlt: Boolean,
+        ): String? {
+            if (!isCtrl || !isShift || isAlt) return null
+            return when (keyCode) {
+                KeyEvent.KEYCODE_COMMA -> TOOL_SYMBOL
+                KeyEvent.KEYCODE_PERIOD -> TOOL_CLIPBOARD
+                KeyEvent.KEYCODE_SLASH -> TOOL_MENU
+                else -> null
+            }
+        }
+
+        /**
+         * 檢測宿主應用（如富文本筆記/文檔編輯器）是否在 `onKeyPreIme` 階段搶佔了 `Tab` 的 `ACTION_DOWN`：
+         * 當懸浮工具層處於開啟狀態，卻僅收到孤立的 `KEYCODE_TAB` `ACTION_UP`（未曾收到對應 `ACTION_DOWN`）時返回 `true`。
+         */
+        @JvmStatic
+        fun isOrphanHostInterceptedTabUp(
+            keyCode: Int,
+            wasConsumedOnDown: Boolean,
+            hasActiveToolOverlay: Boolean,
+        ): Boolean = keyCode == KeyEvent.KEYCODE_TAB && !wasConsumedOnDown && hasActiveToolOverlay
     }
 }

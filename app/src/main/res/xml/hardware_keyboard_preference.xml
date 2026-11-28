@@ -6,6 +6,16 @@
 
     <PreferenceCategory
         app:iconSpaceReserved="false"
+        app:title="@string/pref_keyboard__hardware_manual_section">
+        <Preference
+            android:key="keyboard__hw_manual"
+            android:title="@string/keyboard__hw_manual_title"
+            android:summary="@string/keyboard__hw_manual_summary"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
         app:title="@string/pref_keyboard__hardware_mode_section">
         <SwitchPreferenceCompat
             android:defaultValue="true"

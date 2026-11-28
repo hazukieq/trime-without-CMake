@@ -1,14 +1,15 @@
 # ==============================================================================
-# hkrime 主题配置 v5.0（客语简约主题）
+# hkrime 主题配置 v5.1（客语简约主题）
 # ==============================================================================
 # 本文件仅负责「键盘与候选窗外观」以及「配色方案」：
 # - 配色回退链已独立至 fallback_colors.yaml，每套配色仅需定义核心语义色。
-# - 系统行为默认值、常见键盘布局（12键 / 26键 / 9键 / 五笔 / 笔画 / 英文 / 数字）
+# - 系统行为默认值、常见键盘布局（12键 / 26键 / 9键 / 五笔 / 笔画 / 注音 / 英文 / 数字）
 #   以及符号面板、文字编辑面板均由 App 原生内置并按方案按需加载。
-# - 高级用户可取消文件末尾注释，按需覆盖内置布局或新建自定义键盘类型。
+# - 多键位布局（12key / 9key / 自定义多键）统一遵循原生 Token-Set 规范（使用 atoms，
+#   严禁再写数字或字母占位码 + xlit）；详见文末高级自定义与多键位书写规范。
 # ==============================================================================
 
-config_version: "5.0"
+config_version: "5.1"
 name: 客语简约主题
 author: "叶月绘梨依"
 
@@ -30,6 +31,7 @@ keyboard:
     9key: pinyin_9key
     wubi: wubi_qwerty
     stroke: stroke_9key
+    bopomofo: bopomofo_kbd
 
 # ------------------------------------------------------------------------------
 # 2. 候选窗外观
@@ -103,46 +105,136 @@ colors:
     comment_text_color: 0xff6e695f
 
 # ==============================================================================
-# 高级自定义示例（默认注释，仅面向有定制需求的高级用户）
+# 高级自定义与多键位书写规范（默认注释，仅面向有定制需求的高级用户）
 # ==============================================================================
-# 规则：
-# 1. 不接受未声明 type 的杂乱键盘（覆盖内置 english / number 除外）。
-# 2. 允许覆盖已有类型布局（如覆盖 english / jiugong_simp / letter），
-#    或新建自定义 type 并与方案中的 keyboard/type 对应。
+# 一、通用规则：
+# 1. 严禁未声明 type 的杂乱键盘（仅覆盖内置 english / number 工具键盘除外）。
+# 2. 允许覆盖已有类型布局（如 english / jiugong_simp / letter / pinyin_9key），
+#    或新建自定义 type 并与对应 *.schema.yaml 的 keyboard/type 保持一致。
+#
+# 二、多键位书写规范（Token-Set 原生规范，拒绝旧版写法）：
+# 1. 多键按键必须用 atoms 声明语义音素集合，如 atoms: [a, b, c] 或 atoms: "a,b,c"；
+#    多字母组合声母作为整体单元写入，如 atoms: [th]、atoms: [ng]、atoms: [zh, ch, sh]。
+# 2. 支持两种等价写法（下方示例 A 为全内联写法，示例 B 为 preset_keys 引用写法）：
+#    - 内联写法：直接在 keyboards.<id>.keys 中写 { label: def, atoms: [d, e, f] }
+#    - 预设键引用：在 preset_keys 中定义后通过 click 引用（不可覆盖 letter_* / t9_2..9 为无 atoms）
+# 3. 严禁旧规范：禁止使用 send: "2" / send: "5" / click: "2" 等数字或占位符编码，
+#    也禁止在方案中写 xlit 或 derive/[abc]/2/（此类旧主题项与旧方案会被系统拒绝加载）。
+# 4. 分词键统一在组合态配置 composing: delimiter（或 click: delimiter），闲置态可写
+#    text: "@" 或切换功能键；直出数字键请使用内置 num_0..num_9（走 commit 直出）。
 #
 # keyboards:
-#   # 示例 A：覆盖系统内置英文 26 键
-#   english:
-#     name: 自定义英文26键
-#     type: english
-#     ascii_mode: 1
-#     width: 10
+#   # --------------------------------------------------------------------------
+#   # 示例 A：完整 12 键客语布局（全内联 atoms 写法；覆盖 jiugong_simp 或新建布局）
+#   # 配套 *.schema.yaml 须声明 keyboard: { type: 12key } 与 speller/multi_key: true
+#   # --------------------------------------------------------------------------
+#   my_custom_12key:
+#     name: 自定义12键客语
+#     type: 12key
+#     ascii_mode: 0
+#     reset_ascii_mode: true
+#     ascii_keyboard: english
+#     full_shape: 0
+#     width: 17
 #     height: 55
+#     horizontal_gap: 5
+#     vertical_gap: 0
+#     key_press_offset_x: 2
+#     key_press_offset_y: 2
 #     keys:
-#       - { click: q, long_click: "1" }
-#       - { click: w, long_click: "2" }
-#       - { click: e, long_click: "3" }
-#       - { click: r, long_click: "4" }
-#       - { click: t, long_click: "5" }
-#       - { click: y, long_click: "6" }
-#       - { click: u, long_click: "7" }
-#       - { click: i, long_click: "8" }
-#       - { click: o, long_click: "9" }
-#       - { click: p, long_click: "0" }
-#       # ... 其余按键行
+#       # 顶部留白
+#       - { key_back_color: 0, width: 100, height: 7 }
+#       # 第 1 行：， | nz | qt | abc | def | 退格
+#       - { click: "，", long_click: "-", key_back_color: 0, width: 16 }
+#       - { label: nz, atoms: [nz], long_click: "@" }
+#       - { label: qt, atoms: [q, t], long_click: "`" }
+#       - { label: abc, atoms: [a, b, c], long_click: Keyboard_edit }
+#       - { label: def, atoms: [d, e, f], long_click: "~" }
+#       - { click: BackSpace, width: 16, key_back_color: off_key_back_color, key_text_color: off_key_text_color }
+#       # 第 2 行：。 | ng | ghi | kl | mno | /
+#       - { key_back_color: 0, width: 100, height: 7 }
+#       - { click: "。", long_click: "#", key_back_color: 0, width: 16 }
+#       - { label: ng, atoms: [ng], long_click: "'" }
+#       - { label: ghi, atoms: [g, h, i], long_click: "=" }
+#       - { label: kl, atoms: [k, l], long_click: "_" }
+#       - { label: mno, atoms: [m, n, o], long_click: "*" }
+#       - { click: "/", width: 16, key_back_color: off_key_back_color, key_text_color: off_key_text_color }
+#       # 第 3 行：？ | th | ps | vur | zj | 、
+#       - { key_back_color: 0, width: 100, height: 7 }
+#       - { click: "？", long_click: "！", key_back_color: 0, width: 16 }
+#       - { label: th, atoms: [th], long_click: copy }
+#       - { label: ps, atoms: [p, s], long_click: paste }
+#       - { label: vur, atoms: [v, u, r], long_click: cut }
+#       - { label: zj, atoms: [z, j], long_click: "[]{Left}" }
+#       - { click: "、", width: 16, key_back_color: off_key_back_color, key_text_color: off_key_text_color }
+#       # 第 4 行：符号 | 123 | 空格 | 英文/分词(composing: delimiter) | 回车
+#       - { key_back_color: 0, width: 100, height: 7 }
+#       - { click: Keyboard_bqrw, key_back_color: 0, long_click: Menu, width: 16, height: 50 }
+#       - { click: Keyboard_number, key_back_color: off_key_back_color, key_text_color: off_key_text_color }
+#       - { click: space, width: 34 }
+#       - { click: Keyboard_en, composing: delimiter, long_click: IME_switch, key_back_color: off_key_back_color, key_text_color: off_key_text_color }
+#       - { click: Return, width: 16, key_back_color: off_key_back_color, key_text_color: off_key_text_color }
+#       # 底部留白
+#       - { key_back_color: 0, width: 100, height: 7 }
 #
-#   # 示例 B：新建自定义类型布局（需在对应 *.schema.yaml 写 keyboard: { type: my_custom }）
-#   my_custom_layout:
-#     name: 我的自定义布局
-#     type: my_custom
-#     width: 20
+#   # --------------------------------------------------------------------------
+#   # 示例 B：完整 9 键拼音布局（preset_keys + click 引用写法；覆盖 pinyin_9key 或新建布局）
+#   # 配套 *.schema.yaml 须声明 keyboard: { type: 9key } 与 speller/multi_key: true
+#   # --------------------------------------------------------------------------
+#   my_custom_9key:
+#     name: 自定义9键拼音
+#     type: 9key
+#     ascii_mode: 0
+#     reset_ascii_mode: true
+#     ascii_keyboard: english
+#     full_shape: 0
+#     width: 17
 #     height: 55
+#     horizontal_gap: 5
+#     vertical_gap: 0
+#     key_press_offset_x: 2
+#     key_press_offset_y: 2
 #     keys:
-#       - { click: a }
-#       - { click: b }
-#       - { click: c }
-#       - { click: BackSpace }
-#       - { click: Return }
+#       # 顶部留白
+#       - { key_back_color: 0, width: 100, height: 7 }
+#       # 第 1 行：， | @分词(闲置@, 输入中分词) | ABC | DEF | 退格
+#       - { click: "，", long_click: "-", key_back_color: 0, width: 16 }
+#       - { click: custom_t9_1, composing: delimiter, long_click: "1", width: 22.66 }
+#       - { click: custom_t9_2, long_click: "2", width: 22.67 }
+#       - { click: custom_t9_3, long_click: "3", width: 22.67 }
+#       - { click: BackSpace, width: 16, key_back_color: off_key_back_color, key_text_color: off_key_text_color }
+#       # 第 2 行：。 | GHI | JKL | MNO | 重输
+#       - { key_back_color: 0, width: 100, height: 7 }
+#       - { click: "。", long_click: "#", key_back_color: 0, width: 16 }
+#       - { click: custom_t9_4, long_click: "4", width: 22.66 }
+#       - { click: custom_t9_5, long_click: Keyboard_edit, width: 22.67 }
+#       - { click: custom_t9_6, long_click: "6", width: 22.67 }
+#       - { click: Escape, label: 重输, width: 16, key_back_color: off_key_back_color, key_text_color: off_key_text_color }
+#       # 第 3 行：？ | PQRS | TUV | WXYZ | 、
+#       - { key_back_color: 0, width: 100, height: 7 }
+#       - { click: "？", long_click: "！", key_back_color: 0, width: 16 }
+#       - { click: custom_t9_7, long_click: "7", width: 22.66 }
+#       - { click: custom_t9_8, long_click: "8", width: 22.67 }
+#       - { click: custom_t9_9, long_click: "9", width: 22.67 }
+#       - { click: "、", width: 16, key_back_color: off_key_back_color, key_text_color: off_key_text_color }
+#       # 第 4 行：符号 | 123 | 空格 | 英文 | 回车
+#       - { key_back_color: 0, width: 100, height: 7 }
+#       - { click: Keyboard_symbols, key_back_color: 0, long_click: Menu, width: 16, height: 50 }
+#       - { click: Keyboard_number, width: 17, key_back_color: off_key_back_color, key_text_color: off_key_text_color }
+#       - { click: space, width: 34 }
+#       - { click: Keyboard_en, long_click: IME_switch, width: 17, key_back_color: off_key_back_color, key_text_color: off_key_text_color }
+#       - { click: Return, width: 16, key_back_color: off_key_back_color, key_text_color: off_key_text_color }
+#       # 底部留白
+#       - { key_back_color: 0, width: 100, height: 7 }
 #
+# # 与示例 B 配套的完整 9 键 preset_keys 定义（禁止写 send: "2".."9"）
 # preset_keys:
-#   my_key: { label: 自定义, send: a, functional: false }
+#   custom_t9_1: { label: "@分词", text: "@", functional: false }
+#   custom_t9_2: { label: ABC, atoms: [a, b, c], functional: false }
+#   custom_t9_3: { label: DEF, atoms: [d, e, f], functional: false }
+#   custom_t9_4: { label: GHI, atoms: [g, h, i], functional: false }
+#   custom_t9_5: { label: JKL, atoms: [j, k, l], functional: false }
+#   custom_t9_6: { label: MNO, atoms: [m, n, o], functional: false }
+#   custom_t9_7: { label: PQRS, atoms: [p, q, r, s], functional: false }
+#   custom_t9_8: { label: TUV, atoms: [t, u, v], functional: false }
+#   custom_t9_9: { label: WXYZ, atoms: [w, x, y, z], functional: false }

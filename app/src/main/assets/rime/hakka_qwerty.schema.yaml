@@ -128,7 +128,7 @@ recognizer:
   import_preset: default
   patterns:
     reverse_lookup: "`[a-z]*'?$"
-    punct: "^w([A-Z|a-z]*|[0-9]|10)$"
+    punct: "^/([0-9]0?|[a-z]+)$"
 
 # OpenCC 擴展按各自 option_name 開關產生多值候選。
 ywz:
@@ -145,8 +145,3 @@ emoji:
   opencc_config: emoji.json
   option_name: emoji
   tips: all    #none无注释, char单字注释, all全部注释
-
-emoji:
-  opencc_config: emoji.json
-  option_name: emoji
-  tips: none    #none无注释, char单字注释, all全部注释

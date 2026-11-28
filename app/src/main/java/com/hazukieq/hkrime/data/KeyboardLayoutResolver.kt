@@ -115,6 +115,103 @@ object KeyboardLayoutResolver {
         return raw?.takeIf { it.isNotEmpty() }
     }
 
+    private val MULTI_KEY_TYPES = setOf(TYPE_12KEY, TYPE_9KEY)
+
+    /** 主題多鍵布局與 preset_keys 校驗結果。 */
+    data class ThemeValidationResult(
+        val keyboards: Map<String, Map<String, *>>,
+        val presetKeys: Map<String, Map<String, *>>,
+        val rejectedReasons: List<String>,
+    )
+
+    /**
+     * 校驗並過濾主題自定義的 `keyboards:` 與 `preset_keys:`：
+     * - 必須顯式聲明 `type`（除非覆蓋內置工具鍵盤 `english` / `number`）；
+     * - 多鍵方案按鍵（`letter_*` / `t9_2..9` 覆蓋，以及 `12key`/`9key` 布局內編碼鍵）
+     *   必須使用原生 `atoms`，拒絕舊版 `send: "2"` / 裸數字 / `';'` 佔位寫法。
+     */
+    @JvmStatic
+    fun validateAndFilterTheme(
+        rawKeyboards: Map<String, Map<String, *>>?,
+        rawPresetKeys: Map<String, Map<String, *>>?,
+    ): ThemeValidationResult {
+        val rejected = ArrayList<String>()
+        val validPresets = LinkedHashMap<String, Map<String, *>>()
+        if (!rawPresetKeys.isNullOrEmpty()) {
+            for ((keyId, def) in rawPresetKeys) {
+                if (isLegacyMultiKeyPresetOverride(keyId, def)) {
+                    rejected.add("preset_keys.$keyId 禁止旧版 send 占位写法，必须使用 atoms")
+                    continue
+                }
+                validPresets[keyId] = def
+            }
+        }
+
+        val validKeyboards = LinkedHashMap<String, Map<String, *>>()
+        if (!rawKeyboards.isNullOrEmpty()) {
+            for ((rawId, def) in rawKeyboards) {
+                val id = BuiltinKeyboards.canonicalName(rawId)
+                val isUtilityOverride = BuiltinKeyboards.isUtility(id)
+                val declaredType = declaredTypeOf(def)
+                if (declaredType == null && !isUtilityOverride) {
+                    rejected.add("keyboards.$rawId 缺少显式 type 声明")
+                    continue
+                }
+                if (declaredType != null && declaredType in MULTI_KEY_TYPES) {
+                    val violation = findMultiKeyLayoutViolation(def, validPresets)
+                    if (violation != null) {
+                        rejected.add("keyboards.$rawId($declaredType) $violation")
+                        continue
+                    }
+                }
+                validKeyboards[id] = def
+            }
+        }
+        return ThemeValidationResult(validKeyboards, validPresets, rejected)
+    }
+
+    private fun isBuiltinMultiKeyCodePreset(keyId: String): Boolean =
+        keyId.startsWith("letter_") || (keyId.startsWith("t9_") && keyId != "t9_1")
+
+    private fun isLegacyMultiKeyPresetOverride(keyId: String, def: Map<String, *>): Boolean {
+        if (!isBuiltinMultiKeyCodePreset(keyId)) return false
+        return !hasNonEmptyAtoms(def["atoms"])
+    }
+
+    private fun hasNonEmptyAtoms(raw: Any?): Boolean = when (raw) {
+        null -> false
+        is Collection<*> -> raw.any { it?.toString()?.trim()?.isNotEmpty() == true }
+        else -> raw.toString().split(',', ' ').any { it.trim().isNotEmpty() }
+    }
+
+    private fun isLegacyDigitOrSurrogateSend(send: String): Boolean {
+        val s = send.trim()
+        return s.length == 1 && (s[0] in '0'..'9' || s[0] == ';')
+    }
+
+    private fun findMultiKeyLayoutViolation(
+        layoutDef: Map<String, *>,
+        themePresets: Map<String, Map<String, *>>,
+    ): String? {
+        val rawKeys = layoutDef["keys"] as? List<*> ?: return null
+        for (item in rawKeys) {
+            val km = item as? Map<*, *> ?: continue
+            val click = km["click"]?.toString()?.trim().orEmpty()
+            if (click.isEmpty()) continue
+            if (isLegacyDigitOrSurrogateSend(click)) {
+                return "禁止直接使用数字/占位键 click: \"$click\"，请改用 atoms"
+            }
+            if (hasNonEmptyAtoms(km["atoms"])) continue
+            val preset = themePresets[click] ?: continue
+            val hasCommit = !preset["commit"]?.toString()?.trim().isNullOrEmpty()
+            val send = preset["send"]?.toString()?.trim().orEmpty()
+            if (!hasCommit && !hasNonEmptyAtoms(preset["atoms"]) && isLegacyDigitOrSurrogateSend(send)) {
+                return "引用了旧版占位按键 $click (send: \"$send\")，多键必须改用 atoms"
+            }
+        }
+        return null
+    }
+
     /**
      * 過濾主題自定義的 `keyboards:` 條目：
      * - 必須顯式聲明 `type`（允許覆蓋已有類型或新建自定義類型），或是覆蓋內置工具鍵盤（`english` / `number`）；
@@ -123,20 +220,7 @@ object KeyboardLayoutResolver {
     @JvmStatic
     fun filterCustomKeyboards(
         rawKeyboards: Map<String, Map<String, *>>?,
-    ): Map<String, Map<String, *>> {
-        if (rawKeyboards.isNullOrEmpty()) return emptyMap()
-        val out = LinkedHashMap<String, Map<String, *>>()
-        for ((rawId, def) in rawKeyboards) {
-            val id = BuiltinKeyboards.canonicalName(rawId)
-            val isUtilityOverride = BuiltinKeyboards.isUtility(id)
-            val declaredType = declaredTypeOf(def)
-            if (declaredType == null && !isUtilityOverride) {
-                continue
-            }
-            out[id] = def
-        }
-        return out
-    }
+    ): Map<String, Map<String, *>> = validateAndFilterTheme(rawKeyboards, null).keyboards
 
     /**
      * 合併內置主打字布局與主題自定義打字布局（排除 `english` / `number` 工具鍵盤）。

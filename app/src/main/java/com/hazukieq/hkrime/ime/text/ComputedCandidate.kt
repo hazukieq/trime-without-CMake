@@ -18,10 +18,11 @@ sealed class ComputedCandidate(val geometry: Rect) {
     class Word(
         val word: String,
         val comment: String?,
-        geometry: Rect
+        geometry: Rect,
+        val openccModified: Boolean = false,
     ) : ComputedCandidate(geometry) {
         override fun toString(): String {
-            return "Word { word=\"$word\", comment=\"$comment\", geometry=$geometry }"
+            return "Word { word=\"$word\", comment=\"$comment\", geometry=$geometry, openccModified=$openccModified }"
         }
     }
 

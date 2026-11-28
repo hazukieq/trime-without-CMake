@@ -36,7 +36,6 @@ import android.util.TypedValue;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.hazukieq.hkrime.core.Rime;
-import com.hazukieq.hkrime.ime.enums.PositionType;
 import com.hazukieq.hkrime.ime.keyboard.BuiltinKeyboards;
 import com.hazukieq.hkrime.ime.keyboard.Key;
 import com.hazukieq.hkrime.ime.keyboard.Sound;
@@ -384,11 +383,6 @@ public class Config {
           globalThemeConfig != null
               ? (Map<String, Map<String, String>>) globalThemeConfig.get("preset_keys")
               : null;
-      Map<String, Map<String, String>> mergedPresetKeys =
-          rawPresetKeys != null ? new HashMap<>(rawPresetKeys) : new HashMap<>();
-      BuiltinKeyboards.registerPresetKeys(mergedPresetKeys);
-      Key.presetKeys = mergedPresetKeys;
-
       presetColorSchemes =
           globalThemeConfig != null
               ? (Map<String, Map<String, String>>) globalThemeConfig.get("colors")
@@ -397,7 +391,26 @@ public class Config {
           globalThemeConfig != null
               ? (Map<String, Map<String, ?>>) globalThemeConfig.get("keyboards")
               : null;
-      customKeyboards = KeyboardLayoutResolver.filterCustomKeyboards(rawKeyboards);
+      KeyboardLayoutResolver.ThemeValidationResult themeCheck =
+          KeyboardLayoutResolver.validateAndFilterTheme(
+              rawKeyboards,
+              (Map<String, Map<String, ?>>) (Map<?, ?>) rawPresetKeys);
+      Map<String, Map<String, String>> mergedPresetKeys = new HashMap<>();
+      for (Map.Entry<String, Map<String, ?>> entry : themeCheck.getPresetKeys().entrySet()) {
+        mergedPresetKeys.put(entry.getKey(), (Map<String, String>) (Map<?, ?>) entry.getValue());
+      }
+      BuiltinKeyboards.registerPresetKeys(mergedPresetKeys);
+      Key.presetKeys = mergedPresetKeys;
+
+      customKeyboards = themeCheck.getKeyboards();
+      if (!themeCheck.getRejectedReasons().isEmpty()) {
+        final String msg =
+            "拒绝加载旧规范主题配置："
+                + android.text.TextUtils.join("；", themeCheck.getRejectedReasons());
+        Timber.w("Config: %s", msg);
+        new android.os.Handler(android.os.Looper.getMainLooper())
+            .post(() -> com.blankj.utilcode.util.ToastUtils.showLong(msg));
+      }
       Rime.setShowSwitches(false);
       reset();
       Timber.d("init() reset done");
@@ -926,10 +939,6 @@ public class Config {
   public Drawable getColorDrawable(String key) {
     final Object o = getColorObject(key);
     return drawableObject(o);
-  }
-
-  public PositionType getWinPos() {
-    return PositionType.Companion.fromString(getString("layout/position"));
   }
 
   public int getLongTimeout() {

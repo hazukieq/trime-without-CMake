@@ -122,4 +122,115 @@ class KeyboardLayoutResolverTest {
         // Future custom non-26-key types inherit the same paradigm automatically
         assertTrue(KeyboardLayoutResolver.capabilitiesOf("14key_custom").materializePreeditFromCandidate)
     }
+
+    @Test
+    fun validateAndFilterThemeRejectsLegacyMultiKeyDigitsAndAcceptsAtoms() {
+        val legacyPresets: Map<String, Map<String, Any>> = linkedMapOf(
+            "t9_2" to mapOf("label" to "ABC", "send" to "2", "functional" to "false"),
+            "old_code_5" to mapOf("label" to "kl", "send" to "5"),
+            "modern_th" to mapOf("label" to "th", "atoms" to listOf("th"), "functional" to "false"),
+        )
+        val rawKeyboards: Map<String, Map<String, Any>> = linkedMapOf(
+            "legacy_t9_click_digit" to mapOf(
+                "name" to "旧9键裸数字",
+                "type" to "9key",
+                "keys" to listOf(mapOf("click" to "2")),
+            ),
+            "legacy_12key_preset_send" to mapOf(
+                "name" to "旧12键占位发送",
+                "type" to "12key",
+                "keys" to listOf(mapOf("click" to "old_code_5")),
+            ),
+            "modern_custom_12key" to mapOf(
+                "name" to "新规范12键",
+                "type" to "12key",
+                "keys" to listOf(
+                    mapOf("click" to "modern_th"),
+                    mapOf("label" to "abc", "atoms" to listOf("a", "b", "c"), "long_click" to "2"),
+                    mapOf("click" to "BackSpace"),
+                ),
+            ),
+        )
+
+        val result = KeyboardLayoutResolver.validateAndFilterTheme(rawKeyboards, legacyPresets)
+        assertFalse("legacy t9_2 preset without atoms should be rejected", result.presetKeys.containsKey("t9_2"))
+        assertTrue("modern_th preset with atoms should pass", result.presetKeys.containsKey("modern_th"))
+        assertFalse(result.keyboards.containsKey("legacy_t9_click_digit"))
+        assertFalse(result.keyboards.containsKey("legacy_12key_preset_send"))
+        assertTrue(result.keyboards.containsKey("modern_custom_12key"))
+        assertTrue(result.rejectedReasons.size >= 3)
+    }
+
+    @Test
+    fun fullTemplate12KeyAnd9KeyThemeDefinitionsPassValidation() {
+        val full12KeyKeys = listOf(
+            mapOf("key_back_color" to 0, "width" to 100, "height" to 7),
+            mapOf("click" to "，", "long_click" to "-", "width" to 16),
+            mapOf("label" to "nz", "atoms" to listOf("nz"), "long_click" to "@"),
+            mapOf("label" to "qt", "atoms" to listOf("q", "t"), "long_click" to "`"),
+            mapOf("label" to "abc", "atoms" to listOf("a", "b", "c"), "long_click" to "Keyboard_edit"),
+            mapOf("label" to "def", "atoms" to listOf("d", "e", "f"), "long_click" to "~"),
+            mapOf("click" to "BackSpace", "width" to 16),
+            mapOf("click" to "。", "long_click" to "#", "width" to 16),
+            mapOf("label" to "ng", "atoms" to listOf("ng"), "long_click" to "'"),
+            mapOf("label" to "ghi", "atoms" to listOf("g", "h", "i"), "long_click" to "="),
+            mapOf("label" to "kl", "atoms" to listOf("k", "l"), "long_click" to "_"),
+            mapOf("label" to "mno", "atoms" to listOf("m", "n", "o"), "long_click" to "*"),
+            mapOf("click" to "/", "width" to 16),
+            mapOf("click" to "？", "long_click" to "！", "width" to 16),
+            mapOf("label" to "th", "atoms" to listOf("th"), "long_click" to "copy"),
+            mapOf("label" to "ps", "atoms" to listOf("p", "s"), "long_click" to "paste"),
+            mapOf("label" to "vur", "atoms" to listOf("v", "u", "r"), "long_click" to "cut"),
+            mapOf("label" to "zj", "atoms" to listOf("z", "j"), "long_click" to "[]{Left}"),
+            mapOf("click" to "、", "width" to 16),
+            mapOf("click" to "Keyboard_bqrw", "long_click" to "Menu", "width" to 16),
+            mapOf("click" to "Keyboard_number"),
+            mapOf("click" to "space", "width" to 34),
+            mapOf("click" to "Keyboard_en", "composing" to "delimiter", "long_click" to "IME_switch"),
+            mapOf("click" to "Return", "width" to 16),
+        )
+        val full9Presets = linkedMapOf<String, Map<String, Any>>(
+            "custom_t9_1" to mapOf("label" to "@分词", "text" to "@", "functional" to "false"),
+            "custom_t9_2" to mapOf("label" to "ABC", "atoms" to listOf("a", "b", "c"), "functional" to "false"),
+            "custom_t9_3" to mapOf("label" to "DEF", "atoms" to listOf("d", "e", "f"), "functional" to "false"),
+            "custom_t9_4" to mapOf("label" to "GHI", "atoms" to listOf("g", "h", "i"), "functional" to "false"),
+            "custom_t9_5" to mapOf("label" to "JKL", "atoms" to listOf("j", "k", "l"), "functional" to "false"),
+            "custom_t9_6" to mapOf("label" to "MNO", "atoms" to listOf("m", "n", "o"), "functional" to "false"),
+            "custom_t9_7" to mapOf("label" to "PQRS", "atoms" to listOf("p", "q", "r", "s"), "functional" to "false"),
+            "custom_t9_8" to mapOf("label" to "TUV", "atoms" to listOf("t", "u", "v"), "functional" to "false"),
+            "custom_t9_9" to mapOf("label" to "WXYZ", "atoms" to listOf("w", "x", "y", "z"), "functional" to "false"),
+        )
+        val full9KeyKeys = listOf(
+            mapOf("click" to "，", "long_click" to "-", "width" to 16),
+            mapOf("click" to "custom_t9_1", "composing" to "delimiter", "long_click" to "1", "width" to 22.66),
+            mapOf("click" to "custom_t9_2", "long_click" to "2", "width" to 22.67),
+            mapOf("click" to "custom_t9_3", "long_click" to "3", "width" to 22.67),
+            mapOf("click" to "BackSpace", "width" to 16),
+            mapOf("click" to "。", "long_click" to "#", "width" to 16),
+            mapOf("click" to "custom_t9_4", "long_click" to "4", "width" to 22.66),
+            mapOf("click" to "custom_t9_5", "long_click" to "Keyboard_edit", "width" to 22.67),
+            mapOf("click" to "custom_t9_6", "long_click" to "6", "width" to 22.67),
+            mapOf("click" to "Escape", "label" to "重输", "width" to 16),
+            mapOf("click" to "？", "long_click" to "！", "width" to 16),
+            mapOf("click" to "custom_t9_7", "long_click" to "7", "width" to 22.66),
+            mapOf("click" to "custom_t9_8", "long_click" to "8", "width" to 22.67),
+            mapOf("click" to "custom_t9_9", "long_click" to "9", "width" to 22.67),
+            mapOf("click" to "、", "width" to 16),
+            mapOf("click" to "Keyboard_symbols", "long_click" to "Menu", "width" to 16),
+            mapOf("click" to "Keyboard_number", "width" to 17),
+            mapOf("click" to "space", "width" to 34),
+            mapOf("click" to "Keyboard_en", "long_click" to "IME_switch", "width" to 17),
+            mapOf("click" to "Return", "width" to 16),
+        )
+        val rawKeyboards = linkedMapOf<String, Map<String, Any>>(
+            "my_custom_12key" to mapOf("name" to "自定义12键客语", "type" to "12key", "keys" to full12KeyKeys),
+            "my_custom_9key" to mapOf("name" to "自定义9键拼音", "type" to "9key", "keys" to full9KeyKeys),
+        )
+
+        val result = KeyboardLayoutResolver.validateAndFilterTheme(rawKeyboards, full9Presets)
+        assertTrue("Unexpected rejections: ${result.rejectedReasons}", result.rejectedReasons.isEmpty())
+        assertTrue(result.keyboards.containsKey("my_custom_12key"))
+        assertTrue(result.keyboards.containsKey("my_custom_9key"))
+        assertEquals(9, result.presetKeys.size)
+    }
 }

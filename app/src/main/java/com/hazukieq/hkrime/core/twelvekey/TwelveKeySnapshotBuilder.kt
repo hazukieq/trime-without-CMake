@@ -111,6 +111,8 @@ object TwelveKeySnapshotBuilder {
         initial: String? = null,
         appRankingEnabled: Boolean = true,
         phonetics: List<PhoneticSelection> = emptyList(),
+        preFetchedSnapshot: List<Array<String>>? = null,
+        preFetchedInlinePrefix: String? = null,
     ): TwelveKeySnapshot {
         if (local.isEmpty) return TwelveKeySnapshot.EMPTY
         val input = local.input
@@ -136,7 +138,7 @@ object TwelveKeySnapshotBuilder {
         } else {
             __enumStartNs = System.nanoTime()
             val fetchLimit = if (probeMore) maxCandidates + 1 else maxCandidates
-            val snapshot = runCatching { Rime.candidatesSnapshot(fetchLimit) }.getOrNull()
+            val snapshot = preFetchedSnapshot ?: runCatching { Rime.candidatesSnapshot(fetchLimit) }.getOrNull()
             __enumMs = (System.nanoTime() - __enumStartNs) / 1_000_000
             if (__enumMs >= 8) DiagLog.d("perf", "enum=${__enumMs}ms code=$input n=${snapshot?.size ?: -1}")
 
@@ -148,6 +150,7 @@ object TwelveKeySnapshotBuilder {
                     comment = cleanComment(row.getOrNull(1)),
                     index = row.getOrNull(5)?.toIntOrNull() ?: index,
                     engineSpan = EngineCandidateSpan.fromRow(row),
+                    openccModified = row.getOrNull(6) == "1",
                 )
             }
         } else {
@@ -216,8 +219,8 @@ object TwelveKeySnapshotBuilder {
             withFirstSegmentChars(barList(barCandidates), barCandidates, remaining, initial)
         }
         val barEntries = barEntries0
-        // 推薦組最多 30 詞與 10 單字；詞來自聯想/組合/整串與引擎詞，單字可用段組補位。
-        val recommend = recommendWords(ordered, panelRows, local.remaining)
+        // 推薦組僅在面板展開（wantGroups=true）時建构，候選條路徑免建 40 條推薦與左列確認行。
+        val recommend = if (wantGroups) recommendWords(ordered, panelRows, local.remaining) else emptyList()
         // 過長編碼：候選條/字典都沒有覆蓋全碼的詞時，按「每鍵第一個給拼音聲母」造一個組詞，
         // 放在條首與推薦首位，避免 preedit/預覽裸露原碼。
         // 「盡力找」只在**候選條固定窗口**裡找：bar/full 必須用同一窗口判定，
@@ -242,30 +245,32 @@ object TwelveKeySnapshotBuilder {
         val recommendWithSynth = if (synthesized != null) listOf(synthesized) + recommend else recommend
         // 推薦組固定排左列第一（reading 為空 + [RECOMMEND_SEGMENT] 標記）；空的就不插，
         // 這樣「候選全上了條」時段組自然回到第 0 組。
-        val recommendRow = if (recommendWithSynth.isEmpty()) {
+        val groupsWithRecommend = if (!wantGroups) {
             emptyList()
         } else {
-            listOf(
-                SyllableGroup(
-                    reading = "",
-                    syllables = emptyList(),
-                    items = recommendWithSynth,
-                    segment = RECOMMEND_SEGMENT,
-                ),
-            )
-        }
-        // 12 鍵：左列只放「確認」行（把模糊碼轉成確切音節/首字母），與右側候選徹底分離；
-        // 其它方案保持原來的「讀音組 + 右格」導航。
-        val groupsWithRecommend = if (mapFallbackLetters) {
-            recommendRow + confirmGroups(remaining, emptyList())
-        } else {
-            recommendRow + panelRows.map { it.toSyllableGroup() }
+            val recommendRow = if (recommendWithSynth.isEmpty()) {
+                emptyList()
+            } else {
+                listOf(
+                    SyllableGroup(
+                        reading = "",
+                        syllables = emptyList(),
+                        items = recommendWithSynth,
+                        segment = RECOMMEND_SEGMENT,
+                    ),
+                )
+            }
+            if (mapFallbackLetters) {
+                recommendRow + confirmGroups(remaining, emptyList())
+            } else {
+                recommendRow + panelRows.map { it.toSyllableGroup() }
+            }
         }
         // 預覽文字與候選條第 0 條同源：一次算好，隨快照發佈。
         val previewText = barWithSynth.firstOrNull { it.text.isNotEmpty() }?.text ?: ""
         // 已選前綴（librime context 裡尚未 commit 的字）+ 第一條候選 = 嵌入式預覽全文
         // App 側暫存的字（兜底逐段選字）也要算進嵌入式預覽，否則選中的字在輸入框裡看不到。
-        val inlineText = runCatching { Rime.getCompositionPrefix() }.getOrDefault("") + previewText
+        val inlineText = (preFetchedInlinePrefix ?: runCatching { Rime.getCompositionPrefix() }.getOrDefault("")) + previewText
         // 兜底按引擎和字典候選是否可用判斷，不能把面板關閉的空 groups 當成無候選。
         val fallback = if (shouldShowFallback(barEntries.size, remaining)) {
             val raw = remaining.takeLast(MAX_FALLBACK_CODE)
@@ -279,9 +284,13 @@ object TwelveKeySnapshotBuilder {
         if (degraded) {
             Timber.w("twelvekey: enumerate native missing, degraded to single page (%d)", flat.size)
         }
-        val boundGroups = groupsWithRecommend.map { group -> group.copy(items = group.items.map(inputBinder::bind)) }
-        val boundBar = barWithSynth.map(inputBinder::bind)
-        val boundRecommend = recommendWithSynth.map(inputBinder::bind)
+        val boundGroups = if (wantGroups) {
+            groupsWithRecommend.map { group -> group.copy(items = group.items.map { if (it.inputSpan != null) it else inputBinder.bind(it) }) }
+        } else {
+            emptyList()
+        }
+        val boundBar = barWithSynth.map { if (it.inputSpan != null) it else inputBinder.bind(it) }
+        val boundRecommend = recommendWithSynth.map { if (it.inputSpan != null) it else inputBinder.bind(it) }
         DiagLog.d(
             "snapshot",
             "build code=${input} mode=app wantGroups=$wantGroups groups=${groupsWithRecommend.size}" +
@@ -310,7 +319,7 @@ object TwelveKeySnapshotBuilder {
             inlineText = inlineText,
             contextKey = local.contextKey,
             rawPreedit = local.rawPreedit,
-            initialChoices = if (mapFallbackLetters) InitialDisambiguation.choices(remaining) else emptyList(),
+            initialChoices = if (mapFallbackLetters && wantGroups) InitialDisambiguation.choices(remaining) else emptyList(),
             initial = null,
             phoneticNavigation = mapFallbackLetters,
         )
@@ -332,20 +341,27 @@ object TwelveKeySnapshotBuilder {
         hasEngineMore: Boolean = false,
     ): TwelveKeySnapshot {
         val code = local.remaining
+        val plan = CandidateInputBoundary.InputPlan(code)
         val binder = CandidateSelection.InputBinder(code, local.consumedEnd)
         // 引擎已按 hkrime_initial 在窗口前收窄；這裡再用「完整序列 + 實際跨度」校驗：
         // 只覆蓋前幾段的整音節單字不能冒充已確認序列。
-        fun validate(source: List<CandidateItem>): List<CandidateItem> = source.map(binder::bind).filter { item ->
-            val span = item.inputSpan ?: return@filter false
-            PhoneticSelection.matches(span.reading, phonetics) &&
-                PhoneticSelection.matchesInput(span.reading, code, span.end, phonetics)
+        val matchCache = HashMap<Pair<String, Int>, Boolean>()
+        val matched = ArrayList<CandidateItem>(flat.size)
+        val barMatched = ArrayList<CandidateItem>(minOf(flat.size, TwelveKeyTuning.BAR_CANDIDATES))
+        flat.forEachIndexed { idx, rawItem ->
+            val item = binder.bind(rawItem)
+            val span = item.inputSpan ?: return@forEachIndexed
+            val ok = matchCache.getOrPut(span.reading to span.end) {
+                val parsedTokens = TwelveKeyPreedit.parseComment(span.reading)
+                PhoneticSelection.matches(span.reading, phonetics, parsedTokens) &&
+                    PhoneticSelection.matchesInput(span.reading, code, span.end, phonetics, parsedTokens, plan)
+            }
+            if (ok) {
+                matched.add(item)
+                if (idx < TwelveKeyTuning.BAR_CANDIDATES) barMatched.add(item)
+            }
         }
-        // 候選條固定只從前 64 條引擎窗口算，full/limited 的前 12 項必須一致。
-        val barWindow = if (flat.size > TwelveKeyTuning.BAR_CANDIDATES) flat.subList(0, TwelveKeyTuning.BAR_CANDIDATES) else flat
-        val matched = validate(flat)
-        val barMatched = if (barWindow === flat) matched else validate(barWindow)
         val words = matched.distinctBy { it.text }
-        val pending = PhoneticSelection.pending(code, phonetics)
         val first = phonetics.firstOrNull()
         // 候選條與面板都需要首段漢字（引擎菜單沒有只覆蓋首段的單字）。
         val firstChars = if (appRankingEnabled && first != null) {
@@ -525,10 +541,15 @@ object TwelveKeySnapshotBuilder {
         val rest = code.substring(first.code.length)
         val seen = HashSet<String>()
         val chars = ArrayList<Triple<String, String, Int>>()
+        val perSyllableLimit = if (first.initialOnly && syllables.size > 4) 24 else TwelveKeyTuning.SEGMENT_CHARS_LIMIT
         for (syllable in syllables) {
-            val nativeChars = runCatching {
-                Rime.query_syllable_chars(syllable, TwelveKeyTuning.SEGMENT_CHARS_LIMIT)?.toList()
-            }.getOrNull().orEmpty()
+            val nativeChars = if (first.initialOnly && chars.size >= TwelveKeyTuning.SEGMENT_CHARS_LIMIT) {
+                emptyList()
+            } else {
+                runCatching {
+                    Rime.query_syllable_chars(syllable, perSyllableLimit)?.toList()
+                }.getOrNull().orEmpty()
+            }
             val list = if (nativeChars.isNotEmpty()) {
                 nativeChars
             } else {
@@ -1299,9 +1320,7 @@ object TwelveKeySnapshotBuilder {
         if (initial != null && units.firstOrNull() != initial) return null
         val chars = ArrayList<String>(units.size)
         for (unit in units) {
-            val best = TwelveKeyPreedit.syllablesByInitials(listOf(unit)).asSequence()
-                .flatMap { TwelveKeyPreedit.charsForSyllable(it, 2).asSequence() }
-                .maxByOrNull { TwelveKeyPreedit.generalScore(it) } ?: return null
+            val best = TwelveKeyPreedit.bestCharForInitial(unit) ?: return null
             chars.add(best)
         }
         val text = chars.joinToString("")
@@ -1332,6 +1351,7 @@ object TwelveKeySnapshotBuilder {
         initial: String? = null,
     ): List<CandidateItem> {
         if (remaining.isEmpty() || bar.isEmpty() || bar.any { it.text.length == 1 }) return bar
+        if (ranked.none { it.text.length == 1 }) return bar
         val head = splitParts(remaining, initial).firstOrNull() ?: return bar
         if (head.rest.isEmpty()) return bar
         val syllables = head.syllables.take(FIRST_SEGMENT_CHARS).toSet()

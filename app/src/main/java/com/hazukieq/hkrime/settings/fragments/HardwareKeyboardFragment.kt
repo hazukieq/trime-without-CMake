@@ -2,9 +2,14 @@ package com.hazukieq.hkrime.settings.fragments
 
 import android.content.SharedPreferences
 import android.os.Bundle
+import android.util.TypedValue
 import android.view.Menu
 import android.view.View
+import android.widget.ScrollView
+import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.core.view.forEach
+import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import com.hazukieq.hkrime.R
 import com.hazukieq.hkrime.data.AppPrefs
@@ -47,6 +52,38 @@ class HardwareKeyboardFragment :
         }
     }
 
+    override fun onPreferenceTreeClick(preference: Preference): Boolean {
+        return when (preference.key) {
+            KEY_HW_MANUAL -> {
+                showHardwareManualDialog()
+                true
+            }
+            else -> super.onPreferenceTreeClick(preference)
+        }
+    }
+
+    private fun showHardwareManualDialog() {
+        val ctx = context ?: return
+        val density = ctx.resources.displayMetrics.density
+        val padH = (22f * density).toInt()
+        val padV = (14f * density).toInt()
+        val contentView = TextView(ctx).apply {
+            text = getString(R.string.keyboard__hw_manual_content)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setLineSpacing(0f, 1.38f)
+            setTextIsSelectable(true)
+            setPadding(padH, padV, padH, padV)
+        }
+        val scrollView = ScrollView(ctx).apply {
+            addView(contentView)
+        }
+        AlertDialog.Builder(ctx)
+            .setTitle(R.string.keyboard__hw_manual_title)
+            .setView(scrollView)
+            .setPositiveButton(R.string.keyboard__hw_manual_close, null)
+            .show()
+    }
+
     override fun onResume() {
         super.onResume()
         preferenceScreen.sharedPreferences?.registerOnSharedPreferenceChangeListener(this)
@@ -55,5 +92,9 @@ class HardwareKeyboardFragment :
     override fun onPause() {
         super.onPause()
         preferenceScreen.sharedPreferences?.unregisterOnSharedPreferenceChangeListener(this)
+    }
+
+    companion object {
+        private const val KEY_HW_MANUAL = "keyboard__hw_manual"
     }
 }

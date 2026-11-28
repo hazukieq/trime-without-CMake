@@ -77,6 +77,16 @@ sealed interface MultiKeyProfile {
         override val codeKeys: String = "aei5479381wy'"
         override val allowLongCodeSynthesis: Boolean = true
 
+        override fun isCodeChar(c: Char): Boolean =
+            if (TwelveKeyPreedit.hasTokenBindings()) {
+                c == '\'' || TwelveKeyPreedit.isBoundHandle(c)
+            } else {
+                c in codeKeys
+            }
+
+        override fun isCodeString(input: String): Boolean =
+            input.isNotEmpty() && input.all { isCodeChar(it) || it == '\'' || it.isWhitespace() }
+
         private val fallbackMap = mapOf(
             '3' to "u",
             '1' to "ng",
@@ -108,8 +118,7 @@ sealed interface MultiKeyProfile {
         override fun hasFullSyllable(code: String): Boolean = TwelveKeyPreedit.hasFullSyllable(code)
         override fun decodeSpans(code: String): List<Pair<String, String>>? = TwelveKeyPreedit.decodeSpans(code)
         override fun resolveExactCodeLength(reading: String, effectiveCode: String): Int? =
-            TwelveKeySnapshotBuilder.splitParts(effectiveCode).firstOrNull { reading in it.syllables }
-                ?.let { effectiveCode.length - it.rest.length }
+            TwelveKeyPreedit.exactCodeLengthForSyllable(reading, effectiveCode)
         override fun rewritePreedit(
             raw: String,
             firstText: String?,
@@ -117,7 +126,9 @@ sealed interface MultiKeyProfile {
             rawInput: String,
         ): String? = TwelveKeyPreedit.rewrite(raw, firstText, firstComment, rawInput = rawInput)
 
-        override fun fallbackLetter(codeChar: Char): String = fallbackMap[codeChar] ?: codeChar.toString()
+        override fun fallbackLetter(codeChar: Char): String =
+            if (TwelveKeyPreedit.hasTokenBindings()) TwelveKeyPreedit.fallbackTokenLetter(codeChar)
+            else fallbackMap[codeChar] ?: codeChar.toString()
     }
 
     /**
@@ -171,8 +182,19 @@ sealed interface MultiKeyProfile {
                 "zhu zhua zhuai zhuan zhuang zhui zhun zhuo zi zong zou zu zuan zui zun zuo"
             ).split(' ').toSet()
 
+        private fun defaultCodeOf(syllable: String): String {
+            if (syllable.isEmpty()) return ""
+            val lower = syllable.lowercase()
+            val sb = StringBuilder(lower.length)
+            for (ch in lower) {
+                val mapped = letterToKey[ch] ?: return ""
+                sb.append(mapped)
+            }
+            return sb.toString()
+        }
+
         private val codeToSyllables: Map<String, List<String>> = syllables
-            .groupBy { codeOf(it) }
+            .groupBy { defaultCodeOf(it) }
             .mapValues { (_, list) -> list.sorted() }
 
         private val initialToSyllables: Map<String, List<String>> = syllables
@@ -183,38 +205,109 @@ sealed interface MultiKeyProfile {
             letters.map { it.toString() }.filter { it in initialToSyllables }.sorted()
         }
 
+        private class NineTrieNode {
+            val children = arrayOfNulls<NineTrieNode>(26)
+            var syllable: String? = null
+        }
+
+        private val trieRoot: NineTrieNode = NineTrieNode().apply {
+            syllables.forEach { syll ->
+                var cur = this
+                for (i in 0 until syll.length) {
+                    val ch = syll[i]
+                    if (ch !in 'a'..'z') return@forEach
+                    val idx = ch - 'a'
+                    cur = cur.children[idx] ?: NineTrieNode().also { cur.children[idx] = it }
+                }
+                cur.syllable = syll
+            }
+        }
+
         private val maxSyllableLen: Int = syllables.maxOf { it.length }
 
-        override fun keyLetters(c: Char): String = keyMap[c.lowercaseChar()].orEmpty()
+        private fun isCodeLetter(c: Char): Boolean =
+            if (TwelveKeyPreedit.hasTokenBindings()) TwelveKeyPreedit.isBoundHandle(c)
+            else c in '2'..'9'
+
+        override fun isCodeChar(c: Char): Boolean = c == '\'' || isCodeLetter(c)
+
+        override fun isCodeString(input: String): Boolean =
+            input.isNotEmpty() && input.all { isCodeChar(it) || it.isWhitespace() }
+
+        override fun keyLetters(c: Char): String {
+            if (TwelveKeyPreedit.hasTokenBindings()) {
+                val bound = TwelveKeyPreedit.tokenBindingsSnapshot()[c]
+                if (!bound.isNullOrEmpty()) return bound.joinToString("")
+            }
+            return keyMap[c.lowercaseChar()].orEmpty()
+        }
 
         override fun codeOf(syllable: String): String {
             if (syllable.isEmpty()) return ""
-            val sb = StringBuilder(syllable.length)
-            for (ch in syllable.lowercase()) {
-                val mapped = letterToKey[ch] ?: return ""
-                sb.append(mapped)
+            val lower = syllable.lowercase()
+            if (TwelveKeyPreedit.hasTokenBindings()) {
+                return TwelveKeyPreedit.encodeRawByBindings(lower)
             }
-            return sb.toString()
+            return defaultCodeOf(lower)
         }
 
         override fun initialUnit(syllable: String): String =
             syllable.firstOrNull()?.lowercaseChar()?.toString().orEmpty()
 
-        override fun keyInitialUnits(codeChar: Char, isLast: Boolean): List<String> =
-            initialUnitsByKey[codeChar].orEmpty()
+        override fun keyInitialUnits(codeChar: Char, isLast: Boolean): List<String> {
+            if (TwelveKeyPreedit.hasTokenBindings()) {
+                val tokens = TwelveKeyPreedit.tokenBindingsSnapshot()[codeChar]
+                if (!tokens.isNullOrEmpty()) {
+                    return tokens.filter { it in initialToSyllables }.sorted()
+                }
+            }
+            return initialUnitsByKey[codeChar].orEmpty()
+        }
 
         override fun isKnownSyllable(syllable: String): Boolean = syllable.lowercase() in syllables
 
-        override fun exactSyllables(code: String): List<String> = codeToSyllables[code].orEmpty()
+        private fun stepTrieNode(node: NineTrieNode, tok: String): NineTrieNode? {
+            var cur = node
+            for (i in 0 until tok.length) {
+                val ch = tok[i]
+                if (ch !in 'a'..'z') return null
+                cur = cur.children[ch - 'a'] ?: return null
+            }
+            return cur
+        }
+
+        private fun exactSyllablesForClean(clean: String): List<String> {
+            if (clean.isEmpty()) return emptyList()
+            if (!TwelveKeyPreedit.hasTokenBindings()) return codeToSyllables[clean].orEmpty()
+            val bindings = TwelveKeyPreedit.tokenBindingsSnapshot()
+            val out = ArrayList<String>(4)
+            fun walk(stepIdx: Int, node: NineTrieNode) {
+                if (stepIdx == clean.length) {
+                    node.syllable?.let { out.add(it) }
+                    return
+                }
+                val toks = bindings[clean[stepIdx]] ?: return
+                for (tok in toks) {
+                    val next = stepTrieNode(node, tok) ?: continue
+                    walk(stepIdx + 1, next)
+                }
+            }
+            walk(0, trieRoot)
+            if (out.size > 1) out.sort()
+            return out
+        }
+
+        override fun exactSyllables(code: String): List<String> =
+            exactSyllablesForClean(code.filter { isCodeLetter(it) })
 
         override fun syllablesCompletingPrefix(pending: String): List<String> {
-            val clean = pending.filter { it in '2'..'9' }
+            val clean = pending.filter { isCodeLetter(it) }
             if (clean.isEmpty()) return emptyList()
             val out = ArrayList<String>()
             val seen = HashSet<String>()
             val maxLen = minOf(maxSyllableLen, clean.length)
             for (len in maxLen downTo 1) {
-                val hits = codeToSyllables[clean.substring(0, len)] ?: continue
+                val hits = exactSyllablesForClean(clean.substring(0, len))
                 for (s in hits) {
                     if (seen.add(s)) out.add(s)
                 }
@@ -247,7 +340,7 @@ sealed interface MultiKeyProfile {
         override fun hasFullSyllable(code: String): Boolean = decodeSpans(code) != null
 
         override fun decodeSpans(code: String): List<Pair<String, String>>? {
-            val clean = code.filter { it in '2'..'9' }
+            val clean = code.filter { isCodeLetter(it) }
             if (clean.isEmpty()) return null
             val n = clean.length
             val dp = arrayOfNulls<Pair<Int, String>>(n + 1)
@@ -256,7 +349,8 @@ sealed interface MultiKeyProfile {
                 if (dp[i] == null) continue
                 val maxLen = minOf(maxSyllableLen, n - i)
                 for (len in maxLen downTo 1) {
-                    val hits = codeToSyllables[clean.substring(i, i + len)] ?: continue
+                    val hits = exactSyllablesForClean(clean.substring(i, i + len))
+                    if (hits.isEmpty()) continue
                     val next = i + len
                     if (dp[next] == null) {
                         dp[next] = i to hits.first()
@@ -276,13 +370,13 @@ sealed interface MultiKeyProfile {
         }
 
         override fun resolveExactCodeLength(reading: String, effectiveCode: String): Int? {
-            val clean = effectiveCode.filter { it in '2'..'9' }
+            val clean = effectiveCode.filter { isCodeLetter(it) }
             val full = codeOf(reading)
             if (full.isEmpty() || !clean.startsWith(full)) return null
             // 映射回 effectiveCode 含分詞符的實際跨度
             var matched = 0
             for (i in effectiveCode.indices) {
-                if (effectiveCode[i] in '2'..'9') {
+                if (isCodeLetter(effectiveCode[i])) {
                     matched++
                     if (matched == full.length) return i + 1
                 }
@@ -298,8 +392,53 @@ sealed interface MultiKeyProfile {
         ): String? {
             val cleanRaw = raw.replace("\u2038", "")
             val comment = firstComment?.trim().orEmpty()
-            if (comment.isEmpty()) return cleanRaw
-            return PreeditPresentation.materializeSegmentedPreedit(cleanRaw, comment)
+            val base = if (comment.isEmpty()) {
+                cleanRaw
+            } else {
+                PreeditPresentation.materializeSegmentedPreedit(cleanRaw, comment)
+            }
+            if (!TwelveKeyPreedit.hasTokenBindings()) return base
+            return decodeRemainingBoundHandles(base)
+        }
+
+        private fun decodeRemainingBoundHandles(text: String): String {
+            var hasHandle = false
+            for (i in text.indices) {
+                if (TwelveKeyPreedit.isBoundHandle(text[i])) {
+                    hasHandle = true
+                    break
+                }
+            }
+            if (!hasHandle) return text
+            val out = StringBuilder(text.length + 8)
+            var i = 0
+            while (i < text.length) {
+                if (!TwelveKeyPreedit.isBoundHandle(text[i])) {
+                    out.append(text[i])
+                    i++
+                    continue
+                }
+                var j = i
+                while (j < text.length && TwelveKeyPreedit.isBoundHandle(text[j])) j++
+                val handleRun = text.substring(i, j)
+                if (i > 0 && text[i - 1] != ' ' && text[i - 1] != '\'') {
+                    out.append(' ')
+                }
+                out.append(decodeNineKeyHandleRun(handleRun))
+                i = j
+            }
+            return out.toString()
+        }
+
+        private fun decodeNineKeyHandleRun(run: String): String {
+            val spans = decodeSpans(run)
+            if (spans != null) return spans.joinToString(" ") { it.second }
+            for (cut in run.length - 1 downTo 1) {
+                val head = decodeSpans(run.substring(0, cut)) ?: continue
+                val tailLetters = run.substring(cut).map { fallbackLetter(it) }.joinToString("")
+                return head.joinToString(" ") { it.second } + " " + tailLetters
+            }
+            return run.map { fallbackLetter(it) }.joinToString("")
         }
 
         override fun fallbackLetter(codeChar: Char): String =

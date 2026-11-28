@@ -70,12 +70,18 @@ object SchemaCompat {
     fun ensureForEnabledSchemas(): Int {
         val userDir = runCatching { File(AppPrefs.defaultInstance().conf.userDataDir) }
             .getOrNull() ?: return 0
+        val sharedDir = runCatching { File(AppPrefs.defaultInstance().conf.sharedDataDir) }.getOrNull()
         val schemaIds = runCatching { readSchemaList(File(userDir, "default.custom.yaml")) }
             .getOrElse { emptyList() }
         if (schemaIds.isEmpty()) return 0
 
         var changed = 0
         for (id in schemaIds) {
+            val validation = SchemaSpecValidator.validateSchemaFiles(userDir, sharedDir, id)
+            if (!validation.valid) {
+                Timber.w("SchemaCompat: reject patching non-compliant schema %s: %s", id, validation.formatMessage())
+                continue
+            }
             if (id in TWELVE_KEY_SCHEMAS) continue
             val patched = runCatching { ensurePatched(File(userDir, "$id.custom.yaml")) }
                 .onFailure { Timber.e(it, "SchemaCompat: patch %s failed", id) }

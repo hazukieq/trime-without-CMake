@@ -62,6 +62,8 @@ data class CandidateItem(
     val inputSpan: InputCodeSpan? = null,
     /** 引擎原始輸入的絕對跨度，與顯示說明分離；App 合成項沒有此欄。 */
     val engineSpan: EngineCandidateSpan? = null,
+    /** 是否經 OpenCC 簡繁/聯想等濾鏡實際改寫（與原詞典文本不同）。 */
+    val openccModified: Boolean = false,
 )
 
 data class EngineCandidateSpan(val start: Int, val end: Int, val sourceComment: String) {

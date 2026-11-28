@@ -48,17 +48,14 @@ translator:
 
 punctuator:
   half_shape:
-    "1": [1, "@", ".", "/", ":", "_", "-", "#"]
     "@": [1, "@", ！, ：, 、, ……, ～]
     "#": [0, "#", "$", "%", "^", "&", "*", "(", ")"]
 
-key_binder:
-  bindings:
-    - { when: has_menu, accept: 1, send: apostrophe }
-
 speller:
-  alphabet: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA9876543210
-  initials: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA9876543210
+  alphabet: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA'
+  initials: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA
+  delimiter: " '"
+  multi_key: true
   algebra:
     - abbrev/^([a-z]).+$/$1/
     - abbrev/^([zcs]h).+$/$1/
@@ -72,11 +69,3 @@ speller:
     - derive/ong$/on/
     - derive/ao$/oa/
     - derive/([iu])a(o|ng?)$/a$1$2/
-    - derive/[abc]/2/
-    - derive/[def]/3/
-    - derive/[hgi]/4/
-    - derive/[jkl]/5/
-    - derive/[omn]/6/
-    - derive/[pqrs]/7/
-    - derive/[tuv]/8/
-    - derive/[wxyz]/9/

@@ -340,7 +340,11 @@ class TextInputManager private constructor() :
     }.getOrNull()
 
     fun isTwelveKeyMode(): Boolean {
-        val profile = activeMultiKeyProfile() ?: return false
+        val profile = activeMultiKeyProfile()
+        if (profile == null) {
+            com.hazukieq.hkrime.core.TwelveKeyPreedit.updateTokenBindings(emptyMap())
+            return false
+        }
         com.hazukieq.hkrime.core.twelvekey.MultiKeyProfile.active = profile
         return true
     }
@@ -907,9 +911,7 @@ class TextInputManager private constructor() :
         twelveKeyController?.phonetics = composition.phonetics
         Rime.setProperty(com.hazukieq.hkrime.core.twelvekey.InitialDisambiguation.PROPERTY,
             com.hazukieq.hkrime.core.twelvekey.PhoneticSelection.constraint(composition.phonetics))
-        Rime.clearComposition()
-        if (code.isNotEmpty()) Rime.onText(code)
-        Rime.getContexts()
+        com.hazukieq.hkrime.core.twelvekey.TwelveKeyController.replayEngineCodeLocked(code)
     }
 
     /** 原生 buffer 不等同於使用者完成選擇。拒絕意外提交並還原待選碼。 */
@@ -1128,7 +1130,16 @@ class TextInputManager private constructor() :
             return
         }
         chooseTwelveKey(
-            CandidateItem(item.text, item.comment, item.index, item.segment, item.restCode, item.inputSpan, item.engineSpan),
+            CandidateItem(
+                item.text,
+                item.comment,
+                item.index,
+                item.segment,
+                item.restCode,
+                item.inputSpan,
+                item.engineSpan,
+                openccModified = item.openccModified,
+            ),
             item.contextKey,
             if (item.segment == ISOLATED_CHAR_SEGMENT) CompositionSession.Origin.ISOLATED else CompositionSession.Origin.PANEL,
         )
@@ -1444,6 +1455,10 @@ class TextInputManager private constructor() :
 
     private fun onEventLocked(event: Event?) {
         event ?: return
+        if (event.hasAtoms()) {
+            onTokenKeyLocked(event.atoms)
+            return
+        }
         if (!event.commit.isNullOrEmpty()) {
             // Directly commit the text and don't dispatch to Rime
             activeEditorInstance.commitText(event.commit, false)
@@ -1552,6 +1567,48 @@ class TextInputManager private constructor() :
         }
     }
 
+    private fun onTokenKeyLocked(atoms: Array<String>) {
+        if (atoms.isEmpty()) return
+        if (Rime.isAsciiMode()) {
+            activeEditorInstance.commitText(atoms[0], false)
+            return
+        }
+        if (isTwelveKeyMode()) {
+            onEditorSessionChanged()
+            twelveKeyController?.flushPendingRestoreLocked()
+            if (Rime.RimeGetInput().isNullOrEmpty() && composition.remaining.isNotEmpty()) {
+                restoreTwelveKeyCode(composition.remaining)
+            }
+            val currentLen = maxOf(
+                Rime.RimeGetInput().orEmpty().length,
+                composition.remaining.length,
+            )
+            if (currentLen >= com.hazukieq.hkrime.core.twelvekey.CompositionInput.MAX_CODE_LENGTH) {
+                trime.notifyCodeLimitReached()
+                return
+            }
+            Rime.pushTokenKey(atoms)
+            com.hazukieq.hkrime.core.TwelveKeyPreedit.updateTokenBindings(Rime.getTokenBindings())
+            val actual = Rime.RimeGetInput().orEmpty()
+            rawEngineCommitAllowed = false
+            composition.input(actual)
+            twelveKeyController?.phonetics = composition.phonetics
+            PreeditPresentation.invalidate(composition.selectedText, composition.phonetics)
+            twelveKeyController?.invalidateForEngine()
+            activeEditorInstance.commitRimeText()
+            return
+        }
+        if (com.hazukieq.hkrime.core.twelvekey.CompositionInput.isCodeLimitReached(
+                Rime.RimeGetInput(),
+            )
+        ) {
+            trime.notifyCodeLimitReached()
+            return
+        }
+        Rime.pushTokenKey(atoms)
+        activeEditorInstance.commitRimeText()
+    }
+
     override fun onKey(keyEventCode: Int, metaState: Int) {
         printModifierKeyState(metaState, "keyEventCode=" + keyEventCode)
         if (trime.handleKey(keyEventCode, metaState)) return
@@ -1592,6 +1649,11 @@ class TextInputManager private constructor() :
                         val input = Rime.RimeGetInput().orEmpty()
                         val caret = runCatching { Rime.RimeGetCaretPos() }.getOrDefault(input.length)
                         if (CompositionInput.shouldIgnoreDelimiter(input, caret, allowWhenEmpty = false)) {
+                            textToParse = textToParse.substring(target.length)
+                            continue
+                        }
+                        if (CompositionInput.isCodeLimitReached(input)) {
+                            trime.notifyCodeLimitReached()
                             textToParse = textToParse.substring(target.length)
                             continue
                         }

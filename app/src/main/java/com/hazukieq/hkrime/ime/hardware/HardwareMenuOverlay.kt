@@ -23,15 +23,17 @@ import com.hazukieq.hkrime.data.AppPrefs
 import com.hazukieq.hkrime.data.Config
 
 /**
- * 物理鍵盤接手模式下的「跟隨光標方案切換 / 啟停 & 開關懸浮窗」（快捷鍵 `Ctrl+Shift+M`）：
- * - 風格與 [HardwareClipboardPopup] 一致，直接渲染於 `InputMethod` 透明畫布內（免權限、全場景可見）；
- * - 頂部雙標籤：
+ * 物理鍵盤接手模式下的「跟隨光標方案切換 / 啟停、開關、主題配色與說明懸浮層」（快捷鍵 `Ctrl+Shift+M`）：
+ * - 風格與 [HardwareClipboardOverlay] 一致，直接渲染於 `InputMethod` 透明畫布內（免權限、全場景可見）；
+ * - 頂部四標籤：
  *   - `方案`：僅列出物理鍵盤支援的 26 鍵方案（含已啟用與未啟用），
  *     `Enter`/`1-9`/點擊可切換（未啟用則自動啟用並部署後切換），`Space` 或點右側狀態膠囊可開啟/關閉方案；
  *   - `開關`：切換當前方案的 Rime switches（簡繁、標點、顏文字、表情等），支援連續切換不關閉；
+ *   - `主題`：即時切換當前配色方案；
+ *   - `說明`：隨手可查的外設模式操作與快捷鍵速覽；
  * - 全鍵盤操作：`Tab`/`←`/`→` 切頁、`↑`/`↓` 選中、`Enter`/`1-9` 確認、`Space` 啟停方案或切開關、`Esc` 關閉。
  */
-class HardwareMenuPopup(
+class HardwareMenuOverlay(
     private val context: Context,
     private val isSchemaSupported: (String?) -> Boolean,
 ) {
@@ -65,11 +67,13 @@ class HardwareMenuPopup(
     private var tabSchemaView: TextView? = null
     private var tabSwitchView: TextView? = null
     private var tabThemeView: TextView? = null
+    private var tabGuideView: TextView? = null
     private var dividerView: View? = null
     private var listView: RecyclerView? = null
     private var emptyView: TextView? = null
     private var hintView: TextView? = null
 
+    private val uiHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var activeTab: Int = TAB_SCHEMA
     private var selectedIndex: Int = 0
     private var busyDeploying: Boolean = false
@@ -77,6 +81,14 @@ class HardwareMenuPopup(
     private var lastAnchorView: View? = null
     private val lastCursorRect = RectF()
     private var lastColorSchemeKey: String? = null
+    private var defaultHintText: String = "←→ / [ ] 切页 · Enter/1-9 切 · Space 启停 · Esc 关"
+    private val restoreHintRunnable = Runnable {
+        hintView?.apply {
+            text = defaultHintText
+            setTextColor(subTextColor)
+            setTypeface(Typeface.DEFAULT, Typeface.NORMAL)
+        }
+    }
 
     // Theme tokens
     private var cardBgColor: Int = 0xFFFFFFFF.toInt()
@@ -172,7 +184,7 @@ class HardwareMenuPopup(
     }
 
     fun show(anchorView: View?, cursorRect: RectF, initialTab: Int = activeTab) {
-        activeTab = initialTab.coerceIn(TAB_SCHEMA, TAB_THEME)
+        activeTab = initialTab.coerceIn(TAB_SCHEMA, TAB_GUIDE)
         busyDeploying = false
         lastAnchorView = anchorView
         lastCursorRect.set(cursorRect)
@@ -190,7 +202,22 @@ class HardwareMenuPopup(
         positionPopup(lastAnchorView, lastCursorRect)
     }
 
+    fun showTemporaryHint(message: String, durationMs: Long = TEMP_HINT_DURATION_MS) {
+        val tv = hintView ?: return
+        uiHandler.removeCallbacks(restoreHintRunnable)
+        val amber = if (ColorUtils.calculateLuminance(textColor) > 0.5) {
+            0xFFFBBF24.toInt()
+        } else {
+            0xFFD97706.toInt()
+        }
+        tv.text = message
+        tv.setTextColor(amber)
+        tv.setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+        uiHandler.postDelayed(restoreHintRunnable, durationMs)
+    }
+
     fun dismiss() {
+        uiHandler.removeCallbacks(restoreHintRunnable)
         val wasShowing = isShowing
         busyDeploying = false
         overlay.dismiss()
@@ -212,11 +239,15 @@ class HardwareMenuPopup(
                 switchTab((activeTab + delta + TAB_COUNT) % TAB_COUNT)
                 return true
             }
-            keyCode == KeyEvent.KEYCODE_DPAD_RIGHT -> {
+            keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ||
+                keyCode == KeyEvent.KEYCODE_RIGHT_BRACKET ||
+                keyCode == KeyEvent.KEYCODE_PAGE_DOWN -> {
                 switchTab((activeTab + 1) % TAB_COUNT)
                 return true
             }
-            keyCode == KeyEvent.KEYCODE_DPAD_LEFT -> {
+            keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
+                keyCode == KeyEvent.KEYCODE_LEFT_BRACKET ||
+                keyCode == KeyEvent.KEYCODE_PAGE_UP -> {
                 switchTab((activeTab - 1 + TAB_COUNT) % TAB_COUNT)
                 return true
             }
@@ -285,7 +316,7 @@ class HardwareMenuPopup(
         } else if (activeTab == TAB_SWITCH) {
             onToggleSwitch?.invoke(row.index)
             refreshData(resetSelection = false)
-        } else {
+        } else if (activeTab == TAB_THEME) {
             val colorKey = row.schemaId ?: return
             onSelectColor?.invoke(colorKey)
             applyTheme()
@@ -386,7 +417,7 @@ class HardwareMenuPopup(
             } else {
                 selectedIndex.coerceIn(0, (built.size - 1).coerceAtLeast(0))
             }
-            hintView?.text = "Tab 切页 · Enter/1-9 切换 · Space 启停 · Esc 关闭"
+            hintView?.text = "←→ / [ ] 切页 · Enter/1-9 切 · Space 启停 · Esc 关"
         } else if (activeTab == TAB_SWITCH) {
             val labels = synchronized(Rime.ENGINE_LOCK) {
                 Rime.getContexts()
@@ -409,8 +440,8 @@ class HardwareMenuPopup(
             } else {
                 selectedIndex.coerceIn(0, (built.size - 1).coerceAtLeast(0))
             }
-            hintView?.text = "Tab 切页 · ↑↓ 选择 · Enter/Space/1-9 切换 · Esc 关闭"
-        } else {
+            hintView?.text = "←→ / [ ] 切页 · ↑↓ 选 · Enter/1-9 开关 · Esc 关"
+        } else if (activeTab == TAB_THEME) {
             val cfg = runCatching { Config.get(context) }.getOrNull()
             val currentColor = runCatching { AppPrefs.defaultInstance().looks.selectedColor }.getOrNull().orEmpty()
             val keys = runCatching { cfg?.colorKeys }.getOrNull()?.also { it.sort() } ?: emptyArray()
@@ -437,16 +468,48 @@ class HardwareMenuPopup(
             } else {
                 selectedIndex.coerceIn(0, (built.size - 1).coerceAtLeast(0))
             }
-            hintView?.text = "Tab 切页 · ↑↓ 选择 · Enter/Space/1-9 即时换色 · Esc 关闭"
+            hintView?.text = "←→ / [ ] 切页 · ↑↓ 选 · Enter/1-9 换色 · Esc 关"
+        } else {
+            val guideItems = listOf(
+                "连物理键盘+开接手；12键自动软键盘" to "仅26键",
+                "单击切换中/英文并弹出状态胶囊" to "Shift",
+                "数字选词；空格/回车上屏高亮词" to "1-9 / Space",
+                "←→移编码光标；↑↓选词；-=翻页" to "←→ / ↑↓",
+                "超48键暂停追加并在顶部琥珀提示" to "48键上限",
+                "候选右上琥珀圆点＝OpenCC转换词" to "圆点标记",
+                "符号与表情（[ ]/-=切分类/方向键选）" to "Ctrl+Shift+,",
+                "剪切板历史（↑↓/1-9贴/P置顶/Del删）" to "Ctrl+Shift+.",
+                "外设菜单（←→/[ ]切页/Space启停）" to "Ctrl+Shift+?",
+                "完整条款：设置 → 物理键盘 → 说明书" to "详细说明",
+            )
+            guideItems.forEachIndexed { idx, (desc, keyBadge) ->
+                built.add(
+                    MenuRow(
+                        index = idx,
+                        schemaId = null,
+                        title = desc,
+                        badge = keyBadge,
+                        isCurrent = false,
+                        isEnabled = true,
+                    ),
+                )
+            }
+            selectedIndex = 0
+            hintView?.text = "←→ / [ ] 切页 · ↑↓ 浏览 · Esc 关闭"
         }
 
         rows = built
+        uiHandler.removeCallbacks(restoreHintRunnable)
+        defaultHintText = hintView?.text?.toString().orEmpty()
+        hintView?.setTextColor(subTextColor)
+        hintView?.setTypeface(Typeface.DEFAULT, Typeface.NORMAL)
         if (rows.isEmpty()) {
             listView?.visibility = View.GONE
             emptyView?.text = when (activeTab) {
                 TAB_SCHEMA -> "暂无支持的外设方案"
                 TAB_SWITCH -> "当前方案无可用开关"
-                else -> "暂无可用主题配色"
+                TAB_THEME -> "暂无可用主题配色"
+                else -> ""
             }
             emptyView?.visibility = View.VISIBLE
         } else {
@@ -463,6 +526,7 @@ class HardwareMenuPopup(
         styleTabPill(tabSchemaView, activeTab == TAB_SCHEMA)
         styleTabPill(tabSwitchView, activeTab == TAB_SWITCH)
         styleTabPill(tabThemeView, activeTab == TAB_THEME)
+        styleTabPill(tabGuideView, activeTab == TAB_GUIDE)
     }
 
     private fun styleTabPill(tv: TextView?, active: Boolean) {
@@ -482,6 +546,9 @@ class HardwareMenuPopup(
             setBackgroundColor(Color.TRANSPARENT)
             clipChildren = false
             clipToPadding = false
+            isFocusable = false
+            isFocusableInTouchMode = false
+            descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
             setPadding(pad, pad, pad, pad)
         }
 
@@ -490,6 +557,9 @@ class HardwareMenuPopup(
             elevation = dp(6).toFloat()
             outlineProvider = ViewOutlineProvider.BACKGROUND
             clipToOutline = true
+            isFocusable = false
+            isFocusableInTouchMode = false
+            descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
             setPadding(dp(10), dp(8), dp(10), dp(8))
             layoutParams = FrameLayout.LayoutParams(dp(CARD_WIDTH_DP), ViewGroup.LayoutParams.WRAP_CONTENT)
         }
@@ -508,42 +578,34 @@ class HardwareMenuPopup(
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         }
-        val schemaTab = TextView(context).apply {
-            text = "方案"
+        fun makeTabPill(label: String, tab: Int, addMargin: Boolean): TextView = TextView(context).apply {
+            text = label
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f)
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            setPadding(dp(8), dp(3), dp(8), dp(3))
+            setPadding(dp(7), dp(3), dp(7), dp(3))
+            isFocusable = false
+            isFocusableInTouchMode = false
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                focusable = View.NOT_FOCUSABLE
+            }
             isClickable = true
-            setOnClickListener { switchTab(TAB_SCHEMA) }
+            if (addMargin) {
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { marginStart = dp(4) }
+            }
+            setOnClickListener { switchTab(tab) }
         }
-        val switchTab = TextView(context).apply {
-            text = "开关"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f)
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            setPadding(dp(8), dp(3), dp(8), dp(3))
-            isClickable = true
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { marginStart = dp(4) }
-            setOnClickListener { switchTab(TAB_SWITCH) }
-        }
-        val themeTab = TextView(context).apply {
-            text = "主题"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f)
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            setPadding(dp(8), dp(3), dp(8), dp(3))
-            isClickable = true
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { marginStart = dp(4) }
-            setOnClickListener { switchTab(TAB_THEME) }
-        }
+        val schemaTab = makeTabPill("方案", TAB_SCHEMA, addMargin = false)
+        val switchTab = makeTabPill("开关", TAB_SWITCH, addMargin = true)
+        val themeTab = makeTabPill("主题", TAB_THEME, addMargin = true)
+        val guideTab = makeTabPill("说明", TAB_GUIDE, addMargin = true)
         header.addView(titleTv)
         header.addView(schemaTab)
         header.addView(switchTab)
         header.addView(themeTab)
+        header.addView(guideTab)
 
         val divider = View(context).apply {
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1).apply {
@@ -554,8 +616,11 @@ class HardwareMenuPopup(
 
         val rv = RecyclerView(context).apply {
             layoutManager = LinearLayoutManager(context)
-            adapter = this@HardwareMenuPopup.adapter
+            adapter = this@HardwareMenuOverlay.adapter
             overScrollMode = View.OVER_SCROLL_NEVER
+            isFocusable = false
+            isFocusableInTouchMode = false
+            descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
             itemAnimator = null
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -575,7 +640,7 @@ class HardwareMenuPopup(
         }
 
         val hintTv = TextView(context).apply {
-            text = "Tab 切页 · Enter/1-9 切换 · Space 启停 · Esc 关闭"
+            text = "Tab / ←→ 切页 · Enter/1-9 切换 · Space 启停 · Esc 关闭"
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f)
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
@@ -595,6 +660,7 @@ class HardwareMenuPopup(
         tabSchemaView = schemaTab
         tabSwitchView = switchTab
         tabThemeView = themeTab
+        tabGuideView = guideTab
         dividerView = divider
         listView = rv
         emptyView = emptyTv
@@ -613,7 +679,8 @@ class HardwareMenuPopup(
         val cardW = dp(CARD_WIDTH_DP).coerceAtMost((screenW - margin * 2).coerceAtLeast(dp(240)))
         rootCard?.layoutParams = FrameLayout.LayoutParams(cardW, ViewGroup.LayoutParams.WRAP_CONTENT)
         val maxListH = dp(MAX_LIST_HEIGHT_DP).coerceAtMost((screenH * 0.42f).toInt())
-        val desiredListH = if (rows.isEmpty()) 0 else (rows.size * dp(44)).coerceAtMost(maxListH)
+        val rowHeightEst = if (activeTab == TAB_GUIDE) dp(48) else dp(44)
+        val desiredListH = if (rows.isEmpty()) 0 else (rows.size * rowHeightEst).coerceAtMost(maxListH)
         listView?.layoutParams = LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             desiredListH,
@@ -722,31 +789,37 @@ class HardwareMenuPopup(
             }
             holder.numTv.text = if (position < 9) "${position + 1}." else "·"
             holder.numTv.setTextColor(if (selected) ColorUtils.setAlphaComponent(accentTextColor, 200) else subTextColor)
+            holder.titleTv.maxLines = if (activeTab == TAB_GUIDE) 2 else 1
+            holder.titleTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, if (activeTab == TAB_GUIDE) 12.5f else 13.5f)
             holder.titleTv.text = item.title
             holder.titleTv.setTextColor(primaryInk)
             holder.badgeTv.text = item.badge
             holder.badgeTv.setTextColor(badgeInk)
-            if (activeTab == TAB_SCHEMA) {
+            if (activeTab == TAB_SCHEMA || activeTab == TAB_GUIDE) {
                 holder.badgeTv.background = GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
                     cornerRadius = dp(6).toFloat()
                     setColor(
                         if (selected) {
                             ColorUtils.setAlphaComponent(accentTextColor, 34)
-                        } else if (item.isEnabled) {
+                        } else if (activeTab == TAB_SCHEMA && item.isEnabled) {
                             ColorUtils.setAlphaComponent(accentBgColor, 24)
+                        } else if (activeTab == TAB_GUIDE) {
+                            ColorUtils.setAlphaComponent(accentBgColor, 20)
                         } else {
                             ColorUtils.setAlphaComponent(textColor, 14)
                         },
                     )
                 }
-                holder.badgeTv.setOnClickListener { toggleSchemaEnableAt(position) }
+                holder.badgeTv.setOnClickListener {
+                    if (activeTab == TAB_SCHEMA) toggleSchemaEnableAt(position)
+                }
             } else {
                 holder.badgeTv.background = null
                 holder.badgeTv.setOnClickListener { activateRow(position) }
             }
             holder.row.setOnClickListener {
-                activateRow(position)
+                if (activeTab != TAB_GUIDE) activateRow(position)
             }
         }
 
@@ -764,9 +837,11 @@ class HardwareMenuPopup(
         const val TAB_SCHEMA = 0
         const val TAB_SWITCH = 1
         const val TAB_THEME = 2
-        private const val TAB_COUNT = 3
-        private const val CARD_WIDTH_DP = 320
+        const val TAB_GUIDE = 3
+        private const val TAB_COUNT = 4
+        private const val CARD_WIDTH_DP = 340
         private const val MAX_LIST_HEIGHT_DP = 250
         private const val SHADOW_PAD_DP = 10
+        private const val TEMP_HINT_DURATION_MS = 3500L
     }
 }

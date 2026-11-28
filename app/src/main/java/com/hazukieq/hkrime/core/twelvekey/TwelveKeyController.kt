@@ -54,9 +54,7 @@ class TwelveKeyController(
         val (code, confirmed) = pending
         val constraint = PhoneticSelection.constraint(confirmed)
         Rime.setProperty(InitialDisambiguation.PROPERTY, constraint)
-        Rime.clearComposition()
-        if (code.isNotEmpty()) Rime.onText(code)
-        Rime.getContexts()
+        replayEngineCodeLocked(code)
     }
 
     /**
@@ -153,7 +151,12 @@ class TwelveKeyController(
         refreshJob = scope.launch(Dispatchers.Default) {
             if (!immediate) delay(DEBOUNCE_MS)
             val result = run {
-                synchronized(ENGINE_LOCK) {
+                var offLockFetch: Triple<TwelveKeySnapshotBuilder.Local, String, String>? = null
+                var offLockLimit = 0
+                var offLockRaw: List<Array<String>>? = null
+                var offLockPrefix = ""
+
+                val immediateResult = synchronized(ENGINE_LOCK) {
                     runCatching {
                         flushPendingRestoreLocked()
                         val confirmed = phonetics
@@ -177,39 +180,83 @@ class TwelveKeyController(
                                 "|a" + TwelveKeyPreedit.assocGeneration
                             val fKey = fastCacheKey(local.remaining, full, constraint, rankingEnabled, full && loadAll)
                             val cached = cacheLookup(key) { it } ?: cacheLookup(fKey) { it }
-                            val t0 = System.nanoTime()
                             val limit = when {
                                 !full -> BAR_CANDIDATES
                                 loadAll -> TwelveKeyTuning.CONFIRM_ALL_LIMIT
                                 confirmed.isNotEmpty() -> TwelveKeyTuning.CONFIRM_RECOMMEND_LIMIT
                                 else -> TwelveKeySnapshotBuilder.MAX_CANDIDATES
                             }
-                            val built = cached ?: TwelveKeySnapshotBuilder.build(
-                                local,
-                                limit,
-                                segmentAnchor = segmentAnchor,
-                                segmented = segmentMode,
-                                wantGroups = full,
-                                initial = null,
-                                appRankingEnabled = rankingEnabled,
-                                phonetics = confirmed,
-                            )
-                            // 性能排查用：INFO 级别，真機 logcat 可直接統計每鍵快照耗時
-                            Timber.i(
-                                "twelvekey:build %s cached=%s ms=%.1f",
-                                key,
-                                cached != null,
-                                (System.nanoTime() - t0) / 1e6,
-                            )
-                            // 只缓存「真的有候選」的快照：兜底/空快照一旦進緩存，
-                            // 同一輸入之後永遠命中它（見 invalidateForEngine 註釋）。
-                            if (cached == null && built.hasCandidates) {
-                                cachePut(key, built)
-                                cachePut(fKey, built)
+                            if (cached != null) {
+                                Timber.i("twelvekey:build %s cached=true ms=0.0", key)
+                                Triple(local, cached, true)
+                            } else if (confirmed.isNotEmpty()) {
+                                val t0 = System.nanoTime()
+                                val built = TwelveKeySnapshotBuilder.build(
+                                    local,
+                                    limit,
+                                    segmentAnchor = segmentAnchor,
+                                    segmented = segmentMode,
+                                    wantGroups = full,
+                                    initial = null,
+                                    appRankingEnabled = rankingEnabled,
+                                    phonetics = confirmed,
+                                )
+                                Timber.i(
+                                    "twelvekey:build %s cached=false ms=%.1f",
+                                    key,
+                                    (System.nanoTime() - t0) / 1e6,
+                                )
+                                if (built.hasCandidates) {
+                                    cachePut(key, built)
+                                    cachePut(fKey, built)
+                                }
+                                Triple(local, built, true)
+                            } else {
+                                // 僅在鎖內讀取原生候選快照與前綴（~1ms），隨即釋放 ENGINE_LOCK，
+                                // 避免後續 Kotlin 分組/绑定阻塞主線程下一次按鍵進鎖。
+                                val probeMore = full && confirmed.isNotEmpty() &&
+                                    limit >= TwelveKeyTuning.CONFIRM_RECOMMEND_LIMIT &&
+                                    limit < TwelveKeyTuning.CONFIRM_ALL_LIMIT
+                                val fetchLimit = if (probeMore) limit + 1 else limit
+                                offLockRaw = runCatching { Rime.candidatesSnapshot(fetchLimit) }.getOrNull()
+                                offLockPrefix = runCatching { Rime.getCompositionPrefix() }.getOrDefault("")
+                                offLockLimit = limit
+                                offLockFetch = Triple(local, key, fKey)
+                                null
                             }
-                            Triple(local, built, true)
                         }
                     }.getOrNull()
+                }
+                if (immediateResult != null) {
+                    immediateResult
+                } else if (offLockFetch != null) {
+                    if (gen != generation) return@launch
+                    val (local, key, fKey) = offLockFetch!!
+                    val t0 = System.nanoTime()
+                    val built = TwelveKeySnapshotBuilder.build(
+                        local,
+                        offLockLimit,
+                        segmentAnchor = segmentAnchor,
+                        segmented = segmentMode,
+                        wantGroups = full,
+                        initial = null,
+                        appRankingEnabled = rankingEnabled,
+                        phonetics = emptyList(),
+                        preFetchedSnapshot = offLockRaw,
+                        preFetchedInlinePrefix = offLockPrefix,
+                    )
+                    Timber.i(
+                        "twelvekey:build %s cached=false ms=%.1f",
+                        key,
+                        (System.nanoTime() - t0) / 1e6,
+                    )
+                    if (built.hasCandidates) {
+                        cachePut(key, built)
+                        cachePut(fKey, built)
+                    }
+                    Triple(local, built, true)
+                } else {
+                    null
                 }
             } ?: return@launch
             if (gen != generation) return@launch
@@ -297,5 +344,17 @@ class TwelveKeyController(
 
         /** 連打期間不做全量枚舉，停手後再算。 */
         private const val DEBOUNCE_MS = 120L
+
+        /** 在 ENGINE_LOCK 內按當前 speller 類型（Token-Set 句柄 / 傳統鍵碼）重放待選原碼。 */
+        fun replayEngineCodeLocked(code: String) {
+            if (Rime.isMultiKeySpeller()) {
+                if (code.isEmpty()) Rime.clearComposition() else Rime.setTokenInput(code)
+                TwelveKeyPreedit.updateTokenBindings(Rime.getTokenBindings())
+            } else {
+                Rime.clearComposition()
+                if (code.isNotEmpty()) Rime.onText(code)
+                Rime.getContexts()
+            }
+        }
     }
 }
