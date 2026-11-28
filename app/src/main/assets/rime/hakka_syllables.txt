@@ -81,7 +81,6 @@ cuk
 cun
 cung
 cut
-cw
 da
 dai
 dak
@@ -679,7 +678,6 @@ suk
 sun
 sung
 sut
-sw
 ta
 tai
 tak
@@ -841,4 +839,3 @@ zuk
 zun
 zung
 zut
-zw
