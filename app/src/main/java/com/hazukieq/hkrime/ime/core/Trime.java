@@ -1416,7 +1416,14 @@ public class Trime extends LifecycleInputMethodService {
     final Window w = getWindow().getWindow();
     if (w == null) return;
     final LinearLayout inputRoot = inputRootBinding != null ? inputRootBinding.inputRoot : null;
-    if (inputRoot != null && !isHardwareKeyboardModeActive()) {
+    if (isHardwareKeyboardModeActive()) {
+      final View inputArea = w.findViewById(android.R.id.inputArea);
+      if (inputArea != null) {
+        inputArea.setBackgroundColor(Color.TRANSPARENT);
+      }
+      return;
+    }
+    if (inputRoot != null) {
       final int layoutHeight =
           isFullscreenMode()
               ? WindowManager.LayoutParams.WRAP_CONTENT

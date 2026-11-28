@@ -307,6 +307,7 @@ class HardwareKeyboardController(
                 win.isNavigationBarContrastEnforced = false
             }
             win.decorView.setBackgroundColor(Color.TRANSPARENT)
+            win.findViewById<View>(android.R.id.inputArea)?.setBackgroundColor(Color.TRANSPARENT)
             win.decorView.findViewById<View>(android.R.id.navigationBarBackground)?.alpha = 0f
             // 同步設定導航欄淺/深色圖標，與系統深淺模式匹配
             WindowCompat.getInsetsController(win, win.decorView).isAppearanceLightNavigationBars = !night
