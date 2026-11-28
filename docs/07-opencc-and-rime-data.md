@@ -38,7 +38,7 @@
 `OpenCCDictManager` 在部署时将 txt 编译成 ocd2，转换时加载 json 与其依赖。
 不要只复制 json 而漏掉所需字典；以真实部署结果判断可用性。
 
-`ywz` 和 `lenth` 的字典一行可包含空格分隔的多个目标值，librime simplifier 负责候选扩展。
+`ywz`、`emoji` 的字典一行可包含空格分隔的多个目标值，librime simplifier 负责候选扩展（客语方案已移除 `lenth` 联想过滤）。
 JNI `openccConvert` 的文本转换结果不能替代面板多候选行为测试。
 
 ```bash

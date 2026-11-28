@@ -15,18 +15,16 @@
 
 ## 十二键编码
 
-`hakka_jiugong.schema.yaml` 的 algebra 定义声母缩写、音节别名和按键映射。
-`th → w`、`nz → y`、`ng → 1`；其它字母经 xform/xlit 合并到对应键。
-App 的 `TwelveKeyPreedit.codeOf`、PC 测试的 CodeOf 与诊断脚本必须同口径。
+`hakka_jiugong.schema.yaml` 使用原生多键 `multi_key: true`（0011 补丁），直接将按键语义音素集送入 prism 切分，不再依赖 `xlit`/`xform` 键位替换 hack 或冗余 `derive` 规则；`alphabet`/`initials` 严格限定为客语实际字母表 `abcdefghijklmnopqrstuvz`（不含 `w/x/y`），`abbrev` 仅覆盖客语 20 个标准声母（3 个双字母 `th/nz/ng` + 17 个单字母 `b c d f g h j k l m n p q s t v z`，`r` 为末段儿化后缀）。
 
-方案使用 `script_translator`，`enable_sentence: false`，`spelling_hints: 100`；
-用户词典开启，但简拼路径受本地性能补丁约束。候选 comment 是面板具体读音与 preedit 对齐的数据源。
-`custom_phrase` 通过 tabledb 提供自定义编码短语。`ywz`、`lenth` 开关对应 OpenCC 扩展；
-普通话反查使用反引号前缀。
+方案使用 `script_translator`，`enable_sentence: true`、`max_homophones: 7`、`spelling_hints: 100`；
+全拼长句由 0012 补丁走完整音节子图组句（最长 20 音节 / 64 键），并由双层马尔可夫语言模型（静态 `hakka-zh-hans.gram` + 动态 `hakka.bigram.tsv`，满 2 次自动升格整词进 `hakka.userdb`）引导排序。
+`custom_phrase` 通过 tabledb 提供自定义编码短语。`ywz`、`emoji` 开关对应 OpenCC 扩展（`lenth` 联想过滤已移除）；
+普通话反查使用反引号前缀（依赖 `rime_ice_qwerty`）。
 
 ## 词典
 
-`hakka.dict.yaml` 是主词典；App 运行时音节集合只取主词典字表。
+`hakka.dict.yaml` 是主词典（`w` 韵母已全部并入 `u`，不再区分 `cw/zw` 与 `cu/zu`）；App 运行时音节集合只取主词典字表。
 扩展词表按其 `import_tables` 递归读取，不能把其它方案词典混入 12 键索引。
 带读音行只取第二列作为读音；任一音节不属于运行时集合则整条过滤。
 无读音词表可通过字表反推联想读音，整串码索引仅收录自带读音的词条。

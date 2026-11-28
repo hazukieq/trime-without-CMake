@@ -39,9 +39,8 @@
 
 ## 当前限制
 
-- APK 只配置 arm64-v8a；x86_64 模拟器须具有 ARM64 native bridge 才能运行。
-  Android 34 Google APIs AVD 已通过 `libndk_translation.so` 执行本库；功能测试不能代替 ARM64 真机性能验收。
-- 当前 ELF LOAD 是 4 KB 对齐，尚不能声明支持 16 KB 页设备。
+- APK 同时包含 arm64-v8a 与 x86_64 原生库；功能测试不能代替 ARM64 真机性能验收。
+- 当前 ELF LOAD 已为 `0x4000`（16 KB）对齐且 Release APK 通过 `zipalign -c -P 16 4`，已支持 16 KB 页设备。
 - 完整音节可能遮蔽相同码的简拼解释；简拼路径还受搜索预算限制，覆盖率须按类别解释。
 - 开面板等待完整快照，不在主线程同步枚举；重点验证首次开面板的 UI 延迟。
 - 主题预览器默认按钮仍请求未随包提供的 `trime.yaml`，应打开现有客家主题；预览不能替代真机。

@@ -22,7 +22,7 @@ pull 脚本使用 adb，多个设备时通过 ANDROID_SERIAL 选目标。它拉�
 import 表、短语、OpenCC 的 txt/json/ocd2 和 sync 的 userdb 导出，不提交这些个人文件。
 脚本在 `/tmp/hkrime-host-run` 建可写副本并部署；再次运行会重置该临时目录，不能并行运行。
 
-OpenCC 的 simplifier（`ywz` 颜文字/表情、`lenth` 联想短语）除了 txt 还需要配置 json
+OpenCC 的 simplifier（`ywz` 颜文字、`emoji` 表情）除了 txt 还需要配置 json
 和转换词典 ocd2。真机由 deploy 生成 ocd2；PC 端 `run-host-test.sh` 会复制 json，
 并用 `third_party/OpenCC/build-host/src/tools/opencc_dict` 就地编译缺失的 ocd2。
 没有这一步时 simplifier 静默不生效，语料里不会出现表情候选，相关测试会失真。
@@ -53,7 +53,7 @@ userdb key 是音节拼写，不能假定数码输入会直接命中；12 键组
 在 `hkrime/`：
 
 ```bash
-export JAVA_HOME="$HOME/opt/jdk17/jdk-17.0.9"
+export JAVA_HOME="$HOME/openjdk/openjdk17"
 ./gradlew :app:testDebugUnitTest --tests '*RealCorpusTest*'
 ./gradlew :app:testDebugUnitTest
 python3 tools/panel_probe.py selftest

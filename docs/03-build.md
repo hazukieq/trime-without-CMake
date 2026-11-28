@@ -4,7 +4,7 @@
 
 App：JDK 17、Gradle Wrapper 7.5、AGP 7.4.2、Kotlin 插件 1.8.20；
 compile/targetSdk 33、minSdk 21，ABI 为 arm64-v8a。
-本机 JDK 为 `$HOME/opt/jdk17/jdk-17.0.9`，SDK 为 `$HOME/Android/Sdk`。
+本机 JDK 17 为 `$HOME/openjdk/openjdk17`，SDK 为 `$HOME/Android/Sdk`。
 `local.properties` 的 `sdk.dir` 指向实际 SDK；不要提交本机配置或签名秘密。
 
 ## App 构建
@@ -12,7 +12,7 @@ compile/targetSdk 33、minSdk 21，ABI 为 arm64-v8a。
 以下命令在 `hkrime/` 执行：
 
 ```bash
-export JAVA_HOME="$HOME/opt/jdk17/jdk-17.0.9"
+export JAVA_HOME="$HOME/openjdk/openjdk17"
 ./gradlew :app:assembleDebug
 ./gradlew :app:testDebugUnitTest
 ./gradlew :app:assembleRelease

@@ -7,13 +7,13 @@
 | App 库 | `app/libs/arm64-v8a/librime_jni.so` |
 | 构建入口 | `../rime-jni/script/build.sh`，默认 Release |
 | 引擎 | librime 1.17.0，Lua/charcode/octagram 合并插件 |
-| 大小 | 6,425,960 字节 |
-| SHA-256 | `8b40fe0eb771758353a494f74e35ed70fa4b515c7a8fa406dc4a001184b9ea4d` |
-| JNI 契约 | 源码声明 77，导出 77，缺失/额外/`Java_com_osfans_trime_` 残留均为 0 |
-| ELF LOAD 对齐 | 当前三个 LOAD 段均为 `0x1000`（4 KB） |
+| 大小 | 6,581,744 字节 |
+| SHA-256 | `7f186938a44904bdbca28169981019ede7383e3f87aaa0e87764e2e6d6481933` |
+| JNI 契约 | 源码声明 85，导出 85，缺失/额外/`Java_com_osfans_trime_` 残留均为 0 |
+| ELF LOAD 对齐 | 三个 LOAD 段均为 `0x4000`（16 KB），由 `-Wl,-z,max-page-size=16384` 生成 |
 
-当前 ELF 不满足 16 KB LOAD 对齐，不能标记为已支持 16 KB 页设备。
-APK 的 zipalign 检查与 ELF 的 LOAD 对齐是不同检查，前者通过不能替代后者。
+当前 ELF LOAD 对齐与 Release APK `zipalign -c -P 16 4` 均已通过，支持 16 KB 页设备。
+APK 的 zipalign 检查与 ELF 的 LOAD 对齐是不同检查，发版时须同时核验。
 
 ## 接口
 
