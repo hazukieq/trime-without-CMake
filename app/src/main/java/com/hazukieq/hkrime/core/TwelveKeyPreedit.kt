@@ -178,12 +178,7 @@ object TwelveKeyPreedit {
     private fun tokensForHandle(c: Char): List<String> =
         activeTokenBindings[c] ?: listOf(c.toString())
 
-    private fun spellingVariants(syllable: String): List<String> {
-        val out = ArrayList<String>(2)
-        out.add(syllable)
-        if (syllable.endsWith("w")) out.add(syllable.dropLast(1) + "u")
-        return out
-    }
+    private fun spellingVariants(syllable: String): List<String> = listOf(syllable)
 
     private fun matchStepsNextChars(
         variant: String,

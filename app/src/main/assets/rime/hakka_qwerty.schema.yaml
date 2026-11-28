@@ -71,8 +71,6 @@ speller:
     #- xform/^ci/cshi/ #恢复拼音方案中csh的输入
     #- derive/^q/$1/#允许零声母输入,a=qa,e=qe,o=qo,u=qu
     #- derive/([ei])n$/$1ng/#纠正eng=en,ing=in
-    # 韵母w 变为u
-    - derive/w$/u/
     #- derive/im$/in/#模糊输入in=im
     #- derive/em$/en/#模糊输入en=em
     #- derive/on$/om/#模糊输入om=on

@@ -74,8 +74,6 @@ speller:
   suffix_only:
     - r
   algebra:
-    # 僅保留 w->u 韻母衍生，與 26 鍵口徑完全一致
-    - derive/w$/u/
     # 有限簡拼規則：雙字母原子聲母 (th / nz / ng) + 元音外單輔音（.+ 不為單字母 r 或孤立 ng 造簡拼）
     - abbrev/^(th|nz|ng|(?!th|nz|ng)[bcdfghjklmnpqrstvwxyz]).+$/$1/
  
