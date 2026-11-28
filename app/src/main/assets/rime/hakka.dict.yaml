@@ -20,6 +20,8 @@
 #本字典收录开通用规范汉字约个以上，并为其标注上相对应的客家读音。同时，由于个人能力有限，在词汇收录上、审音上不免会犯错，故会随时进行補充修改，望多多担待。
 # 也希望各位同乡能有所指正，以便更好的改进本字典收录的字音。
 #
+# 修订说明（w/u 合并）：口语中 w 韵母（cw/zw）已与 u 韵母（cu/zu）完全合并，本字典已将所有 w 韵母并入 u，不再区分 w 与 u。
+#
 ---
 name: hakka
 version: "20.20.20"
@@ -71,7 +73,7 @@ import_tables:   #导入拓展词典
 吗	ma	998
 或	fet	998
 或	vet	998
-子	zw	998
+子	zu	998
 生	sang	998
 生	thang	998
 生	then	998
@@ -118,7 +120,7 @@ import_tables:   #导入拓展词典
 金	gim	996
 县	jen	996
 县	qien	996
-自	cw	995
+自	cu	995
 得	det	995
 去	ki	995
 去	ku	995
@@ -279,7 +281,7 @@ import_tables:   #导入拓展词典
 定	tin	985
 此	ce	985
 此	ci	985
-此	cw	985
+此	cu	985
 进	zin	985
 再	zai	985
 种	zung	985
@@ -320,7 +322,7 @@ import_tables:   #导入拓展词典
 觉	gau	982
 觉	gok	982
 因	jin	982
-次	cw	982
+次	cu	982
 重	cung	982
 云	hun	982
 云	jun	982
@@ -495,7 +497,7 @@ import_tables:   #导入拓展词典
 足	zuk	969
 义	ji	969
 义	nzi	969
-资	zw	969
+资	zu	969
 表	biau	968
 许	hi	968
 许	si	968
@@ -857,7 +859,7 @@ import_tables:   #导入拓展词典
 元	nzien	940
 脑	nau	940
 楚	co	940
-楚	cw	940
+楚	cu	940
 睛	zin	940
 响	song	940
 确	kok	940
@@ -881,7 +883,7 @@ import_tables:   #导入拓展词典
 浪	long	939
 浪	nong	939
 厂	cong	939
-组	zw	938
+组	zu	938
 团	ton	938
 母	mu	938
 亮	liong	938
@@ -936,7 +938,7 @@ import_tables:   #导入拓展词典
 胜	sin	934
 胜	thang	934
 财	coi	934
-词	cw	934
+词	cu	934
 帝	di	933
 兄	hiung	933
 兄	sung	933
@@ -1289,7 +1291,7 @@ import_tables:   #导入拓展词典
 猛	mang	904
 骑	ki	904
 谷	guk	904
-助	cw	903
+助	cu	903
 永	jun	903
 永	jung	903
 永	qiung	903
@@ -1346,7 +1348,7 @@ import_tables:   #导入拓展词典
 船	son	899
 圆	jen	899
 织	zit	899
-辞	cw	899
+辞	cu	899
 虫	cung	899
 井	ziang	899
 冠	gon	899
@@ -1442,9 +1444,9 @@ import_tables:   #导入拓展词典
 凌	lin	890
 嘛	ma	890
 梅	moi	890
-紫	cw	890
+紫	cu	890
 紫	zi	890
-紫	zw	890
+紫	zu	890
 略	liok	890
 亡	mong	890
 亡	vong	890
@@ -1800,7 +1802,7 @@ import_tables:   #导入拓展词典
 徒	tu	859
 概	gai	859
 概	koi	859
-祖	zw	859
+祖	zu	859
 忧	jau	859
 忧	jiu	859
 融	jung	859
@@ -1996,7 +1998,7 @@ import_tables:   #导入拓展词典
 序	thi	843
 遥	jau	842
 阻	zo	842
-阻	zw	842
+阻	zu	842
 例	le	842
 睁	zang	842
 瞪	cang	842
@@ -2052,7 +2054,7 @@ import_tables:   #导入拓展词典
 骗	pen	837
 浩	hau	837
 潮	cau	837
-租	zw	837
+租	zu	837
 贪	tam	837
 薪	thin	837
 膜	mok	837
@@ -2108,7 +2110,7 @@ import_tables:   #导入拓展词典
 辛	thin	832
 抵	dai	832
 抵	di	832
-粗	cw	832
+粗	cu	832
 仰	ngong	832
 潜	ciam	832
 哀	qoi	832
@@ -2197,7 +2199,7 @@ import_tables:   #导入拓展词典
 繁	fan	824
 棋	ki	824
 览	lam	824
-磁	cw	824
+磁	cu	824
 磁	sak	824
 佩	pui	823
 享	song	823
@@ -2264,7 +2266,7 @@ import_tables:   #导入拓展词典
 伍	ngh	818
 寂	suk	818
 寂	zit	818
-姿	zw	818
+姿	zu	818
 嘉	ga	818
 督	duk	818
 竭	get	818
@@ -2389,7 +2391,7 @@ import_tables:   #导入拓展词典
 颇	po	807
 茫	mong	807
 措	co	807
-措	cw	807
+措	cu	807
 竞	gin	807
 衡	hang	807
 衡	vang	807
@@ -2553,7 +2555,7 @@ import_tables:   #导入拓展词典
 沸	bui	791
 沸	fui	791
 莹	jin	790
-滋	zw	790
+滋	zu	790
 蛮	man	790
 涛	tau	790
 宏	fen	790
@@ -2657,7 +2659,7 @@ import_tables:   #导入拓展词典
 娱	ngu	783
 址	ci	783
 址	zi	783
-瓷	cw	783
+瓷	cu	783
 匹	pit	782
 凑	ceu	782
 陌	bak	782
@@ -2701,7 +2703,7 @@ import_tables:   #导入拓展词典
 躯	ki	778
 躯	ku	778
 泛	fan	778
-慈	cw	778
+慈	cu	778
 笼	lung	778
 壶	fu	778
 篮	lam	777
@@ -2844,7 +2846,7 @@ import_tables:   #导入拓展词典
 蝇	jin	766
 肾	sin	766
 瑶	jau	765
-赐	cw	765
+赐	cu	765
 赐	thi	765
 捏	net	765
 姚	jau	765
@@ -2990,7 +2992,7 @@ import_tables:   #导入拓展词典
 衰	thoi	753
 肿	zung	753
 蒸	zin	753
-醋	cw	753
+醋	cu	753
 醋	thu	753
 镂	leu	753
 棍	gun	752
@@ -3146,8 +3148,8 @@ import_tables:   #导入拓展词典
 匠	thiong	738
 坊	fong	738
 坊	piong	738
-咨	zw	738
-孜	zw	738
+咨	zu	738
+孜	zu	738
 敝	pet	738
 涵	ham	737
 赔	poi	737
@@ -3636,7 +3638,7 @@ import_tables:   #导入拓展词典
 骷	gu	695
 妞	niu	695
 妞	nziu	695
-兹	zw	695
+兹	zu	695
 圭	gui	695
 墅	ja	694
 墅	su	694
@@ -3798,7 +3800,7 @@ import_tables:   #导入拓展词典
 贿	fui	682
 贿	kui	682
 雌	ci	682
-雌	cw	682
+雌	cu	682
 凫	fu	682
 凫	pu	682
 婶	sin	681
@@ -3850,7 +3852,7 @@ import_tables:   #导入拓展词典
 钝	dun	678
 雏	ci	678
 雏	cu	678
-饲	cw	678
+饲	cu	678
 钠	na	678
 钠	nap	678
 豕	di	678
@@ -3912,7 +3914,7 @@ import_tables:   #导入拓展词典
 嗔	cin	672
 嗔	ten	672
 沮	zo	672
-沮	zw	672
+沮	zu	672
 廖	liau	672
 虏	lu	672
 皓	gau	672
@@ -4044,7 +4046,7 @@ import_tables:   #导入拓展词典
 殃	jong	662
 殚	dan	662
 拧	nen	661
-伺	cw	661
+伺	cu	661
 霖	lim	661
 驼	to	661
 襄	thiong	661
@@ -4193,7 +4195,7 @@ import_tables:   #导入拓展词典
 唔	ngh	650
 幢	cong	650
 幢	tung	650
-诅	zw	650
+诅	zu	650
 巍	ngui	650
 搔	thau	650
 帚	ziu	650
@@ -4220,7 +4222,7 @@ import_tables:   #导入拓展词典
 邑	jip	648
 豚	tun	648
 茨	ci	647
-茨	cw	647
+茨	cu	647
 蹬	dang	647
 蹬	dem	647
 蹬	den	647
@@ -4265,7 +4267,7 @@ import_tables:   #导入拓展词典
 弛	ci	645
 弛	di	645
 恣	zi	645
-恣	zw	645
+恣	zu	645
 唬	fu	644
 扳	ban	644
 扳	pan	644
@@ -4332,7 +4334,7 @@ import_tables:   #导入拓展词典
 娴	qan	638
 抿	min	638
 抿	mun	638
-咀	zw	638
+咀	zu	638
 徙	sai	638
 徙	si	638
 徙	thai	638
@@ -4488,7 +4490,7 @@ import_tables:   #导入拓展词典
 驯	sun	623
 闸	cap	623
 锄	co	623
-锄	cw	623
+锄	cu	623
 鬻	cuk	623
 鬻	zuk	623
 鸱	ci	623
@@ -4504,7 +4506,7 @@ import_tables:   #导入拓展词典
 伽	ga	621
 雳	lit	621
 檐	jam	621
-嗣	cw	621
+嗣	cu	621
 嗣	thu	621
 舵	to	621
 糜	mi	621
@@ -4563,7 +4565,7 @@ import_tables:   #导入拓展词典
 亘	then	616
 刍	co	616
 刍	cu	616
-狙	zw	615
+狙	zu	615
 闵	min	615
 闵	mun	615
 辫	ben	615
@@ -4823,7 +4825,7 @@ import_tables:   #导入拓展词典
 铛	dong	594
 桦	fa	594
 邃	thui	594
-恃	cw	594
+恃	cu	594
 恃	thi	594
 恃	thu	594
 募	mu	593
@@ -4838,7 +4840,7 @@ import_tables:   #导入拓展词典
 奠	ten	592
 颔	ham	592
 陇	lung	592
-俎	zw	592
+俎	zu	592
 殴	qeu	591
 喋	diap	591
 喋	tiap	591
@@ -5049,13 +5051,13 @@ import_tables:   #导入拓展词典
 崛	guk	575
 崛	kut	575
 稼	ga	575
-孳	zw	575
+孳	zu	575
 汐	cit	574
 壕	hau	574
 娄	leu	574
 娄	liu	574
 玑	gi	574
-祠	cw	574
+祠	cu	574
 鹫	ziu	574
 佼	gau	574
 冢	cung	574
@@ -5137,7 +5139,7 @@ import_tables:   #导入拓展词典
 瘁	zut	567
 癸	kui	567
 眦	cia	567
-眦	cw	567
+眦	cu	567
 眦	zi	567
 癣	then	567
 簸	bo	566
@@ -5656,7 +5658,7 @@ import_tables:   #导入拓展词典
 佞	nin	522
 勐	mang	522
 厝	co	522
-厝	cw	522
+厝	cu	522
 㜣	nen	522
 噘	ket	521
 掬	kiuk	521
@@ -5916,7 +5918,7 @@ import_tables:   #导入拓展词典
 愫	thu	498
 龇	cai	498
 龇	ce	498
-龇	cw	498
+龇	cu	498
 糯	no	498
 玷	nziam	497
 玷	zam	497
@@ -6039,8 +6041,8 @@ import_tables:   #导入拓展词典
 俪	li	487
 鸮	jau	487
 沏	cet	486
-蛆	cw	486
-蛆	zw	486
+蛆	cu	486
+蛆	zu	486
 揄	ji	486
 辎	zi	486
 踮	diam	486
@@ -6633,7 +6635,7 @@ import_tables:   #导入拓展词典
 逖	tit	427
 雎	ci	427
 雎	cio	427
-雎	cw	427
+雎	cu	427
 雎	zi	427
 雎	zio	427
 骞	kan	427
@@ -6924,7 +6926,7 @@ import_tables:   #导入拓展词典
 舂	zung	397
 苴	ca	397
 苴	cia	397
-苴	cw	397
+苴	cu	397
 苷	gam	397
 蛭	det	396
 珲	fun	396
@@ -7133,7 +7135,7 @@ import_tables:   #导入拓展词典
 鬣	liap	373
 鼐	nai	373
 嗞	zi	373
-嗞	zw	373
+嗞	zu	373
 獾	gon	373
 邛	kiung	373
 啶	tin	373
@@ -7404,7 +7406,7 @@ import_tables:   #导入拓展词典
 岈	nga	342
 龃	cia	342
 龃	co	342
-龃	zw	342
+龃	zu	342
 痱	fui	342
 芾	bui	341
 芾	fui	341
@@ -7463,7 +7465,7 @@ import_tables:   #导入拓展词典
 鞨	hot	334
 泔	gam	334
 聃	dam	334
-徂	cw	334
+徂	cu	334
 堞	tiap	334
 榫	thun	334
 棼	fun	334
@@ -7686,7 +7688,7 @@ import_tables:   #导入拓展词典
 颡	thong	310
 剀	koi	309
 糍	zi	309
-糍	zw	309
+糍	zu	309
 霅	thap	309
 蹼	buk	308
 缡	li	308
@@ -7820,7 +7822,7 @@ import_tables:   #导入拓展词典
 徼	giau	292
 暾	dun	291
 訾	zi	291
-訾	zw	291
+訾	zu	291
 缳	van	291
 缳	ven	291
 碛	zak	291
@@ -7903,9 +7905,9 @@ import_tables:   #导入拓展词典
 亍	cok	281
 缒	cui	281
 亍	cuk	281
-鹚	cw	281
+鹚	cu	281
 缒	dui	281
-鹚	zw	281
+鹚	zu	281
 刖	nziet	281
 炻	sak	280
 磴	den	280
@@ -7922,7 +7924,7 @@ import_tables:   #导入拓展词典
 缫	thau	278
 盫	qem	278
 凇	cung	277
-殂	cw	277
+殂	cu	277
 嗉	thio	277
 癜	den	277
 瘘	leu	277
@@ -8160,7 +8162,7 @@ import_tables:   #导入拓展词典
 罱	lam	243
 怃	mu	243
 怃	vu	243
-嵫	zw	243
+嵫	zu	243
 篼	deu	243
 篥	lit	243
 彳	cit	242
@@ -8348,13 +8350,13 @@ import_tables:   #导入拓展词典
 谂	sim	216
 挲	tho	216
 錶	biau	216
-趑	cw	215
+趑	cu	215
 栝	gat	215
 褰	ken	215
 栝	tiam	215
 馇	za	215
-菹	zw	215
-趑	zw	215
+菹	zu	215
+趑	zu	215
 醌	kun	215
 玙	ji	214
 郄	kiak	214
@@ -8940,7 +8942,7 @@ import_tables:   #导入拓展词典
 絷	zip	106
 眚	thang	106
 茺	cung	106
-茈	zw	106
+茈	zu	106
 跽	ki	106
 蓂	min	106
 哳	ze	106
@@ -10358,7 +10360,7 @@ import_tables:   #导入拓展词典
 瑃	cun	100
 㳘	cung	100
 茽	cung	100
-𫚖	cw	100
+𫚖	cu	100
 䃅	dai	100
 垈	dai	100
 瑖	dan	100
@@ -10644,7 +10646,7 @@ import_tables:   #导入拓展词典
 昣	zun	100
 𨱔	zun	100
 𫖳	zun	100
-觃	zw	100
+觃	zu	100
 𠳐	bong	98
 赕	tam	96
 螋	theu	96
