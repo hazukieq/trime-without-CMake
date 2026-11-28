@@ -1503,6 +1503,9 @@ public class Rime {
   /** [hkrime] 顯式寫入原生用戶詞庫（text + 空格分隔音節讀音）。 */
   public static native boolean learn_phrase(String text, String readings);
 
+  /** [hkrime] 將 12 鍵逐段選字序列寫入原生馬爾可夫 Bigram 轉移表。 */
+  public static native boolean record_bigram_sequence(String[] words);
+
   /** [hkrime] 查詢單音節常用字（用戶詞庫優先 + 主詞典烘焙字頻降序）。 */
   public static native String[] query_syllable_chars(String syllable, int limit);
 

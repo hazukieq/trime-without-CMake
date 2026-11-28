@@ -866,6 +866,10 @@ class TextInputManager private constructor() :
                     if (Rime.learn_phrase(pick.text, pick.reading)) learned = true
                 }
             }
+            val bigramWords = completed.picks.mapNotNull { it.text.takeIf(String::isNotEmpty) }
+            if (bigramWords.isNotEmpty()) {
+                if (Rime.record_bigram_sequence(bigramWords.toTypedArray())) learned = true
+            }
             val readings = completed.picks.joinToString(" ") { it.reading }
             val learnable = text.isNotEmpty() &&
                 completed.picks.isNotEmpty() &&
