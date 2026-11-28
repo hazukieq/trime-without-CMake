@@ -21,9 +21,6 @@ switches:
   - name: ywz
     reset: 1    #0为默认关闭，1为默认开启（颜文字联想：默认开启）
     states: [ 关, 颜 ]    #控制开关，可自定义括号内，开关显示内容
-  - name: lenth
-    reset: 1    #0为默认关闭，1为默认开启（联想：默认开启）
-    states: [ 关, 联 ]    #控制开关
   - name: emoji
     reset: 1    #0为默认关闭，1为默认开启（表情联想：默认开启）
     states: [ 关, 情 ]    #表情开关
@@ -53,7 +50,6 @@ engine:
     - simplifier
     - uniquifier
     - simplifier@ywz
-    - simplifier@lenth
     - simplifier@emoji
 
 speller:
@@ -99,6 +95,16 @@ translator:
   always_show_comments: true
   enable_user_dict: true
   enable_sentence: true
+  max_homophones: 7
+
+grammar:
+  language: hakka-zh-hans
+  collocation_max_length: 4
+  collocation_min_length: 2
+  collocation_penalty: -12
+  non_collocation_penalty: -12
+  weak_collocation_penalty: -24
+  rear_penalty: -18
 
 custom_phrase:
   dictionary: ""
@@ -135,11 +141,6 @@ ywz:
   opencc_config: ywz.json
   option_name: ywz
   tips: all    #none无注释, char单字注释, all全部注释
-
-lenth:
-  opencc_config: lenth.json
-  option_name: lenth
-  tips: none    #none无注释, char单字注释, all全部注释
 
 emoji:
   opencc_config: emoji.json
