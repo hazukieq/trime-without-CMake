@@ -182,7 +182,6 @@ object TwelveKeyPreedit {
         val out = ArrayList<String>(4)
         out.add(syllable)
         if (syllable.endsWith("w")) out.add(syllable.dropLast(1) + "u")
-        if (syllable.startsWith("q") && syllable.length > 1) out.add(syllable.substring(1))
         val base = out.size
         for (i in 0 until base) {
             val s = out[i]
