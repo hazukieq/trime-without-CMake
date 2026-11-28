@@ -870,6 +870,20 @@ class TextInputManager private constructor() :
             if (bigramWords.isNotEmpty()) {
                 if (Rime.record_bigram_sequence(bigramWords.toTypedArray())) learned = true
             }
+            // 多段選字中相鄰短詞對（2..4 字）在馬爾可夫轉移累計滿 2 次時，自動升格為 userdb 整詞，
+            // 使 Poet 組句只需扣一次詞邊界懲罰，能正面壓過同碼普通話雙字詞（如「講分」vs「工分」）。
+            for (i in 0 until completed.picks.size - 1) {
+                val a = completed.picks[i]
+                val b = completed.picks[i + 1]
+                if (a.text.isEmpty() || b.text.isEmpty() || a.reading.isBlank() || b.reading.isBlank()) continue
+                val pairText = a.text + b.text
+                val cpCount = pairText.codePointCount(0, pairText.length)
+                if (cpCount in 2..4 && Rime.query_bigram_count(a.text, b.text) >= 2) {
+                    if (Rime.learn_phrase(pairText, "${a.reading.trim()} ${b.reading.trim()}")) {
+                        learned = true
+                    }
+                }
+            }
             val readings = completed.picks.joinToString(" ") { it.reading }
             val learnable = text.isNotEmpty() &&
                 completed.picks.isNotEmpty() &&

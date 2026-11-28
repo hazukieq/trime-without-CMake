@@ -1506,6 +1506,9 @@ public class Rime {
   /** [hkrime] 將 12 鍵逐段選字序列寫入原生馬爾可夫 Bigram 轉移表。 */
   public static native boolean record_bigram_sequence(String[] words);
 
+  /** [hkrime] 查詢原生馬爾可夫 Bigram 轉移次數（滿 2 次觸發自動升格為 userdb 整詞）。 */
+  public static native int query_bigram_count(String prev, String next);
+
   /** [hkrime] 查詢單音節常用字（用戶詞庫優先 + 主詞典烘焙字頻降序）。 */
   public static native String[] query_syllable_chars(String syllable, int limit);
 
